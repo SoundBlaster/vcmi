@@ -66,6 +66,13 @@ before the first move left the hero in place. The trace is in
 `runtime/user-logs/VCMI_Client_log.txt` on TB5.
 
 These screenshots are discrete observations; they do not establish
-frame-by-frame scrolling or animation smoothness. Mouse input did not activate
-the expected controls during this attempt; its cause was not established.
-Map balance, AI behavior on this fixture and multiplayer remain unverified.
+frame-by-frame scrolling or animation smoothness. Initially mouse input did
+not activate the expected controls while the older test client was also open.
+After the older client exited, a click with the pointer displayed over a
+resource instead displayed a route to another tile; a following click started
+the route, and another selected the town. The trace records the resulting
+three-step movement to `(3,3,0)`. This is an unresolved discrepancy in this
+Computer Use setup: the observation alone does not distinguish input delivery,
+coordinate scaling, focus, or a game defect. It is not a successful mouse
+selection or minimap-selection test for this fixture. Map balance, AI behavior
+on this fixture and multiplayer remain unverified.
