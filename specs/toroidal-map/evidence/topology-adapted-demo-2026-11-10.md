@@ -86,3 +86,11 @@ Computer Use setup: the observation alone does not distinguish input delivery,
 coordinate scaling, focus, or a game defect. It is not a successful mouse
 selection or minimap-selection test for this fixture. Map balance, AI behavior
 on this fixture and multiplayer remain unverified.
+
+After the save/reload check, another click on an ordinary town portrait did
+not select it. As a diagnostic the tester switched from fullscreen to windowed
+mode using F4 and tried the town portrait again; Computer Use returned
+`windowNotFoundAtPosition` before delivering that click. F4 restored the
+fullscreen setting. This adds an input-tool/window-location limitation to the
+observations; neither the source of the original discrepancy nor ordinary
+physical-mouse behavior has been established.
