@@ -245,3 +245,34 @@ TEST_F(MapObjectDrawOrderTest, ChangingTopologyRebuildsShownButNotHiddenObjects)
 	EXPECT_FALSE(vstd::contains(map.getTile(int3(5, 5, 0)).blockingObjects, hidden->id));
 	EXPECT_EQ(map.getTile(int3(0, 0, 0)).blockingObjects, (std::vector<ObjectInstanceID>{overlapping->id, shown->id}));
 }
+
+TEST_F(MapObjectDrawOrderTest, WrappedInteractiveOverlapCanHaveDifferentVisualAndVisitOrder)
+{
+	map.width = 10;
+	map.height = 10;
+	map.initTerrain();
+	for(int z = 0; z < map.levels(); ++z)
+		for(int x = 0; x < map.width; ++x)
+			for(int y = 0; y < map.height; ++y)
+				map.getTile(int3(x, y, z)).terrainType = ETerrainId::GRASS;
+
+	auto existing = std::make_shared<CGObjectInstance>(nullptr);
+	existing->id = ObjectInstanceID(0);
+	existing->pos = int3(9, 5, 0);
+	existing->appearance = makeTemplate(R"([ "A" ])", -100);
+	auto wrapped = std::make_shared<CGObjectInstance>(nullptr);
+	wrapped->id = ObjectInstanceID(1);
+	wrapped->pos = int3(0, 5, 0);
+	wrapped->appearance = makeTemplate(R"([ "AA" ])", 100);
+	map.objects = {existing, wrapped};
+	map.showObject(existing.get());
+	map.showObject(wrapped.get());
+	const int3 overlap(9, 5, 0);
+	ASSERT_EQ(map.getTile(overlap).topVisitableObj(), existing->id);
+
+	map.setToroidalAndRebuild(true);
+	const auto & tileAtOverlap = map.getTile(overlap);
+	ASSERT_EQ(tileAtOverlap.visitableObjects, (std::vector<ObjectInstanceID>{existing->id, wrapped->id}));
+	EXPECT_EQ(tileAtOverlap.objectVisitedBy(ObjectInstanceID()), wrapped->id);
+	EXPECT_EQ(MapObjectDrawOrder::findTopObject(map, {existing.get(), wrapped.get()}, overlap), existing.get());
+}

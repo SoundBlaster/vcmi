@@ -55,6 +55,13 @@ The pilot restriction above is still active until the implementation and its
 tests support the agreed policy. This policy does not turn legacy maps into
 toroidal maps unless an author explicitly opts in.
 
+The initial demonstration is experimental and uses maps adapted to the
+topology, without ambiguous interactive-object overlaps at the seams. General
+conversion of arbitrary legacy content and resolution of those overlaps are
+follow-on compatibility work, not prerequisites for demonstrating such a map.
+The agreed footprint-wrapping policy remains the target for that work; the
+current static-footprint restriction is an implementation limitation.
+
 ## What the shared layer does
 
 `CMapHeader::getTopology()` constructs a `MapTopology` from map dimensions,

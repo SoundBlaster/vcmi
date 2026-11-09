@@ -84,3 +84,13 @@ toroidal mode, not bounded mode, and does not leak onto the other level. The
 patch supplies a synthetic battlefield ID, so this does not verify the effects
 or rendering of an original cursed-ground or magic-plains object. The focused
 run passed three tests (`seam-terrain-patch-tests.log`).
+
+`MapObjectDrawOrderTest.WrappedInteractiveOverlapCanHaveDifferentVisualAndVisitOrder`
+characterizes a synthetic overlap created by turning wrapping on. The tile's
+visitable list selects the newly wrapped object, while the draw-order helper
+places the pre-existing object above it because their `printPriority` values
+differ. This demonstrates that these two ordering mechanisms can disagree;
+it is not a screenshot or a real-object visit test. It and the existing
+wrapped drawing-order test passed (`wrapped-overlap-order-final-tests.log`).
+The experimental demonstration will avoid ambiguous interactive overlaps;
+the policy for arbitrary legacy maps remains to be designed.
