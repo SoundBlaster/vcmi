@@ -36,6 +36,8 @@ void GeneralSettings::initialize(MapController & c)
 	ui->mapVersionEdit->setText(QString::fromStdString(controller->map()->mapVersion.toString(&Translator::instance())));
 	ui->heroLevelLimit->setValue(controller->map()->levelLimit);
 	ui->heroLevelLimitCheck->setChecked(controller->map()->levelLimit);
+	ui->toroidalMapCheck->setChecked(controller->map()->toroidal);
+	ui->toroidalMapCheck->setEnabled(controller->map()->width >= 3 && controller->map()->height >= 3);
 
 	//set difficulty
 	switch(controller->map()->difficulty)
@@ -70,6 +72,11 @@ void GeneralSettings::update()
 	controller->map()->authorContact = MetaString::createFromRawString(ui->authorContactEdit->text().toStdString());
 	controller->map()->creationDateTime = ui->mapCreationDateTimeEdit->dateTime().toSecsSinceEpoch();
 	controller->map()->mapVersion = MetaString::createFromRawString(ui->mapVersionEdit->text().toStdString());
+	if(controller->map()->toroidal != ui->toroidalMapCheck->isChecked())
+	{
+		controller->map()->toroidal = ui->toroidalMapCheck->isChecked();
+		controller->map()->calculateGuardingGreaturePositions();
+	}
 	if(ui->heroLevelLimitCheck->isChecked())
 		controller->map()->levelLimit = ui->heroLevelLimit->value();
 	else

@@ -124,6 +124,16 @@
     </layout>
    </item>
    <item>
+    <widget class="QCheckBox" name="toroidalMapCheck">
+     <property name="toolTip">
+      <string>North joins south and east joins west on each level. Design terrain and roads to match across the edges.</string>
+     </property>
+     <property name="text">
+      <string>Connect opposite map edges</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QGroupBox" name="groupBox">
      <property name="title">
       <string>Difficulty</string>

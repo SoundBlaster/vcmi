@@ -1362,6 +1362,14 @@ Warning: levels cannot be removed once added.</source>
         <source>Difficulty</source>
         <translation>Сложность</translation>
     </message>
+    <message>
+        <source>Connect opposite map edges</source>
+        <translation>Соединить противоположные края карты</translation>
+    </message>
+    <message>
+        <source>North joins south and east joins west on each level. Design terrain and roads to match across the edges.</source>
+        <translation>На каждом уровне север соединяется с югом, а восток — с западом. Продумайте рельеф и дороги на стыках.</translation>
+    </message>
 </context>
 <context>
     <name>GeneratorProgress</name>
