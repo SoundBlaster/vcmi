@@ -13,6 +13,7 @@
 
 #include "../AIGateway.h"
 #include "../Engine/Nullkiller.h"
+#include "../../../lib/mapping/CMapHeader.h"
 
 namespace NK2AI
 {
@@ -54,18 +55,19 @@ const CGObjectInstance * AttackOneWayPortalGuard::findTrappingGuard(
 	int3 trappingGuardPosition(-1);
 	bool foundUsableMove = false;
 
+	const auto topology = aiNk->cc->getMapHeader()->getTopology();
 	for(const int3 & direction : int3::getDirs())
 	{
-		const int3 destination = hero->visitablePos() + direction;
-		if(!aiNk->cc->isInTheMap(destination))
+		const auto destination = topology.canonicalize(hero->visitablePos() + direction);
+		if(!destination)
 			continue;
 
-		const auto * pathInfo = pathsInfo->getPathInfo(destination);
+		const auto * pathInfo = pathsInfo->getPathInfo(*destination);
 		if(!pathInfo->reachable() || pathInfo->turns != 0)
 			continue;
 
 		foundUsableMove = true;
-		const int3 guardPosition = aiNk->cc->getGuardingCreaturePosition(destination);
+		const int3 guardPosition = aiNk->cc->getGuardingCreaturePosition(*destination);
 		if(!guardPosition.isValid())
 			return nullptr;
 

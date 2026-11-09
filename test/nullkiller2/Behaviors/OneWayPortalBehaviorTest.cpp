@@ -10,6 +10,7 @@
 #include "StdInc.h"
 
 #include "AI/Nullkiller2/Behaviors/ExplorationBehavior.h"
+#include "AI/Nullkiller2/Goals/AttackOneWayPortalGuard.h"
 
 #include "mock/TinyH3MBuilder.h"
 #include "nullkiller2/NullkillerTest.h"
@@ -477,6 +478,19 @@ TEST_F(Nullkiller2_Behaviors_OneWayPortal, trappedHeroAttacksBeatableGuardAtLand
 			NK2AI::PriorityEvaluator::PriorityTier::ESCAPE,
 			evaluationContext),
 		0.0f) << "the fight out of the exit must be ranked as an escape";
+}
+
+TEST_F(Nullkiller2_Behaviors_OneWayPortal, seamExitIsNotTrappedWhenWrappedNeighborIsSafe)
+{
+	start(makeGuardedExitMap({500, 100}, 1, {FAR_EXIT, GUARDED_EXIT}), GUARDED_EXIT);
+	map()->toroidal = true;
+	map()->calculateGuardingGreaturePositions();
+	auto * landedScout = scout();
+	sendThroughPortal(*landedScout);
+	preparePlanning();
+
+	EXPECT_EQ(NK2AI::Goals::AttackOneWayPortalGuard::findTrappingGuard(landedScout, gateway->nullkiller.get()), nullptr)
+		<< "the scout can leave the corner through an unguarded wrapped neighbor";
 }
 
 TEST_F(Nullkiller2_Behaviors_OneWayPortal, trappedHeroDoesNotAttackOverwhelmingExitGuard)

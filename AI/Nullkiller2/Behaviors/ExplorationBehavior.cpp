@@ -22,6 +22,7 @@
 #include "ExplorationBehavior.h"
 
 #include "../../../lib/CPlayerState.h"
+#include "../../../lib/mapping/CMapHeader.h"
 
 namespace NK2AI
 {
@@ -472,17 +473,18 @@ std::optional<AIPath> findExitVacatingPath(
 	if(hero->visitablePos() != exit->visitablePos())
 		return result;
 
+	const auto topology = aiNk->cc->getMapHeader()->getTopology();
 	for(const int3 & direction : int3::getDirs())
 	{
-		const int3 destination = hero->visitablePos() + direction;
-		if(!aiNk->cc->isInTheMap(destination)
-			|| aiNk->cc->getGuardingCreaturePosition(destination).isValid()
-			|| !aiNk->cc->getVisitableObjs(destination).empty())
+		const auto destination = topology.canonicalize(hero->visitablePos() + direction);
+		if(!destination
+			|| aiNk->cc->getGuardingCreaturePosition(*destination).isValid()
+			|| !aiNk->cc->getVisitableObjs(*destination).empty())
 		{
 			continue;
 		}
 
-		for(const auto & path : aiNk->pathfinder->getPathInfo(destination, false))
+		for(const auto & path : aiNk->pathfinder->getPathInfo(*destination, false))
 		{
 			if(path.targetHero != hero
 				|| path.exchangeCount > 1
@@ -508,18 +510,19 @@ std::optional<AIPath> findEntranceGuardPath(
 {
 	std::optional<AIPath> result;
 
+	const auto topology = aiNk->cc->getMapHeader()->getTopology();
 	for(const int3 & direction : int3::getDirs())
 	{
-		const int3 destination = guard->visitablePos() + direction;
-		if(!aiNk->cc->isInTheMap(destination)
-			|| destination == entrance->visitablePos()
-			|| aiNk->cc->getGuardingCreaturePosition(destination) != guard->visitablePos())
+		const auto destination = topology.canonicalize(guard->visitablePos() + direction);
+		if(!destination
+			|| *destination == entrance->visitablePos()
+			|| aiNk->cc->getGuardingCreaturePosition(*destination) != guard->visitablePos())
 		{
 			continue;
 		}
 
 		auto paths = aiNk->pathfinder->getPathInfo(
-			destination,
+			*destination,
 			aiNk->isObjectGraphAllowed());
 		// the guard task carries no prerequisite, so its route must be executable as is
 		vstd::erase_if(paths, [](const AIPath & path)
