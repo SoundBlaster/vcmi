@@ -77,6 +77,9 @@ public:
 	/// Return pointer to static map header for current map
 	virtual const CMapHeader * getMapHeader() const = 0;
 
+	/// Callbacks that allow an unattached state override this to return null.
+	virtual const CMapHeader * tryGetMapHeader() const { return getMapHeader(); }
+
 	/// Returns post-randomized startin information on current game
 	virtual const StartInfo * getStartInfo() const = 0;
 

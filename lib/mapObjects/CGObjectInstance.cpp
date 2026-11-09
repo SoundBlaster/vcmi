@@ -94,7 +94,7 @@ static int3 footprintOffset(const CGObjectInstance & object, const int3 & tile)
 	if(offset.x >= 0 && offset.x < object.getWidth() && offset.y >= 0 && offset.y < object.getHeight())
 		return offset;
 
-	const auto * header = object.cb ? object.cb->getMapHeader() : nullptr;
+	const auto * header = object.cb ? object.cb->tryGetMapHeader() : nullptr;
 	if(header && header->toroidal && tile.x >= 0 && tile.x < header->width
 		&& tile.y >= 0 && tile.y < header->height && tile.z >= 0 && tile.z < header->levels()
 		&& object.getWidth() <= header->width && object.getHeight() <= header->height)

@@ -43,3 +43,18 @@ raw coordinate in this case; a global change would need to account for object
 construction before the editor has attached a map. The single resource check
 does not prove that other consumers handle this raw value, and the authored
 static-object restriction remains in force.
+
+The later unbound-callback check exposed a regression in the new footprint
+lookup: `EditorCallback` throws if asked for a map header before a map is
+attached. `IGameInfoCallback::tryGetMapHeader` now allows callbacks with an
+unattached state to provide a nullable result; `EditorCallback` does so, and
+the footprint and boat-generator queries use it. The test checks both the
+unattached fallback and wrapped lookup after the callback is attached. It
+failed before this correction (`unbound-editor-before-test.log`).
+
+After rebuilding `vcmitest`, `vcmiclient`, and `vcmieditor`, the complete
+suite passed 1,358 tests from 222 suites, with three disabled
+(`full-suite-unbound-editor-fix.log`). Adding a virtual callback method changes
+the C++ interface; this local test does not establish ABI compatibility with
+separately built plugins or mixed versions. The [GUI conversion check](topology-legacy-editor-2026-11-10.md)
+used the earlier editor build, before this correction.

@@ -19,6 +19,7 @@ public:
 
 	void setMap(const CMap * map);
 	const CMap * getMapConstPtr() const override;
+	const CMapHeader * tryGetMapHeader() const override;
 
 	// Access to full game state — not available in editor
 	CGameState & gameState() override;

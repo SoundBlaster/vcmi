@@ -30,6 +30,11 @@ void EditorCallback::setMap(const CMap * newMap)
 	map = newMap;
 }
 
+const CMapHeader * EditorCallback::tryGetMapHeader() const
+{
+	return map;
+}
+
 const scripting::Pool & EditorCallback::getScriptContextPool() const
 {
 	THROW_EDITOR_UNSUPPORTED;

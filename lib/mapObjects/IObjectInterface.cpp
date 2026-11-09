@@ -83,7 +83,7 @@ int3 IBoatGenerator::bestLocation() const
 {
 	std::vector<int3> offsets;
 	getOutOffsets(offsets);
-	const auto * mapHeader = getObject()->cb->getMapHeader();
+	const auto * mapHeader = getObject()->cb->tryGetMapHeader();
 
 	for (auto & offset : offsets)
 	{

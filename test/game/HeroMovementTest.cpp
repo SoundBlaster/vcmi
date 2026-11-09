@@ -16,6 +16,7 @@
 #include "../../lib/CPlayerState.h"
 #include "../../lib/battle/BattleInfo.h"
 #include "../../lib/campaign/CampaignState.h"
+#include "../../lib/callback/EditorCallback.h"
 #include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
@@ -372,6 +373,11 @@ TEST_F(HeroMovementTest, ObjectTileQueriesFindFootprintAcrossToroidalCorner)
 	object.cb = nullptr;
 	EXPECT_FALSE(object.coveringAt(across));
 	EXPECT_TRUE(object.coveringAt(local));
+	EditorCallback unboundEditor(nullptr);
+	object.cb = &unboundEditor;
+	EXPECT_NO_THROW(EXPECT_FALSE(object.coveringAt(across)));
+	unboundEditor.setMap(map());
+	EXPECT_TRUE(object.coveringAt(across));
 }
 
 TEST_F(HeroMovementTest, SeamSpanningBlockerPreventsMovementOnBothSides)
