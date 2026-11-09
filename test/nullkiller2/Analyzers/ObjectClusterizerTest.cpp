@@ -11,6 +11,9 @@
 
 #include "AI/Nullkiller2/Analyzers/ObjectClusterizer.h"
 #include "lib/mapping/MapTopology.h"
+#include "lib/mapObjects/CGResource.h"
+#include "mock/TinyH3MBuilder.h"
+#include "nullkiller2/NullkillerTest.h"
 
 namespace
 {
@@ -67,4 +70,60 @@ TEST(Nullkiller2_Analyzers_ObjectClusterizer, dimensionDoorReachWrapsEdgesAndCor
 	EXPECT_FALSE(NK2AI::canReachWithDimensionDoor(reach, int3(35, 35, 0), bounded));
 	EXPECT_FALSE(NK2AI::canReachWithDimensionDoor(reach, int3(32, 35, 0), toroidal));
 	EXPECT_FALSE(NK2AI::canReachWithDimensionDoor(reach, int3(35, 35, 1), toroidal));
+}
+
+class Nullkiller2_ObjectClusterCenter : public NullkillerTest {};
+
+TEST_F(Nullkiller2_ObjectClusterCenter, clusterCenterTreatsOppositeEdgesAsNearby)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(player)
+		.hero({6, 5, 0}, HeroTypeID(0), player)
+		.resource({0, 10, 0}, GameResID::GOLD, 1000)
+		.resource({35, 10, 0}, GameResID::GOLD, 1000)
+		.resource({18, 10, 0}, GameResID::GOLD, 1000);
+	startWithMap(std::move(builder));
+	revealMap(player);
+	auto callback = makeCallback(player);
+	NK2AI::ObjectCluster cluster;
+	const auto resources = findAll<CGResource>();
+	for(const auto * resource : resources)
+	{
+		NK2AI::ClusterObjectInfo info{};
+		info.priority = 1;
+		cluster.objects.insert({resource->id, info});
+	}
+	ASSERT_EQ(cluster.objects.size(), 3);
+	map()->toroidal = false;
+	const auto * ordinary = cluster.calculateCenter(callback.get());
+	ASSERT_NE(ordinary, nullptr);
+	EXPECT_EQ(ordinary->visitablePos().x, 18);
+	map()->toroidal = true;
+	const auto * wrapped = cluster.calculateCenter(callback.get());
+	ASSERT_NE(wrapped, nullptr);
+	EXPECT_TRUE(wrapped->visitablePos().x == 0 || wrapped->visitablePos().x == 35);
+	const auto middle = std::ranges::find_if(resources, [](const auto * object) { return object->visitablePos().x == 18; });
+	ASSERT_NE(middle, resources.end());
+	{
+		NK2AI::ClusterObjects::accessor info;
+		ASSERT_TRUE(cluster.objects.find(info, (*middle)->id));
+		info->second.priority = 5;
+	}
+	EXPECT_EQ(cluster.calculateCenter(callback.get()), *middle) << "higher-priority targets keep their weight";
+
+	NK2AI::ObjectCluster opposite;
+	const CGResource * first = nullptr;
+	for(const auto * resource : resources)
+		if(resource->visitablePos().x != 35)
+		{
+			NK2AI::ClusterObjectInfo info{};
+			info.priority = 1;
+			opposite.objects.insert({resource->id, info});
+			if(!first || resource->id.getNum() < first->id.getNum())
+				first = resource;
+		}
+	ASSERT_EQ(opposite.objects.size(), 2);
+	EXPECT_EQ(opposite.calculateCenter(callback.get()), first) << "an ambiguous circular mean has a deterministic fallback";
 }

@@ -19,3 +19,7 @@ The focused run passed 34 tests from six suites
 on TB5). The standalone topology binary passed nine tests before the final
 exploration-test-only edit (`topology-rectangle-standalone.log`). These tests
 do not establish a live AI cast or every possible object/terrain interaction.
+
+The full `vcmitest` run at code commit `558826b` passed 1,349 tests from 220
+suites with three disabled (`full-suite-rectangle-enumeration.log`). This
+result predates the later cluster-center change.

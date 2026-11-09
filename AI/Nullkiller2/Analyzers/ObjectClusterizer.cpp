@@ -14,6 +14,7 @@
 #include "../Engine/Nullkiller.h"
 #include "../Helpers/DimensionDoorUtils.h"
 #include "../../../lib/mapping/MapTopology.h"
+#include "../../../lib/mapping/CMapHeader.h"
 
 namespace NK2AI
 {
@@ -91,6 +92,47 @@ void ObjectCluster::addObject(const CGObjectInstance * obj, const AIPath & path,
 
 const CGObjectInstance * ObjectCluster::calculateCenter(const CPlayerSpecificInfoCallback * cpsic) const
 {
+	const auto * header = cpsic->getMapHeader();
+	if(header->toroidal)
+	{
+		// A linear average puts objects at opposite edges in the middle of the map.
+		const double tau = 2.0 * std::acos(-1.0);
+		double sinX = 0, cosX = 0, sinY = 0, cosY = 0, totalWeight = 0;
+		const CGObjectInstance * fallback = nullptr;
+		for(const auto & pair : objects)
+		{
+			const auto * object = cpsic->getObj(pair.first);
+			if(!fallback || object->id.getNum() < fallback->id.getNum())
+				fallback = object;
+			const auto position = object->visitablePos();
+			const double weight = std::pow(pair.second.priority, 4);
+			const double angleX = tau * position.x / header->width;
+			const double angleY = tau * position.y / header->height;
+			sinX += weight * std::sin(angleX);
+			cosX += weight * std::cos(angleX);
+			sinY += weight * std::sin(angleY);
+			cosY += weight * std::cos(angleY);
+			totalWeight += weight;
+		}
+		const auto centerCoordinate = [tau, totalWeight](double sine, double cosine, int extent, int fallbackCoordinate)
+		{
+			// Opposing, equally weighted points have no unique circular mean.
+			if(std::hypot(sine, cosine) <= totalWeight * 1e-12)
+				return fallbackCoordinate;
+			return MapTopology::wrapCoordinate(static_cast<int>(std::lround(std::atan2(sine, cosine) * extent / tau)), extent);
+		};
+		const auto fallbackPosition = fallback->visitablePos();
+		const int3 center(centerCoordinate(sinX, cosX, header->width, fallbackPosition.x),
+			centerCoordinate(sinY, cosY, header->height, fallbackPosition.y), fallbackPosition.z);
+		const auto topology = header->getTopology();
+		const auto closest = *vstd::minElementByFun(objects, [&](const std::pair<ObjectInstanceID, ClusterObjectInfo> & pair) -> ui32
+		{
+			const auto position = cpsic->getObj(pair.first)->visitablePos();
+			return topology.horizontalDistanceSquaredIgnoringLevel(center, position).value_or(position.dist2dSQ(center));
+		});
+		return cpsic->getObj(closest.first);
+	}
+
 	auto tile = int3(0);
 	float priority = 0;
 
