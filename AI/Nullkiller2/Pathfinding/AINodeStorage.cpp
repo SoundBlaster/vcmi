@@ -16,6 +16,7 @@
 #include "../../../lib/IGameSettings.h"
 #include "../../../lib/callback/IGameInfoCallback.h"
 #include "../../../lib/mapping/CMap.h"
+#include "../../../lib/mapping/MapTopology.h"
 #include "../../../lib/pathfinder/CPathfinder.h"
 #include "../../../lib/pathfinder/PathfinderOptions.h"
 #include "../../../lib/pathfinder/PathfinderUtil.h"
@@ -1373,8 +1374,9 @@ struct TownPortalFinder
 	uint64_t movementNeeded;
 	SpellID spellID;
 	bool townSelectionAllowed;
+	const MapTopology topology;
 
-	TownPortalFinder(const ChainActor * actor, const std::vector<CGPathNode *> & initialNodes, const std::vector<const CGTownInstance *> & targetTowns, AINodeStorage * nodeStorage, SpellID spellID)
+	TownPortalFinder(const ChainActor * actor, const std::vector<CGPathNode *> & initialNodes, const std::vector<const CGTownInstance *> & targetTowns, AINodeStorage * nodeStorage, SpellID spellID, const MapTopology & topology)
 		: initialNodes(initialNodes)
 		, actor(actor)
 		, hero(actor->hero)
@@ -1382,6 +1384,7 @@ struct TownPortalFinder
 		, nodeStorage(nodeStorage)
 		, townPortal(spellID.toSpell())
 		, spellID(spellID)
+		, topology(topology)
 	{
 		auto townPortalEffect = townPortal->getAdventureMechanics().getEffectAs<TownPortalEffect>(hero);
 		movementNeeded = townPortalEffect->getMovementPointsRequired();
@@ -1410,7 +1413,14 @@ struct TownPortalFinder
 			{
 				const CGTownInstance * nearestTown = *vstd::minElementByFun(targetTowns, [&](const CGTownInstance * t) -> int
 				{
-					return node->coord.dist2dSQ(t->visitablePos());
+					int3 townPos = t->visitablePos();
+					// Town Portal compares horizontal distance even across levels.
+					townPos.z = node->coord.z;
+					const auto from = topology.canonicalize(node->coord);
+					const auto to = topology.canonicalize(townPos);
+					if(from && to)
+						return int3(0, 0, 0).dist2dSQ(topology.displacement(*from, *to));
+					return node->coord.dist2dSQ(townPos);
 				});
 
 				if(targetTown != nearestTown)
@@ -1493,7 +1503,7 @@ void AINodeStorage::calculateTownPortal(
 		if (!townPortalEffect)
 			continue;
 
-		TownPortalFinder townPortalFinder(actor, initialNodes, towns, this, spell->id);
+		TownPortalFinder townPortalFinder(actor, initialNodes, towns, this, spell->id, aiNk->cc->getMapHeader()->getTopology());
 
 		if(!townPortalFinder.actorCanCastTownPortal())
 			continue;

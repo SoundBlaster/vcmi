@@ -13,6 +13,8 @@
 #include "nullkiller2/ScriptedMovementClient.h"
 
 #include "lib/callback/CCallback.h"
+#include "AI/Nullkiller2/Pathfinding/Actions/TownPortalAction.h"
+#include "lib/mapObjects/CGTownInstance.h"
 
 namespace
 {
@@ -177,5 +179,52 @@ TEST_F(Nullkiller2_AIGateway, choosesDirectRouteAcrossToroidalSeam)
 		EXPECT_EQ(client->movementRequests, requestsBefore + 1);
 		EXPECT_TRUE(client->requested(destination));
 		EXPECT_EQ(hero->visitablePos(), destination);
+	}
+}
+
+TEST_F(Nullkiller2_AIGateway, plansUnskilledTownPortalToNearestTownAcrossSeam)
+{
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(PLAYER)
+		.hero({1, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.heroPrimary(0, 0, 20, 20)
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({SpellID(SpellID::decode("core:townPortal"))})
+		.town({9, 10, 0}, FactionID(0), PLAYER)
+		.town({35, 10, 0}, FactionID(0), PLAYER);
+	startWithMap(std::move(builder));
+	revealMap(PLAYER);
+	hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	hero->mana = 200;
+	hero->setMovementPoints(300);
+	const auto towns = findAll<CGTownInstance>();
+	auto across = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().x == 35; });
+	auto interior = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().x == 9; });
+	ASSERT_NE(across, towns.end());
+	ASSERT_NE(interior, towns.end());
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
+		map()->toroidal = toroidal;
+		client = std::make_unique<ScriptedMovementClient>(gameState());
+		callback = makeCallback(PLAYER, client.get());
+		gateway = makeGateway(callback);
+		client->notify(*gateway);
+		const auto * expected = toroidal ? *across : *interior;
+		const auto paths = withGameStateReadLock([&]
+		{
+			preparePlanning(*gateway);
+			return gateway->nullkiller->pathfinder->getPathInfo(expected->visitablePos());
+		});
+		EXPECT_TRUE(std::ranges::any_of(paths, [](const auto & path)
+		{
+			return path.turn() == 0 && std::ranges::any_of(path.nodes, [](const auto & node)
+			{
+				return dynamic_cast<const NK2AI::AIPathfinding::TownPortalAction *>(node.specialAction.get()) != nullptr;
+			});
+		})) << "AI should consider the same nearest town as the game spell";
 	}
 }

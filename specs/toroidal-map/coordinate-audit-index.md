@@ -45,7 +45,7 @@ regenerating the index resets manually recorded statuses.
 | `AI/Nullkiller2/Goals/ExploreNeighbourTile.h` | 44, 55 | unreviewed |
 | `AI/Nullkiller2/Helpers/ExplorationHelper.cpp` | 41, 42, 43, 44, 45, 70, 72, 76, 117, 118, 124, 166, 177, 179, 194, 195, 205, 246, 613, 647, 665, 666, 668, 669, 726, 773, 784, 788 | unreviewed |
 | `AI/Nullkiller2/Helpers/ExplorationHelper.h` | 51, 112 | unreviewed |
-| `AI/Nullkiller2/Pathfinding/AINodeStorage.cpp` | 47, 53, 418, 428, 1001, 1185, 1195, 1256, 1257, 1258, 1259, 1260, 1413 | partial: nearest-town candidate |
+| `AI/Nullkiller2/Pathfinding/AINodeStorage.cpp` | 47, 53, 418, 428, 1001, 1185, 1195, 1256, 1257, 1258, 1259, 1260, 1413 | partial: nearest-town planning fixed and tested after baseline; other candidates unreviewed |
 | `AI/Nullkiller2/Pathfinding/AINodeStorage.h` | 241, 310, 319, 320 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/AIPathfinder.cpp` | 97, 98 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/AIPathfinder.h` | 35, 36 | unreviewed |
