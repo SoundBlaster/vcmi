@@ -203,6 +203,40 @@ TEST(MapFormat, ToroidalTopologyRoundTripsAndRequiresNewFormat)
 	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
 }
 
+TEST(MapFormat, ToroidalHeaderRequiresAtLeastThreeTilesOnEachAxis)
+{
+	const JsonNode original(JsonPath::builtin("test/TerrainTest/" + CMapFormatJson::HEADER_FILE_NAME));
+	auto loadHeader = [](const JsonNode & header)
+	{
+		CMemoryBuffer buffer;
+		std::shared_ptr<CIOApi> io(new CProxyIOApi(&buffer));
+		{
+			CZipSaver saver(io, "_");
+			addToArchive(saver, header, CMapFormatJson::HEADER_FILE_NAME);
+		}
+		buffer.seek(0);
+		CMapLoaderJson loader(&buffer);
+		return loader.loadMapHeader();
+	};
+
+	JsonNode header = original;
+	header["versionMajor"].Float() = CMapFormatJson::VERSION_MAJOR_TOROIDAL;
+	header["topology"].String() = "toroidal";
+	auto & surface = header["mapLevels"]["surface"];
+	surface["width"].Float() = 3;
+	surface["height"].Float() = 3;
+	const auto minimum = loadHeader(header);
+	ASSERT_TRUE(minimum->toroidal);
+	EXPECT_EQ(minimum->width, 3);
+	EXPECT_EQ(minimum->height, 3);
+
+	surface["width"].Float() = 2;
+	EXPECT_THROW(loadHeader(header), std::runtime_error);
+	surface["width"].Float() = 3;
+	surface["height"].Float() = 2;
+	EXPECT_THROW(loadHeader(header), std::runtime_error);
+}
+
 TEST(MapFormat, LegacyH3MCanBeOptedIntoToroidalVmap)
 {
 	const PlayerColor player(0);

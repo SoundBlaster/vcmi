@@ -27,6 +27,16 @@ but the format round-trip, legacy save behavior and network compatibility are
 **not verified** by execution. The standalone coordinate tests reported in
 the separate unit record do not cover these claims.
 
+On 2026-11-10, with the copied Complete resources, a Release `vcmitest` build
+from `3c8e2e1` plus the added header test passed
+`MapFormat.ToroidalTopologyRoundTripsAndRequiresNewFormat` and
+`MapFormat.ToroidalHeaderRequiresAtLeastThreeTilesOnEachAxis`. The second test
+loads headers and checks that 3×3 is accepted, while 2×3 and 3×2 are rejected;
+it does not initialize or play a complete 3×3 map. The command ran from
+`cmake/bin` with those two names in `--gtest_filter`; the TB5 log is
+`toroidal-header-minimum-tests.log`. This later run supersedes the earlier
+failed attempt only for the named round-trip test, not network compatibility.
+
 SHA-256 of selected changed files at the time of the build:
 
 ```text
