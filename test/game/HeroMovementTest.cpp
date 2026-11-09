@@ -748,6 +748,16 @@ TEST_F(HeroMovementTest, ServerRejectsForbiddenObjectEntranceAcrossToroidalSeam)
 		EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold);
 		EXPECT_NE(map()->getObject(resourceId), nullptr);
 	}
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::AIR));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold);
+	EXPECT_NE(map()->getObject(resourceId), nullptr);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold);
+	EXPECT_NE(map()->getObject(resourceId), nullptr);
 }
 
 TEST_F(HeroMovementTest, RoadMovementCostAppliesAcrossToroidalSeam)

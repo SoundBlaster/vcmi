@@ -81,3 +81,14 @@ movement or cost. Four focused tests passed, then all 1,379 local tests from
 TB5). The build used `a0609e2` plus the change
 (`aviation-embark-after-build.log`); this is not a test of a specific mod,
 its client presentation, or full airship path planning.
+
+With a real flying bonus, an `AIR` request without transit still triggered a
+blocking visit to the forbidden resource. The normal human client and
+Nullkiller2 send transit for `AIR` movement. Standard toroidal `AIR` movement
+now requires transit, except when actually boarding a matching vehicle. The
+test confirms the non-transit visit is rejected and a transit flight crosses
+the tile without collecting the resource. Three focused tests passed, and the
+full local suite passed 1,380 tests with three disabled
+(`full-suite-flight-transit.log` on TB5). Client, server and tests were built
+from `43db0ef` plus this change (`flight-transit-after-build.log`). Other AI
+profiles, water-walking visit semantics and multiplayer remain unverified.

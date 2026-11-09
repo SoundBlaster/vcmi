@@ -864,6 +864,9 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		&& ((layer == EPathfindingLayer::LAND && t.isWater())
 			|| ((layer == EPathfindingLayer::SAIL || layer == EPathfindingLayer::WATER) && !t.isWater())))
 		return complainRet("Movement layer does not match the destination terrain!");
+	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
+		&& layer == EPathfindingLayer::AIR && !transit && !canEmbarkLayer)
+		return complainRet("Flying movement must transit without visiting objects!");
 	const bool usesMovementCost = movementMode == EMovementMode::STANDARD || embarking || disembarking;
 	const int cost = usesMovementCost
 		? pathfinderHelper->getMovementCost(h->visitablePos(), hmpos, layer, h->movementPointsRemaining())
