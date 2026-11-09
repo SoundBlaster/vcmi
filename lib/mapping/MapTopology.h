@@ -67,6 +67,36 @@ public:
 		return int3(0, 0, 0).dist2dSQ(displacement(*canonicalFrom, *canonicalTo));
 	}
 
+	/// Visits each tile in a rectangular range once, preserving the center's level.
+	/// Callers must exclude sentinel positions before requesting toroidal wrapping.
+	template<typename Visitor>
+	void forEachTileInRectangle(const int3 & position, int rangeX, int rangeY, Visitor visit) const
+	{
+		const auto center = canonicalize(position);
+		if(!center || rangeX < 0 || rangeY < 0)
+			return;
+
+		const auto intervals = [this](int coordinate, int range, int extent)
+		{
+			if(wraps)
+			{
+				if(range >= extent / 2)
+					return std::vector<std::pair<int, int>>{{0, extent}};
+				return splitWrappedInterval(coordinate - range, 2 * range + 1, extent);
+			}
+			const int start = std::max(0, coordinate - std::min(range, extent));
+			const int end = std::min(extent - 1, coordinate + std::min(range, extent));
+			return std::vector<std::pair<int, int>>{{start, end - start + 1}};
+		};
+		const auto xs = intervals(center->x, rangeX, width);
+		const auto ys = intervals(center->y, rangeY, height);
+		for(const auto & [xStart, xLength] : xs)
+			for(int x = xStart; x < xStart + xLength; ++x)
+				for(const auto & [yStart, yLength] : ys)
+					for(int y = yStart; y < yStart + yLength; ++y)
+						visit(int3(x, y, center->z));
+	}
+
 	/// Visits each toroidal tile in range once, preserving the center's level.
 	/// The center may itself be a repeated image outside the canonical rectangle.
 	template<typename Visitor>

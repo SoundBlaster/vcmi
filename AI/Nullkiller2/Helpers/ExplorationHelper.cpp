@@ -38,17 +38,7 @@ namespace
 template<typename Function>
 void forEachTileInMapSquare(const CCallback * cc, const int3 & center, int rangeX, int rangeY, Function function)
 {
-	const int3 mapSize = cc->getMapSize();
-	const int minX = std::max(0, center.x - rangeX);
-	const int maxX = std::min(mapSize.x - 1, center.x + rangeX);
-	const int minY = std::max(0, center.y - rangeY);
-	const int maxY = std::min(mapSize.y - 1, center.y + rangeY);
-
-	for(int x = minX; x <= maxX; ++x)
-	{
-		for(int y = minY; y <= maxY; ++y)
-			function(int3(x, y, center.z));
-	}
+	cc->getMapHeader()->getTopology().forEachTileInRectangle(center, rangeX, rangeY, function);
 }
 
 template<typename Function>

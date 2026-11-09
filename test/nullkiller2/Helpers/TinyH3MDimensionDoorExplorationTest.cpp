@@ -21,6 +21,7 @@
 #include "lib/CPlayerState.h"
 #include "lib/IGameSettings.h"
 #include "lib/mapObjects/CGHeroInstance.h"
+#include "lib/mapping/TerrainTile.h"
 #include "lib/spells/CSpell.h"
 
 namespace
@@ -128,6 +129,49 @@ TEST_F(TinyH3MDimensionDoorExplorationTest, GeneratedHeroWithoutDimensionDoorDoe
 
 	EXPECT_FALSE(helper.canUseDimensionDoor());
 	EXPECT_FALSE(helper.considerDimensionDoorExplorationTargets());
+}
+
+TEST_F(TinyH3MDimensionDoorExplorationTest, ExploresAcrossToroidalSeamWithDimensionDoor)
+{
+	overrideSettingBeforeInit(EGameSettings::SPELLS_DIMENSION_DOOR_TRIGGERS_GUARDS, false);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(PLAYER)
+		.hero({1, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID(27), 1}})
+		.heroPrimary(10, 10, 10, 50)
+		.heroSecondarySkills({{SecondarySkill::AIR_MAGIC, 3}})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({DIMENSION_DOOR});
+	startWithMap(std::move(builder));
+	auto * hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_TRUE(prepareForAdventureSpellPlanning(*hero));
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			map()->getTile(int3(x, y, 0)).terrainType = TerrainId::ROCK;
+	map()->getTile(int3(0, 10, 0)).terrainType = TerrainId::GRASS;
+	map()->getTile(int3(30, 10, 0)).terrainType = TerrainId::GRASS;
+	setMapVisibility(PLAYER, false);
+	setTileVisible(PLAYER, hero->visitablePos(), true);
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
+		map()->toroidal = toroidal;
+		const auto gateway = makeGateway(PLAYER);
+		NK2AI::ExplorationHelper helper(hero, gateway->nullkiller.get());
+		const bool found = helper.considerDimensionDoorExplorationTargets();
+		EXPECT_EQ(found, toroidal);
+		if(found)
+		{
+			const auto goals = helper.makeComposition()->decompose(gateway->nullkiller.get());
+			EXPECT_TRUE(std::ranges::any_of(goals, [](const auto & goal)
+			{
+				const auto * cast = dynamic_cast<const NK2AI::Goals::AdventureSpellCast *>(goal.get());
+				return cast && cast->getSpell()->getId() == DIMENSION_DOOR && cast->tile == int3(30, 10, 0);
+			}));
+		}
+	}
 }
 
 TEST_F(TinyH3MDimensionDoorExplorationTest, GeneratedDimensionDoorHeroDoesNotProbeHiddenTilesWhenGuardedLandingsTrigger)

@@ -27,6 +27,9 @@ uses wrapped displacement. The focused run in `ai-dd-reach-tests.log` passed
 different-level comparisons. This tests the heuristic, not an assembled
 cluster-selection decision.
 
+The later [rectangle-enumeration change](topology-rectangle-enumeration-2026-11-09.md)
+also adapts the AI's separate exploration and continuation scans.
+
 This is range validation and AI planning evidence, not a live spell cast or
 proof of the behavior of every ranged spell. Cross-level spell semantics,
 animation, visibility and multiplayer require further verification.

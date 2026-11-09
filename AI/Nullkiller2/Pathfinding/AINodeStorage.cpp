@@ -1254,42 +1254,15 @@ void AINodeStorage::calculateDimensionDoorTeleportationsForSpell(
 	const DimensionDoorSpellPlan & plan)
 {
 	const auto * hero = srcNode->actor->hero;
-	const int3 mapSize = aiNk->cc->getMapSize();
-	const int minX = std::max(0, source.node->coord.x - plan.effect->getRangeX());
-	const int maxX = std::min(mapSize.x - 1, source.node->coord.x + plan.effect->getRangeX());
-	const int minY = std::max(0, source.node->coord.y - plan.effect->getRangeY());
-	const int maxY = std::min(mapSize.y - 1, source.node->coord.y + plan.effect->getRangeY());
-	const bool toroidal = aiNk->cc->getMapHeader()->toroidal;
-	const auto xIntervals = toroidal
-		? MapTopology::splitWrappedInterval(source.node->coord.x - plan.effect->getRangeX(), 2 * plan.effect->getRangeX() + 1, mapSize.x)
-		: std::vector<std::pair<int, int>>{{minX, std::max(0, maxX - minX + 1)}};
-	const auto yIntervals = toroidal
-		? MapTopology::splitWrappedInterval(source.node->coord.y - plan.effect->getRangeY(), 2 * plan.effect->getRangeY() + 1, mapSize.y)
-		: std::vector<std::pair<int, int>>{{minY, std::max(0, maxY - minY + 1)}};
-
-	for(const auto & [xStart, xLength] : xIntervals)
+	const auto topology = aiNk->cc->getMapHeader()->getTopology();
+	topology.forEachTileInRectangle(source.node->coord, plan.effect->getRangeX(), plan.effect->getRangeY(), [&](const int3 & destination)
 	{
-		for(int x = xStart; x < xStart + xLength; ++x)
-		{
-			for(const auto & [yStart, yLength] : yIntervals)
-			{
-				for(int y = yStart; y < yStart + yLength; ++y)
-				{
-					const int3 destination(x, y, source.node->coord.z);
-
-					if(!isDimensionDoorDestinationValid(source, hero, destination, plan))
-						continue;
-
-					auto landing = getDimensionDoorLandingInfo(srcNode, hero, destination);
-
-					if(!landing.canLand)
-						continue;
-
-					addDimensionDoorTeleportation(neighbours, source, srcNode, destination, plan, landing);
-				}
-			}
-		}
-	}
+		if(!isDimensionDoorDestinationValid(source, hero, destination, plan))
+			return;
+		auto landing = getDimensionDoorLandingInfo(srcNode, hero, destination);
+		if(landing.canLand)
+			addDimensionDoorTeleportation(neighbours, source, srcNode, destination, plan, landing);
+	});
 }
 
 bool AINodeStorage::isDimensionDoorDestinationValid(

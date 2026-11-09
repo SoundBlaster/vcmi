@@ -58,6 +58,38 @@ TEST(MapTopology, HorizontalDistanceCanComparePositionsAcrossLevels)
 	EXPECT_FALSE(wrapped.horizontalDistanceSquaredIgnoringLevel({0, 0, -1}, {35, 0, 0}));
 }
 
+TEST(MapTopology, RectangleEnumerationMatchesBoundedAndWrappedDistancesWithoutDuplicates)
+{
+	for(int width = 3; width <= 7; ++width)
+		for(int height = 3; height <= 7; ++height)
+			for(int rangeX = 0; rangeX <= 8; ++rangeX)
+				for(int rangeY = 0; rangeY <= 8; ++rangeY)
+					for(bool wraps : {false, true})
+					{
+						const MapTopology topology(width, height, 2, wraps);
+						const int3 center(0, height - 1, 1);
+						std::set<int3> expected;
+						for(int x = 0; x < width; ++x)
+							for(int y = 0; y < height; ++y)
+							{
+								const int dx = wraps ? std::min(x, width - x) : x;
+								const int rawY = height - 1 - y;
+								const int dy = wraps ? std::min(rawY, height - rawY) : rawY;
+								if(dx <= rangeX && dy <= rangeY)
+									expected.insert(int3(x, y, 1));
+							}
+						std::set<int3> actual;
+						int visits = 0;
+						topology.forEachTileInRectangle(center, rangeX, rangeY, [&](const int3 & tile)
+						{
+							++visits;
+							actual.insert(tile);
+						});
+						EXPECT_EQ(actual, expected) << width << "x" << height << " ranges=" << rangeX << "," << rangeY << " wraps=" << wraps;
+						EXPECT_EQ(visits, actual.size());
+					}
+}
+
 TEST(MapTopology, WrapsPixelCoordinatesAcrossMultiplePeriods)
 {
 	constexpr int extent = 100 * 32;
