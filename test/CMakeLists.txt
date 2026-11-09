@@ -61,6 +61,7 @@ set(test_SRCS
 		map/HeroMissionCriticalTest.cpp
 		map/MapScriptTest.cpp
 		map/MapObjectDrawOrderTest.cpp
+		map/MapTopologyTest.cpp
 		map/PlayerFactionsTest.cpp
 		map/ScenarioMetadataTest.cpp
 		map/TinyH3MBuilderTest.cpp

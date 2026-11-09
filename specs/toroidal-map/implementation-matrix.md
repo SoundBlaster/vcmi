@@ -7,7 +7,8 @@ It does not change the SpecPM schema or prove implementation, acceptance, or
 runtime behavior. Baseline: VCMI commit
 `30e9207276f137658da5132705c05644bfe33aee`, inspected source clean before
 the specification work; only the selected entrypoints in `review.md` were
-examined. No toroidal implementation or scenario execution is claimed.
+examined. A coordinate helper has since been added and tested in isolation;
+no toroidal gameplay scenario execution is claimed.
 
 ## How to read and update this matrix
 
@@ -53,10 +54,10 @@ future opt-in design preserves it.
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `topology` | Horizontal and vertical steps wrap in both directions. | G1, G2 | not started | not run | pending | none |
-| `topology` | Diagonal crossing wraps one or both axes, including all four corners. | G3, G4 | not started | not run | pending | none |
-| `topology` | Canonical tile coordinates and supported dimensions remain valid. | G1–G4; small-map cases to specify | not started | not run | pending | none; minimum dimensions undecided |
-| `level_isolation` | Seams preserve level; normal inter-level passages continue to work. | G9 | not started | not run | pending | none |
+| `topology` | Horizontal and vertical steps wrap in both directions. | G1, G2 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no hero movement |
+| `topology` | Diagonal crossing wraps one or both axes, including all four corners. | G3, G4 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no hero movement |
+| `topology` | Canonical tile coordinates and supported dimensions remain valid. | G1–G4; small-map cases to specify | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); minimum dimensions undecided |
+| `level_isolation` | Seams preserve level; normal inter-level passages continue to work. | G9 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no passage test |
 | `movement_and_route` | Crossing uses normal passability, diagonal rules, cost, movement points and visits. | G4, G5, G10 | not started | not run | pending | none |
 | `movement_and_route` | Route finding considers legal wrapped neighbors under normal knowledge rules. | G6 | not started | not run | pending | none; route selection coverage needs refinement |
 | `movement_and_route` | Boat travel, embarking and disembarking follow normal rules at seams. | G8 | not started | not run | pending | none |
@@ -100,6 +101,8 @@ blanket conformance claim.
 
 ## Execution record
 
+The isolated helper tests are recorded in
+[`evidence/topology-unit-2026-11-09.md`](evidence/topology-unit-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
