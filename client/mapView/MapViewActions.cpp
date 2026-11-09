@@ -21,9 +21,18 @@
 #include "render/IScreenHandler.h"
 
 #include "../CPlayerInterface.h"
+#include "../GameInstance.h"
 #include "../adventureMap/CInGameConsole.h"
 
 #include "../../lib/CConfigHandler.h"
+#include "../../lib/callback/CCallback.h"
+#include "../../lib/mapping/CMapHeader.h"
+#include "../../lib/mapping/MapTopology.h"
+
+static std::optional<int3> mapPosition(const int3 & position)
+{
+	return GAME->interface()->cb->getMapHeader()->getTopology().canonicalize(position);
+}
 
 MapViewActions::MapViewActions(MapView & owner, const std::shared_ptr<MapViewModel> & model)
 	: model(model)
@@ -46,10 +55,10 @@ void MapViewActions::clickPressed(const Point & cursorPosition)
 {
 	if (!settings["adventure"]["leftButtonDrag"].Bool())
 	{
-		int3 tile = model->getTileAtPoint(cursorPosition - pos.topLeft());
+		auto tile = mapPosition(model->getTileAtPoint(cursorPosition - pos.topLeft()));
 
-		if(context->isInMap(tile))
-			adventureInt->onTileLeftClicked(tile);
+		if(tile)
+			adventureInt->onTileLeftClicked(*tile);
 	}
 }
 
@@ -57,10 +66,10 @@ void MapViewActions::clickReleased(const Point & cursorPosition)
 {
 	if (!dragActive && settings["adventure"]["leftButtonDrag"].Bool())
 	{
-		int3 tile = model->getTileAtPoint(cursorPosition - pos.topLeft());
+		auto tile = mapPosition(model->getTileAtPoint(cursorPosition - pos.topLeft()));
 
-		if(context->isInMap(tile))
-			adventureInt->onTileLeftClicked(tile);
+		if(tile)
+			adventureInt->onTileLeftClicked(*tile);
 	}
 	dragActive = false;
 	dragDistance = Point(0,0);
@@ -74,10 +83,10 @@ void MapViewActions::clickCancel(const Point & cursorPosition)
 
 void MapViewActions::showPopupWindow(const Point & cursorPosition)
 {
-	int3 tile = model->getTileAtPoint(cursorPosition - pos.topLeft());
+	auto tile = mapPosition(model->getTileAtPoint(cursorPosition - pos.topLeft()));
 
-	if(context->isInMap(tile))
-		adventureInt->onTileRightClicked(tile);
+	if(tile)
+		adventureInt->onTileRightClicked(*tile);
 }
 
 void MapViewActions::closePopupWindow(bool alreadyClosed)
@@ -149,15 +158,15 @@ void MapViewActions::gesture(bool on, const Point & initialPosition, const Point
 
 void MapViewActions::handleHover(const Point & cursorPosition)
 {
-	int3 tile = model->getTileAtPoint(cursorPosition - pos.topLeft());
+	auto tile = mapPosition(model->getTileAtPoint(cursorPosition - pos.topLeft()));
 
-	if(!context->isInMap(tile))
+	if(!tile)
 	{
 		ENGINE->cursor().set(Cursor::Map::POINTER);
 		return;
 	}
 
-	adventureInt->onTileHovered(tile);
+	adventureInt->onTileHovered(*tile);
 }
 
 void MapViewActions::hover(bool on)

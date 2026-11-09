@@ -26,7 +26,9 @@
 #include "../../lib/callback/CCallback.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/MiscObjects.h"
+#include "../../lib/mapObjects/MapObjectDrawOrder.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/MapTopology.h"
 #include "../../lib/pathfinder/CGPathNode.h"
 #include "../../lib/spells/ISpellMechanics.h"
 #include "../../lib/spells/adventure/AdventureSpellEffect.h"
@@ -120,15 +122,18 @@ int3 MapRendererBaseContext::getMapSize() const
 
 bool MapRendererBaseContext::isInMap(const int3 & coordinates) const
 {
-	return GAME->interface()->cb->isInTheMap(coordinates);
+	return GAME->map().getMap()->getTopology().canonicalize(coordinates).has_value();
 }
 
 bool MapRendererBaseContext::isVisible(const int3 & coordinates) const
 {
+	const auto tile = GAME->map().getMap()->getTopology().canonicalize(coordinates);
+	if(!tile)
+		return false;
 	if(settingsSessionSpectate)
-		return GAME->interface()->cb->isInTheMap(coordinates);
+		return true;
 	else
-		return GAME->interface()->cb->isVisible(coordinates);
+		return GAME->interface()->cb->isVisible(*tile);
 }
 
 bool MapRendererBaseContext::isActiveHero(const CGObjectInstance * obj) const
@@ -172,13 +177,14 @@ bool MapRendererBaseContext::tileAnimated(const int3 & coordinates) const
 
 const TerrainTile & MapRendererBaseContext::getMapTile(const int3 & coordinates) const
 {
-	return GAME->map().getMap()->getTile(coordinates);
+	const auto * map = GAME->map().getMap();
+	return map->getTile(map->getTopology().canonicalize(coordinates).value());
 }
 
 const MapRendererBaseContext::MapObjectsList & MapRendererBaseContext::getObjects(const int3 & coordinates) const
 {
 	assert(isInMap(coordinates));
-	return viewState.objects[coordinates];
+	return viewState.objects[GAME->map().getMap()->getTopology().canonicalize(coordinates).value()];
 }
 
 const CGObjectInstance * MapRendererBaseContext::getObject(ObjectInstanceID objectID) const
@@ -201,6 +207,17 @@ Point MapRendererBaseContext::objectImageOffset(ObjectInstanceID objectID, const
 {
 	const CGObjectInstance * object = getObject(objectID);
 	int3 offsetTiles(object->anchorPos() - coordinates);
+	const auto * map = GAME->map().getMap();
+	if(map->toroidal && MapObjectDrawOrder::usesFixedDrawSlot(object))
+	{
+		auto wrap = [](int value, int extent)
+		{
+			const int remainder = value % extent;
+			return remainder < 0 ? remainder + extent : remainder;
+		};
+		offsetTiles.x = wrap(offsetTiles.x, map->width);
+		offsetTiles.y = wrap(offsetTiles.y, map->height);
+	}
 	return Point(offsetTiles) * Point(32, 32);
 }
 
@@ -492,6 +509,17 @@ Point MapRendererAdventureMovingContext::objectImageOffset(ObjectInstanceID obje
 	{
 		int3 offsetTilesFrom = tileFrom - coordinates;
 		int3 offsetTilesDest = tileDest - coordinates;
+		const auto * map = GAME->map().getMap();
+		if(map->toroidal)
+		{
+			const auto topology = map->getTopology();
+			const auto from = topology.canonicalize(tileFrom);
+			const auto dest = topology.canonicalize(tileDest);
+			const auto tile = topology.canonicalize(coordinates);
+			assert(from && dest && tile);
+			offsetTilesFrom = topology.displacement(*tile, *from);
+			offsetTilesDest = offsetTilesFrom + topology.displacement(*from, *dest);
+		}
 
 		Point offsetPixelsFrom = Point(offsetTilesFrom) * Point(32, 32);
 		Point offsetPixelsDest = Point(offsetTilesDest) * Point(32, 32);

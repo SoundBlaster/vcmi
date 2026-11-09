@@ -23,6 +23,7 @@
 #include "../../lib/mapObjects/MapObjectDrawOrder.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/MapTopology.h"
 
 #include <tbb/parallel_for.h>
 
@@ -108,18 +109,19 @@ void MapRendererContextState::stampObject(const CGObjectInstance * obj, bool ord
 		{
 			int3 currTile(obj->anchorPos().x - fx, obj->anchorPos().y - fy, obj->anchorPos().z);
 
-			if(!GAME->interface()->cb->isInTheMap(currTile))
-				continue;
-
 			if(MapObjectDrawOrder::usesFixedDrawSlot(obj))
 			{
-				if(obj->coveringAt(currTile))
+				const auto tile = GAME->map().getMap()->getTopology().canonicalize(currTile);
+				if(tile && obj->coveringAt(currTile) && !vstd::contains(objects[*tile], obj->id))
 				{
-					objects[currTile].push_back(obj->id);
-					usedTiles[obj->id].push_back(currTile);
+					objects[*tile].push_back(obj->id);
+					usedTiles[obj->id].push_back(*tile);
 				}
 				continue;
 			}
+
+			if(!GAME->interface()->cb->isInTheMap(currTile))
+				continue;
 
 			// like in H3 every cell of the object takes part in ordering, even if nothing is drawn there
 			const CMap & map = *GAME->map().getMap();
@@ -142,22 +144,31 @@ void MapRendererContextState::stampObject(const CGObjectInstance * obj, bool ord
 
 void MapRendererContextState::addMovingObject(const CGObjectInstance * object, const int3 & tileFrom, const int3 & tileDest)
 {
-	int xFrom = std::min(tileFrom.x, tileDest.x) - object->getWidth();
-	int xDest = std::max(tileFrom.x, tileDest.x);
-	int yFrom = std::min(tileFrom.y, tileDest.y) - object->getHeight();
-	int yDest = std::max(tileFrom.y, tileDest.y);
+	const auto * map = GAME->map().getMap();
+	const auto topology = map->getTopology();
+	int3 adjacentDest = tileDest;
+	if(map->toroidal)
+	{
+		const auto from = topology.canonicalize(tileFrom);
+		const auto dest = topology.canonicalize(tileDest);
+		assert(from && dest);
+		adjacentDest = tileFrom + topology.displacement(*from, *dest);
+	}
+	int xFrom = std::min(tileFrom.x, adjacentDest.x) - object->getWidth();
+	int xDest = std::max(tileFrom.x, adjacentDest.x);
+	int yFrom = std::min(tileFrom.y, adjacentDest.y) - object->getHeight();
+	int yDest = std::max(tileFrom.y, adjacentDest.y);
 
 	for(int x = xFrom; x <= xDest; ++x)
 	{
 		for(int y = yFrom; y <= yDest; ++y)
 		{
-			int3 currTile(x, y, object->anchorPos().z);
-
-			if(GAME->interface()->cb->isInTheMap(currTile))
+			const auto tile = topology.canonicalize(int3(x, y, object->anchorPos().z));
+			if(tile && !vstd::contains(usedTiles[object->id], *tile))
 			{
 				// only heroes and boats move, and those are not ordered
-				objects[currTile].push_back(object->id);
-				usedTiles[object->id].push_back(currTile);
+				objects[*tile].push_back(object->id);
+				usedTiles[object->id].push_back(*tile);
 			}
 		}
 	}

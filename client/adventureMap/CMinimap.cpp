@@ -31,6 +31,7 @@
 #include "../../lib/callback/CCallback.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapping/TerrainTile.h"
+#include "../../lib/mapping/CMapHeader.h"
 #include "../../lib/texts/CGeneralTextHandler.h"
 
 ColorRGBA CMinimapInstance::getTileColor(const int3 & pos, bool minimapShowHeroes) const
@@ -223,15 +224,47 @@ void CMinimap::showAll(Canvas & to)
 			}
 		}
 
-		//draw radar
-		Rect radar =
+		if(GAME->interface()->cb->getMapHeader()->toroidal)
+		{
+			auto split = [](int start, int length, int extent)
 			{
-				screenArea.x * pos.w / mapSizes.x,
-				screenArea.y * pos.h / mapSizes.y,
-				screenArea.w * pos.w / mapSizes.x - 1,
-				screenArea.h * pos.h / mapSizes.y - 1
+				std::vector<std::pair<int, int>> parts;
+				if(length <= 0)
+					return parts;
+				if(length >= extent)
+				{
+					parts.emplace_back(0, extent);
+					return parts;
+				}
+				start %= extent;
+				if(start < 0)
+					start += extent;
+				const int firstLength = std::min(length, extent - start);
+				parts.emplace_back(start, firstLength);
+				if(firstLength < length)
+					parts.emplace_back(0, length - firstLength);
+				return parts;
 			};
-		clippedTarget.drawBorderDashed(radar, Colors::PURPLE);
+			for(const auto & [x, width] : split(screenArea.x, screenArea.w, mapSizes.x))
+				for(const auto & [y, height] : split(screenArea.y, screenArea.h, mapSizes.y))
+				{
+					Rect radar{x * pos.w / mapSizes.x, y * pos.h / mapSizes.y,
+						std::max(0, (x + width) * pos.w / mapSizes.x - x * pos.w / mapSizes.x - 1),
+						std::max(0, (y + height) * pos.h / mapSizes.y - y * pos.h / mapSizes.y - 1)};
+					clippedTarget.drawBorderDashed(radar, Colors::PURPLE);
+				}
+		}
+		else
+		{
+			Rect radar =
+				{
+					screenArea.x * pos.w / mapSizes.x,
+					screenArea.y * pos.h / mapSizes.y,
+					screenArea.w * pos.w / mapSizes.x - 1,
+					screenArea.h * pos.h / mapSizes.y - 1
+				};
+			clippedTarget.drawBorderDashed(radar, Colors::PURPLE);
+		}
 	}
 }
 

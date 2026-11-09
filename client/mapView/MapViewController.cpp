@@ -30,6 +30,8 @@
 #include "../../lib/callback/CCallback.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/MiscObjects.h"
+#include "../../lib/mapping/CMapHeader.h"
+#include "../../lib/mapping/MapTopology.h"
 #include "../../lib/pathfinder/CGPathNode.h"
 #include "../../lib/spells/ViewSpellInt.h"
 
@@ -65,7 +67,18 @@ void MapViewController::setViewCenter(const Point & position, int level)
 		lowerLimit = actualLowerLimit;
 	}
 
-	Point betterPosition = {std::clamp(position.x, lowerLimit.x, upperLimit.x), std::clamp(position.y, lowerLimit.y, upperLimit.y)};
+	Point betterPosition;
+	if(GAME->interface()->cb->getMapHeader()->toroidal && !worldViewContext && !puzzleMapContext)
+	{
+		auto wrap = [](int value, int extent)
+		{
+			const int remainder = value % extent;
+			return remainder < 0 ? remainder + extent : remainder;
+		};
+		betterPosition = {wrap(position.x, upperLimit.x), wrap(position.y, upperLimit.y)};
+	}
+	else
+		betterPosition = {std::clamp(position.x, lowerLimit.x, upperLimit.x), std::clamp(position.y, lowerLimit.y, upperLimit.y)};
 
 	model->setViewCenter(betterPosition);
 	model->setLevel(std::clamp(level, 0, context->getMapSize().z));
@@ -193,7 +206,12 @@ void MapViewController::tick(uint32_t timeDelta)
 		movementContext->progress = std::min( 1.0, movementContext->progress);
 
 		Point positionFrom = Point(hero->convertToVisitablePos(movementContext->tileFrom)) * model->getSingleTileSize() + model->getSingleTileSize() / 2;
-		Point positionDest = Point(hero->convertToVisitablePos(movementContext->tileDest)) * model->getSingleTileSize() + model->getSingleTileSize() / 2;
+		int3 destination = hero->convertToVisitablePos(movementContext->tileDest);
+		const int3 source = hero->convertToVisitablePos(movementContext->tileFrom);
+		const auto * mapHeader = GAME->interface()->cb->getMapHeader();
+		if(mapHeader->toroidal && source.z == destination.z)
+			destination = source + mapHeader->getTopology().displacement(source, destination);
+		Point positionDest = Point(destination) * model->getSingleTileSize() + model->getSingleTileSize() / 2;
 
 		Point positionCurr = vstd::lerp(positionFrom, positionDest, movementContext->progress);
 

@@ -38,6 +38,7 @@
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/MapTopology.h"
 #include "../../lib/mapping/TerrainTile.h"
 #include "../../lib/pathfinder/CGPathNode.h"
 
@@ -928,11 +929,16 @@ size_t MapRendererPath::selectImage(IMapRendererContext & context, const int3 & 
 	if(next == path->nodes.end())
 		return std::numeric_limits<size_t>::max();
 
-	bool pathContinuous = iter->coord.areNeighbours(next->coord) && iter->coord.areNeighbours(prev->coord);
+	const auto * map = GAME->map().getMap();
+	const bool sameLevel = iter->coord.z == next->coord.z && iter->coord.z == prev->coord.z;
+	const bool wrapped = map->toroidal && sameLevel && map->isInTheMap(iter->coord) && map->isInTheMap(next->coord) && map->isInTheMap(prev->coord);
+	const int3 nextOffset = wrapped ? map->getTopology().displacement(iter->coord, next->coord) : next->coord - iter->coord;
+	const int3 prevOffset = wrapped ? map->getTopology().displacement(iter->coord, prev->coord) : prev->coord - iter->coord;
+	bool pathContinuous = sameLevel && int3(0, 0, 0).areNeighbours(nextOffset) && int3(0, 0, 0).areNeighbours(prevOffset);
 	bool embarking = iter->action == EPathNodeAction::EMBARK || iter->action == EPathNodeAction::DISEMBARK;
 
 	if(pathContinuous && !embarking)
-		return selectImageArrow(reachableToday, iter->coord, prev->coord, next->coord);
+		return selectImageArrow(reachableToday, iter->coord, iter->coord + prevOffset, iter->coord + nextOffset);
 
 	return selectImageCross(reachableToday, iter->coord);
 }
@@ -948,8 +954,16 @@ void MapRenderer::prepareFrame(IMapRendererContext & context)
 	rendererObjects.prepareFrame();
 }
 
-MapRenderer::TileChecksum MapRenderer::getTileChecksum(IMapRendererContext & context, const int3 & coordinates)
+MapRenderer::TileChecksum MapRenderer::getTileChecksum(IMapRendererContext & context, const int3 & originalCoordinates)
 {
+	int3 coordinates = originalCoordinates;
+	const auto * map = GAME->map().getMap();
+	if(map->toroidal)
+	{
+		const auto tile = map->getTopology().canonicalize(coordinates);
+		if(tile)
+			coordinates = *tile;
+	}
 	// computes basic checksum to determine whether tile needs an update
 	// if any component gives different value, tile will be updated
 	TileChecksum result;
@@ -990,8 +1004,16 @@ MapRenderer::TileChecksum MapRenderer::getTileChecksum(IMapRendererContext & con
 	return result;
 }
 
-void MapRenderer::renderTile(IMapRendererContext & context, Canvas & target, const int3 & coordinates, bool withOverlays)
+void MapRenderer::renderTile(IMapRendererContext & context, Canvas & target, const int3 & originalCoordinates, bool withOverlays)
 {
+	int3 coordinates = originalCoordinates;
+	const auto * map = GAME->map().getMap();
+	if(map->toroidal)
+	{
+		const auto tile = map->getTopology().canonicalize(coordinates);
+		if(tile)
+			coordinates = *tile;
+	}
 	if(!context.isInMap(coordinates))
 	{
 		rendererBorder.renderTile(context, target, coordinates);

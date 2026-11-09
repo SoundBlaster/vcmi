@@ -70,12 +70,12 @@ future opt-in design preserves it.
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `rendering` | Continuous terrain, roads, rivers, objects, overlays and fog at every edge and corner. | V1 | not started | not run | pending | none; visual playthrough required |
-| `rendering` | View spanning multiple map periods renders correct copies without erroneous duplicates. | V4 | not started | not run | pending | none |
-| `viewport_input` | Hover and clicks on visible copies address the same canonical location. | V2, V4 | not started | not run | pending | none |
-| `viewport_input` | Destination selection remains correct across both seams and at wide zoom. | V2, V4; destination-specific case to specify | not started | not run | pending | none |
-| `movement_presentation` | Hero and boat cross as a short continuous step with correct direction and path indicator. | V3; boat-animation case to specify | not started | not run | pending | none; runtime visual check required |
-| `minimap` | Visible area and map selection remain correct across one or both seams. | V5 | not started | not run | pending | none; wide-view case to specify |
+| `rendering` | Continuous terrain, roads, rivers, objects, overlays and fog at every edge and corner. | V1 | partial: viewport and renderer mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); static seam-spanning objects need work |
+| `rendering` | View spanning multiple map periods renders correct copies without erroneous duplicates. | V4 | partial: repeated tile mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); no visual run |
+| `viewport_input` | Hover and clicks on visible copies address the same canonical location. | V2, V4 | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md) |
+| `viewport_input` | Destination selection remains correct across both seams and at wide zoom. | V2, V4; destination-specific case to specify | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); destination case unspecified |
+| `movement_presentation` | Hero and boat cross as a short continuous step with correct direction and path indicator. | V3; boat-animation case to specify | partial: camera and sprite offsets | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); runtime visual check required |
+| `minimap` | Visible area and map selection remain correct across one or both seams. | V5 | partial: split radar | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); wide-view case to specify |
 
 ## Persistence, compatibility and supported profiles
 
@@ -107,6 +107,8 @@ The format and save test attempt is recorded in
 [`evidence/topology-format-2026-11-09.md`](evidence/topology-format-2026-11-09.md).
 The gameplay movement test attempt is recorded in
 [`evidence/topology-movement-2026-11-09.md`](evidence/topology-movement-2026-11-09.md).
+The client build is recorded in
+[`evidence/topology-viewport-2026-11-09.md`](evidence/topology-viewport-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
