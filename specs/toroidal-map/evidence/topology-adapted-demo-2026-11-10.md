@@ -47,6 +47,25 @@ An ordinary ad-hoc signed client was prepared on TB5 from the current build;
 the signed executable SHA-256 was
 `369c4e941468769afff789f10e69644855646bfda6e99ff621da1bab5a2469d4`.
 On launch macOS requested removable-volume access for
-`local.vcmi.toroid.lab`; the user was busy and no response to that specific
-prompt was observed. No GUI playthrough, visual seamlessness, map balance,
-AI behavior on this fixture or multiplayer result is claimed.
+`local.vcmi.toroid.lab`; the user later authorized the game launch and the
+client reached the menu. The window reported `1.8.0.a2bf933`, an older build
+stamp; this observation does not establish the exact shared libraries mapped
+in the running process or a visual test of the latest minimap change.
+
+Using Computer Use keyboard input and screenshots, the tester selected the
+on-disk **Toroid Seam Laboratory** in the ordinary scenario list and started
+it. At the starting corner, keypad 7 collected the diagonally adjacent gold:
+the GUI displayed a 1,000-gold pickup and the total rose from 20,000 to
+21,000. A second keypad 7 entered the vacated corner; keypad 6 and keypad 2
+then returned across the horizontal and vertical seams. The minimap marker
+appeared successively at the bottom-right, bottom-left, and top-left corners.
+The integrated server log records successful hero-anchor moves
+`(1,0,0) -> (36,35,0) -> (1,35,0) -> (1,0,0)`; the corresponding visitable
+tiles are `(0,0,0) -> (35,35,0) -> (0,35,0) -> (0,0,0)`. The resource visit
+before the first move left the hero in place. The trace is in
+`runtime/user-logs/VCMI_Client_log.txt` on TB5.
+
+These screenshots are discrete observations; they do not establish
+frame-by-frame scrolling or animation smoothness. Mouse input did not activate
+the expected controls during this attempt; its cause was not established.
+Map balance, AI behavior on this fixture and multiplayer remain unverified.
