@@ -103,3 +103,15 @@ the full local suite passed; the latter ran 1,381 tests with three disabled
 (`full-suite-water-blocking.log` on TB5). Client, server and tests were built
 from `ad0829a` plus this change (`water-blocking-after-build.log`). Other
 water-object rules, vehicle types and multiplayer remain unverified.
+
+An additional synthetic `AVIATE` vehicle test exposed the same disagreement
+for a visitable resource across a seam. The pathfinder marked the destination
+unreachable, but the server triggered a visit. Standard toroidal `AVIATE`
+movement now rejects blocked or visitable destinations except when boarding
+a matching vehicle, following the pathfinder's tile classification. The test
+checks no movement, point expenditure or resource collection and then moves
+the vehicle onto a free tile. Three focused tests and the complete local suite
+passed; the latter ran 1,382 tests with three disabled
+(`full-suite-aviation-blocked.log` on TB5). The client, server and tests were
+built from `6e3b605` plus this change (`aviation-blocked-after-build.log`).
+This synthetic vehicle does not establish support for a specific mod.

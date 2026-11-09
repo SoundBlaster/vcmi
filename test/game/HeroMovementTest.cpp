@@ -1109,6 +1109,50 @@ TEST_F(HeroMovementTest, HeroCanEmbarkAviationVehicleAcrossToroidalSeam)
 	EXPECT_EQ(hero->visitablePos(), destination);
 }
 
+TEST_F(HeroMovementTest, AviationVehicleCannotEnterVisitableObjectAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(2, 5, 0), HeroTypeID(0), player)
+		.terrain(origin, TerrainId::WATER)
+		.terrain(destination, TerrainId::WATER)
+		.resource(destination, GameResID::GOLD, 10);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	auto * resource = findFirst<CGResource>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(resource, nullptr);
+	const auto resourceId = resource->id;
+	const auto gold = gameState()->players.at(player).resources[GameResID::GOLD];
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(origin, BoatId::CASTLE, player);
+	auto * vehicle = dynamic_cast<CGBoat *>(map()->getObject(map()->getTile(origin).topVisitableObj()));
+	ASSERT_NE(vehicle, nullptr);
+	vehicle->layer = EPathfindingLayer::AVIATE;
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	ASSERT_TRUE(hero->inBoat());
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	EXPECT_FALSE(paths.getNode(destination, EPathfindingLayer::AVIATE)->reachable());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold);
+	EXPECT_NE(map()->getObject(resourceId), nullptr);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 6, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	EXPECT_TRUE(hero->inBoat());
+	EXPECT_EQ(hero->visitablePos(), int3(0, 6, 0));
+}
+
 TEST_F(HeroMovementTest, BoatCanSailAcrossToroidalCornerAndBothAxes)
 {
 	const PlayerColor player(0);

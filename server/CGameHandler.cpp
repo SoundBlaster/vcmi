@@ -870,6 +870,9 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
 		&& layer == EPathfindingLayer::WATER && t.blocked() && !canEmbarkLayer)
 		return complainRet("Cannot walk on water through a blocked tile!");
+	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
+		&& layer == EPathfindingLayer::AVIATE && (t.blocked() || t.visitable()) && !canEmbarkLayer)
+		return complainRet("Cannot navigate an aviation vehicle onto an occupied tile!");
 	const bool usesMovementCost = movementMode == EMovementMode::STANDARD || embarking || disembarking;
 	const int cost = usesMovementCost
 		? pathfinderHelper->getMovementCost(h->visitablePos(), hmpos, layer, h->movementPointsRemaining())
