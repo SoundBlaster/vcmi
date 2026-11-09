@@ -63,7 +63,7 @@ future opt-in design preserves it.
 | `movement_and_route` | Boat travel, embarking and disembarking follow normal rules at seams. | G8 | partial: wrapped pathfinder and server movement | partial: one horizontal scenario | pending | [boat record](evidence/topology-boat-movement-2026-11-09.md); other directions, blocked shores and animation unverified |
 | `authority` | Client route and server agree on legal wrapped steps. | G1–G4, G6, P3 | partial: pathfinder and server | partial: RoE direct steps | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); multiplayer unverified |
 | `authority` | Blocked or illegal crossing is rejected without applying movement effects. | G5, G10, P3 | partial: server rules adapted | partial: one blocked RoE tile | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); other rejection cases unverified |
-| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | partial: hidden range, guard positions and one battle start | pending | [guard battle record](evidence/topology-guard-battle-2026-11-09.md); complete guard and fog behavior unverified |
+| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range, Visions bonus and guard lookups | partial: hidden range, guard positions, Visions range and one battle start | pending | [guard battle](evidence/topology-guard-battle-2026-11-09.md), [Visions range](evidence/topology-visions-spell-2026-11-09.md); complete guard and fog behavior unverified |
 | `vision_and_guards` | Object interaction across seams follows normal rules. | G10; additional object cases to specify | partial: server movement and visit logic | partial: one resource across a corner | pending | [resource record](evidence/topology-resource-visit-2026-11-09.md); object audit incomplete |
 
 ## Presentation and interaction
@@ -138,6 +138,8 @@ The later human-player viewport observation is recorded in
 [`evidence/topology-gui-player-2026-11-09.md`](evidence/topology-gui-player-2026-11-09.md).
 The directional hero input change is recorded in
 [`evidence/topology-directional-input-2026-11-09.md`](evidence/topology-directional-input-2026-11-09.md).
+The Visions spell range check is recorded in
+[`evidence/topology-visions-spell-2026-11-09.md`](evidence/topology-visions-spell-2026-11-09.md).
 The wrapped terrain-brush checks are recorded in
 [`evidence/topology-terrain-brush-2026-11-09.md`](evidence/topology-terrain-brush-2026-11-09.md).
 The road and river brush checks are recorded in

@@ -193,6 +193,37 @@ TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)
 	EXPECT_FALSE(guards(int3(0, 0, 0), int3(35, 35, 0)));
 }
 
+TEST_F(HeroMovementTest, visionsRangeUsesToroidalDistance)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 0, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	const BonusSubtypeID subtype(BonusCustomSubtype(0));
+	CGObjectInstance target(gameState().get());
+	map()->toroidal = true;
+	target.pos = int3(35, 0, 0);
+	EXPECT_FALSE(hero->hasVisions(&target, subtype));
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::VISIONS, BonusSource::OTHER, 1, BonusSourceID(), subtype));
+
+	map()->toroidal = false;
+	EXPECT_FALSE(hero->hasVisions(&target, subtype));
+	target.pos = int3(1, 0, 0);
+	EXPECT_TRUE(hero->hasVisions(&target, subtype));
+	map()->toroidal = true;
+	target.pos = int3(35, 0, 0);
+	EXPECT_TRUE(hero->hasVisions(&target, subtype));
+	target.pos = int3(35, 35, 0);
+	EXPECT_TRUE(hero->hasVisions(&target, subtype));
+	target.pos = int3(30, 30, 0);
+	EXPECT_FALSE(hero->hasVisions(&target, subtype));
+	target.pos = int3(35, 35, 1);
+	EXPECT_FALSE(hero->hasVisions(&target, subtype));
+}
+
 TEST_F(HeroMovementTest, ObjectVisibilityUsesWrappedFootprintTiles)
 {
 	const PlayerColor player(0);

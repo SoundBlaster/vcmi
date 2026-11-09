@@ -30,6 +30,7 @@
 #include "../CCreatureHandler.h"
 #include "../CPlayerState.h"
 #include "../mapping/CMap.h"
+#include "../mapping/MapTopology.h"
 #include "../StartInfo.h"
 #include "../GameSettings.h"
 #include "CGTownInstance.h"
@@ -1701,7 +1702,17 @@ bool CGHeroInstance::hasVisions(const CGObjectInstance * target, BonusSubtypeID 
 	if (visionsMultiplier > 0)
 		vstd::amax(visionsRange, 3); //minimum range is 3 tiles, but only if VISIONS bonus present
 
-	const int distance = static_cast<int>(target->anchorPos().dist2d(visitablePos()));
+	int3 offset = target->anchorPos() - visitablePos();
+	const auto * mapHeader = cb->getMapHeader();
+	if(mapHeader->toroidal && target->anchorPos().z == visitablePos().z)
+	{
+		const auto topology = mapHeader->getTopology();
+		const auto from = topology.canonicalize(visitablePos());
+		const auto to = topology.canonicalize(target->anchorPos());
+		if(from && to)
+			offset = topology.displacement(*from, *to);
+	}
+	const int distance = static_cast<int>(offset.dist2d(int3(0, 0, 0)));
 
 	//logGlobal->debug(boost::str(boost::format("Visions: dist %d, mult %d, range %d") % distance % visionsMultiplier % visionsRange));
 
