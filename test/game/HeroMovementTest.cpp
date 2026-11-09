@@ -19,6 +19,7 @@
 #include "../../lib/campaign/CampaignState.h"
 #include "../../lib/callback/EditorCallback.h"
 #include "../../lib/gameState/SaveMetadata.h"
+#include "../../lib/filesystem/CMemoryBuffer.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGResource.h"
@@ -27,6 +28,9 @@
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/TerrainTile.h"
 #include "../../lib/mapping/MapTopology.h"
+#include "../../lib/mapping/CMapService.h"
+#include "../../lib/mapping/MapFormatH3M.h"
+#include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/modding/IdentifierResolver.h"
 #include "../../lib/networkPacks/PacksForClient.h"
 #include "../../lib/spells/CSpellHandler.h"
@@ -81,6 +85,77 @@ TEST_F(ToroidalDemoGameTest, HeroCrossesCornerAndBothEdges)
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 35, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->visitablePos(), int3(0, 0, 0));
+}
+
+TEST(ToroidalDemoVmapTest, SavedMapStartsAndSupportsCornerVisit)
+{
+	auto source = makeToroidalDemoMap().build();
+	CMemoryBuffer legacyBytes;
+	legacyBytes.write(source.data(), static_cast<si64>(source.size()));
+	legacyBytes.seek(0);
+	EditorCallback editor(nullptr);
+	CMapLoaderH3M legacyLoader("ToroidSeamLaboratory", "core", "ASCII", &legacyBytes);
+	auto legacy = legacyLoader.loadMap(&editor);
+	editor.setMap(legacy.get());
+	legacy->setToroidalAndRebuild(true);
+	CMemoryBuffer archive;
+	{
+		CMapSaverJson saver(&archive);
+		saver.saveMap(legacy);
+	}
+	class DemoMapService : public CMapService
+	{
+	public:
+		explicit DemoMapService(const std::vector<ui8> & data) : data(data) {}
+		std::unique_ptr<CMap> loadMap(const ResourcePath &, IGameInfoCallback * callback) const override
+		{
+			return CMapService::loadMap(data.data(), static_cast<int>(data.size()), "ToroidSeamLaboratory", "core", "ASCII", callback);
+		}
+		std::unique_ptr<CMapHeader> loadMapHeader(const ResourcePath &, bool = false) const override
+		{
+			return CMapService::loadMapHeader(data.data(), static_cast<int>(data.size()), "ToroidSeamLaboratory", "core", "ASCII");
+		}
+	private:
+		const std::vector<ui8> & data;
+	};
+	DemoMapService service(archive.getBuffer());
+	auto header = service.loadMapHeader(ResourcePath("memory"));
+	ASSERT_TRUE(header->toroidal);
+	StartInfo info;
+	info.mapname = "memory";
+	info.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
+	info.mode = EStartMode::NEW_GAME;
+	for(int index = 0; index < static_cast<int>(header->players.size()); ++index)
+	{
+		const auto & playerInfo = header->players[index];
+		if(!(playerInfo.canHumanPlay || playerInfo.canComputerPlay))
+			continue;
+		auto & settings = info.playerInfos[PlayerColor(index)];
+		settings.color = PlayerColor(index);
+		settings.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(index));
+		settings.name = "Player";
+		settings.castle = playerInfo.defaultCastle();
+		settings.hero = playerInfo.defaultHero();
+		settings.bonus = PlayerStartingBonus::GOLD;
+	}
+	auto state = std::make_shared<CGameState>();
+	state->preInit(LIBRARY);
+	GameRandomizer randomizer(*state);
+	Load::ProgressAccumulator progress;
+	state->init(&service, &info, randomizer, progress, false);
+	ASSERT_TRUE(state->getMap().toroidal);
+	CGHeroInstance * hero = nullptr;
+	for(const auto & object : state->getMap().objects)
+		if(auto * candidate = dynamic_cast<CGHeroInstance *>(object.get()); candidate && candidate->getOwner() == PlayerColor(0))
+			hero = candidate;
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	hero->setMovementPoints(3000);
+	const auto goldBefore = state->players.at(PlayerColor(0)).resources[GameResID::GOLD];
+	GameHandlerTestServer server(state, PlayerColor(0));
+	CGameHandler handler(server, state);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 35, 0)), EMovementMode::STANDARD, false, PlayerColor(0), EPathfindingLayer::LAND));
+	EXPECT_GT(state->players.at(PlayerColor(0)).resources[GameResID::GOLD], goldBefore);
 }
 
 class GrailTopologyTest : public TinyMapGameTest

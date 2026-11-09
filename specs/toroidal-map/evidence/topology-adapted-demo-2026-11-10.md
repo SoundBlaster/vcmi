@@ -27,6 +27,14 @@ tests passed (`adapted-demo-game-final-tests.log`); the test target built
 (`adapted-demo-game-final-build.log`). The gameplay test uses the fixture
 in-memory, not a game session loaded from the saved VMAP.
 
+The later `ToroidalDemoVmapTest.SavedMapStartsAndSupportsCornerVisit` creates
+and serializes the same fixture, loads the resulting in-memory VMAP through
+`CMapService` into a fully initialized `CGameState`, and uses the real server
+move handler to collect the corner resource. Together with the earlier two
+fixture tests it passed three tests (`adapted-demo-vmap-tests.log`). This run
+loads an independently generated in-memory archive, not the exact file above;
+it is not a client UI or visual rendering test.
+
 An ordinary ad-hoc signed client was prepared on TB5 from the current build;
 the signed executable SHA-256 was
 `369c4e941468769afff789f10e69644855646bfda6e99ff621da1bab5a2469d4`.
