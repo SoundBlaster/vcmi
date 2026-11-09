@@ -87,7 +87,7 @@ future opt-in design preserves it.
 | `bounded_compatibility` | Existing maps and saves remain bounded; toroidal behavior is opt-in. | P2 | partial: versioned default | not run | pending | [format record](evidence/topology-format-2026-11-09.md); no legacy regression execution |
 | `authoring` | A supported authored map can have coherent passable seams. | E1 | partial: editor topology setting | not run | pending | [editor record](evidence/topology-editor-2026-11-09.md); seam validation and runtime unverified |
 | `authoring` | Any supported random generator respects topology. | E2 | not started | not run | pending | none; generator support is conditional |
-| `ai` | Each advertised supported AI can plan and act using legal wrapped routes. | A1 | not started | not run | pending | none; supported profiles undecided |
+| `ai` | Each advertised supported AI can plan and act using legal wrapped routes. | A1 | partial: Nullkiller2 neighborhood and exploration heuristics | not run | pending | [AI record](evidence/topology-ai-2026-11-09.md); full AI audit and profile support undecided |
 | `ai` | Unsupported AI profiles are identified as unsupported. | A2 | not started | not run | pending | none |
 
 ## Specification evidence discipline
@@ -111,6 +111,8 @@ The client build is recorded in
 [`evidence/topology-viewport-2026-11-09.md`](evidence/topology-viewport-2026-11-09.md).
 The map-editor build is recorded in
 [`evidence/topology-editor-2026-11-09.md`](evidence/topology-editor-2026-11-09.md).
+The AI and combat-direction build is recorded in
+[`evidence/topology-ai-2026-11-09.md`](evidence/topology-ai-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

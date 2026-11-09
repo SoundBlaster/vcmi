@@ -44,6 +44,8 @@
 #include "../../lib/CStopWatch.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/callback/CCallback.h"
+#include "../../lib/mapping/CMapHeader.h"
+#include "../../lib/mapping/MapTopology.h"
 
 #include <chrono>
 
@@ -157,22 +159,24 @@ void foreach_visible_tile_pos(const CCallback & cc, const Func & foo)
 template<class Func>
 void foreach_neighbour(const CCallback & cc, const int3 & pos, const Func & foo)
 {
+	const auto topology = cc.getMapHeader()->getTopology();
 	for(const int3 & dir : int3::getDirs())
 	{
-		const int3 n = pos + dir;
-		if(cc.isInTheMap(n))
-			foo(pos + dir);
+		const auto n = topology.canonicalize(pos + dir);
+		if(n)
+			foo(*n);
 	}
 }
 
 template<class Func>
 void foreach_neighbour(CCallback * cbp, const int3 & pos, const Func & foo) // avoid costly retrieval of thread-specific pointer
 {
+	const auto topology = cbp->getMapHeader()->getTopology();
 	for(const int3 & dir : int3::getDirs())
 	{
-		const int3 n = pos + dir;
-		if(cbp->isInTheMap(n))
-			foo(cbp, pos + dir);
+		const auto n = topology.canonicalize(pos + dir);
+		if(n)
+			foo(cbp, *n);
 	}
 }
 

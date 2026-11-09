@@ -25,6 +25,8 @@
 #include "../../../lib/spells/CSpell.h"
 #include "../../../lib/spells/Problem.h"
 #include "../../../lib/mapping/TerrainTile.h"
+#include "../../../lib/mapping/CMapHeader.h"
+#include "../../../lib/mapping/MapTopology.h"
 
 namespace NK2AI
 {
@@ -59,16 +61,22 @@ void forEachHiddenTileInSightRange(
 {
 	int3 tile(0, 0, center.z);
 	const auto & fow = ts->fogOfWarMap;
+	const auto topology = cc->getMapHeader()->getTopology();
+	const auto canonicalCenter = topology.canonicalize(center);
+	if(!canonicalCenter)
+		return;
+	std::set<int3> visited;
 
 	for(tile.x = center.x - sightRadius; tile.x <= center.x + sightRadius; ++tile.x)
 	{
 		for(tile.y = center.y - sightRadius; tile.y <= center.y + sightRadius; ++tile.y)
 		{
-			if(cc->isInTheMap(tile)
-				&& center.dist2d(tile) - 0.5 < sightRadius
-				&& !fow[tile])
+			const auto canonical = topology.canonicalize(tile);
+			if(canonical && visited.insert(*canonical).second
+				&& int3(0, 0, 0).dist2d(topology.displacement(*canonicalCenter, *canonical)) - 0.5 < sightRadius
+				&& !fow[*canonical])
 			{
-				function(tile);
+				function(*canonical);
 			}
 		}
 	}
@@ -163,14 +171,17 @@ DimensionDoorExplorationEvaluation evaluateDimensionDoorExplorationCandidate(
 bool ExplorationHelper::scanSector(int scanRadius)
 {
 	int3 tile = int3(0, 0, ourPos.z);
+	const auto topology = cc->getMapHeader()->getTopology();
+	std::set<int3> visited;
 
 	for(tile.x = ourPos.x - scanRadius; tile.x <= ourPos.x + scanRadius; tile.x++)
 	{
 		for(tile.y = ourPos.y - scanRadius; tile.y <= ourPos.y + scanRadius; tile.y++)
 		{
-			if(cc->isInTheMap(tile) && ts->fogOfWarMap[tile])
+			const auto canonical = topology.canonicalize(tile);
+			if(canonical && visited.insert(*canonical).second && ts->fogOfWarMap[*canonical])
 			{
-				scanTile(tile);
+				scanTile(*canonical);
 			}
 		}
 	}
@@ -648,7 +659,15 @@ float ExplorationHelper::getDimensionDoorStrategicScore(const int3 & tile) const
 		if(!obj || obj->visitablePos().z != tile.z)
 			return;
 
-		const int progress = ourPos.dist2d(obj->visitablePos()) - tile.dist2d(obj->visitablePos());
+		const auto topology = cc->getMapHeader()->getTopology();
+		const double oldDistance = ourPos.z == obj->visitablePos().z
+			&& topology.canonicalize(ourPos) == ourPos && topology.canonicalize(obj->visitablePos()) == obj->visitablePos()
+			? int3(0, 0, 0).dist2d(topology.displacement(ourPos, obj->visitablePos()))
+			: ourPos.dist2d(obj->visitablePos());
+		const double newDistance = topology.canonicalize(tile) == tile && topology.canonicalize(obj->visitablePos()) == obj->visitablePos()
+			? int3(0, 0, 0).dist2d(topology.displacement(tile, obj->visitablePos()))
+			: tile.dist2d(obj->visitablePos());
+		const int progress = oldDistance - newDistance;
 		if(progress > 0)
 			score += progress * weight;
 	};
@@ -704,15 +723,15 @@ int ExplorationHelper::estimateDimensionDoorContinuationValue(
 
 	for(const int3 & direction : int3::getDirs())
 	{
-		const int3 neighbour = tile + direction;
-		if(!cc->isInTheMap(neighbour))
+		const auto neighbour = cc->getMapHeader()->getTopology().canonicalize(tile + direction);
+		if(!neighbour)
 			continue;
 
-		const TerrainTile * neighbourTile = cc->getTileUnchecked(neighbour);
+		const TerrainTile * neighbourTile = cc->getTileUnchecked(*neighbour);
 		if(!neighbourTile || !neighbourTile->isClear(sourceTile))
 			continue;
 
-		bestContinuation = std::max(bestContinuation, countHiddenTilesAround(neighbour, revealedTiles));
+		bestContinuation = std::max(bestContinuation, countHiddenTilesAround(*neighbour, revealedTiles));
 	}
 
 	return bestContinuation;
@@ -766,12 +785,12 @@ bool ExplorationHelper::hasReachableNeighbor(const int3 & pos) const
 {
 	for(const int3 & dir : int3::getDirs())
 	{
-		int3 tile = pos + dir;
-		if(cc->isInTheMap(tile))
+		const auto tile = cc->getMapHeader()->getTopology().canonicalize(pos + dir);
+		if(tile)
 		{
 			auto isAccessible = useCPathfinderAccessibility
-				? aiNk->getPathsInfo(hero)->getPathInfo(tile)->reachable()
-				: aiNk->pathfinder->isTileAccessible(HeroPtr(hero, aiNk->cc.get()), tile);
+				? aiNk->getPathsInfo(hero)->getPathInfo(*tile)->reachable()
+				: aiNk->pathfinder->isTileAccessible(HeroPtr(hero, aiNk->cc.get()), *tile);
 
 			if(isAccessible)
 				return true;

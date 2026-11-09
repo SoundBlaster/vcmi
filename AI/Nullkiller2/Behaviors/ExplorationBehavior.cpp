@@ -54,8 +54,13 @@ bool hasAlternativeProgress(
 	});
 
 	// a task is most likely found near the hero, which ends the search early
-	std::ranges::sort(candidates, {}, [hero](const CGObjectInstance * object)
+	const auto topology = aiNk->cc->getMapHeader()->getTopology();
+	std::ranges::sort(candidates, {}, [hero, topology](const CGObjectInstance * object)
 	{
+		if(hero->visitablePos().z == object->visitablePos().z
+			&& topology.canonicalize(hero->visitablePos()) == hero->visitablePos()
+			&& topology.canonicalize(object->visitablePos()) == object->visitablePos())
+			return int3(0, 0, 0).dist2dSQ(topology.displacement(hero->visitablePos(), object->visitablePos()));
 		return hero->visitablePos().dist2dSQ(object->visitablePos());
 	});
 

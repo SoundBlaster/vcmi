@@ -93,6 +93,11 @@ constraints:
     level: MUST
     statement: This draft and its source analysis do not establish implementation, runtime conformance, visual continuity, or acceptance of every detailed requirement.
 evidence:
+  - id: topology_ai_build
+    kind: documentation
+    path: specs/toroidal-map/evidence/topology-ai-2026-11-09.md
+    supports:
+      - provenance
   - id: topology_editor_build
     kind: documentation
     path: specs/toroidal-map/evidence/topology-editor-2026-11-09.md

@@ -59,6 +59,26 @@ TinyH3M::TinyH3MBuilder makeQuestGuardMap()
 class Nullkiller2_AIUtility : public NullkillerTest {};
 }
 
+TEST_F(Nullkiller2_AIUtility, neighbourEnumerationWrapsAtCorners)
+{
+	ASSERT_NO_FATAL_FAILURE(startWithMap(makeQuestlessSeerMap()));
+	const auto callback = makeCallback(PLAYER);
+	const int3 corner(0, 0, 0);
+	std::set<int3> neighbours;
+
+	NK2AI::foreach_neighbour(*callback, corner, [&](const int3 & tile) { neighbours.insert(tile); });
+	EXPECT_EQ(neighbours.size(), 3);
+	EXPECT_FALSE(neighbours.contains(int3(35, 35, 0)));
+
+	map()->toroidal = true;
+	neighbours.clear();
+	NK2AI::foreach_neighbour(*callback, corner, [&](const int3 & tile) { neighbours.insert(tile); });
+	EXPECT_EQ(neighbours.size(), 8);
+	EXPECT_TRUE(neighbours.contains(int3(35, 0, 0)));
+	EXPECT_TRUE(neighbours.contains(int3(0, 35, 0)));
+	EXPECT_TRUE(neighbours.contains(int3(35, 35, 0)));
+}
+
 TEST_F(Nullkiller2_AIUtility, trackedSeerWithoutActiveQuestIsNotVisitable)
 {
 	ASSERT_NO_FATAL_FAILURE(startWithMap(makeQuestlessSeerMap()));

@@ -29,6 +29,8 @@
 #include "../lib/pathfinder/CGPathNode.h"
 #include "../lib/mapObjects/CGHeroInstance.h"
 #include "../lib/mapping/TerrainTile.h"
+#include "../lib/mapping/CMapHeader.h"
+#include "../lib/mapping/MapTopology.h"
 #include "../lib/networkPacks/PacksForClient.h"
 #include "../lib/RoadHandler.h"
 #include "../lib/TerrainHandler.h"
@@ -202,6 +204,10 @@ void HeroMovementController::onTryMoveHero(const CGHeroInstance * hero, const Tr
 	{
 		// Get direction to attacker.
 		int3 posOffset = details.attackedFrom - details.end + int3(2, 1, 0);
+		const auto * mapHeader = GAME->interface()->cb->getMapHeader();
+		const int3 heroTile = hero->convertToVisitablePos(details.end);
+		if(mapHeader->toroidal && heroTile.z == details.attackedFrom.z)
+			posOffset = mapHeader->getTopology().displacement(heroTile, details.attackedFrom) + int3(1, 1, 0);
 		static const ui8 dirLookup[3][3] =
 		{
 			{ 1, 2, 3 },
