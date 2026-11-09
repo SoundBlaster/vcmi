@@ -85,7 +85,7 @@ future opt-in design preserves it.
 | `persistence_and_network` | Supported multiplayer peers agree on movement and visibility. | P3 | not started | not run | pending | none |
 | `persistence_and_network` | Unsupported peers or readers cannot silently interpret topology incorrectly. | P4 | partial: versioned format and lobby start guard | not run | pending | [format record](evidence/topology-format-2026-11-09.md); locally assigned version can collide with future upstream, so capability identity remains unresolved |
 | `bounded_compatibility` | Existing maps and saves remain bounded; toroidal behavior is opt-in. | P2 | partial: versioned default | partial: legacy header and bounded save | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); full legacy gameplay regression unverified |
-| `authoring` | A supported authored map can have coherent passable seams. | E1 | partial: editor topology setting and static-footprint restriction | not run | pending | [editor record](evidence/topology-editor-2026-11-09.md); terrain seam validation and runtime unverified |
+| `authoring` | A supported authored map can have coherent passable seams. | E1 | partial: editor topology setting, wrapped terrain brush and static-footprint restriction | partial: brush on one corner | pending | [brush record](evidence/topology-terrain-brush-2026-11-09.md); GUI editing, road and river continuity remain unverified |
 | `authoring` | Any supported random generator respects topology. | E2 | not started | not run | pending | none; generator support is conditional |
 | `ai` | Each advertised supported AI can plan and act using legal wrapped routes. | A1 | partial: Nullkiller2 neighborhoods, exploration heuristics and portal tasks | not run | pending | [AI record](evidence/topology-ai-2026-11-09.md), [portal record](evidence/topology-portal-ai-2026-11-09.md); full AI audit and profile support undecided |
 | `ai` | Unsupported AI profiles are identified as unsupported. | A2 | partial: editor warns AI is unverified | not run | pending | [editor status record](evidence/topology-editor-status-2026-11-09.md); no profile-specific selection warning |
@@ -133,6 +133,8 @@ The limited demo integration runs are recorded in
 [`evidence/topology-demo-integration-2026-11-09.md`](evidence/topology-demo-integration-2026-11-09.md).
 The spectator viewport observation is recorded in
 [`evidence/topology-gui-spectator-2026-11-09.md`](evidence/topology-gui-spectator-2026-11-09.md).
+The wrapped terrain-brush checks are recorded in
+[`evidence/topology-terrain-brush-2026-11-09.md`](evidence/topology-terrain-brush-2026-11-09.md).
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

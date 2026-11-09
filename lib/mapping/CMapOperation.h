@@ -94,6 +94,7 @@ private:
 
 	void changeTerrainType(CTerrainSelection selection, TerrainId terrainType);
 	void expandSelection(CTerrainSelection selection);
+	std::vector<int3> tilesAround(const int3 & centerPos) const;
 	void expandInvalidatedTileList(const int3 & centerPos);
 	InvalidTiles getInvalidTiles(const int3 & centerPos) const;
 	void saveTileState(int3 tile);

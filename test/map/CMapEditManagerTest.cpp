@@ -13,6 +13,7 @@
 #include "../../lib/filesystem/ResourcePath.h"
 #include "../../lib/mapping/CMapService.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/MapTopology.h"
 #include "../../lib/TerrainHandler.h"
 #include "../../lib/mapping/CMapEditManager.h"
 #include "../../lib/int3.h"
@@ -106,6 +107,51 @@ TEST(MapManager, DrawTerrain_Type)
 		FAIL()<<e.what();
 		throw;
 	}
+}
+
+TEST(MapManager, ToroidalTerrainBrushTreatsCornerAsInterior)
+{
+	constexpr int size = 20;
+	auto makeMap = []
+	{
+		auto map = std::make_unique<CMap>(nullptr);
+		map->width = size;
+		map->height = size;
+		map->toroidal = true;
+		map->initTerrain();
+		CRandomGenerator random;
+		map->getEditManager()->clearTerrain(&random);
+		return map;
+	};
+	auto interior = makeMap();
+	auto corner = makeMap();
+	CRandomGenerator random;
+	auto paint = [&](CMap & map, int3 position)
+	{
+		auto * editor = map.getEditManager();
+		editor->getTerrainSelection().select(position);
+		editor->drawTerrain(ETerrainId::GRASS, 0, &random);
+	};
+	paint(*interior, int3(10, 10, 0));
+	paint(*corner, int3(0, 0, 0));
+
+	for(int x = -3; x <= 3; ++x)
+		for(int y = -3; y <= 3; ++y)
+		{
+			const int3 offset(x, y, 0);
+			const auto wrapped = corner->getTopology().canonicalize(offset);
+			ASSERT_TRUE(wrapped);
+			EXPECT_EQ(corner->getTile(*wrapped).getTerrainID(), interior->getTile(int3(10, 10, 0) + offset).getTerrainID()) << offset.toString();
+			if(std::abs(x) <= 1 && std::abs(y) <= 1)
+				EXPECT_EQ(corner->getTile(*wrapped).extTileFlags & 3, interior->getTile(int3(10, 10, 0) + offset).extTileFlags & 3) << offset.toString();
+		}
+
+	const auto beforeUndo = corner->getTile(int3(size - 1, 0, 0)).getTerrainID();
+	EXPECT_EQ(beforeUndo, ETerrainId::GRASS);
+	corner->getEditManager()->getUndoManager().undo();
+	EXPECT_EQ(corner->getTile(int3(size - 1, 0, 0)).getTerrainID(), ETerrainId::WATER);
+	corner->getEditManager()->getUndoManager().redo();
+	EXPECT_EQ(corner->getTile(int3(size - 1, 0, 0)).getTerrainID(), beforeUndo);
 }
 
 TEST(MapManager, DrawTerrain_View)

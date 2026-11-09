@@ -16,6 +16,7 @@
 #include "../MapLayerHandler.h"
 #include "../mapObjects/CGObjectInstance.h"
 #include "CMap.h"
+#include "MapTopology.h"
 #include "MapEditUtils.h"
 
 #include <vstd/RNG.h>
@@ -180,12 +181,11 @@ void CDrawTerrainOperation::expandSelection(CTerrainSelection selection)
 		if(tiles.nativeTiles.find(centerPos) != tiles.nativeTiles.end())
 		{
 			// Explosion
-			auto rect = extendTileAroundSafely(centerPos);
 			std::set<int3> suitableTiles;
 			int invalidForeignTilesCnt = std::numeric_limits<int>::max();
 			int invalidNativeTilesCnt = 0;
 			bool centerPosValid = false;
-			rect.forEach([&](const int3& posToTest)
+			for(const auto & posToTest : tilesAround(centerPos))
 				{
 					auto & terrainTile = map->getTile(posToTest);
 					if(centerTile.getTerrain() != terrainTile.getTerrain())
@@ -250,7 +250,7 @@ void CDrawTerrainOperation::expandSelection(CTerrainSelection selection)
 
 						terrainTile.terrainType = formerTerType;
 					}
-				});
+				}
 
 			if(suitableTiles.size() == 1)
 			{
@@ -262,7 +262,8 @@ void CDrawTerrainOperation::expandSelection(CTerrainSelection selection)
 											int3(-1, -1, 0), int3(-1, 1, 0), int3(1, 1, 0), int3(1, -1, 0) };
 				for(const auto & direction : directions)
 				{
-					auto it = suitableTiles.find(centerPos + direction);
+					const auto neighbor = map->getTopology().canonicalize(centerPos + direction);
+					auto it = neighbor ? suitableTiles.find(*neighbor) : suitableTiles.end();
 					if (it != suitableTiles.end())
 					{
 						updateTerrainType(*it);
@@ -383,6 +384,8 @@ CDrawTerrainOperation::ValidationResult CDrawTerrainOperation::validateTerrainVi
 		int cx = pos.x + (i % 3) - 1;
 		int cy = pos.y + (i / 3) - 1;
 		int3 currentPos(cx, cy, pos.z);
+		if(map->toroidal)
+			currentPos = *map->getTopology().canonicalize(currentPos);
 		bool isAlien = false;
 		const TerrainType * terType = nullptr;
 		if(!map->isInTheMap(currentPos))
@@ -523,13 +526,22 @@ CDrawTerrainOperation::ValidationResult CDrawTerrainOperation::validateTerrainVi
 	}
 }
 
+std::vector<int3> CDrawTerrainOperation::tilesAround(const int3 & centerPos) const
+{
+	std::vector<int3> result;
+	extendTileAround(centerPos).forEach([&](const int3 & pos)
+		{
+			const auto tile = map->getTopology().canonicalize(pos);
+			if(tile && !vstd::contains(result, *tile))
+				result.push_back(*tile);
+		});
+	return result;
+}
+
 void CDrawTerrainOperation::expandInvalidatedTileList(const int3& centerPos)
 {
-	auto rect = extendTileAroundSafely(centerPos);
-	rect.forEach([&](const int3& pos)
-		{
-			invalidatedTerViews.insert(pos);
-		});
+	for(const auto & pos : tilesAround(centerPos))
+		invalidatedTerViews.insert(pos);
 }
 
 CDrawTerrainOperation::InvalidTiles CDrawTerrainOperation::getInvalidTiles(const int3& centerPos) const
@@ -537,8 +549,7 @@ CDrawTerrainOperation::InvalidTiles CDrawTerrainOperation::getInvalidTiles(const
 	//TODO: this is very expensive function for RMG, needs optimization
 	InvalidTiles tiles;
 	const auto * centerTerType = map->getTile(centerPos).getTerrain();
-	auto rect = extendTileAround(centerPos);
-	rect.forEach([&](const int3& pos)
+	for(const auto & pos : tilesAround(centerPos))
 		{
 			if(map->isInTheMap(pos))
 			{
@@ -576,7 +587,7 @@ CDrawTerrainOperation::InvalidTiles CDrawTerrainOperation::getInvalidTiles(const
 					tiles.centerPosValid = true;
 				}
 			}
-		});
+		}
 	return tiles;
 }
 
