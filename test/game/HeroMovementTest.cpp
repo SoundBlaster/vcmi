@@ -218,6 +218,61 @@ TEST_F(HeroMovementTest, ObjectVisibilityUsesWrappedFootprintTiles)
 	EXPECT_FALSE(object.isVisibleFor(player));
 }
 
+TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.terrain(int3(35, 1, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 1, 0));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const int3 west(35, 1, 0);
+	const int3 east(0, 1, 0);
+	handler.createBoat(west, BoatId::CASTLE, player);
+	const auto routeRemaining = [&](const int3 & destination, EPathfindingLayer layer)
+	{
+		CPathsInfo paths(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+		CPathfinder pathfinder(*gameState(), config);
+		pathfinder.calculatePaths();
+		const auto * node = paths.getNode(destination, layer);
+		if(!node->reachable() || node->turns != 0)
+			return -1;
+		return static_cast<int>(node->moveRemains);
+	};
+	const int embarkRemaining = routeRemaining(west, EPathfindingLayer::SAIL);
+	ASSERT_GE(embarkRemaining, 0);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(west), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	ASSERT_EQ(hero->visitablePos(), west);
+	EXPECT_EQ(hero->movementPointsRemaining(), embarkRemaining);
+
+	map()->getTile(east).terrainType = TerrainId::WATER;
+	hero->setMovementPoints(3000);
+	const int sailingRemaining = routeRemaining(east, EPathfindingLayer::SAIL);
+	ASSERT_GE(sailingRemaining, 0);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(east), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	ASSERT_EQ(hero->visitablePos(), east);
+	EXPECT_EQ(hero->movementPointsRemaining(), sailingRemaining);
+
+	map()->getTile(west).terrainType = TerrainId::GRASS;
+	hero->setMovementPoints(3000);
+	const int disembarkRemaining = routeRemaining(west, EPathfindingLayer::LAND);
+	ASSERT_GE(disembarkRemaining, 0);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(west), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_FALSE(hero->inBoat());
+	EXPECT_EQ(hero->visitablePos(), west);
+	EXPECT_EQ(hero->movementPointsRemaining(), disembarkRemaining);
+}
+
 TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 {
 	const PlayerColor player(0);

@@ -60,7 +60,7 @@ future opt-in design preserves it.
 | `level_isolation` | Seams preserve level; normal inter-level passages continue to work. | G9 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no passage test |
 | `movement_and_route` | Crossing uses normal passability, diagonal rules, cost, movement points and visits. | G4, G5, G10 | partial: server and direction handling | partial: RoE terrain cost and one blocked step | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); object, road and other cases remain |
 | `movement_and_route` | Route finding considers legal wrapped neighbors under normal knowledge rules. | G6 | partial: neighbor enumeration | partial: direct RoE paths | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); obstacles and knowledge rules unverified |
-| `movement_and_route` | Boat travel, embarking and disembarking follow normal rules at seams. | G8 | not started | not run | pending | none |
+| `movement_and_route` | Boat travel, embarking and disembarking follow normal rules at seams. | G8 | partial: wrapped pathfinder and server movement | partial: one horizontal scenario | pending | [boat record](evidence/topology-boat-movement-2026-11-09.md); other directions, blocked shores and animation unverified |
 | `authority` | Client route and server agree on legal wrapped steps. | G1–G4, G6, P3 | partial: pathfinder and server | partial: RoE direct steps | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); multiplayer unverified |
 | `authority` | Blocked or illegal crossing is rejected without applying movement effects. | G5, G10, P3 | partial: server rules adapted | partial: one blocked RoE tile | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); other rejection cases unverified |
 | `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | partial: hidden range and selected guard positions | pending | [integration record](evidence/topology-demo-integration-2026-11-09.md); complete guard interactions and fog behavior unverified |
@@ -151,6 +151,8 @@ Editor topology switching is recorded in
 [`evidence/topology-editor-switch-2026-11-09.md`](evidence/topology-editor-switch-2026-11-09.md).
 The save-file check after crossing is recorded in
 [`evidence/topology-seam-save-2026-11-09.md`](evidence/topology-seam-save-2026-11-09.md).
+The boat-movement checks are recorded in
+[`evidence/topology-boat-movement-2026-11-09.md`](evidence/topology-boat-movement-2026-11-09.md).
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
