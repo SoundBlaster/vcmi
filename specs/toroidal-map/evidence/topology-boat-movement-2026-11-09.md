@@ -27,3 +27,12 @@ constructed SoD fixture the hero embarked without crossing a seam and sailed
 found a direct same-turn predecessor and its remaining movement points matched
 the server result. This covers one corner and one direction on each axis, not
 corner embarking or disembarking, blocked shores, AI or visual animation.
+
+On 2026-11-10, a build from `ab55639` plus the new test passed
+`HeroMovementTest.HeroCanEmbarkAndDisembarkAcrossToroidalCorner` and the two
+previously mentioned boat tests (three passed). From `cmake/bin`, the
+`vcmitest` filter named those three tests. On an SoD fixture the hero embarked
+from `(0,0,0)` onto a boat at `(35,35,0)` and disembarked back onto the same
+shore; both steps had direct same-turn pathfinder predecessors and matching
+server movement points. The build log is `boat-corner-embark-build.log` on TB5.
+Other corners, blocked shores and visual animation remain unverified.
