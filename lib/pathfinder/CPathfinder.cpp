@@ -24,6 +24,7 @@
 #include "../mapObjects/CGTownInstance.h"
 #include "../mapObjects/MiscObjects.h"
 #include "../mapping/CMap.h"
+#include "../mapping/MapTopology.h"
 #include "../spells/CSpellHandler.h"
 #include "../spells/ISpellMechanics.h"
 
@@ -592,6 +593,7 @@ void CPathfinderHelper::getNeighbours(
 	const bool limitCoastSailing) const
 {
 	const TerrainType * sourceTerrain = sourceTile.getTerrain();
+	const auto topology = gameInfo.getMapHeader()->getTopology();
 
 	static constexpr std::array dirs = {
 		int3(-1, +1, +0),	int3(0, +1, +0),	int3(+1, +1, +0),
@@ -601,11 +603,11 @@ void CPathfinderHelper::getNeighbours(
 
 	for(const auto & dir : dirs)
 	{
-		const int3 destCoord = srcCoord + dir;
-		if(!gameInfo.isInTheMap(destCoord))
+		const auto destCoord = topology.canonicalize(srcCoord + dir);
+		if(!destCoord)
 			continue;
 
-		const TerrainTile * destTile = gameInfo.getTile(destCoord);
+		const TerrainTile * destTile = gameInfo.getTile(*destCoord);
 		const TerrainType * destTerrain = destTile->getTerrain();
 		if(!destTerrain->isPassable())
 			continue;
@@ -613,13 +615,14 @@ void CPathfinderHelper::getNeighbours(
 		/// Following condition let us avoid diagonal movement over coast when sailing
 		if(sourceTerrain->isWater() && limitCoastSailing && destTerrain->isWater() && dir.x && dir.y) //diagonal move through water
 		{
-			const int3 horizontalNeighbour = srcCoord + int3{dir.x, 0, 0};
-			const int3 verticalNeighbour = srcCoord + int3{0, dir.y, 0};
-			if(gameInfo.getTile(horizontalNeighbour)->isLand() || gameInfo.getTile(verticalNeighbour)->isLand())
+			const auto horizontalNeighbour = topology.canonicalize(srcCoord + int3{dir.x, 0, 0});
+			const auto verticalNeighbour = topology.canonicalize(srcCoord + int3{0, dir.y, 0});
+			assert(horizontalNeighbour && verticalNeighbour);
+			if(gameInfo.getTile(*horizontalNeighbour)->isLand() || gameInfo.getTile(*verticalNeighbour)->isLand())
 				continue;
 		}
 
-		vec.push_back(destCoord);
+		vec.push_back(*destCoord);
 	}
 }
 

@@ -8,6 +8,7 @@
  *
  */
 #include "StdInc.h"
+#include "MapTopology.h"
 #include "CMap.h"
 
 #include "CMapEditManager.h"
@@ -325,6 +326,20 @@ void CMap::calculateGuardingGreaturePositions()
 
 void CMap::calculateGuardingGreaturePositions(int3 topleft, int3 bottomright)
 {
+	if(toroidal)
+	{
+		const auto topology = getTopology();
+		for(int z = std::max(0, topleft.z); z <= std::min<int>(levels() - 1, bottomright.z); ++z)
+			for(int x = topleft.x; x <= std::min(bottomright.x, topleft.x + width - 1); ++x)
+				for(int y = topleft.y; y <= std::min(bottomright.y, topleft.y + height - 1); ++y)
+				{
+					const auto tile = topology.canonicalize(int3(x, y, z));
+					assert(tile);
+					guardingCreaturePositions[*tile] = guardingCreaturePosition(*tile);
+				}
+		return;
+	}
+
 	int3 topleftReal = {
 		std::max(0, topleft.x),
 		std::max(0, topleft.y),
@@ -390,11 +405,10 @@ bool CMap::isCoastalTile(const int3 & pos) const
 
 	for(const auto & dir : dirs)
 	{
-		const int3 hlp = pos + dir;
-
-		if(!isInTheMap(hlp))
+		const auto hlp = getTopology().canonicalize(pos + dir);
+		if(!hlp)
 			continue;
-		const TerrainTile &hlpt = getTile(hlp);
+		const TerrainTile &hlpt = getTile(*hlp);
 		if(hlpt.isWater())
 			return true;
 	}
@@ -418,7 +432,9 @@ bool CMap::checkForVisitableDir(const int3 & src, const TerrainTile * pom, const
 		if(!vstd::contains(pom->blockingObjects, objID)) //this visitable object is not blocking, ignore
 			continue;
 
-		if (!getObject(objID)->appearance->isVisitableFrom(src.x - dst.x, src.y - dst.y))
+		const int3 offset = toroidal && src.z == dst.z && isInTheMap(src) && isInTheMap(dst)
+			? getTopology().displacement(dst, src) : src - dst;
+		if (!getObject(objID)->appearance->isVisitableFrom(offset.x, offset.y))
 			return false;
 	}
 	return true;
@@ -449,16 +465,17 @@ int3 CMap::guardingCreaturePosition (int3 pos) const
 	{
 		for (int dy = 0; dy < 3; dy++)
 		{
-			if (isInTheMap(pos))
+			const auto neighbor = getTopology().canonicalize(pos);
+			if (neighbor)
 			{
-				const auto & tile = getTile(pos);
+				const auto & tile = getTile(*neighbor);
 				if (tile.visitable() && (tile.isWater() == water))
 				{
 					for (const auto & objID : tile.visitableObjects)
 					{
 						const auto * object = getObject(objID);
-						if (object->ID == Obj::MONSTER  &&  checkForVisitableDir(pos, &posTile, originalPos)) // Monster being able to attack investigated tile
-							return pos;
+						if (object->ID == Obj::MONSTER  &&  checkForVisitableDir(*neighbor, &posTile, originalPos)) // Monster being able to attack investigated tile
+							return *neighbor;
 					}
 				}
 			}

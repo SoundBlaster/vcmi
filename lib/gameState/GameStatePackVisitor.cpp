@@ -8,6 +8,7 @@
  *
  */
 #include "StdInc.h"
+#include "../mapping/MapTopology.h"
 #include "GameStatePackVisitor.h"
 
 #include "CGameState.h"
@@ -598,7 +599,12 @@ void GameStatePackVisitor::visitTryMoveHero(TryMoveHero & pack)
 
 	if((pack.result == TryMoveHero::SUCCESS || pack.result == TryMoveHero::BLOCKING_VISIT || pack.result == TryMoveHero::EMBARK || pack.result == TryMoveHero::DISEMBARK) && pack.start != pack.end)
 	{
-		auto dir = getDir(pack.start, pack.end);
+		const auto & map = gs.getMap();
+		const int3 startTile = h->convertToVisitablePos(pack.start);
+		const int3 endTile = h->convertToVisitablePos(pack.end);
+		const int3 endForDirection = map.toroidal && startTile.z == endTile.z
+			? pack.start + map.getTopology().displacement(startTile, endTile) : pack.end;
+		auto dir = getDir(pack.start, endForDirection);
 		if(dir > 0  &&  dir <= 8)
 			h->moveDir = dir;
 		//else don`t change move direction - hero might have traversed the subterranean gate, direction should be kept

@@ -23,6 +23,7 @@
 #include "MapDifficulty.h"
 
 class CGObjectInstance;
+class MapTopology;
 enum class EMapFormat : uint8_t;
 
 /// The hero name struct consists of the hero id and the hero name.
@@ -230,6 +231,7 @@ public:
 	virtual ~CMapHeader();
 
 	ui8 levels() const;
+	MapTopology getTopology() const;
 
 	void banWaterHeroes(bool isWaterMap);
 

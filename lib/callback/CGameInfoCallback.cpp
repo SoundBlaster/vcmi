@@ -27,6 +27,7 @@
 #include "../battle/BattleInfo.h"
 #include "../IGameSettings.h"
 #include "../mapping/CMap.h"
+#include "../mapping/MapTopology.h"
 #include "../CPlayerState.h"
 #include "../TerrainHandler.h"
 
@@ -870,6 +871,30 @@ void CGameInfoCallback::getTilesInRange(FowTilesType & tiles,
 	else
 	{
 		const TeamState * team = !player ? nullptr : gameState().getPlayerTeam(*player);
+		const auto & map = gameState().getMap();
+		if(map.toroidal)
+		{
+			const auto topology = map.getTopology();
+			const auto center = topology.canonicalize(pos);
+			if(!center || radious < 0)
+				return;
+			const int xRange = std::min(radious, map.width / 2 + 1);
+			const int yRange = std::min(radious, map.height / 2 + 1);
+			for(int dx = -xRange; dx <= xRange; ++dx)
+				for(int dy = -yRange; dy <= yRange; ++dy)
+				{
+					const auto tile = topology.canonicalize(*center + int3(dx, dy, 0));
+					assert(tile);
+					const int3 offset = topology.displacement(*center, *tile);
+					if(int3(0, 0, 0).dist(offset, distanceFormula) > radious)
+						continue;
+					if(!player
+					   || (mode == ETileVisibility::HIDDEN && team->fogOfWarMap[*tile] == 0)
+					   || (mode == ETileVisibility::REVEALED && team->fogOfWarMap[*tile] == 1))
+						tiles.insert(*tile);
+				}
+			return;
+		}
 		for (int xd = std::max<int>(pos.x - radious , 0); xd <= std::min<int>(pos.x + radious, gameState().getMap().width - 1); xd++)
 		{
 			for (int yd = std::max<int>(pos.y - radious, 0); yd <= std::min<int>(pos.y + radious, gameState().getMap().height - 1); yd++)

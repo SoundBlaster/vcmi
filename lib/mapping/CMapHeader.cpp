@@ -11,6 +11,7 @@
 #include "CMapHeader.h"
 
 #include "MapFormat.h"
+#include "MapTopology.h"
 
 #include "../GameLibrary.h"
 #include "../entities/faction/CTownHandler.h"
@@ -138,6 +139,11 @@ CMapHeader::~CMapHeader() = default;
 ui8 CMapHeader::levels() const
 {
 	return mapLayers.size();
+}
+
+MapTopology CMapHeader::getTopology() const
+{
+	return MapTopology(width, height, levels(), toroidal);
 }
 
 void CMapHeader::registerMapStrings()

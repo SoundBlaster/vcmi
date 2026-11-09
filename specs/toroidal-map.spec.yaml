@@ -93,6 +93,11 @@ constraints:
     level: MUST
     statement: This draft and its source analysis do not establish implementation, runtime conformance, visual continuity, or acceptance of every detailed requirement.
 evidence:
+  - id: topology_movement_build_and_test_attempt
+    kind: documentation
+    path: specs/toroidal-map/evidence/topology-movement-2026-11-09.md
+    supports:
+      - provenance
   - id: topology_format_build_and_test_attempt
     kind: documentation
     path: specs/toroidal-map/evidence/topology-format-2026-11-09.md

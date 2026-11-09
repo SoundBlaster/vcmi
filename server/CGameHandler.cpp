@@ -8,6 +8,7 @@
  *
  */
 #include "StdInc.h"
+#include "../lib/mapping/MapTopology.h"
 #include "CGameHandler.h"
 
 #include "CVCMIServer.h"
@@ -900,8 +901,12 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			return complainRet("Cannot disembark hero, tile contains a hole!");
 	}
 
-	if(!h->pos.areNeighbours(dst) && movementMode == EMovementMode::STANDARD)
-		return complainRet("Tiles " + h->pos.toString()+ " and "+ dst.toString() +" are not neighboring!");
+	if(movementMode == EMovementMode::STANDARD)
+	{
+		const int3 source = h->visitablePos();
+		if(source.z != hmpos.z || !int3(0, 0, 0).areNeighbours(gameState().getMap().getTopology().displacement(source, hmpos)))
+			return complainRet("Tiles " + h->pos.toString()+ " and "+ dst.toString() +" are not neighboring!");
+	}
 
 	if(h->isGarrisoned())
 		return complainRet("Can not move garrisoned hero!");

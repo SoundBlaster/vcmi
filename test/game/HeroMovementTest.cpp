@@ -31,6 +31,60 @@ protected:
 	const Services * gameServices() override { return LIBRARY; }
 };
 
+TEST_F(HeroMovementTest, pathfinderAndServerCrossToroidalSeams)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 1, 0));
+	hero->setMovementPoints(3000);
+	const int3 acrossWest(35, 1, 0);
+
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * node = paths.getNode(acrossWest, EPathfindingLayer::LAND);
+	ASSERT_TRUE(node->reachable());
+	ASSERT_NE(node->theNodeBefore, nullptr);
+	EXPECT_EQ(node->theNodeBefore->coord, hero->visitablePos());
+
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(acrossWest), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), acrossWest);
+
+	const int3 topLeft(0, 0, 0);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(topLeft), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), topLeft);
+	const int3 acrossCorner(35, 35, 0);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(acrossCorner), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), acrossCorner);
+}
+
+TEST_F(HeroMovementTest, sightRangeWrapsWithoutRevealingDistantTiles)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	setMapVisibility(player, false);
+
+	FowTilesType tiles;
+	gameState()->getTilesInRange(tiles, int3(0, 0, 0), 1, ETileVisibility::HIDDEN, player);
+	EXPECT_TRUE(tiles.contains(int3(35, 0, 0)));
+	EXPECT_TRUE(tiles.contains(int3(0, 35, 0)));
+	EXPECT_TRUE(tiles.contains(int3(35, 35, 0)));
+	EXPECT_FALSE(tiles.contains(int3(33, 0, 0)));
+}
+
 /// Two towns that share an entrance tile, as found on some SoD maps. The pathfinder only considers the top town.
 TEST_F(HeroMovementTest, sharedEntranceInteractsOnlyWithTopTown)
 {

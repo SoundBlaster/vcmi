@@ -58,12 +58,12 @@ future opt-in design preserves it.
 | `topology` | Diagonal crossing wraps one or both axes, including all four corners. | G3, G4 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no hero movement |
 | `topology` | Canonical tile coordinates and supported dimensions remain valid. | G1–G4; small-map cases to specify | partial: helper and format minimum | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); format minimum is untested |
 | `level_isolation` | Seams preserve level; normal inter-level passages continue to work. | G9 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no passage test |
-| `movement_and_route` | Crossing uses normal passability, diagonal rules, cost, movement points and visits. | G4, G5, G10 | not started | not run | pending | none |
-| `movement_and_route` | Route finding considers legal wrapped neighbors under normal knowledge rules. | G6 | not started | not run | pending | none; route selection coverage needs refinement |
+| `movement_and_route` | Crossing uses normal passability, diagonal rules, cost, movement points and visits. | G4, G5, G10 | partial: server and direction handling | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); object and cost cases remain |
+| `movement_and_route` | Route finding considers legal wrapped neighbors under normal knowledge rules. | G6 | partial: neighbor enumeration | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); route selection coverage needs refinement |
 | `movement_and_route` | Boat travel, embarking and disembarking follow normal rules at seams. | G8 | not started | not run | pending | none |
-| `authority` | Client route and server agree on legal wrapped steps. | G1–G4, G6, P3 | not started | not run | pending | none |
-| `authority` | Blocked or illegal crossing is rejected without applying movement effects. | G5, G10, P3 | not started | not run | pending | none |
-| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | not started | not run | pending | none |
+| `authority` | Client route and server agree on legal wrapped steps. | G1–G4, G6, P3 | partial: pathfinder and server | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); multiplayer unverified |
+| `authority` | Blocked or illegal crossing is rejected without applying movement effects. | G5, G10, P3 | partial: server rules adapted | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); rejection cases unverified |
+| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); no runtime observation |
 | `vision_and_guards` | Object interaction across seams follows normal rules. | G10; additional object cases to specify | not started | not run | pending | none; object audit incomplete |
 
 ## Presentation and interaction
@@ -105,6 +105,8 @@ The isolated helper tests are recorded in
 [`evidence/topology-unit-2026-11-09.md`](evidence/topology-unit-2026-11-09.md).
 The format and save test attempt is recorded in
 [`evidence/topology-format-2026-11-09.md`](evidence/topology-format-2026-11-09.md).
+The gameplay movement test attempt is recorded in
+[`evidence/topology-movement-2026-11-09.md`](evidence/topology-movement-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

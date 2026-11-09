@@ -8,6 +8,7 @@
  *
  */
 #include "StdInc.h"
+#include "../mapping/MapTopology.h"
 #include "CGameState.h"
 
 #include "EVictoryLossCheckResult.h"
@@ -1311,16 +1312,17 @@ std::vector<const CGObjectInstance*> CGameState::guardingCreatures (int3 pos) co
 	{
 		for (int dy = 0; dy < 3; dy++)
 		{
-			if (map->isInTheMap(pos))
+			const auto neighbor = map->getTopology().canonicalize(pos);
+			if (neighbor)
 			{
-				const auto & tile = map->getTile(pos);
+				const auto & tile = map->getTile(*neighbor);
 				if (tile.visitable() && (tile.isWater() == posTile.isWater()))
 				{
 					for (ObjectInstanceID objectID : tile.visitableObjects)
 					{
 						const CGObjectInstance * object = getObjInstance(objectID);
 
-						if (object->ID == Obj::MONSTER  &&  map->checkForVisitableDir(pos, &map->getTile(originalPos), originalPos)) // Monster being able to attack investigated tile
+						if (object->ID == Obj::MONSTER  &&  map->checkForVisitableDir(*neighbor, &map->getTile(originalPos), originalPos)) // Monster being able to attack investigated tile
 						{
 							guards.push_back(object);
 						}
