@@ -37,6 +37,11 @@ it is not a client UI or visual rendering test.
 The same VMAP test was extended to run `CPathfinder` before the server move;
 the corner resource is reachable with the start tile as its immediate
 predecessor. All three fixture tests passed (`adapted-demo-route-tests.log`).
+The VMAP test was then extended to enter the vacated corner, write a temporary
+`.vsgm1` save file on TB5, reload its game state, verify the hero position,
+topology and gold, and continue across the horizontal seam. Four focused
+tests passed (`adapted-demo-save-tests.log`). This does not verify the GUI
+save/load flow or all fog-of-war state.
 
 An ordinary ad-hoc signed client was prepared on TB5 from the current build;
 the signed executable SHA-256 was

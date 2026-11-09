@@ -164,6 +164,39 @@ TEST(ToroidalDemoVmapTest, SavedMapStartsAndSupportsCornerVisit)
 	CGameHandler handler(server, state);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 35, 0)), EMovementMode::STANDARD, false, PlayerColor(0), EPathfindingLayer::LAND));
 	EXPECT_GT(state->players.at(PlayerColor(0)).resources[GameResID::GOLD], goldBefore);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 35, 0)), EMovementMode::STANDARD, false, PlayerColor(0), EPathfindingLayer::LAND));
+	ASSERT_EQ(hero->visitablePos(), int3(35, 35, 0));
+	const auto heroID = hero->id;
+	const auto goldAfter = state->players.at(PlayerColor(0)).resources[GameResID::GOLD];
+	CMemorySerializer stateBytes, headerBytes;
+	state->saveGame(stateBytes.oser);
+	state->saveHeader(headerBytes.oser);
+	const auto path = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-demo-seam-%%%%-%%%%.vsgm1");
+	struct TemporarySave
+	{
+		boost::filesystem::path path;
+		~TemporarySave() { boost::filesystem::remove(path); }
+	} temporarySave{path};
+	CSaveFile save;
+	save.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*state).toBytes());
+	save.addChunk(SaveFileFormat::CHUNK_HEADER, headerBytes.extractBuffer());
+	save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, stateBytes.extractBuffer());
+	save.write(path);
+	CLoadFile load(path);
+	auto restored = std::make_shared<CGameState>();
+	restored->preInit(LIBRARY);
+	auto chunk = load.openChunk(SaveFileFormat::CHUNK_GAMESTATE, restored.get());
+	restored->loadGame(chunk->iser);
+	ASSERT_TRUE(chunk->isFullyRead());
+	ASSERT_TRUE(restored->getMap().toroidal);
+	auto * restoredHero = dynamic_cast<CGHeroInstance *>(restored->getMap().getObject(heroID));
+	ASSERT_NE(restoredHero, nullptr);
+	ASSERT_EQ(restoredHero->visitablePos(), int3(35, 35, 0));
+	EXPECT_EQ(restored->players.at(PlayerColor(0)).resources[GameResID::GOLD], goldAfter);
+	GameHandlerTestServer restoredServer(restored, PlayerColor(0));
+	CGameHandler restoredHandler(restoredServer, restored);
+	ASSERT_TRUE(restoredHandler.moveHero(heroID, restoredHero->convertFromVisitablePos(int3(0, 35, 0)), EMovementMode::STANDARD, false, PlayerColor(0), EPathfindingLayer::LAND));
+	EXPECT_EQ(restoredHero->visitablePos(), int3(0, 35, 0));
 }
 
 class GrailTopologyTest : public TinyMapGameTest
