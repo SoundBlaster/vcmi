@@ -35,3 +35,9 @@ hero and boat animations. The original demo art was not authored to connect
 its opposing edges, and visible terrain discontinuities remain at the seam.
 Real-player fog, input at each seam, appropriate seam art, other directions,
 wide zoom, and acceptance remain unverified.
+
+A later attempt to start a human game reached the scenario-selection screen
+using the keyboard, but the test map could not be selected: the filter did
+not accept the attempted input and the list was not exposed in the available
+accessibility tree. The client closed normally. No human-mode fog or scroll
+result, continuous recording, or new screen-recording permission was obtained.

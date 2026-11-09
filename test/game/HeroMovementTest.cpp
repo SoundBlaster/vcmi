@@ -307,6 +307,34 @@ TEST_F(HeroMovementTest, UndergroundSeamPreservesLevelAndFogIsolation)
 	EXPECT_FALSE(paths.getNode(int3(35, 1, 0), EPathfindingLayer::LAND)->reachable());
 }
 
+TEST_F(HeroMovementTest, HeroCollectsResourceAcrossToroidalCorner)
+{
+	const PlayerColor player(0);
+	const int3 destination(35, 35, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 0, 0), HeroTypeID(0), player)
+		.resource(destination, GameResID::GOLD, 10);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	hero->setMovementPoints(3000);
+	const auto resourceID = map()->getTile(destination).topVisitableObj();
+	ASSERT_TRUE(resourceID.hasValue());
+	const auto goldBefore = gameState()->players.at(player).resources[GameResID::GOLD];
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
+	EXPECT_EQ(map()->getObject(resourceID), nullptr);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
+}
+
 TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 {
 	const PlayerColor player(0);
