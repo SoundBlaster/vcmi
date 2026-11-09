@@ -17,6 +17,15 @@ Jebus Outcast version, including its rules and mod dependencies, have not
 been verified. Importing a diagram or a file is not proof that another engine
 will generate the same maps or apply identical game rules.
 
+On 2026-11-10 the locally built Template Editor opened the bundled VCMI
+`hdmod/jebusCross.json` and displayed its five zone cards and their links.
+The editor also showed general template settings and controls for zones and
+connections. This was a read-only GUI observation of Jebus Cross, not Jebus
+Outcast, a template editing round trip, or toroidal generation. The input file
+SHA-256 was
+`f633c6a4e6d3f4ddce6509f50a1adb80acb24a31a498dc7afba7ffc160b556c6`;
+the application identity is recorded in the [legacy editor check](evidence/topology-legacy-editor-2026-11-10.md).
+
 - [VCMI template format](https://github.com/vcmi/vcmi/blob/develop/docs/modders/Random_Map_Template.md)
 - [HotA template editor](https://h3hota.com/en/templates)
 
