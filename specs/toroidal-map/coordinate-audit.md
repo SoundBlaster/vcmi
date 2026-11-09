@@ -1,5 +1,8 @@
 # Coordinate and distance audit
 
+For the map flag, legacy compatibility and the role of the shared topology
+layer, see [topology design](topology-design.md).
+
 This is a review queue for the toroidal feature, not a claim that every match
 is a bug or that every topology-dependent expression has been found. The
 [candidate index](coordinate-audit-index.md) records per-file search results
