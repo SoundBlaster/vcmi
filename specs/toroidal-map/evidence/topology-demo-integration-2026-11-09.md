@@ -1,5 +1,13 @@
 # Demo-based integration checks
 
+On 2026-11-10, an SoD synthetic map had cobblestone on both sides of a
+horizontal seam. `HeroMovementTest.RoadMovementCostAppliesAcrossToroidalSeam`
+checked that the pathfinder selects the direct step `(0,5,0) -> (35,5,0)`
+and that both pathfinder and server spend 50 of 3,000 movement points. It
+passed alongside the RoE and SoD seam tests (three tests) after a build from
+`6c0ede5` plus the new test (`road-seam-cost-build.log` on TB5). This does
+not test road rendering or other road types and diagonal combinations.
+
 On 2026-11-09 the Linux Heroes III demo was obtained from the archived URL
 in `launcher/demo.cpp`, and its SHA-1 matched that code's expected
 `74c28240794d0aa2fb52cadcd088ab6dd47478c1`. Only the files selected by that

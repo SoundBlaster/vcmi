@@ -747,6 +747,39 @@ TEST_F(HeroMovementTest, ServerRejectsForbiddenObjectEntranceAcrossToroidalSeam)
 	}
 }
 
+TEST_F(HeroMovementTest, RoadMovementCostAppliesAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	map()->getTile(origin).roadType = RoadId::COBBLESTONE_ROAD;
+	map()->getTile(destination).roadType = RoadId::COBBLESTONE_ROAD;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * node = paths.getNode(destination, EPathfindingLayer::LAND);
+	ASSERT_TRUE(node->reachable());
+	ASSERT_EQ(node->turns, 0);
+	ASSERT_NE(node->theNodeBefore, nullptr);
+	EXPECT_EQ(node->theNodeBefore->coord, origin);
+	EXPECT_EQ(node->moveRemains, 2950);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_EQ(hero->movementPointsRemaining(), 2950);
+}
+
 TEST_F(HeroMovementTest, ObjectEntranceDirectionIsRespectedAcrossToroidalSeams)
 {
 	const PlayerColor player(0);
