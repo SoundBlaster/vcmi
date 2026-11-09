@@ -76,3 +76,11 @@ passed (`minimap-footprints-tests.log`); the client, editor, and test targets
 built (`minimap-footprints-build.log`). These tests do not exercise GUI
 minimap updates or editor highlighting. The editor's selection outline and
 static seam-object restriction remain separate, unresolved concerns.
+
+The synthetic `HeroMovementTest.SpecialTerrainCoversOppositeCornerOnToroidalMap`
+places a 2×2 `CGTerrainPatch` across a corner and calls the actual game-state
+special-battlefield lookup. It finds the patch at the opposite corner in
+toroidal mode, not bounded mode, and does not leak onto the other level. The
+patch supplies a synthetic battlefield ID, so this does not verify the effects
+or rendering of an original cursed-ground or magic-plains object. The focused
+run passed three tests (`seam-terrain-patch-tests.log`).

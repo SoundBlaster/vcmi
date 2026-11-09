@@ -340,6 +340,35 @@ TEST_F(HeroMovementTest, ObjectVisibilityUsesWrappedFootprintTiles)
 	EXPECT_FALSE(object.isVisibleFor(player));
 }
 
+TEST_F(HeroMovementTest, SpecialTerrainCoversOppositeCornerOnToroidalMap)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	class SyntheticTerrainPatch : public CGTerrainPatch
+	{
+	public:
+		using CGTerrainPatch::CGTerrainPatch;
+		BattleField getBattlefield() const override { return BattleField(0); }
+	};
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "VV", "VV" ] })";
+	JsonNode definition(text.data(), text.size(), "SeamTerrainPatchTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto patch = std::make_shared<SyntheticTerrainPatch>(gameState().get());
+	patch->appearance = appearance;
+	patch->pos = int3(0, 0, 0);
+	patch->instanceName = "seam_terrain_patch";
+	map()->addNewObject(patch);
+	EXPECT_EQ(gameState()->getSpecialTerrainAt(int3(0, 0, 0)), BattleField(0));
+	EXPECT_EQ(gameState()->getSpecialTerrainAt(int3(35, 35, 0)), BattleField::NONE);
+	map()->toroidal = true;
+	EXPECT_EQ(gameState()->getSpecialTerrainAt(int3(35, 35, 0)), BattleField(0));
+	EXPECT_EQ(gameState()->getSpecialTerrainAt(int3(35, 35, 1)), BattleField::NONE);
+}
+
 TEST_F(HeroMovementTest, ObjectTileQueriesFindFootprintAcrossToroidalCorner)
 {
 	const PlayerColor player(0);
