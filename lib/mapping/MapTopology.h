@@ -11,6 +11,7 @@
 
 #include "../int3.h"
 
+#include <algorithm>
 #include <optional>
 
 /// Converts explicitly requested map positions without changing level identity.
@@ -50,6 +51,29 @@ public:
 			result.y = shortestOffset(result.y, height);
 		}
 		return result;
+	}
+
+	/// Visits each toroidal tile in range once, preserving the center's level.
+	/// The center may itself be a repeated image outside the canonical rectangle.
+	template<typename Visitor>
+	void forEachWrappedTileInRange(const int3 & position, int radius, int3::EDistanceFormula formula, Visitor visit) const
+	{
+		assert(wraps);
+		const auto center = canonicalize(position);
+		if(!center || radius < 0)
+			return;
+
+		const int minX = -std::min(radius, width / 2);
+		const int maxX = std::min(radius, (width - 1) / 2);
+		const int minY = -std::min(radius, height / 2);
+		const int maxY = std::min(radius, (height - 1) / 2);
+		for(int dx = minX; dx <= maxX; ++dx)
+			for(int dy = minY; dy <= maxY; ++dy)
+			{
+				const int3 offset(dx, dy, 0);
+				if(int3(0, 0, 0).dist(offset, formula) <= radius)
+					visit(*canonicalize(*center + offset));
+			}
 	}
 
 	static int wrapCoordinate(int value, int extent)

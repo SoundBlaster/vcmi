@@ -56,3 +56,48 @@ TEST(MapTopology, WrapsPixelCoordinatesAcrossMultiplePeriods)
 	EXPECT_EQ(MapTopology::wrapCoordinate(-2 * extent - 17, extent), extent - 17);
 	EXPECT_EQ(MapTopology::wrapCoordinate(3 * extent + 17, extent), 17);
 }
+
+TEST(MapTopology, WrappedRangesMatchExhaustiveMapAndDoNotRepeatTiles)
+{
+	for(int width = 3; width <= 8; ++width)
+		for(int height = 3; height <= 8; ++height)
+			for(int radius = 0; radius <= 10; ++radius)
+				for(const auto formula : {int3::DIST_2D, int3::DIST_MANHATTAN, int3::DIST_CHEBYSHEV, int3::DIST_2DSQ})
+				{
+					const MapTopology topology(width, height, 2, true);
+					const int3 position(-width - 1, 2 * height + 1, 1);
+					const int centerX = width - 1;
+					const int centerY = 1;
+					std::set<int3> expected;
+					for(int x = 0; x < width; ++x)
+						for(int y = 0; y < height; ++y)
+						{
+							const int rawX = std::abs(x - centerX);
+							const int rawY = std::abs(y - centerY);
+							const int3 distance(std::min(rawX, width - rawX), std::min(rawY, height - rawY), 0);
+							if(int3(0, 0, 0).dist(distance, formula) <= radius)
+								expected.insert(int3(x, y, 1));
+						}
+
+					std::set<int3> actual;
+					int visits = 0;
+					topology.forEachWrappedTileInRange(position, radius, formula, [&](const int3 & tile)
+					{
+						++visits;
+						actual.insert(tile);
+					});
+					EXPECT_EQ(actual, expected) << width << "x" << height << " radius=" << radius << " formula=" << formula;
+					EXPECT_EQ(visits, actual.size());
+				}
+}
+
+TEST(MapTopology, WrappedRangeRejectsInvalidLevelsAndNegativeRadius)
+{
+	const MapTopology topology(5, 5, 2, true);
+	int visits = 0;
+	const auto visitor = [&](const int3 &) { ++visits; };
+	topology.forEachWrappedTileInRange(int3(0, 0, -1), 2, int3::DIST_2D, visitor);
+	topology.forEachWrappedTileInRange(int3(0, 0, 2), 2, int3::DIST_2D, visitor);
+	topology.forEachWrappedTileInRange(int3(0, 0, 0), -1, int3::DIST_2D, visitor);
+	EXPECT_EQ(visits, 0);
+}

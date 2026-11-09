@@ -63,7 +63,7 @@ future opt-in design preserves it.
 | `movement_and_route` | Boat travel, embarking and disembarking follow normal rules at seams. | G8 | not started | not run | pending | none |
 | `authority` | Client route and server agree on legal wrapped steps. | G1–G4, G6, P3 | partial: pathfinder and server | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); multiplayer unverified |
 | `authority` | Blocked or illegal crossing is rejected without applying movement effects. | G5, G10, P3 | partial: server rules adapted | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); rejection cases unverified |
-| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); no runtime observation |
+| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | partial: isolated range enumeration | pending | [range record](evidence/topology-range-2026-11-09.md), [movement record](evidence/topology-movement-2026-11-09.md); fog and guards have no runtime observation |
 | `vision_and_guards` | Object interaction across seams follows normal rules. | G10; additional object cases to specify | not started | not run | pending | none; object audit incomplete |
 
 ## Presentation and interaction
@@ -121,6 +121,8 @@ The static seam-object restriction and its unexecuted integration test are recor
 [`evidence/topology-seam-validation-2026-11-09.md`](evidence/topology-seam-validation-2026-11-09.md).
 The one-way portal AI changes are recorded in
 [`evidence/topology-portal-ai-2026-11-09.md`](evidence/topology-portal-ai-2026-11-09.md).
+The isolated sight-range enumeration checks are recorded in
+[`evidence/topology-range-2026-11-09.md`](evidence/topology-range-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
