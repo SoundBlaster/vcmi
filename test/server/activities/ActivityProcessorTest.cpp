@@ -2616,7 +2616,7 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGatePairedAcrossToroidalSeam)
 	builder.size(36, true).playerActive(player).hero(int3(2, 5, 0), HeroTypeID(0), player);
 	startWithMap(std::move(builder));
 	map()->toroidal = true;
-	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A" ] })";
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ "A" ] })";
 	JsonNode definition(text.data(), text.size(), "GateTraversalTest");
 	auto appearance = std::make_shared<ObjectTemplate>();
 	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
@@ -2672,7 +2672,7 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGateWithVisitableTileAcrossSeam)
 	map()->toroidal = true;
 	const auto makeAppearance = [](const std::string & mask)
 	{
-		const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ ")" + mask + R"(" ] })";
+		const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ ")" + mask + R"(" ] })";
 		JsonNode definition(text.data(), text.size(), "SeamGateTraversalTest");
 		auto appearance = std::make_shared<ObjectTemplate>();
 		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
@@ -2730,7 +2730,7 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesOneWayMonolithWithExitAcrossSeam)
 	GameRandomizer randomizer(*gameState());
 	const auto addMonolith = [&](MapObjectID type, const int3 & pos, const std::string & name, const std::string & mask)
 	{
-		const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ ")" + mask + R"(" ] })";
+		const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ ")" + mask + R"(" ] })";
 		JsonNode definition(text.data(), text.size(), "SeamMonolithTraversalTest");
 		auto appearance = std::make_shared<ObjectTemplate>();
 		InstantIdentifierResolver resolver(*LIBRARY->identifiers());

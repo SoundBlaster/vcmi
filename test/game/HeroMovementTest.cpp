@@ -621,7 +621,7 @@ TEST_F(HeroMovementTest, CollectsResourceWithVisitableTileAcrossSeam)
 	ASSERT_NE(hero, nullptr);
 	ASSERT_NE(resource, nullptr);
 	ASSERT_EQ(hero->visitablePos(), int3(34, 10, 0));
-	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A0" ] })";
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ "A0" ] })";
 	JsonNode definition(text.data(), text.size(), "SeamResourceTest");
 	auto appearance = std::make_shared<ObjectTemplate>();
 	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
@@ -696,6 +696,47 @@ TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
 	EXPECT_FALSE(hero->inBoat());
 	EXPECT_EQ(hero->visitablePos(), west);
 	EXPECT_EQ(hero->movementPointsRemaining(), disembarkRemaining);
+}
+
+TEST_F(HeroMovementTest, ServerRejectsForbiddenObjectEntranceAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.resource(destination, GameResID::GOLD, 10);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	auto * resource = findFirst<CGResource>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(resource, nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "ForbiddenSeamEntrance");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	map()->hideObject(resource);
+	resource->appearance = appearance;
+	map()->showObject(resource);
+	const auto resourceId = resource->id;
+	const auto gold = gameState()->players.at(player).resources[GameResID::GOLD];
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	EXPECT_FALSE(paths.getNode(destination, EPathfindingLayer::LAND)->reachable());
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold);
+	EXPECT_NE(map()->getObject(resourceId), nullptr);
 }
 
 TEST_F(HeroMovementTest, HeroCrossesMinimumToroidalMapCorner)
