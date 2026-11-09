@@ -157,6 +157,32 @@ TEST_F(HeroMovementTest, blockedToroidalStepIsRejectedRoE)
 	checkBlockedToroidalStep(EMapFormat::ROE);
 }
 
+TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.monster(int3(35, 5, 0), CreatureID(0), 10)
+		.monster(int3(35, 35, 0), CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	map()->calculateGuardingGreaturePositions();
+
+	const auto guards = [&](const int3 & tile, const int3 & position)
+	{
+		const auto monsters = gameState()->guardingCreatures(tile);
+		return std::ranges::any_of(monsters, [&](const auto * monster) { return monster->visitablePos() == position; });
+	};
+	EXPECT_TRUE(guards(int3(0, 5, 0), int3(35, 5, 0)));
+	EXPECT_TRUE(guards(int3(0, 0, 0), int3(35, 35, 0)));
+	EXPECT_FALSE(guards(int3(2, 5, 0), int3(35, 5, 0)));
+
+	map()->toroidal = false;
+	map()->calculateGuardingGreaturePositions();
+	EXPECT_FALSE(guards(int3(0, 5, 0), int3(35, 5, 0)));
+	EXPECT_FALSE(guards(int3(0, 0, 0), int3(35, 35, 0)));
+}
+
 TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 {
 	const PlayerColor player(0);

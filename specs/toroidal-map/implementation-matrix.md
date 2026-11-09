@@ -63,7 +63,7 @@ future opt-in design preserves it.
 | `movement_and_route` | Boat travel, embarking and disembarking follow normal rules at seams. | G8 | not started | not run | pending | none |
 | `authority` | Client route and server agree on legal wrapped steps. | G1–G4, G6, P3 | partial: pathfinder and server | partial: RoE direct steps | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); multiplayer unverified |
 | `authority` | Blocked or illegal crossing is rejected without applying movement effects. | G5, G10, P3 | partial: server rules adapted | partial: one blocked RoE tile | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); other rejection cases unverified |
-| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | partial: RoE hidden range and isolated enumeration | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); guards and full fog behavior unverified |
+| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | partial: hidden range and selected guard positions | pending | [integration record](evidence/topology-demo-integration-2026-11-09.md); complete guard interactions and fog behavior unverified |
 | `vision_and_guards` | Object interaction across seams follows normal rules. | G10; additional object cases to specify | not started | not run | pending | none; object audit incomplete |
 
 ## Presentation and interaction

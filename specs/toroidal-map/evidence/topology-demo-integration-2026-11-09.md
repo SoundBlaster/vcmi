@@ -89,5 +89,13 @@ This is not a full-file save after crossing or exhaustive fog verification.
 The test source SHA-256 at this run was
 `8108025b1e6abd2c7852d739c5b4c689f7ccf2506756d01ac79b315ec68b10ac`.
 
+After `e7e5ea9`, `HeroMovementTest.monstersGuardAcrossToroidalEdgesAndCorners`
+passed with Complete data (`guard-seam-tests.log`). On one SoD fixture it
+checks guard lookup across the horizontal edge and one corner, rejects a
+distant tile, and confirms the same edge and corner are not adjacent when
+the topology is bounded. It does not initiate combat or cover every guard
+rule. The test source SHA-256 at this run was
+`6609517d3400382a17861e19a5a4fd029cbf4577841ce7d2fb0653b52d63be46`.
+
 The real viewport, animated seam crossing, multiplayer and seam-spanning
 static objects still require additional work or verification.
