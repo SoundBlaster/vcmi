@@ -1005,6 +1005,32 @@ TEST_F(HeroMovementTest, MonsterGuardAcrossSeamStartsBattle)
 	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
 }
 
+TEST_F(HeroMovementTest, MonsterGuardAcrossCornerStartsBattle)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.monster(int3(35, 35, 0), CreatureID(27), 100);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 1, 0));
+	const auto guardID = map()->getTile(int3(35, 35, 0)).topVisitableObj();
+	const auto * guard = dynamic_cast<const CArmedInstance *>(map()->getObject(guardID));
+	ASSERT_NE(guard, nullptr);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	const auto * battle = gameState()->getBattle(player);
+	ASSERT_NE(battle, nullptr);
+	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+}
+
 TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 {
 	const PlayerColor player(0);

@@ -1,5 +1,13 @@
 # Battle with a guard across a seam
 
+On 2026-11-10 a synthetic SoD scenario additionally placed the guard at
+`(35,35,0)` and moved the hero from `(0,1,0)` into `(0,0,0)`. The server
+started a battle with that guard as defender. The new corner test, the earlier
+edge battle test and guard-position test all passed on macOS arm64 (three
+tests); `vcmitest` was built from `d94dd32` plus the test
+(`corner-guard-battle-build.log` on TB5). Combat animation, victory and all
+guard configurations remain unverified.
+
 On 2026-11-09 on macOS arm64 with copied Complete data, an SoD fixture
 placed a hero at (0,7) and a hostile monster at (35,5). Moving the hero to
 (0,6) entered the monster's wrapped guard range. The server started a battle
