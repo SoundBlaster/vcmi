@@ -107,6 +107,11 @@ public:
 
 	void loadObject(LibraryLoadContext & context, const std::string & scope, const std::string & name, const JsonNode & data, size_t index) override
 	{
+		// Demo datasets can contain fewer legacy records than the built-in
+		// configuration reserves. Preserve their numeric identifiers without
+		// indexing past the legacy-sized vector.
+		if(index >= objects.size())
+			objects.resize(index + 1);
 		if(objects[index] != nullptr)
 			logMod->debug("Replacing existing object at index %d with '%s'", index, name); // required for war machines in demo (uses ids from conflux creatures)
 		objects[index] = loadFromJson(context, scope, data, name, index);
