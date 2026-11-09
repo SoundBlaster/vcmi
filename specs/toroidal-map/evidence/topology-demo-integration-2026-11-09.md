@@ -85,7 +85,8 @@ After `b5f5aad`, `HeroMovementTest.crossedSeamAndFogSurviveGameStateReload`
 passed with Complete data (`save-seam-tests.log`). It performs a real server
 step from (0,1) to (35,1), serializes and reloads the game state in memory,
 and checks the destination, topology, one visible tile and one hidden tile.
-This is not a full-file save after crossing or exhaustive fog verification.
+That run did not use a full-file save or exhaustively verify fog. A later
+[save-file test](topology-seam-save-2026-11-09.md) covers one crossing.
 The test source SHA-256 at this run was
 `8108025b1e6abd2c7852d739c5b4c689f7ccf2506756d01ac79b315ec68b10ac`.
 

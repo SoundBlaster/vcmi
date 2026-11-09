@@ -81,7 +81,7 @@ future opt-in design preserves it.
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `persistence_and_network` | Save/reload preserves topology and authoritative state. | P1 | partial: versioned header serialization | partial: file round trip and in-memory state reload after seam crossing | pending | [integration record](evidence/topology-demo-integration-2026-11-09.md); full-file save after crossing and multiplayer unverified |
+| `persistence_and_network` | Save/reload preserves topology and authoritative state. | P1 | partial: versioned header serialization | partial: file round trip after one seam crossing | pending | [save record](evidence/topology-seam-save-2026-11-09.md); GUI save/load and multiplayer unverified |
 | `persistence_and_network` | Supported multiplayer peers agree on movement and visibility. | P3 | not started | not run | pending | none |
 | `persistence_and_network` | Unsupported peers or readers cannot silently interpret topology incorrectly. | P4 | partial: versioned format and lobby start guard | not run | pending | [format record](evidence/topology-format-2026-11-09.md); locally assigned version can collide with future upstream, so capability identity remains unresolved |
 | `bounded_compatibility` | Existing maps and saves remain bounded; toroidal behavior is opt-in. | P2 | partial: versioned default | partial: legacy header and bounded save | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); full legacy gameplay regression unverified |
@@ -149,6 +149,8 @@ Wrapped object-visibility checks are recorded in
 [`evidence/topology-object-visibility-2026-11-09.md`](evidence/topology-object-visibility-2026-11-09.md).
 Editor topology switching is recorded in
 [`evidence/topology-editor-switch-2026-11-09.md`](evidence/topology-editor-switch-2026-11-09.md).
+The save-file check after crossing is recorded in
+[`evidence/topology-seam-save-2026-11-09.md`](evidence/topology-seam-save-2026-11-09.md).
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

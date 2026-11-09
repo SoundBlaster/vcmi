@@ -14,6 +14,8 @@
 
 #include "../../lib/GameLibrary.h"
 #include "../../lib/CPlayerState.h"
+#include "../../lib/campaign/CampaignState.h"
+#include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
@@ -27,7 +29,10 @@
 #include "../../lib/bonuses/Bonus.h"
 #include "../../lib/pathfinder/CPathfinder.h"
 #include "../../lib/pathfinder/PathfinderOptions.h"
+#include "../../lib/rmg/CMapGenOptions.h"
 #include "../../lib/serializer/CMemorySerializer.h"
+#include "../../lib/serializer/CLoadFile.h"
+#include "../../lib/serializer/CSaveFile.h"
 #include "../../server/CGameHandler.h"
 
 class HeroMovementTest : public TinyMapGameTest
@@ -237,11 +242,32 @@ TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 
 	CMemorySerializer serialized;
 	gameState()->saveGame(serialized.oser);
+	CMemorySerializer header;
+	gameState()->saveHeader(header.oser);
+	const auto savePath = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-seam-save-%%%%-%%%%-%%%%.vsgm1");
+	struct TemporarySave
+	{
+		boost::filesystem::path path;
+		~TemporarySave() { boost::filesystem::remove(path); }
+	} temporarySave{savePath};
+	CSaveFile save;
+	save.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*gameState()).toBytes());
+	save.addChunk(SaveFileFormat::CHUNK_HEADER, header.extractBuffer());
+	save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, serialized.extractBuffer());
+	save.write(savePath);
+	CLoadFile loader(savePath);
+	CMapHeader loadedHeader;
+	StartInfo loadedStartInfo;
+	auto headerChunk = loader.openChunk(SaveFileFormat::CHUNK_HEADER, nullptr);
+	headerChunk->iser & loadedHeader;
+	headerChunk->iser & loadedStartInfo;
+	EXPECT_TRUE(headerChunk->isFullyRead());
+	EXPECT_TRUE(loadedHeader.toroidal);
 	auto restored = std::make_shared<CGameState>();
 	restored->preInit(LIBRARY);
-	serialized.iser.cb = restored.get();
-	restored->loadGame(serialized.iser);
-	EXPECT_TRUE(serialized.isFullyRead());
+	auto gameChunk = loader.openChunk(SaveFileFormat::CHUNK_GAMESTATE, restored.get());
+	restored->loadGame(gameChunk->iser);
+	EXPECT_TRUE(gameChunk->isFullyRead());
 	EXPECT_TRUE(restored->getMap().toroidal);
 	ASSERT_NE(restored->getMap().getObject(heroID), nullptr);
 	EXPECT_EQ(restored->getMap().getObject(heroID)->visitablePos(), destination);
