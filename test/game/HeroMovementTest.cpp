@@ -23,6 +23,7 @@
 #include "../../lib/bonuses/Bonus.h"
 #include "../../lib/pathfinder/CPathfinder.h"
 #include "../../lib/pathfinder/PathfinderOptions.h"
+#include "../../lib/serializer/CMemorySerializer.h"
 #include "../../server/CGameHandler.h"
 
 class HeroMovementTest : public TinyMapGameTest
@@ -154,6 +155,42 @@ TEST_F(HeroMovementTest, blockedToroidalStepIsRejected)
 TEST_F(HeroMovementTest, blockedToroidalStepIsRejectedRoE)
 {
 	checkBlockedToroidalStep(EMapFormat::ROE);
+}
+
+TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	setMapVisibility(player, false);
+
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const int3 destination(35, 1, 0);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_EQ(hero->visitablePos(), destination);
+	const auto heroID = hero->id;
+	const int3 hiddenTile(15, 15, 0);
+	ASSERT_TRUE(gameState()->isVisibleFor(destination, player));
+	ASSERT_FALSE(gameState()->isVisibleFor(hiddenTile, player));
+
+	CMemorySerializer serialized;
+	gameState()->saveGame(serialized.oser);
+	auto restored = std::make_shared<CGameState>();
+	restored->preInit(LIBRARY);
+	serialized.iser.cb = restored.get();
+	restored->loadGame(serialized.iser);
+	EXPECT_TRUE(serialized.isFullyRead());
+	EXPECT_TRUE(restored->getMap().toroidal);
+	ASSERT_NE(restored->getMap().getObject(heroID), nullptr);
+	EXPECT_EQ(restored->getMap().getObject(heroID)->visitablePos(), destination);
+	EXPECT_TRUE(restored->isVisibleFor(destination, player));
+	EXPECT_FALSE(restored->isVisibleFor(hiddenTile, player));
 }
 
 /// Two towns that share an entrance tile, as found on some SoD maps. The pathfinder only considers the top town.

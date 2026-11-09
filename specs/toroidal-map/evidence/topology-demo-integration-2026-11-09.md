@@ -81,5 +81,13 @@ index), `a8d5132` (language profiles), `d9738a9` (AI test locking), and
   `CP1251`, and deviation `0.000388139`. The client interface language
   remained separately configured as English.
 
-The real viewport, animated seam crossing, fog persistence, multiplayer and
-seam-spanning static objects still require additional work or verification.
+After `b5f5aad`, `HeroMovementTest.crossedSeamAndFogSurviveGameStateReload`
+passed with Complete data (`save-seam-tests.log`). It performs a real server
+step from (0,1) to (35,1), serializes and reloads the game state in memory,
+and checks the destination, topology, one visible tile and one hidden tile.
+This is not a full-file save after crossing or exhaustive fog verification.
+The test source SHA-256 at this run was
+`8108025b1e6abd2c7852d739c5b4c689f7ccf2506756d01ac79b315ec68b10ac`.
+
+The real viewport, animated seam crossing, multiplayer and seam-spanning
+static objects still require additional work or verification.
