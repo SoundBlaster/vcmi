@@ -139,3 +139,43 @@ TEST_F(Nullkiller2_AIGateway, reportsUnreachableTileAsBlocked)
 	EXPECT_EQ(moveHeroTo(UNREACHABLE_TILE), NK2AI::HeroMovementResult::BLOCKED);
 	EXPECT_EQ(client->movementRequests, 0);
 }
+
+TEST_F(Nullkiller2_AIGateway, choosesDirectRouteAcrossToroidalSeam)
+{
+	startGame();
+	map()->toroidal = true;
+	const std::vector<std::pair<int3, int3>> steps = {
+		{{0, 5, 0}, {35, 5, 0}}, {{35, 5, 0}, {0, 5, 0}},
+		{{5, 0, 0}, {5, 35, 0}}, {{5, 35, 0}, {5, 0, 0}},
+		{{0, 0, 0}, {35, 35, 0}}, {{35, 35, 0}, {0, 0, 0}},
+		{{35, 0, 0}, {0, 35, 0}}, {{0, 35, 0}, {35, 0, 0}}
+	};
+	for(const auto & [start, destination] : steps)
+	{
+		SCOPED_TRACE(start.toString() + " -> " + destination.toString());
+		TryMoveHero placement;
+		placement.id = hero->id;
+		placement.start = hero->pos;
+		placement.end = hero->convertFromVisitablePos(start);
+		placement.movePoints = 2000;
+		placement.result = TryMoveHero::TELEPORTATION;
+		gameState()->apply(placement);
+		gateway->invalidatePaths();
+		gateway->heroMoved(placement, false);
+		ASSERT_EQ(hero->visitablePos(), start);
+		const auto paths = withGameStateReadLock([&]
+		{
+			preparePlanning(*gateway);
+			return gateway->nullkiller->pathfinder->getPathInfo(destination);
+		});
+		ASSERT_TRUE(std::ranges::any_of(paths, [&](const auto & path)
+		{
+			return path.targetHero == hero && !path.nodes.empty() && path.turn() == 0 && path.firstTileToGet() == destination;
+		}));
+		const int requestsBefore = client->movementRequests;
+		EXPECT_EQ(moveHeroTo(destination), NK2AI::HeroMovementResult::COMPLETE);
+		EXPECT_EQ(client->movementRequests, requestsBefore + 1);
+		EXPECT_TRUE(client->requested(destination));
+		EXPECT_EQ(hero->visitablePos(), destination);
+	}
+}
