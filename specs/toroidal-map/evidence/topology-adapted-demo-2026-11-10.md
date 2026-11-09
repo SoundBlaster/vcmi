@@ -34,6 +34,9 @@ move handler to collect the corner resource. Together with the earlier two
 fixture tests it passed three tests (`adapted-demo-vmap-tests.log`). This run
 loads an independently generated in-memory archive, not the exact file above;
 it is not a client UI or visual rendering test.
+The same VMAP test was extended to run `CPathfinder` before the server move;
+the corner resource is reachable with the start tile as its immediate
+predecessor. All three fixture tests passed (`adapted-demo-route-tests.log`).
 
 An ordinary ad-hoc signed client was prepared on TB5 from the current build;
 the signed executable SHA-256 was

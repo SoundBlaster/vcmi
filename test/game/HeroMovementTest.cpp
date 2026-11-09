@@ -151,6 +151,14 @@ TEST(ToroidalDemoVmapTest, SavedMapStartsAndSupportsCornerVisit)
 	ASSERT_NE(hero, nullptr);
 	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
 	hero->setMovementPoints(3000);
+	CPathsInfo paths(state->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
+	CPathfinder pathfinder(*state, config);
+	pathfinder.calculatePaths();
+	const auto * corner = paths.getNode(int3(35, 35, 0), EPathfindingLayer::LAND);
+	ASSERT_TRUE(corner->reachable());
+	ASSERT_NE(corner->theNodeBefore, nullptr);
+	EXPECT_EQ(corner->theNodeBefore->coord, hero->visitablePos());
 	const auto goldBefore = state->players.at(PlayerColor(0)).resources[GameResID::GOLD];
 	GameHandlerTestServer server(state, PlayerColor(0));
 	CGameHandler handler(server, state);
