@@ -7,8 +7,8 @@ It does not change the SpecPM schema or prove implementation, acceptance, or
 runtime behavior. Baseline: VCMI commit
 `30e9207276f137658da5132705c05644bfe33aee`, inspected source clean before
 the specification work; only the selected entrypoints in `review.md` were
-examined. A coordinate helper has since been added and tested in isolation;
-no toroidal gameplay scenario execution is claimed.
+examined. Since then, implementation and limited integration tests have been
+added as documented below; visual and profile-wide acceptance remains open.
 
 ## How to read and update this matrix
 
@@ -54,16 +54,16 @@ future opt-in design preserves it.
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `topology` | Horizontal and vertical steps wrap in both directions. | G1, G2 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no hero movement |
-| `topology` | Diagonal crossing wraps one or both axes, including all four corners. | G3, G4 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no hero movement |
+| `topology` | Horizontal and vertical steps wrap in both directions. | G1, G2 | partial: helper, pathfinder and server | partial: RoE and SoD single-level integration | pending | [integration record](evidence/topology-demo-integration-2026-11-09.md); other profiles unverified |
+| `topology` | Diagonal crossing wraps one or both axes, including all four corners. | G3, G4 | partial: helper, pathfinder and server | partial: RoE and SoD corner integration | pending | [integration record](evidence/topology-demo-integration-2026-11-09.md); other diagonal cases unverified |
 | `topology` | Canonical tile coordinates and supported dimensions remain valid. | G1–G4; small-map cases to specify | partial: helper and format minimum | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); format minimum is untested |
 | `level_isolation` | Seams preserve level; normal inter-level passages continue to work. | G9 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no passage test |
-| `movement_and_route` | Crossing uses normal passability, diagonal rules, cost, movement points and visits. | G4, G5, G10 | partial: server and direction handling | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); object and cost cases remain |
-| `movement_and_route` | Route finding considers legal wrapped neighbors under normal knowledge rules. | G6 | partial: neighbor enumeration | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); route selection coverage needs refinement |
+| `movement_and_route` | Crossing uses normal passability, diagonal rules, cost, movement points and visits. | G4, G5, G10 | partial: server and direction handling | partial: RoE terrain cost and one blocked step | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); object, road and other cases remain |
+| `movement_and_route` | Route finding considers legal wrapped neighbors under normal knowledge rules. | G6 | partial: neighbor enumeration | partial: direct RoE paths | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); obstacles and knowledge rules unverified |
 | `movement_and_route` | Boat travel, embarking and disembarking follow normal rules at seams. | G8 | not started | not run | pending | none |
-| `authority` | Client route and server agree on legal wrapped steps. | G1–G4, G6, P3 | partial: pathfinder and server | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); multiplayer unverified |
-| `authority` | Blocked or illegal crossing is rejected without applying movement effects. | G5, G10, P3 | partial: server rules adapted | not run | pending | [movement record](evidence/topology-movement-2026-11-09.md); rejection cases unverified |
-| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | partial: isolated range enumeration | pending | [range record](evidence/topology-range-2026-11-09.md), [movement record](evidence/topology-movement-2026-11-09.md); fog and guards have no runtime observation |
+| `authority` | Client route and server agree on legal wrapped steps. | G1–G4, G6, P3 | partial: pathfinder and server | partial: RoE direct steps | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); multiplayer unverified |
+| `authority` | Blocked or illegal crossing is rejected without applying movement effects. | G5, G10, P3 | partial: server rules adapted | partial: one blocked RoE tile | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); other rejection cases unverified |
+| `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range and guard lookups | partial: RoE hidden range and isolated enumeration | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); guards and full fog behavior unverified |
 | `vision_and_guards` | Object interaction across seams follows normal rules. | G10; additional object cases to specify | not started | not run | pending | none; object audit incomplete |
 
 ## Presentation and interaction
@@ -81,10 +81,10 @@ future opt-in design preserves it.
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `persistence_and_network` | Save/reload preserves topology and authoritative state. | P1 | partial: versioned header serialization | not run | pending | [format record](evidence/topology-format-2026-11-09.md); game reload unverified |
+| `persistence_and_network` | Save/reload preserves topology and authoritative state. | P1 | partial: versioned header serialization | partial: game-state round trip on demo | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); saving after seam crossing and fog unverified |
 | `persistence_and_network` | Supported multiplayer peers agree on movement and visibility. | P3 | not started | not run | pending | none |
 | `persistence_and_network` | Unsupported peers or readers cannot silently interpret topology incorrectly. | P4 | partial: versioned format and lobby start guard | not run | pending | [format record](evidence/topology-format-2026-11-09.md); locally assigned version can collide with future upstream, so capability identity remains unresolved |
-| `bounded_compatibility` | Existing maps and saves remain bounded; toroidal behavior is opt-in. | P2 | partial: versioned default | not run | pending | [format record](evidence/topology-format-2026-11-09.md); no legacy regression execution |
+| `bounded_compatibility` | Existing maps and saves remain bounded; toroidal behavior is opt-in. | P2 | partial: versioned default | partial: legacy header and bounded save | pending | [demo record](evidence/topology-demo-integration-2026-11-09.md); full legacy gameplay regression unverified |
 | `authoring` | A supported authored map can have coherent passable seams. | E1 | partial: editor topology setting and static-footprint restriction | not run | pending | [editor record](evidence/topology-editor-2026-11-09.md); terrain seam validation and runtime unverified |
 | `authoring` | Any supported random generator respects topology. | E2 | not started | not run | pending | none; generator support is conditional |
 | `ai` | Each advertised supported AI can plan and act using legal wrapped routes. | A1 | partial: Nullkiller2 neighborhoods, exploration heuristics and portal tasks | not run | pending | [AI record](evidence/topology-ai-2026-11-09.md), [portal record](evidence/topology-portal-ai-2026-11-09.md); full AI audit and profile support undecided |
@@ -129,7 +129,9 @@ The minimap interval checks are recorded in
 [`evidence/topology-minimap-2026-11-09.md`](evidence/topology-minimap-2026-11-09.md).
 The editor's experimental status is recorded in
 [`evidence/topology-editor-status-2026-11-09.md`](evidence/topology-editor-status-2026-11-09.md).
-No gameplay scenario has been executed. Add a dated record for each run with:
+The limited demo integration runs are recorded in
+[`evidence/topology-demo-integration-2026-11-09.md`](evidence/topology-demo-integration-2026-11-09.md).
+These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
 result and evidence path; remaining gaps; and the responsible review decision

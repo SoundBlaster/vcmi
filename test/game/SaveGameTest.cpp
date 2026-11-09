@@ -25,6 +25,7 @@ class SaveGameTest : public GameStateTest
 {
 protected:
 	boost::filesystem::path directory;
+	void checkSavedGameIsRestored(bool toroidal);
 
 	void SetUp() override
 	{
@@ -40,9 +41,14 @@ protected:
 	}
 };
 
-TEST_F(SaveGameTest, savedGameIsRestored)
+void SaveGameTest::checkSavedGameIsRestored(bool toroidal)
 {
 	startTestGame();
+	map->toroidal = toroidal;
+	const auto hero = std::ranges::find_if(map->objects, [](const auto & object) { return object && object->ID == Obj::HERO; });
+	ASSERT_NE(hero, map->objects.end());
+	const auto heroID = (*hero)->id;
+	const auto heroPosition = (*hero)->visitablePos();
 	const auto saveFile = directory / "test.vsgm1";
 
 	{
@@ -73,6 +79,7 @@ TEST_F(SaveGameTest, savedGameIsRestored)
 	headerChunk->iser & loadedStartInfo;
 	EXPECT_TRUE(headerChunk->isFullyRead());
 	EXPECT_EQ(loadedHeader.width, map->width);
+	EXPECT_EQ(loadedHeader.toroidal, toroidal);
 	EXPECT_EQ(loadedStartInfo.mapname, gameState->getStartInfo()->mapname);
 
 	auto loadedState = std::make_shared<CGameState>();
@@ -82,7 +89,20 @@ TEST_F(SaveGameTest, savedGameIsRestored)
 	EXPECT_TRUE(gameChunk->isFullyRead());
 	EXPECT_EQ(loadedState->day, gameState->day);
 	EXPECT_EQ(loadedState->getMap().width, map->width);
+	EXPECT_EQ(loadedState->getMap().toroidal, toroidal);
+	ASSERT_NE(loadedState->getMap().getObject(heroID), nullptr);
+	EXPECT_EQ(loadedState->getMap().getObject(heroID)->visitablePos(), heroPosition);
 	EXPECT_EQ(loadedState->players.size(), gameState->players.size());
+}
+
+TEST_F(SaveGameTest, savedGameIsRestored)
+{
+	checkSavedGameIsRestored(false);
+}
+
+TEST_F(SaveGameTest, savedToroidalGameIsRestored)
+{
+	checkSavedGameIsRestored(true);
 }
 
 TEST_F(SaveGameTest, mapTopologyIsVersionedInSavedHeader)

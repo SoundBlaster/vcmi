@@ -29,12 +29,15 @@ class HeroMovementTest : public TinyMapGameTest
 {
 protected:
 	const Services * gameServices() override { return LIBRARY; }
+	void checkToroidalSeamMovement(EMapFormat format);
+	void checkToroidalSightRange(EMapFormat format);
+	void checkBlockedToroidalStep(EMapFormat format);
 };
 
-TEST_F(HeroMovementTest, pathfinderAndServerCrossToroidalSeams)
+void HeroMovementTest::checkToroidalSeamMovement(EMapFormat format)
 {
 	const PlayerColor player(0);
-	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	TinyH3M::TinyH3MBuilder builder(format);
 	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player);
 	startWithMap(std::move(builder));
 	map()->toroidal = true;
@@ -44,34 +47,72 @@ TEST_F(HeroMovementTest, pathfinderAndServerCrossToroidalSeams)
 	ASSERT_NE(hero, nullptr);
 	ASSERT_EQ(hero->visitablePos(), int3(0, 1, 0));
 	hero->setMovementPoints(3000);
-	const int3 acrossWest(35, 1, 0);
-
-	CPathsInfo paths(gameState()->getMapSize(), hero);
-	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
-	CPathfinder pathfinder(*gameState(), config);
-	pathfinder.calculatePaths();
-	const auto * node = paths.getNode(acrossWest, EPathfindingLayer::LAND);
-	ASSERT_TRUE(node->reachable());
-	ASSERT_NE(node->theNodeBefore, nullptr);
-	EXPECT_EQ(node->theNodeBefore->coord, hero->visitablePos());
-
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
-	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(acrossWest), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
-	EXPECT_EQ(hero->visitablePos(), acrossWest);
 
-	const int3 topLeft(0, 0, 0);
-	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(topLeft), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
-	EXPECT_EQ(hero->visitablePos(), topLeft);
-	const int3 acrossCorner(35, 35, 0);
-	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(acrossCorner), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
-	EXPECT_EQ(hero->visitablePos(), acrossCorner);
+	const auto moveTo = [&](const int3 & tile)
+	{
+		if(hero->visitablePos() != tile)
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(tile), EMovementMode::MONOLITH, false, PlayerColor::NEUTRAL, EPathfindingLayer::LAND));
+		ASSERT_EQ(hero->visitablePos(), tile);
+		hero->setMovementPoints(3000);
+	};
+	const auto costFor = [&](const int3 & from, const int3 & to)
+	{
+		moveTo(from);
+		const int before = hero->movementPointsRemaining();
+		EXPECT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(to), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+		EXPECT_EQ(hero->visitablePos(), to);
+		return before - hero->movementPointsRemaining();
+	};
+	const int straightCost = costFor(int3(10, 10, 0), int3(11, 10, 0));
+	const int diagonalCost = costFor(int3(10, 10, 0), int3(11, 11, 0));
+	ASSERT_GT(straightCost, 0);
+	ASSERT_GT(diagonalCost, straightCost);
+
+	const std::vector<std::pair<int3, int3>> steps = {
+		{{0, 5, 0}, {35, 5, 0}}, {{35, 5, 0}, {0, 5, 0}},
+		{{5, 0, 0}, {5, 35, 0}}, {{5, 35, 0}, {5, 0, 0}},
+		{{0, 0, 0}, {35, 35, 0}}, {{35, 35, 0}, {0, 0, 0}},
+		{{35, 0, 0}, {0, 35, 0}}, {{0, 35, 0}, {35, 0, 0}}
+	};
+	for(const auto & [from, to] : steps)
+	{
+		SCOPED_TRACE(from.toString() + " -> " + to.toString());
+		moveTo(from);
+		CPathsInfo paths(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+		CPathfinder pathfinder(*gameState(), config);
+		pathfinder.calculatePaths();
+		const auto * node = paths.getNode(to, EPathfindingLayer::LAND);
+		ASSERT_TRUE(node->reachable());
+		ASSERT_NE(node->theNodeBefore, nullptr);
+		EXPECT_EQ(node->theNodeBefore->coord, from);
+		EXPECT_EQ(costFor(from, to), from.x != to.x && from.y != to.y ? diagonalCost : straightCost);
+	}
 }
 
-TEST_F(HeroMovementTest, sightRangeWrapsWithoutRevealingDistantTiles)
+void HeroMovementTest::checkBlockedToroidalStep(EMapFormat format)
 {
 	const PlayerColor player(0);
-	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	TinyH3M::TinyH3MBuilder builder(format);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player).terrain(int3(35, 1, 0), TerrainId::ROCK);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 1, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(0, 1, 0));
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+}
+
+void HeroMovementTest::checkToroidalSightRange(EMapFormat format)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(format);
 	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player);
 	startWithMap(std::move(builder));
 	map()->toroidal = true;
@@ -83,6 +124,36 @@ TEST_F(HeroMovementTest, sightRangeWrapsWithoutRevealingDistantTiles)
 	EXPECT_TRUE(tiles.contains(int3(0, 35, 0)));
 	EXPECT_TRUE(tiles.contains(int3(35, 35, 0)));
 	EXPECT_FALSE(tiles.contains(int3(33, 0, 0)));
+}
+
+TEST_F(HeroMovementTest, pathfinderAndServerCrossToroidalSeams)
+{
+	checkToroidalSeamMovement(EMapFormat::SOD);
+}
+
+TEST_F(HeroMovementTest, pathfinderAndServerCrossToroidalSeamsRoE)
+{
+	checkToroidalSeamMovement(EMapFormat::ROE);
+}
+
+TEST_F(HeroMovementTest, sightRangeWrapsWithoutRevealingDistantTiles)
+{
+	checkToroidalSightRange(EMapFormat::SOD);
+}
+
+TEST_F(HeroMovementTest, sightRangeWrapsWithoutRevealingDistantTilesRoE)
+{
+	checkToroidalSightRange(EMapFormat::ROE);
+}
+
+TEST_F(HeroMovementTest, blockedToroidalStepIsRejected)
+{
+	checkBlockedToroidalStep(EMapFormat::SOD);
+}
+
+TEST_F(HeroMovementTest, blockedToroidalStepIsRejectedRoE)
+{
+	checkBlockedToroidalStep(EMapFormat::ROE);
 }
 
 /// Two towns that share an entrance tile, as found on some SoD maps. The pathfinder only considers the top town.
