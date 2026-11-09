@@ -1334,6 +1334,49 @@ TEST_F(HeroMovementTest, MonsterGuardAcrossCornerStartsBattle)
 	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
 }
 
+TEST_F(HeroMovementTest, FlyingAbilityDoesNotBypassGuardOnLandTransit)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.monster(int3(35, 35, 0), CreatureID(27), 100);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::LAND));
+	EXPECT_NE(gameState()->getBattle(player), nullptr);
+}
+
+TEST_F(HeroMovementTest, FlyingTransitStillBypassesGuardAcrossCorner)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.monster(int3(35, 35, 0), CreatureID(27), 100);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	EXPECT_EQ(gameState()->getBattle(player), nullptr);
+	EXPECT_EQ(hero->visitablePos(), int3(0, 0, 0));
+}
+
 TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 {
 	const PlayerColor player(0);

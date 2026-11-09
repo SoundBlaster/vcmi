@@ -1,5 +1,16 @@
 # Battle with a guard across a seam
 
+On 2026-11-10 a server regression test at source revision `7ba620b` showed
+that a flying-capable hero could request `LAND` transit and bypass a guard
+across the corner. The test failed before the fix. On toroidal maps the
+server now applies the flying/water-walking guard bypass only to the
+corresponding requested movement layers; bounded-map behavior is unchanged.
+The regression and a real `AIR` transit case both passed in the 40-test
+`HeroMovementTest` suite. The full suite passed 1,385 tests with three
+disabled (`full-suite-transit-guard.log`). This does not resolve the separately documented
+absence of an authoritative source movement layer. TB5 build output and
+test logs use the `transit-guard-before-*` and `transit-guard-after-*` names.
+
 On 2026-11-10 at source revision `177f97c` plus a new test, removing a
 monster at `(35,35,0)` through the server refreshed the cached guard position
 at `(0,0,0)`, `(0,35,0)` and `(35,0,0)`. The new test and the existing

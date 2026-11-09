@@ -1084,7 +1084,9 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			if (CGTeleport::isTeleport(objectToVisit))
 				visitDest = DONT_VISIT_DEST;
 
-			if (canFly || (canWalkOnSea && t.isWater()))
+			const bool bypassByAir = canFly && (!gameState().getMap().toroidal || layer == EPathfindingLayer::AIR || layer == EPathfindingLayer::AVIATE);
+			const bool bypassByWater = canWalkOnSea && t.isWater() && (!gameState().getMap().toroidal || layer == EPathfindingLayer::WATER);
+			if (bypassByAir || bypassByWater)
 			{
 				lookForGuards = IGNORE_GUARDS;
 				visitDest = DONT_VISIT_DEST;
