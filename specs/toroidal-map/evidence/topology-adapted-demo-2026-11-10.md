@@ -65,6 +65,16 @@ tiles are `(0,0,0) -> (35,35,0) -> (0,35,0) -> (0,0,0)`. The resource visit
 before the first move left the hero in place. The trace is in
 `runtime/user-logs/VCMI_Client_log.txt` on TB5.
 
+The same client saved the session through the game interface after the later
+three-step movement. The confirmation reported success, and the save picker
+showed the new save under the laboratory scenario. Loading it restored the
+visible 21,000 gold and the hero. Four keypad 7 moves then took the hero back
+to the starting corner and across it: the minimap marker appeared at the
+bottom-right corner, and the integrated server trace recorded the successful
+anchor move `(1,0,0) -> (36,35,0)`. This tests one GUI save and reload with
+continued corner movement; it does not establish preservation of all game
+state or frame-by-frame visual continuity.
+
 These screenshots are discrete observations; they do not establish
 frame-by-frame scrolling or animation smoothness. Initially mouse input did
 not activate the expected controls while the older test client was also open.
