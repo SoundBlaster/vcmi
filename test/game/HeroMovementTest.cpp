@@ -397,6 +397,27 @@ TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)
 	EXPECT_FALSE(guards(int3(0, 0, 0), int3(35, 35, 0)));
 }
 
+TEST_F(HeroMovementTest, CoastalTilesRecognizeWaterAcrossToroidalCorner)
+{
+	const PlayerColor player(0);
+	const int3 water(35, 35, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.terrain(water, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	const int3 acrossCorner(0, 0, 0);
+	const int3 acrossWestEast(0, 35, 0);
+	const int3 acrossNorthSouth(35, 0, 0);
+	map()->toroidal = false;
+	for(const auto & tile : {acrossCorner, acrossWestEast, acrossNorthSouth})
+		EXPECT_FALSE(map()->isCoastalTile(tile));
+	map()->toroidal = true;
+	for(const auto & tile : {acrossCorner, acrossWestEast, acrossNorthSouth})
+		EXPECT_TRUE(map()->isCoastalTile(tile));
+	EXPECT_FALSE(map()->isCoastalTile(water));
+	EXPECT_FALSE(map()->isCoastalTile(int3(2, 2, 0)));
+}
+
 TEST_F(HeroMovementTest, removingCornerGuardRefreshesWrappedGuardCache)
 {
 	const PlayerColor player(0);

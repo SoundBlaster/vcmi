@@ -1,5 +1,14 @@
 # Boat movement across a seam
 
+On 2026-11-10 an SoD fixture at revision `ab458e7` plus a new test checked
+coast classification with the only water tile at `(35,35,0)`: the opposite
+corner and two adjoining edges were coastal with toroidal topology and not
+coastal with bounded topology; the water tile and a distant tile were not
+coastal. The focused coast and sailing tests passed
+(`coastal-corner-build.log`, `coastal-corner-test.log` on TB5). This checks
+the map query used by battle setup and ambient sound, not those effects
+themselves.
+
 On 2026-11-10 the sailing fixture at revision `d163185` was extended to
 cross each axis in both directions and each of the four diagonal corner
 directions. For each step the pathfinder chose the direct same-turn route,
