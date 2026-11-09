@@ -17,3 +17,13 @@ Source baseline `985bb2c` with local test change:
 ```text
 fc385d4e44ccafac4db998805aae18e1683a9ef85a59fd07596c6792ef0ffd41  test/game/HeroMovementTest.cpp
 ```
+
+On 2026-11-10, a Release build from `991142a` plus the new test passed
+`HeroMovementTest.BoatCanSailAcrossToroidalCornerAndBothAxes` and the earlier
+embark/sail/disembark test on macOS arm64 with the copied Complete data
+(`boat-corner-build.log`, `boat-corner-tests.log` on TB5). On a separately
+constructed SoD fixture the hero embarked without crossing a seam and sailed
+`(0,0,0) -> (35,35,0) -> (0,35,0) -> (0,0,0)`. For every step the pathfinder
+found a direct same-turn predecessor and its remaining movement points matched
+the server result. This covers one corner and one direction on each axis, not
+corner embarking or disembarking, blocked shores, AI or visual animation.

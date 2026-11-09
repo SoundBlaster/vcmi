@@ -698,6 +698,49 @@ TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
 	EXPECT_EQ(hero->movementPointsRemaining(), disembarkRemaining);
 }
 
+TEST_F(HeroMovementTest, BoatCanSailAcrossToroidalCornerAndBothAxes)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(2, 0, 0), HeroTypeID(0), player)
+		.terrain(int3(0, 0, 0), TerrainId::WATER)
+		.terrain(int3(35, 0, 0), TerrainId::WATER)
+		.terrain(int3(0, 35, 0), TerrainId::WATER)
+		.terrain(int3(35, 35, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(1, 0, 0));
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(int3(0, 0, 0), BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+
+	for(const int3 destination : {int3(35, 35, 0), int3(0, 35, 0), int3(0, 0, 0)})
+	{
+		hero->setMovementPoints(3000);
+		CPathsInfo paths(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+		CPathfinder pathfinder(*gameState(), config);
+		pathfinder.calculatePaths();
+		const auto * node = paths.getNode(destination, EPathfindingLayer::SAIL);
+		ASSERT_TRUE(node->reachable());
+		ASSERT_EQ(node->turns, 0);
+		ASSERT_NE(node->theNodeBefore, nullptr);
+		EXPECT_EQ(node->theNodeBefore->coord, hero->visitablePos());
+		const auto remaining = node->moveRemains;
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+		ASSERT_TRUE(hero->inBoat());
+		EXPECT_EQ(hero->visitablePos(), destination);
+		EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+	}
+}
+
 TEST_F(HeroMovementTest, UndergroundSeamPreservesLevelAndFogIsolation)
 {
 	const PlayerColor player(0);
