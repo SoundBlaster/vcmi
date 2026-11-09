@@ -231,7 +231,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/filesystem/FileInfo.cpp` | 22 | unreviewed |
 | `lib/filesystem/PngStripWriter.cpp` | 24, 27, 29, 30, 42, 43, 97, 100, 115 | unreviewed |
 | `lib/filesystem/PngStripWriter.h` | 32, 35 | unreviewed |
-| `lib/gameState/CGameState.cpp` | 527, 530, 536, 538, 545, 554, 598, 674, 795, 1001, 1007, 1074, 1291, 1310, 1333, 1335, 1336, 1343 | partial: Grail placement candidate |
+| `lib/gameState/CGameState.cpp` | 527, 530, 536, 538, 545, 554, 598, 674, 795, 1001, 1007, 1074, 1291, 1310, 1333, 1335, 1336, 1343 | partial: Grail placement fixed and tested after baseline; other candidates unreviewed |
 | `lib/gameState/GameStatePackVisitor.cpp` | 322, 545, 551, 555, 559, 563, 567, 571, 575, 579, 787, 1655 | unreviewed |
 | `lib/gameState/UpgradeInfo.cpp` | 24, 44, 46, 47 | unreviewed |
 | `lib/gameState/UpgradeInfo.h` | 45 | unreviewed |

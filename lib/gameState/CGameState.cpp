@@ -523,26 +523,38 @@ void CGameState::initGrailPosition(vstd::RNG & randomGenerator)
 	//pick grail location
 	if(map->grailPos.x < 0 || map->grailRadius) //grail not set or set within a radius around some place
 	{
+		const bool unspecified = map->grailPos.x < 0;
 		if(!map->grailRadius) //radius not given -> anywhere on map
 			map->grailRadius = map->width * 2;
 
 		std::vector<int3> allowedPos;
 		static const int BORDER_WIDTH = 9; // grail must be at least 9 tiles away from border
+		const int border = map->toroidal ? 0 : BORDER_WIDTH;
+		const auto topology = map->getTopology();
 
 		// add all not blocked tiles in range
 
 		for (int z = 0; z < map->levels(); z++)
 		{
-			for(int x = BORDER_WIDTH; x < map->width - BORDER_WIDTH ; x++)
+			for(int x = border; x < map->width - border ; x++)
 			{
-				for(int y = BORDER_WIDTH; y < map->height - BORDER_WIDTH; y++)
+				for(int y = border; y < map->height - border; y++)
 				{
-					const TerrainTile &t = map->getTile(int3(x, y, z));
+					const int3 position(x, y, z);
+					const TerrainTile &t = map->getTile(position);
+					int distanceSquared = map->grailPos.dist2dSQ(position);
+					if(map->toroidal && !unspecified
+						&& map->grailPos.x < map->width && map->grailPos.y >= 0 && map->grailPos.y < map->height)
+					{
+						// The legacy radius comparison ignores the difference between levels.
+						const int3 center(map->grailPos.x, map->grailPos.y, z);
+						distanceSquared = int3(0, 0, 0).dist2dSQ(topology.displacement(center, position));
+					}
 					if(!t.blocked()
 					   && !t.visitable()
 						&& t.isLand()
 						&& t.getTerrain()->isPassable()
-						&& (int)map->grailPos.dist2dSQ(int3(x, y, z)) <= (map->grailRadius * map->grailRadius))
+						&& ((map->toroidal && unspecified) || distanceSquared <= (map->grailRadius * map->grailRadius)))
 						allowedPos.emplace_back(x, y, z);
 				}
 			}

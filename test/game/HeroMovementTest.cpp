@@ -46,6 +46,54 @@ protected:
 	void checkBlockedToroidalStep(EMapFormat format);
 };
 
+class GrailTopologyTest : public TinyMapGameTest
+{
+protected:
+	bool toroidal = true;
+	bool unspecified = false;
+
+	const Services * gameServices() override { return LIBRARY; }
+
+	void mapLoaded(CMap * loaded) override
+	{
+		TinyMapGameTest::mapLoaded(loaded);
+		loaded->toroidal = toroidal;
+		loaded->grailPos = unspecified ? int3(-1, -1, -1) : int3(0, 10, 0);
+		loaded->grailRadius = unspecified ? 0 : 1;
+		for(int x = 0; x < loaded->width; ++x)
+			for(int y = 0; y < loaded->height; ++y)
+				loaded->getTile(int3(x, y, 0)).terrainType = TerrainId::ROCK;
+		loaded->getTile(int3(35, 10, 0)).terrainType = TerrainId::GRASS;
+	}
+
+	void startGame()
+	{
+		TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+		builder.size(36, false).playerActive(PlayerColor(0)).hero(int3(6, 5, 0), HeroTypeID(0), PlayerColor(0));
+		startWithMap(std::move(builder));
+	}
+};
+
+TEST_F(GrailTopologyTest, boundedMapKeepsBorderExclusion)
+{
+	toroidal = false;
+	startGame();
+	EXPECT_EQ(map()->grailPos, int3(0, 10, 0));
+}
+
+TEST_F(GrailTopologyTest, radiusIncludesEligibleTileAcrossSeam)
+{
+	startGame();
+	EXPECT_EQ(map()->grailPos, int3(35, 10, 0));
+}
+
+TEST_F(GrailTopologyTest, unspecifiedGrailCanBePlacedAtEdge)
+{
+	unspecified = true;
+	startGame();
+	EXPECT_EQ(map()->grailPos, int3(35, 10, 0));
+}
+
 void HeroMovementTest::checkToroidalSeamMovement(EMapFormat format)
 {
 	const PlayerColor player(0);
