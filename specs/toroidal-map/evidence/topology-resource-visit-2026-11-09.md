@@ -61,3 +61,12 @@ walking is available. Thirty-seven movement, gate and demo tests passed;
 the full local suite passed 1,376 tests with three disabled
 (`full-suite-source-exit.log` on TB5). The build used `2bd0144` plus this
 change (`source-exit-direction-after-build.log`); bounded maps are unchanged.
+
+An additional SoD test uses a resource that forbids entry from the north but
+permits it from the west. Across the north/south seam the server rejects the
+forbidden step without collecting or spending movement; after a short route
+the hero collects the same resource from the west across the east/west seam.
+The pathfinder finds a route whose final predecessor is not the forbidden
+neighbor. This test and the all-directions-forbidden entrance and exit tests
+passed (three tests), using `75cd77a` plus the new test
+(`directional-entrance-build.log` on TB5).
