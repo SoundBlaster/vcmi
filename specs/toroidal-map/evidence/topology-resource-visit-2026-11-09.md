@@ -92,3 +92,14 @@ full local suite passed 1,380 tests with three disabled
 (`full-suite-flight-transit.log` on TB5). Client, server and tests were built
 from `43db0ef` plus this change (`flight-transit-after-build.log`). Other AI
 profiles, water-walking visit semantics and multiplayer remain unverified.
+
+A further water-walking fixture placed a blocking resource on water across a
+seam. The pathfinder rejected the `WATER` destination, while the server
+accepted a non-transit visit and collected it. The server now rejects blocked
+`WATER` tiles for standard toroidal moves, except for boarding a matching
+vehicle. The test verifies both transit and non-transit attempts leave the
+hero, movement points, gold and resource unchanged. Three focused tests and
+the full local suite passed; the latter ran 1,381 tests with three disabled
+(`full-suite-water-blocking.log` on TB5). Client, server and tests were built
+from `ad0829a` plus this change (`water-blocking-after-build.log`). Other
+water-object rules, vehicle types and multiplayer remain unverified.
