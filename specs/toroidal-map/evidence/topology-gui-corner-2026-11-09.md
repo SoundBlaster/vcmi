@@ -28,3 +28,19 @@ Local screenshots from before and after the diagonal crossing, respectively:
 
 The fixture and game assets remain local. The screenshots are discrete states
 and do not prove continuity of every frame of movement or scrolling.
+
+In the same game, after returning the hero to `(0,0,0)`, the camera was
+scrolled with Ctrl+Left held for approximately 250 ms and then Ctrl+Up for
+approximately 250 ms. Computer-use observations before and after each action
+showed the hero, towns and fog moving with the view; the minimap indicated
+wrapped viewport portions on both axes. The local F3 screenshots are:
+
+- `screenshot-20261109T234126.png`, before scrolling: SHA-256
+  `f2761893fcd0a1d825c3914a08bbecf4114a718b3b67cce779ecffae54c6e417`.
+- `screenshot-20261109T234135.png`, after scrolling left: SHA-256
+  `2927c7c9395e421b1a70f012a90ae518a6a2203b2a07f4126408f13f2521c163`.
+- `screenshot-20261109T234143.png`, after scrolling up: SHA-256
+  `86b1d1758591b5a6061b4b2136cc919ca16349cbb744e4f0cab70f3b8dbc8001`.
+
+These samples establish the observed end states only. Intermediate frames
+were not captured, so this is not evidence of frame-by-frame smoothness.
