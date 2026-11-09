@@ -23,7 +23,6 @@ struct DeathStareCase
 	const char * name;
 	int defendingCreature;
 	uint32_t expectedKills;   ///< most one stare can kill; 0 when the target is immune to it
-	std::vector<std::string> expectedLog;
 };
 
 }
@@ -97,7 +96,12 @@ TEST_P(DeathStareTest, killsExpectedCreatures)
 		[](const RecordedCast & left, const RecordedCast & right) { return left.killed < right.killed; });
 
 	EXPECT_EQ(heaviest.killed, scenario.expectedKills) << scenario.name;
-	EXPECT_EQ(heaviest.logLines, scenario.expectedLog) << scenario.name;
+	ASSERT_EQ(heaviest.logLines.size(), scenario.expectedKills ? 1u : 0u) << scenario.name;
+	if(scenario.expectedKills)
+	{
+		EXPECT_EQ(textIDsOf(heaviest.logLines.front()), (std::vector<std::string>{"core.genrltxt.119", pluralNameOf(CreatureID(scenario.defendingCreature)), pluralNameOf(creatureByName("core:mightyGorgon"))})) << scenario.name;
+		EXPECT_EQ(numbersOf(heaviest.logLines.front()), (std::vector<int64_t>{scenario.expectedKills})) << scenario.name;
+	}
 
 	if(scenario.expectedKills == 0)
 		EXPECT_TRUE(heaviest.announcement.affectedCres.empty()) << scenario.name;
@@ -118,9 +122,9 @@ constexpr int ironGolem = 33;  // non-living, likewise immune
 // the immunity lives in the spell's targetCondition, which a script dealing raw damage would skip -
 // note that they still get the cast and its animation, they just survive it.
 INSTANTIATE_TEST_SUITE_P(Scenarios, DeathStareTest, ::testing::Values(
-	DeathStareCase{"livingTarget", pikeman,  10, {"10 Pikemen die under the terrible gaze of the Mighty Gorgons."}},
-	DeathStareCase{"undeadTarget", skeleton,  0, {}},
-	DeathStareCase{"golemTarget",  ironGolem, 0, {}}
+	DeathStareCase{"livingTarget", pikeman,  10},
+	DeathStareCase{"undeadTarget", skeleton,  0},
+	DeathStareCase{"golemTarget",  ironGolem, 0}
 ),
 	[](const ::testing::TestParamInfo<DeathStareCase> & info) { return info.param.name; });
 

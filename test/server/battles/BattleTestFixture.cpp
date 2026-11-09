@@ -85,7 +85,7 @@ void RecordingGameServer::record(CPackForClient & pack)
 	if(const auto * log = dynamic_cast<const BattleLogMessage *>(&pack))
 	{
 		for(const auto & line : log->lines)
-			casts.back().logLines.push_back(line.toString(LIBRARY->staticTexts()));
+			casts.back().logLines.push_back(line);
 		return;
 	}
 

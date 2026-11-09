@@ -19,6 +19,7 @@
 #include "../../../lib/battle/Destination.h"
 #include "../../../lib/constants/EntityIdentifiers.h"
 #include "../../../lib/networkPacks/PacksForClientBattle.h"
+#include "../../../lib/texts/MetaString.h"
 
 class BattleAction;
 class CArmedInstance;
@@ -37,7 +38,7 @@ struct RecordedCast
 	BattleSpellCast announcement;
 	int64_t damage = 0;
 	uint32_t killed = 0;
-	std::vector<std::string> logLines;
+	std::vector<MetaString> logLines;
 };
 
 /// Applies everything the game handler emits straight to the game state, which is the whole of
