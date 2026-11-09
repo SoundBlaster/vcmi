@@ -7,6 +7,8 @@ connections and other rules; its diagram is not necessarily a spatial map.
 Joining map edges changes tile adjacency and can introduce shortcuts between
 zones, including diagonally at corners. It can thereby bypass guards or other
 rules even when the generated map is otherwise valid.
+What a barrier blocks also depends on movement mode: flying, water travel,
+spells and teleports can legitimately follow different rules from walking.
 
 ## Existing tools
 
@@ -51,7 +53,9 @@ be made with supported terrain and footprints until that restriction changes.
 ## Verification needed before advertising support
 
 For a named template and a range of reproducible seeds, compare the actual
-traversable map graph to the intended zone connections. Check passages and
+ordinary land and boat routes to the intended zone connections. Test separately
+any permitted flying, spells or teleports rather than assuming a forest blocks
+them. Check passages and
 guards across horizontal and vertical seams and all corners, including blocked
 cases; do not assume that a blocked cardinal step necessarily settles every
 diagonal rule. Check that player starting areas and reachable resources remain
