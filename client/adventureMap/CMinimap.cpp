@@ -10,6 +10,7 @@
 
 #include "StdInc.h"
 #include "CMinimap.h"
+#include "MinimapPosition.h"
 
 #include "AdventureMapInterface.h"
 
@@ -125,14 +126,11 @@ CMinimap::CMinimap(const Rect & position)
 
 int3 CMinimap::pixelToTile(const Point & cursorPos) const
 {
-	// 0 = top-left corner, 1 = bottom-right corner
-	double dx = static_cast<double>(cursorPos.x) / pos.w;
-	double dy = static_cast<double>(cursorPos.y) / pos.h;
-
 	int3 mapSizes = GAME->interface()->cb->getMapSize();
+	const bool toroidal = GAME->interface()->cb->getMapHeader()->toroidal;
 
-	int tileX(std::round(mapSizes.x * dx));
-	int tileY(std::round(mapSizes.y * dy));
+	const int tileX = minimapPixelToTile(cursorPos.x, pos.w, mapSizes.x, toroidal);
+	const int tileY = minimapPixelToTile(cursorPos.y, pos.h, mapSizes.y, toroidal);
 
 	return int3(tileX, tileY, level);
 }

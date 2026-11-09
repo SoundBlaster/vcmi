@@ -10,6 +10,24 @@
 #include "StdInc.h"
 
 #include "../../lib/mapping/MapTopology.h"
+#include "../../client/adventureMap/MinimapPosition.h"
+
+TEST(MapTopology, ToroidalMinimapClicksAddressTheTileUnderThePixel)
+{
+	EXPECT_EQ(minimapPixelToTile(0, 150, 36, true), 0);
+	EXPECT_EQ(minimapPixelToTile(75, 150, 36, true), 18);
+	EXPECT_EQ(minimapPixelToTile(149, 150, 36, true), 35);
+	EXPECT_EQ(minimapPixelToTile(99, 100, 60, true), 59);
+	EXPECT_EQ(minimapPixelToTile(-1, 150, 36, true), 0);
+	EXPECT_EQ(minimapPixelToTile(150, 150, 36, true), 35);
+	EXPECT_EQ(minimapPixelToTile(149, 150, 36, false), 36);
+	for(const auto & [mapExtent, displayExtent] : {std::pair{36, 150}, std::pair{60, 100}, std::pair{72, 72}})
+		for(int tile = 0; tile < mapExtent; ++tile)
+		{
+			const int pixelNearCenter = (2 * tile + 1) * displayExtent / (2 * mapExtent);
+			EXPECT_EQ(minimapPixelToTile(pixelNearCenter, displayExtent, mapExtent, true), tile);
+		}
+}
 
 TEST(MapTopology, WrapsEdgesAndCornersOnTheSameLevel)
 {
