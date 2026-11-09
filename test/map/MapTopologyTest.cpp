@@ -27,6 +27,13 @@ TEST(MapTopology, ToroidalMinimapClicksAddressTheTileUnderThePixel)
 			const int pixelNearCenter = (2 * tile + 1) * displayExtent / (2 * mapExtent);
 			EXPECT_EQ(minimapPixelToTile(pixelNearCenter, displayExtent, mapExtent, true), tile);
 		}
+	for(int mapExtent : {36, 72, 144})
+		for(int displayExtent : {73, 100, 150})
+			for(int pixel = 0; pixel < displayExtent; ++pixel)
+			{
+				const double oldRatio = static_cast<double>(pixel) / displayExtent;
+				EXPECT_EQ(minimapPixelToTile(pixel, displayExtent, mapExtent, false), static_cast<int>(std::round(mapExtent * oldRatio)));
+			}
 }
 
 TEST(MapTopology, WrapsEdgesAndCornersOnTheSameLevel)

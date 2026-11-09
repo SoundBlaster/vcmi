@@ -19,5 +19,6 @@ inline int minimapPixelToTile(int pixel, int displayExtent, int mapExtent, bool 
 		const auto inside = std::clamp(pixel, 0, displayExtent - 1);
 		return static_cast<int>(static_cast<std::int64_t>(inside) * mapExtent / displayExtent);
 	}
-	return static_cast<int>(std::round(static_cast<double>(mapExtent) * pixel / displayExtent));
+	const double ratio = static_cast<double>(pixel) / displayExtent;
+	return static_cast<int>(std::round(mapExtent * ratio));
 }

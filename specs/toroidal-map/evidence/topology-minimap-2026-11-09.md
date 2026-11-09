@@ -40,3 +40,11 @@ The new test checks edge pixels, out-of-range input, bounded legacy rounding,
 and tile centers at three scales. It does not establish the outcome of a real
 mouse click or visual alignment in the GUI; the new client was rebuilt after
 the separate test app's previously recorded executable was signed.
+
+The complete local suite subsequently passed 1,367 tests from 224 suites,
+with three disabled (`full-suite-adapted-demo-minimap.log`). A follow-up
+retained the original order of floating-point operations for bounded maps,
+and compared that result over several map sizes, minimap sizes and pixels;
+the focused minimap and demo tests passed (`minimap-legacy-rounding-tests.log`)
+after rebuilding client and test targets (`minimap-legacy-rounding-build.log`).
+The full-suite result predates that follow-up.
