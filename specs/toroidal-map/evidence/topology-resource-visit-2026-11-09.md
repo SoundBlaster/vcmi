@@ -1,5 +1,16 @@
 # Resource interaction across a corner
 
+On 2026-11-10 a synthetic impassable object across a seam exposed another
+pathfinder/server disagreement at revision `24b52c8`: a hero with flying
+ability could request `LAND` movement and enter the blocker. The regression
+test failed before the fix. For standard movement on toroidal maps, the
+server now permits flying over a non-visitable blocker only on the `AIR`
+layer. The test also confirms that actual air transit succeeds, and all 41
+`HeroMovementTest` cases passed. The full suite passed 1,386 tests with three
+disabled (`full-suite-fly-land-obstacle.log`). The TB5 build root contains
+`fly-land-obstacle-before-*` and `fly-land-obstacle-after-*` logs. This does
+not test every object or flying-vehicle configuration.
+
 On 2026-11-09 on macOS arm64 with copied Complete data, an SoD fixture placed
 a hero at (0,0) and a gold pile at (35,35). A server-authorized diagonal
 action collected 1,000 gold across the corner and removed the resource while

@@ -902,7 +902,8 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 
 	//it's a rock or blocked and not visitable tile
 	//OR hero is on land and dest is water and (there is not present only one object - boat)
-	if (!t.getTerrain()->isPassable() || (movingOntoObstacle && !canFly))
+	const bool flightBypassesObstacle = canFly && (!gameState().getMap().toroidal || movementMode != EMovementMode::STANDARD || layer == EPathfindingLayer::AIR);
+	if (!t.getTerrain()->isPassable() || (movingOntoObstacle && !flightBypassesObstacle))
 		return complainRet("Cannot move hero, destination tile is blocked!");
 
 	//hero is not on boat/water walking and dst water tile doesn't contain boat/hero (objs visitable from land) -> we test back cause boat may be on top of another object (#276)
