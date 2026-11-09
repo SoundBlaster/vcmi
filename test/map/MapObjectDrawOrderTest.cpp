@@ -15,6 +15,7 @@
 #include "../../lib/mapObjects/MapObjectDrawOrder.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/TerrainTile.h"
 #include "../../lib/modding/IdentifierResolver.h"
 #include "../../lib/GameLibrary.h"
 
@@ -41,7 +42,7 @@ protected:
 	std::vector<std::unique_ptr<CGObjectInstance>> objects;
 
 	/// The name is the letter of the object in the result of draw(): capital for the body, small for the shadow
-	const CGObjectInstance * addObject(char name, const std::string & mask, const int3 & anchor, int zIndex = 0, MapObjectID type = Obj::NO_OBJ)
+	CGObjectInstance * addObject(char name, const std::string & mask, const int3 & anchor, int zIndex = 0, MapObjectID type = Obj::NO_OBJ)
 	{
 		auto object = std::make_unique<CGObjectInstance>(nullptr);
 		object->id = ObjectInstanceID(name);
@@ -151,4 +152,44 @@ TEST_F(MapObjectDrawOrderTest, RejectsStaticOccupiedFootprintsAcrossToroidalSeam
 	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*hero));
 	map.toroidal = false;
 	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*corner));
+}
+
+TEST_F(MapObjectDrawOrderTest, ToroidalObjectFootprintOccupiesAndClearsWrappedTiles)
+{
+	map.width = 10;
+	map.height = 10;
+	map.toroidal = true;
+	map.initTerrain();
+	auto * object = addObject('O', R"([ "AB", "BB" ])", int3(0, 0, 0));
+	map.showObject(object);
+	for(const auto & tile : {int3(0, 0, 0), int3(9, 0, 0), int3(0, 9, 0), int3(9, 9, 0)})
+		EXPECT_TRUE(vstd::contains(map.getTile(tile).blockingObjects, object->id)) << tile.toString();
+	EXPECT_TRUE(vstd::contains(map.getTile(int3(9, 9, 0)).visitableObjects, object->id));
+	map.hideObject(object);
+	for(const auto & tile : {int3(0, 0, 0), int3(9, 0, 0), int3(0, 9, 0), int3(9, 9, 0)})
+	{
+		EXPECT_FALSE(vstd::contains(map.getTile(tile).blockingObjects, object->id));
+		EXPECT_FALSE(vstd::contains(map.getTile(tile).visitableObjects, object->id));
+	}
+
+	map.toroidal = false;
+	map.showObject(object);
+	EXPECT_TRUE(vstd::contains(map.getTile(int3(0, 0, 0)).blockingObjects, object->id));
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 9, 0)).blockingObjects, object->id));
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 9, 0)).visitableObjects, object->id));
+}
+
+TEST_F(MapObjectDrawOrderTest, OversizedToroidalFootprintOccupiesEachTileOnce)
+{
+	map.width = 3;
+	map.height = 3;
+	map.toroidal = true;
+	map.initTerrain();
+	auto * object = addObject('O', R"([ "BBBB" ])", int3(0, 1, 0));
+	map.showObject(object);
+	for(int x = 0; x < map.width; ++x)
+		EXPECT_EQ(std::ranges::count(map.getTile(int3(x, 1, 0)).blockingObjects, object->id), 1);
+	map.hideObject(object);
+	for(int x = 0; x < map.width; ++x)
+		EXPECT_FALSE(vstd::contains(map.getTile(int3(x, 1, 0)).blockingObjects, object->id));
 }

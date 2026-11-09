@@ -137,6 +137,8 @@ The wrapped terrain-brush checks are recorded in
 [`evidence/topology-terrain-brush-2026-11-09.md`](evidence/topology-terrain-brush-2026-11-09.md).
 The road and river brush checks are recorded in
 [`evidence/topology-line-brush-2026-11-09.md`](evidence/topology-line-brush-2026-11-09.md).
+Object occupancy groundwork is recorded in
+[`evidence/topology-object-occupancy-2026-11-09.md`](evidence/topology-object-occupancy-2026-11-09.md).
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

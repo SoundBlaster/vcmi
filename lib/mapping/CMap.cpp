@@ -291,10 +291,11 @@ void CMap::hideObject(CGObjectInstance * obj)
 		int xVal = obj->anchorPos().x - fx;
 		for(int fy = 0; fy < obj->getHeight(); ++fy)
 		{
-			int yVal = obj->anchorPos().y - fy;
-			if(xVal>=0 && xVal < width && yVal>=0 && yVal < height)
+			const int yVal = obj->anchorPos().y - fy;
+			const auto tile = getTopology().canonicalize(int3(xVal, yVal, zVal));
+			if(tile)
 			{
-				TerrainTile & curt = getTile(int3(xVal, yVal, zVal));
+				TerrainTile & curt = getTile(*tile);
 				curt.visitableObjects -= obj->id;
 				curt.blockingObjects -= obj->id;
 			}
@@ -313,20 +314,26 @@ void CMap::showObject(CGObjectInstance * obj)
 		int xVal = obj->anchorPos().x - fx;
 		for(int fy = 0; fy < obj->getHeight(); ++fy)
 		{
-			int yVal = obj->anchorPos().y - fy;
-			if(xVal>=0 && xVal < width && yVal >= 0 && yVal < height)
+			const int yVal = obj->anchorPos().y - fy;
+			const int3 footprint(xVal, yVal, zVal);
+			const auto tile = getTopology().canonicalize(footprint);
+			if(tile)
 			{
-				TerrainTile & curt = getTile(int3(xVal, yVal, zVal));
-				if(obj->visitableAt(int3(xVal, yVal, zVal)))
+				TerrainTile & curt = getTile(*tile);
+				if(obj->visitableAt(footprint))
 				{
-					assert(!vstd::contains(curt.visitableObjects, obj->id));
-					curt.visitableObjects.push_back(obj->id);
+					const bool duplicate = vstd::contains(curt.visitableObjects, obj->id);
+					assert(!duplicate || (toroidal && (obj->getWidth() > width || obj->getHeight() > height)));
+					if(!duplicate)
+						curt.visitableObjects.push_back(obj->id);
 				}
 
-				if(obj->blockingAt(int3(xVal, yVal, zVal)))
+				if(obj->blockingAt(footprint))
 				{
-					assert(!vstd::contains(curt.blockingObjects, obj->id));
-					curt.blockingObjects.push_back(obj->id);
+					const bool duplicate = vstd::contains(curt.blockingObjects, obj->id);
+					assert(!duplicate || (toroidal && (obj->getWidth() > width || obj->getHeight() > height)));
+					if(!duplicate)
+						curt.blockingObjects.push_back(obj->id);
 				}
 			}
 		}
