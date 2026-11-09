@@ -1,0 +1,139 @@
+apiVersion: specpm.dev/v0.1
+kind: BoundarySpec
+metadata:
+  id: vcmi.adventure_map.toroidal_contract
+  title: Toroidal Adventure Map
+  version: 0.1.0
+  status: draft
+  authors:
+    - name: VCMI local specification contributors
+intent:
+  summary: Describe an adventure map whose opposite edges meet in both axes, including diagonal corners and seamless player-visible scrolling.
+scope:
+  boundedContext: vcmi_adventure_map_topology
+  includes:
+    - Independent wrapping of horizontal and vertical tile coordinates on each adventure map level.
+    - Player movement, route finding, visibility, map interactions, presentation, persistence, and multiplayer consistency at seams.
+    - Compatibility with existing bounded maps and a reviewable path to authored and generated toroidal maps.
+  excludes:
+    - Claiming the desired topology is implemented or tested in the baseline.
+    - Changing tactical battlefields, generating game assets, or distributing Heroes III data.
+    - Selecting an exact serialization field, user interface, release schedule, or map-generation algorithm.
+    - Declaring a concrete policy for static objects that physically span a seam before the open design decision is resolved.
+provides:
+  capabilities:
+    - id: vcmi.adventure_map.toroidal_contract
+      role: primary
+      summary: Draft behavioral contract for a two-axis wrapping adventure map.
+requires:
+  capabilities: []
+interfaces:
+  inbound:
+    - id: adventure_map_session
+      kind: library
+      summary: A valid map, its level and topology, player camera and tile interactions, and legal hero movement requests.
+      inputs:
+        - name: map_and_session_state
+        - name: camera_or_player_action
+      outputs:
+        - name: visible_map_and_authoritative_game_outcome
+  outbound: []
+effects:
+  sideEffects:
+    - id: game_state_changes
+      kind: state_mutation
+      summary: Legal hero movement and its ordinary game effects update authoritative game state.
+    - id: game_state_persistence
+      kind: filesystem_write
+      summary: Saving a game persists the session and its topology when a player saves it.
+    - id: multiplayer_state_exchange
+      kind: network_write
+      summary: Multiplayer sessions exchange requests and authoritative state changes through the existing game protocol.
+constraints:
+  - id: topology
+    level: MUST
+    statement: On a toroidal level of width W and height H, W and H are positive; each tile has a canonical coordinate 0 <= x < W and 0 <= y < H. A one-tile step wraps independently in x and y, while the level remains unchanged. The transition from (0, 0) northwest reaches (W-1, H-1), and all corresponding edge and corner transitions work in both directions.
+  - id: level_isolation
+    level: MUST
+    statement: Each participating map level wraps onto itself; crossing an edge never changes level. Existing inter-level travel remains governed by its normal rules.
+  - id: movement_and_route
+    level: MUST
+    statement: For each seam crossing, movement legality, diagonal rules, terrain and road costs, remaining movement points, object visits, boarding and disembarking follow the same rules as an equivalent adjacent step away from a seam. Route finding considers seam neighbors under the same knowledge and passability rules as ordinary neighbors.
+  - id: authority
+    level: MUST
+    statement: Client route selection and authoritative server validation use consistent topology and movement rules. Illegal or blocked crossings are rejected without applying movement or its effects.
+  - id: vision_and_guards
+    level: MUST
+    statement: Fog of war, sight ranges, adjacency-based guards and object interaction consider the wrapped neighbors using the same rules as equivalent locations away from seams, without revealing otherwise hidden information.
+  - id: rendering
+    level: MUST
+    statement: The adventure viewport continuously presents the adjacent opposite-edge terrain, roads, rivers, objects, overlays and fog before and during camera movement across either seam or a corner; it shows no map border, frame jump, missing strip, or incorrect duplicate attributable to the wrap.
+  - id: viewport_input
+    level: MUST
+    statement: Hover, clicks and destination selection on every displayed map copy address the corresponding canonical tile on the current level. The result remains consistent when both seams are visible or the viewport spans more than one map period.
+  - id: movement_presentation
+    level: MUST
+    statement: Hero and boat movement across a seam is presented as the corresponding short adjacent step, with a continuous camera and correctly oriented path indicators, rather than travel across the full map extent.
+  - id: minimap
+    level: MUST
+    statement: The minimap indicates the current visible area on each affected edge and maps user selection to the correct map location when the view crosses a seam or corner.
+  - id: persistence_and_network
+    level: MUST
+    statement: A supported save and reload preserves the topology and authoritative state; all participants in a supported multiplayer session agree on topology and the resulting movement and visibility. Unsupported versions or peers must not silently interpret a toroidal game as a bounded map.
+  - id: bounded_compatibility
+    level: MUST
+    statement: Existing maps and saves without a toroidal topology declaration retain their existing bounded behavior. The new topology is opt-in and does not silently change existing maps.
+  - id: authoring
+    level: MUST
+    statement: A supported toroidal map can be authored with passable and visually coherent seam crossings; any supported random generator must account for the topology rather than merely connecting unrelated generated edges after the fact.
+  - id: ai
+    level: MUST
+    statement: An AI advertised as supporting toroidal maps must plan and act using legal wrapped routes and must not assume that cells across a seam are far apart. Unsupported AI profiles must be identified rather than silently advertised as compatible.
+  - id: evidence_not_implementation
+    level: MUST
+    statement: This draft and its source analysis do not establish implementation, runtime conformance, visual continuity, or acceptance of every detailed requirement.
+evidence:
+  - id: implementation_tracking
+    kind: documentation
+    path: specs/toroidal-map/implementation-matrix.md
+    supports:
+      - provenance
+  - id: user_intent_and_scenarios
+    kind: documentation
+    path: specs/toroidal-map/review.md
+    supports:
+      - intent.summary
+      - scope
+      - constraints
+      - provenance
+  - id: bounded_map_baseline
+    kind: source
+    path: lib/mapping/CMap.h
+    supports:
+      - provenance
+  - id: bounded_pathfinder_baseline
+    kind: source
+    path: lib/pathfinder/CPathfinder.cpp
+    supports:
+      - provenance
+  - id: server_movement_baseline
+    kind: source
+    path: server/CGameHandler.cpp
+    supports:
+      - provenance
+  - id: viewport_baseline
+    kind: source
+    path: client/mapView/MapViewController.cpp
+    supports:
+      - provenance
+provenance:
+  sourceConfidence:
+    intent: high
+    boundary: medium
+    behavior: unknown
+implementationBindings: []
+keywords:
+  - adventure map
+  - wraparound
+  - topology
+  - noncanonical

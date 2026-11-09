@@ -1,0 +1,29 @@
+apiVersion: specpm.dev/v0.1
+kind: SpecPackage
+metadata:
+  id: vcmi.adventure_map.toroidal_contract
+  name: VCMI Toroidal Adventure Map Contract
+  version: 0.1.0
+  summary: Draft contract for a seamless, two-axis wrapping adventure map in VCMI.
+  license: GPL-2.0-or-later
+  authors:
+    - name: VCMI local specification contributors
+specs:
+  - path: specs/toroidal-map.spec.yaml
+index:
+  provides:
+    capabilities:
+      - vcmi.adventure_map.toroidal_contract
+  requires:
+    capabilities: []
+compatibility:
+  platforms:
+    - any
+  languages:
+    - cpp
+keywords:
+  - adventure map
+  - toroidal topology
+  - seamless scrolling
+  - draft contract
+foreignArtifacts: []

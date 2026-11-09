@@ -1,0 +1,14 @@
+AdventureMapSession
+  MapState
+    MapGeometry
+    MapFormat
+    VisibilityAndGuards
+  Movement
+    RouteFinding
+    ServerValidation
+  Presentation
+    Viewport
+    Renderer
+    MapInteraction
+    Minimap
+  AdventureAI

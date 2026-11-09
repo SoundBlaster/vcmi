@@ -1,0 +1,32 @@
+AdventureMapSession:
+  scope: "Selected current VCMI adventure map responsibilities; not a complete application map"
+  source: "AGENTS.md; docs/developers/Code_Structure.md"
+MapState:
+  source: "lib/mapping/CMap.h; lib/mapping/CMap.cpp"
+MapGeometry:
+  source: "lib/mapping/CMap.h:isInTheMap; lib/mapping/CMap.cpp:isCoastalTile, guardingCreaturePosition"
+  observation: "Canonical tile storage and multiple neighbor checks are bounded by the rectangle"
+MapFormat:
+  source: "lib/mapping/CMapHeader.h; lib/mapping/MapFormatJson.cpp:serializeHeader, readHeader, writeHeader"
+  observation: "Map metadata includes dimensions and layers; a wrapping field was not identified in the inspected header serialization"
+VisibilityAndGuards:
+  source: "lib/callback/CGameInfoCallback.cpp:getTilesInRange; lib/mapping/CMap.cpp:guardingCreaturePosition"
+RouteFinding:
+  source: "lib/pathfinder/CPathfinder.cpp:CPathfinderHelper::getNeighbours"
+  observation: "Eight candidate directions are checked; out-of-map destinations are discarded"
+ServerValidation:
+  source: "server/CGameHandler.cpp:CGameHandler::moveHero"
+  observation: "The server checks map bounds and ordinary coordinate adjacency"
+Viewport:
+  source: "client/mapView/MapViewController.cpp:setViewCenter, onHeroMoved; client/mapView/MapViewModel.cpp:getTileAtPoint"
+  observation: "The camera center is clamped; movement uses linear interpolation of tile coordinates"
+Renderer:
+  source: "client/mapView/MapRenderer.cpp:MapRenderer::renderTile; client/mapView/MapRendererContextState.cpp:stampObject, addMovingObject"
+  observation: "Outside-map tiles use border rendering and object stamping skips outside-map cells"
+MapInteraction:
+  source: "client/mapView/MapViewActions.cpp:clickPressed, clickReleased, showPopupWindow, handleHover"
+Minimap:
+  source: "client/adventureMap/CMinimap.cpp:showAll, onMapViewMoved"
+AdventureAI:
+  source: "AI/Nullkiller2/Helpers/ExplorationHelper.cpp"
+  observation: "Selected exploration calculations use ordinary 2D distance; other AI paths are not fully mapped"
