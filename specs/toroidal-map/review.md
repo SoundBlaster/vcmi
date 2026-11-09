@@ -94,6 +94,7 @@ non-seam step over equivalent terrain.
 | A2 | A player selects an AI profile that does not support the topology | The profile's lack of support is identified; it is not advertised as toroidal-compatible. |
 | E1 | Open/create a supported toroidal map | Seam terrain and passability can be authored coherently; if generation is advertised, generated seams meet the same topology. |
 | E2 | A supported random generator produces a toroidal map | Generated terrain, passages and any advertised roads and rivers respect the joined topology. Applicability depends on a supported generator being offered. |
+| E3 | A supported toroidal generator instantiates a guarded zone template | Actual traversable zone connections, including across both seams and corners, obey the template and its guards. Deliberately blocked seams remain blocked; any advertised seam crossings are reachable. Repeat over representative seeds and sizes. Applicability depends on template and generator support being offered. |
 
 Analytical witness A: on a 100 × 100 level, for `(0,0)` and direction
 `(-1,-1)`, independent wrapping produces `(99,99)` on the same level. This
