@@ -52,4 +52,5 @@ public:
 	void enterLobbyConnectionMode();
 	void setCallback(IGameInfoCallback & cb);
 	void setSerializationVersion(ESerializationVersion version);
+	ESerializationVersion getSerializationVersion() const;
 };

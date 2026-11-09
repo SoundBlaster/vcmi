@@ -357,6 +357,16 @@ bool CVCMIServer::prepareToStartGame()
 	if (!started)
 		return false;
 
+	if(newGH->gameInfo().getMapHeader()->toroidal && std::ranges::any_of(activeConnections, [](const auto & connection)
+	{
+		return connection->getSerializationVersion() < ESerializationVersion::TOROIDAL_MAP;
+	}))
+	{
+		logNetwork->error("Cannot start toroidal map with an incompatible client");
+		announceMessage(MetaString::createFromTextID("vcmi.server.errors.incompatibleVersion"));
+		return false;
+	}
+
 	// prevent loading or starting game where human player is not present on map
 	// actual bug might be someplace else, from more likely to less likely:
 	// a) RMG bug that fails to place player on map

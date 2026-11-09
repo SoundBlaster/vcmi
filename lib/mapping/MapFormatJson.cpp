@@ -239,6 +239,7 @@ namespace TerrainDetail
 
 ///CMapFormatJson
 const int CMapFormatJson::VERSION_MAJOR = 3;
+const int CMapFormatJson::VERSION_MAJOR_TOROIDAL = 4;
 const int CMapFormatJson::VERSION_MINOR = 0;
 
 const std::string CMapFormatJson::HEADER_FILE_NAME = "header.json";
@@ -907,13 +908,25 @@ void CMapLoaderJson::readHeader(const bool complete)
 
 	fileVersionMajor = static_cast<int>(header["versionMajor"].Integer());
 
-	if(fileVersionMajor > VERSION_MAJOR)
+	if(fileVersionMajor > VERSION_MAJOR_TOROIDAL)
 	{
 		logGlobal->error("Unsupported map format version: %d", fileVersionMajor);
 		throw std::runtime_error("Unsupported map format version");
 	}
 
 	fileVersionMinor = static_cast<int>(header["versionMinor"].Integer());
+	if(fileVersionMajor == VERSION_MAJOR_TOROIDAL)
+	{
+		if(!header["topology"].isString() || header["topology"].String() != "toroidal")
+			throw std::runtime_error("Invalid or missing topology in map format version 4");
+		mapHeader->toroidal = true;
+	}
+	else
+	{
+		if(header["topology"].isString() && header["topology"].String() == "toroidal")
+			throw std::runtime_error("Toroidal topology requires map format version 4");
+		mapHeader->toroidal = false;
+	}
 
 	if(fileVersionMinor > VERSION_MINOR)
 	{
@@ -991,6 +1004,8 @@ void CMapLoaderJson::readHeader(const bool complete)
 			}
 		}
 	}
+	if(mapHeader->toroidal && (mapHeader->width < 3 || mapHeader->height < 3))
+		throw std::runtime_error("Toroidal maps require width and height of at least 3 tiles");
 
 	// Load translations BEFORE deserializing header so that header.name etc. can be translated
 	readTranslations();
@@ -1412,8 +1427,10 @@ void CMapSaverJson::writeHeader()
 	JsonNode header;
 	JsonSerializer handler(mapObjectResolver.get(), header);
 
-	header["versionMajor"].Float() = VERSION_MAJOR;
+	header["versionMajor"].Float() = mapHeader->toroidal ? VERSION_MAJOR_TOROIDAL : VERSION_MAJOR;
 	header["versionMinor"].Float() = VERSION_MINOR;
+	if(mapHeader->toroidal)
+		header["topology"].String() = "toroidal";
 	
 	//write mods
 	header["mods"] = ModVerificationInfo::jsonSerializeList(mapHeader->mods);

@@ -239,6 +239,7 @@ public:
 	si32 height; /// The default value is 72.
 	si32 width; /// The default value is 72.
 	std::vector<MapLayerId> mapLayers;
+	bool toroidal = false;
 	MetaString name;
 	MetaString description;
 	EMapDifficulty difficulty;
@@ -330,6 +331,10 @@ public:
 		h & defeatIconIndex;
 		h & disposedHeroes;
 		h & translations;
+		if(h.hasFeature(Handler::Version::TOROIDAL_MAP))
+			h & toroidal;
+		else if(!h.saving)
+			toroidal = false;
 		if(!h.saving)
 			registerMapStrings();
 	}

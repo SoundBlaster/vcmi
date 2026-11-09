@@ -103,9 +103,9 @@ establishes the intended arithmetic only; it is not runtime evidence.
    occupy both sides of a seam. Until then, authoring can prohibit such
    placement while rendering objects located near a seam correctly. Hero and
    boat movement across seams remains required.
-2. **Minimum map dimensions:** choose supported minimum width and height, and
-   define neighbor deduplication when an extent is 1 or 2. The coordinate rule
-   is defined for positive sizes; the supported map-size profile is not.
+2. **Minimum map dimensions:** the initial file-format implementation requires
+   width and height of at least 3. Extents of 1 or 2 make distinct directions
+   lead to the same canonical cell; supporting them remains a separate decision.
 3. **Topology configuration:** choose per-map or per-level representation,
    editor controls, VCMI map format and save compatibility/version negotiation.
    Existing `.h3m` compatibility cannot be assumed to carry a new flag.

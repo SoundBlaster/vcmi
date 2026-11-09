@@ -167,3 +167,34 @@ TEST(MapFormat, Terrain)
 		c.compare("underground", actualUnderground, expectedUnderground);
 	}
 }
+
+TEST(MapFormat, ToroidalTopologyRoundTripsAndRequiresNewFormat)
+{
+	static const std::string MAP_DATA_PATH = "test/TerrainTest/";
+	JsonNode header(JsonPath::builtin(MAP_DATA_PATH + CMapFormatJson::HEADER_FILE_NAME));
+	const JsonNode objects(JsonPath::builtin(MAP_DATA_PATH + CMapFormatJson::OBJECTS_FILE_NAME));
+	const JsonNode surface(JsonPath::builtin(MAP_DATA_PATH + "surface_terrain.json"));
+	const JsonNode underground(JsonPath::builtin(MAP_DATA_PATH + "underground_terrain.json"));
+
+	const auto bounded = loadOriginal(header, objects, surface, underground);
+	EXPECT_FALSE(bounded->toroidal);
+
+	header["topology"].String() = "toroidal";
+	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
+	header["versionMajor"].Float() = CMapFormatJson::VERSION_MAJOR_TOROIDAL;
+	const auto toroidal = loadOriginal(header, objects, surface, underground);
+	ASSERT_TRUE(toroidal->toroidal);
+
+	CMemoryBuffer buffer;
+	JsonNode actualHeader;
+	JsonNode actualObjects;
+	JsonNode actualSurface;
+	JsonNode actualUnderground;
+	loadActual(&buffer, toroidal, actualHeader, actualObjects, actualSurface, actualUnderground);
+	EXPECT_EQ(actualHeader["versionMajor"].Integer(), CMapFormatJson::VERSION_MAJOR_TOROIDAL);
+	EXPECT_EQ(actualHeader["topology"].String(), "toroidal");
+	EXPECT_TRUE(loadOriginal(actualHeader, actualObjects, actualSurface, actualUnderground)->toroidal);
+
+	header["topology"].String() = "unknown";
+	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
+}

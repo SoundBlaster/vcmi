@@ -65,6 +65,11 @@ GameConnection::GameConnection(std::weak_ptr<INetworkConnection> networkConnecti
 
 GameConnection::~GameConnection() = default;
 
+ESerializationVersion GameConnection::getSerializationVersion() const
+{
+	return serializer->version;
+}
+
 void GameConnection::sendPack(const CPack & pack)
 {
 	std::scoped_lock lock(writeMutex);

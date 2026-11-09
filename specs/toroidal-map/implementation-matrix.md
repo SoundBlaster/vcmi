@@ -56,7 +56,7 @@ future opt-in design preserves it.
 | --- | --- | --- | --- | --- | --- | --- |
 | `topology` | Horizontal and vertical steps wrap in both directions. | G1, G2 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no hero movement |
 | `topology` | Diagonal crossing wraps one or both axes, including all four corners. | G3, G4 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no hero movement |
-| `topology` | Canonical tile coordinates and supported dimensions remain valid. | G1–G4; small-map cases to specify | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); minimum dimensions undecided |
+| `topology` | Canonical tile coordinates and supported dimensions remain valid. | G1–G4; small-map cases to specify | partial: helper and format minimum | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); format minimum is untested |
 | `level_isolation` | Seams preserve level; normal inter-level passages continue to work. | G9 | partial: coordinate helper only | partial: isolated helper tests | pending | [unit record](evidence/topology-unit-2026-11-09.md); no passage test |
 | `movement_and_route` | Crossing uses normal passability, diagonal rules, cost, movement points and visits. | G4, G5, G10 | not started | not run | pending | none |
 | `movement_and_route` | Route finding considers legal wrapped neighbors under normal knowledge rules. | G6 | not started | not run | pending | none; route selection coverage needs refinement |
@@ -81,10 +81,10 @@ future opt-in design preserves it.
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `persistence_and_network` | Save/reload preserves topology and authoritative state. | P1 | not started | not run | pending | none |
+| `persistence_and_network` | Save/reload preserves topology and authoritative state. | P1 | partial: versioned header serialization | not run | pending | [format record](evidence/topology-format-2026-11-09.md); game reload unverified |
 | `persistence_and_network` | Supported multiplayer peers agree on movement and visibility. | P3 | not started | not run | pending | none |
-| `persistence_and_network` | Unsupported peers or readers cannot silently interpret topology incorrectly. | P4 | not started | not run | pending | none; protocol and version policy undecided |
-| `bounded_compatibility` | Existing maps and saves remain bounded; toroidal behavior is opt-in. | P2 | not started | not run | pending | none; baseline source reading is not a regression test |
+| `persistence_and_network` | Unsupported peers or readers cannot silently interpret topology incorrectly. | P4 | partial: versioned format and lobby start guard | not run | pending | [format record](evidence/topology-format-2026-11-09.md); behavior unverified |
+| `bounded_compatibility` | Existing maps and saves remain bounded; toroidal behavior is opt-in. | P2 | partial: versioned default | not run | pending | [format record](evidence/topology-format-2026-11-09.md); no legacy regression execution |
 | `authoring` | A supported authored map can have coherent passable seams. | E1 | not started | not run | pending | none; seam-spanning object policy undecided |
 | `authoring` | Any supported random generator respects topology. | E2 | not started | not run | pending | none; generator support is conditional |
 | `ai` | Each advertised supported AI can plan and act using legal wrapped routes. | A1 | not started | not run | pending | none; supported profiles undecided |
@@ -103,6 +103,8 @@ blanket conformance claim.
 
 The isolated helper tests are recorded in
 [`evidence/topology-unit-2026-11-09.md`](evidence/topology-unit-2026-11-09.md).
+The format and save test attempt is recorded in
+[`evidence/topology-format-2026-11-09.md`](evidence/topology-format-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

@@ -85,6 +85,27 @@ TEST_F(SaveGameTest, savedGameIsRestored)
 	EXPECT_EQ(loadedState->players.size(), gameState->players.size());
 }
 
+TEST_F(SaveGameTest, mapTopologyIsVersionedInSavedHeader)
+{
+	CMapHeader original;
+	original.toroidal = true;
+
+	CMemorySerializer current;
+	current.oser & original;
+	CMapHeader restored;
+	current.iser & restored;
+	EXPECT_TRUE(restored.toroidal);
+
+	CMemorySerializer legacy;
+	legacy.oser.version = ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
+	legacy.iser.version = ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
+	legacy.oser & original;
+	CMapHeader restoredLegacy;
+	restoredLegacy.toroidal = true;
+	legacy.iser & restoredLegacy;
+	EXPECT_FALSE(restoredLegacy.toroidal);
+}
+
 TEST_F(SaveGameTest, invalidMetadataIsRejected)
 {
 	startTestGame();
