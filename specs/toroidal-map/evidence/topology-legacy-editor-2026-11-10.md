@@ -36,3 +36,26 @@ The synthetic map was not played in this check. The editor did not repair
 terrain, roads or object placement, and neither this test nor the successful
 save proves that an arbitrary converted map is balanced or visually seamless.
 Game resources and test artifacts remain local on TB5.
+
+## Boundary objects in the demo map
+
+A later local diagnostic loaded the same H3M using the normal H3M loader,
+attached the editor callback, set the topology flag in memory and enumerated
+objects for which `CMap::hasUnsupportedToroidalFootprint` returned true. For
+each object it counted the visible, blocking and visitable mask cells outside
+the original rectangle. The diagnostic was temporary instrumentation, not a
+permanent automated test; its output is `legacy-seam-diagnostic.log` on TB5.
+
+It found 98 objects with outside visible cells, of which 66 also have outside
+blocking cells and none have outside visitable mask cells. The first reported
+gate has three outside visible cells but no outside blocking or visitable
+cells. Other affected objects include mountains, trees, lakes and terrain
+decorations, including objects whose anchor itself is outside the rectangle.
+These counts exclude heroes and boats because the existing restriction does.
+
+The editor's save error reports the first rejected object, not necessarily the
+only one. Wrapping previously clipped object masks can introduce graphics or
+obstacles at the opposite edge; leaving them clipped yields different seam
+behavior. This observation does not decide which transformation an author
+wants, prove the resulting layout is playable, or establish which subset of
+these objects can safely be enabled. The restriction is still in force.
