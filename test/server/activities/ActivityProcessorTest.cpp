@@ -2663,6 +2663,135 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGatePairedAcrossToroidalSeam)
 	EXPECT_EQ(hero->visitablePos(), surface->visitablePos());
 }
 
+TEST_F(SubterraneanGateTopologyTest, heroUsesGateWithVisitableTileAcrossSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(10, 5, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	const auto makeAppearance = [](const std::string & mask)
+	{
+		const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ ")" + mask + R"(" ] })";
+		JsonNode definition(text.data(), text.size(), "SeamGateTraversalTest");
+		auto appearance = std::make_shared<ObjectTemplate>();
+		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+		appearance->readJson(definition, resolver, false);
+		return appearance;
+	};
+	GameRandomizer randomizer(*gameState());
+	const auto addGate = [&](const int3 & pos, const std::string & name, const std::string & mask)
+	{
+		auto gate = std::make_shared<CGSubterraneanGate>(gameState().get());
+		gate->ID = Obj::SUBTERRANEAN_GATE;
+		gate->subID = MapObjectSubID(0);
+		gate->pos = pos;
+		gate->instanceName = name;
+		gate->appearance = makeAppearance(mask);
+		static_cast<CGObjectInstance *>(gate.get())->initObj(randomizer);
+		map()->addNewObject(gate);
+		return gate;
+	};
+	const auto entrance = addGate(int3(10, 5, 0), "entrance", "A");
+	const auto exit = addGate(int3(0, 5, 1), "seam_exit", "A0");
+	ASSERT_EQ(exit->visitablePos(), int3(-1, 5, 1));
+	ASSERT_EQ(map()->getTile(int3(35, 5, 1)).topVisitableObj(), exit->id);
+	CGSubterraneanGate::postInit(gameState().get());
+	ASSERT_EQ(entrance->channel, exit->channel);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NO_THROW(EXPECT_TRUE(CGTeleport::isExitPassable(*gameState(), hero, exit.get())));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(entrance->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	auto dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(hero->visitablePos(), int3(35, 5, 1));
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(34, 5, 1)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 5, 1)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(hero->visitablePos(), entrance->visitablePos());
+}
+
+TEST_F(SubterraneanGateTopologyTest, heroUsesOneWayMonolithWithExitAcrossSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(10, 5, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	GameRandomizer randomizer(*gameState());
+	const auto addMonolith = [&](MapObjectID type, const int3 & pos, const std::string & name, const std::string & mask)
+	{
+		const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ ")" + mask + R"(" ] })";
+		JsonNode definition(text.data(), text.size(), "SeamMonolithTraversalTest");
+		auto appearance = std::make_shared<ObjectTemplate>();
+		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+		appearance->readJson(definition, resolver, false);
+		auto monolith = std::make_shared<CGMonolith>(gameState().get());
+		monolith->ID = type;
+		monolith->subID = MapObjectSubID(0);
+		monolith->pos = pos;
+		monolith->instanceName = name;
+		monolith->appearance = appearance;
+		static_cast<CGObjectInstance *>(monolith.get())->initObj(randomizer);
+		map()->addNewObject(monolith);
+		monolith->assignTeleportChannel();
+		return monolith;
+	};
+	const auto entrance = addMonolith(Obj::MONOLITH_ONE_WAY_ENTRANCE, int3(10, 5, 0), "entrance", "A");
+	const auto exit = addMonolith(Obj::MONOLITH_ONE_WAY_EXIT, int3(0, 5, 0), "seam_exit", "A0");
+	ASSERT_EQ(exit->visitablePos(), int3(-1, 5, 0));
+	ASSERT_EQ(map()->getTile(int3(35, 5, 0)).topVisitableObj(), exit->id);
+	ASSERT_EQ(entrance->channel, exit->channel);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(entrance->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	auto dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(hero->visitablePos(), int3(35, 5, 0));
+}
+
+TEST_F(SubterraneanGateTopologyTest, whirlpoolListsPassableExitTilesAcrossSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(10, 5, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "AA" ] })";
+	JsonNode definition(text.data(), text.size(), "SeamWhirlpoolExitTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto whirlpool = std::make_shared<CGWhirlpool>(gameState().get());
+	whirlpool->ID = Obj::WHIRLPOOL;
+	whirlpool->pos = int3(0, 5, 0);
+	whirlpool->instanceName = "seam_whirlpool";
+	whirlpool->appearance = appearance;
+	map()->addNewObject(whirlpool);
+	const auto exits = CGWhirlpool::getPassableExitTiles(*gameState(), {whirlpool->id});
+	ASSERT_EQ(exits.size(), 2u);
+	EXPECT_NE(std::ranges::find(exits, std::make_pair(whirlpool->id, int3(0, 5, 0))), exits.end());
+	EXPECT_NE(std::ranges::find(exits, std::make_pair(whirlpool->id, int3(35, 5, 0))), exits.end());
+	map()->setToroidalAndRebuild(false);
+	const auto boundedExits = CGWhirlpool::getPassableExitTiles(*gameState(), {whirlpool->id});
+	ASSERT_EQ(boundedExits.size(), 1u);
+	EXPECT_EQ(boundedExits.front().second, int3(0, 5, 0));
+}
+
 TEST_F(SummonBoatTopologyTest, choosesNearestBoatAccordingToMapTopology)
 {
 	const PlayerColor player(0);

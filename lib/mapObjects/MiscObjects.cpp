@@ -351,13 +351,24 @@ bool CGTeleport::isConnected(const CGObjectInstance * src, const CGObjectInstanc
 	return isConnected(srcObj, dstObj);
 }
 
+// Teleport templates can place their visitable cell outside the stored map
+// rectangle. Resolve that cell only in the context of a running toroidal map.
+static int3 teleportVisitableTile(const IGameInfoCallback & gameInfo, const CGObjectInstance & object)
+{
+	const int3 position = object.visitablePos();
+	const auto * header = gameInfo.getMapHeader();
+	if(header->toroidal)
+		return header->getTopology().canonicalize(position).value_or(position);
+	return position;
+}
+
 bool CGTeleport::isExitPassable(const IGameInfoCallback & gameInfo, const CGHeroInstance * h, const CGObjectInstance * obj)
 {
 	// a template with no visitable tile, used by maps as decoration, has no tile to leave it from
 	if(!obj->isVisitable())
 		return false;
 
-	ObjectInstanceID topObjectID = gameInfo.getTile(obj->visitablePos())->topVisitableObj();
+	ObjectInstanceID topObjectID = gameInfo.getTile(teleportVisitableTile(gameInfo, *obj))->topVisitableObj();
 	const CGObjectInstance * topObject = gameInfo.getObjInstance(topObjectID);
 
 	if(topObject->ID == Obj::HERO)
@@ -457,7 +468,7 @@ void CGMonolith::onHeroVisit(IGameEventCallback & gameEvents, const CGHeroInstan
 			auto exits = cb->getTeleportChannelExits(channel);
 			for(const auto & exit : exits)
 			{
-				td.exits.push_back(std::make_pair(exit, cb->getObj(exit)->visitablePos()));
+				td.exits.push_back(std::make_pair(exit, teleportVisitableTile(*cb, *cb->getObj(exit))));
 			}
 		}
 
@@ -489,7 +500,7 @@ void CGMonolith::teleportDialogAnswered(IGameEventCallback & gameEvents, const C
 	else if(vstd::isValidIndex(exits, answer))
 		dPos = exits[answer].second;
 	else
-		dPos = cb->getObj(randomExit)->visitablePos();
+		dPos = teleportVisitableTile(*cb, *cb->getObj(randomExit));
 
 	gameEvents.moveHero(hero->id, hero->convertFromVisitablePos(dPos), EMovementMode::MONOLITH);
 }
@@ -547,7 +558,7 @@ void CGSubterraneanGate::onHeroVisit(IGameEventCallback & gameEvents, const CGHe
 	else
 	{
 		auto exit = getRandomExit(gameEvents, h);
-		td.exits.push_back(std::make_pair(exit, cb->getObj(exit)->visitablePos()));
+		td.exits.push_back(std::make_pair(exit, teleportVisitableTile(*cb, *cb->getObj(exit))));
 	}
 
 	gameEvents.showTeleportDialog(&td);
@@ -712,9 +723,11 @@ void CGWhirlpool::teleportDialogAnswered(IGameEventCallback & gameEvents, const 
 TTeleportExitsList CGWhirlpool::getPassableExitTiles(const IGameInfoCallback & gameInfo, const std::vector<ObjectInstanceID> & exits)
 {
 	TTeleportExitsList result;
+	const auto * header = gameInfo.getMapHeader();
 	for(const auto & exitID : exits)
 	{
 		const auto * exit = gameInfo.getObj(exitID);
+		std::set<int3> visitedTiles;
 		for(int w = 0; w < exit->getWidth(); ++w)
 		{
 			for(int h = 0; h < exit->getHeight(); ++h)
@@ -722,6 +735,13 @@ TTeleportExitsList CGWhirlpool::getPassableExitTiles(const IGameInfoCallback & g
 				int3 tile = exit->anchorPos() - int3(w, h, 0);
 				if(!exit->visitableAt(tile))
 					continue;
+				if(header->toroidal)
+				{
+					const auto canonical = header->getTopology().canonicalize(tile);
+					if(!canonical || !visitedTiles.insert(*canonical).second)
+						continue;
+					tile = *canonical;
+				}
 
 				// a hero standing on the tile is the top visitable object there
 				const TerrainTile * terrainTile = gameInfo.tryGetTile(tile);
