@@ -70,12 +70,12 @@ future opt-in design preserves it.
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `rendering` | Continuous terrain, roads, rivers, objects, overlays and fog at every edge and corner. | V1 | partial: viewport and renderer mapping; static seam-spanning objects prohibited in the pilot | partial: spectator edge observations | pending | [GUI record](evidence/topology-gui-spectator-2026-11-09.md); seam art and continuous visual behavior need testing |
+| `rendering` | Continuous terrain, roads, rivers, objects, overlays and fog at every edge and corner. | V1 | partial: viewport and renderer mapping; static seam-spanning objects prohibited in the pilot | partial: spectator and human-player edge observations | pending | [player GUI record](evidence/topology-gui-player-2026-11-09.md); seam art and continuous visual behavior need testing |
 | `rendering` | View spanning multiple map periods renders correct copies without erroneous duplicates. | V4 | partial: repeated tile mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); no visual run |
 | `viewport_input` | Hover and clicks on visible copies address the same canonical location. | V2, V4 | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md) |
 | `viewport_input` | Destination selection remains correct across both seams and at wide zoom. | V2, V4; destination-specific case to specify | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); destination case unspecified |
 | `movement_presentation` | Hero and boat cross as a short continuous step with correct direction and path indicator. | V3; boat-animation case to specify | partial: camera and sprite offsets | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); runtime visual check required |
-| `minimap` | Visible area and map selection remain correct across one or both seams. | V5 | partial: split radar | partial: isolated interval arithmetic and spectator display | pending | [GUI record](evidence/topology-gui-spectator-2026-11-09.md); selection and player mode unverified |
+| `minimap` | Visible area and map selection remain correct across one or both seams. | V5 | partial: split radar | partial: interval arithmetic and spectator and human-player displays | pending | [player GUI record](evidence/topology-gui-player-2026-11-09.md); selection and full boundary coverage unverified |
 
 ## Persistence, compatibility and supported profiles
 
@@ -133,6 +133,8 @@ The limited demo integration runs are recorded in
 [`evidence/topology-demo-integration-2026-11-09.md`](evidence/topology-demo-integration-2026-11-09.md).
 The spectator viewport observation is recorded in
 [`evidence/topology-gui-spectator-2026-11-09.md`](evidence/topology-gui-spectator-2026-11-09.md).
+The later human-player viewport observation is recorded in
+[`evidence/topology-gui-player-2026-11-09.md`](evidence/topology-gui-player-2026-11-09.md).
 The wrapped terrain-brush checks are recorded in
 [`evidence/topology-terrain-brush-2026-11-09.md`](evidence/topology-terrain-brush-2026-11-09.md).
 The road and river brush checks are recorded in
