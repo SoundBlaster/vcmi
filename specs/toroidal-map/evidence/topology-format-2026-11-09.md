@@ -7,6 +7,14 @@ connected client's negotiated serialization version before starting a
 toroidal session. Width and height below 3 are rejected for this topology.
 The format version is local to this branch and has not been accepted upstream.
 
+Read-only comparison with the original checkout baseline
+`30e9207276f137658da5132705c05644bfe33aee` shows that its VMAP loader sets
+`VERSION_MAJOR` to 3 and throws when a map header has a larger major version.
+Thus its source is designed to reject this branch's version-4 VMAP rather
+than silently load it as bounded. This is source inspection, not execution
+of an old binary, and does not resolve the possibility of a later upstream
+release assigning version 4 a different meaning.
+
 Source baseline: `1ad28cd` plus the then-uncommitted changes identified below.
 The Release CMake build on macOS arm64 completed with exit 0 for `vcmitest`,
 `vcmiclient`, `vcmiserver` and `vcmieditor`, using the same checkout-specific
