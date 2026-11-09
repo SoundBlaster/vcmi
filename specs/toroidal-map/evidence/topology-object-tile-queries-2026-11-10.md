@@ -24,3 +24,11 @@ assertion checking behavior when the object has no callback.
 This is groundwork, not permission to author static objects crossing a seam.
 Other object coordinates, interactions, oversized masks and actual sprite
 rendering remain unverified; the existing load/save restriction stays active.
+
+The subsequent `HeroMovementTest.SeamSpanningBlockerPreventsMovementOnBothSides`
+uses a synthetic two-tile blocking object across the east/west seam. Both
+canonical tiles report blocked, the pathfinder marks one unreachable, and the
+server rejects entry from each neighboring side. Both this test and the tile
+query test passed (`seam-blocker-tests.log`). It uses an in-memory fixture
+that bypasses the authored-map restriction; it is not a test of forest art,
+random template generation, or a diagonal opening around the blocker.

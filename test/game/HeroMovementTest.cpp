@@ -373,6 +373,51 @@ TEST_F(HeroMovementTest, ObjectTileQueriesFindFootprintAcrossToroidalCorner)
 	EXPECT_TRUE(object.coveringAt(local));
 }
 
+TEST_F(HeroMovementTest, SeamSpanningBlockerPreventsMovementOnBothSides)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(35, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(34, 10, 0));
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "BB" ] })";
+	JsonNode definition(text.data(), text.size(), "SeamBlockerTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto obstacle = std::make_shared<CGObjectInstance>(gameState().get());
+	obstacle->pos = int3(0, 10, 0);
+	obstacle->instanceName = "synthetic_seam_blocker";
+	obstacle->appearance = appearance;
+	map()->addNewObject(obstacle);
+	ASSERT_TRUE(map()->getTile(int3(0, 10, 0)).blocked());
+	ASSERT_TRUE(map()->getTile(int3(35, 10, 0)).blocked());
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	EXPECT_FALSE(paths.getNode(int3(35, 10, 0), EPathfindingLayer::LAND)->reachable());
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 10, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(34, 10, 0));
+	TryMoveHero placement;
+	placement.id = hero->id;
+	placement.start = hero->pos;
+	placement.end = hero->convertFromVisitablePos(int3(1, 10, 0));
+	placement.movePoints = 3000;
+	placement.result = TryMoveHero::TELEPORTATION;
+	gameState()->apply(placement);
+	ASSERT_EQ(hero->visitablePos(), int3(1, 10, 0));
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 10, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(1, 10, 0));
+}
+
 TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
 {
 	const PlayerColor player(0);
