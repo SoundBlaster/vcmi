@@ -273,6 +273,40 @@ TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
 	EXPECT_EQ(hero->movementPointsRemaining(), disembarkRemaining);
 }
 
+TEST_F(HeroMovementTest, UndergroundSeamPreservesLevelAndFogIsolation)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 1, 1), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	setMapVisibility(player, false);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 1, 1));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const int3 destination(35, 1, 1);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_TRUE(gameState()->isVisibleFor(destination, player));
+	EXPECT_FALSE(gameState()->isVisibleFor(int3(35, 1, 0), player));
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 1, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), destination);
+
+	revealMap(player);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * wrappedNeighbor = paths.getNode(int3(0, 1, 1), EPathfindingLayer::LAND);
+	ASSERT_TRUE(wrappedNeighbor->reachable());
+	ASSERT_NE(wrappedNeighbor->theNodeBefore, nullptr);
+	EXPECT_EQ(wrappedNeighbor->theNodeBefore->coord, destination);
+	EXPECT_FALSE(paths.getNode(int3(35, 1, 0), EPathfindingLayer::LAND)->reachable());
+}
+
 TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 {
 	const PlayerColor player(0);
