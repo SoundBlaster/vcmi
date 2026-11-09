@@ -31,7 +31,7 @@ regenerating the index resets manually recorded statuses.
 | `AI/Nullkiller2/AIUtility.h` | 144, 145, 147, 149, 160, 165, 172, 177 | unreviewed |
 | `AI/Nullkiller2/Analyzers/DangerHitMapAnalyzer.cpp` | 81, 83, 133, 219, 221, 257 | unreviewed |
 | `AI/Nullkiller2/Analyzers/HeroManager.cpp` | 146 | unreviewed |
-| `AI/Nullkiller2/Analyzers/ObjectClusterizer.cpp` | 22, 37, 60, 61, 97, 103, 496 | partial: cluster centroid candidate |
+| `AI/Nullkiller2/Analyzers/ObjectClusterizer.cpp` | 22, 37, 60, 61, 97, 103, 496 | partial: Dimension Door reach and cluster centroid candidates |
 | `AI/Nullkiller2/Behaviors/EscapeBehavior.cpp` | 186 | unreviewed |
 | `AI/Nullkiller2/Behaviors/ExplorationBehavior.cpp` | 64, 65, 216, 217, 878 | unreviewed |
 | `AI/Nullkiller2/Behaviors/GatherArmyBehavior.cpp` | 235, 297 | unreviewed |
@@ -45,7 +45,7 @@ regenerating the index resets manually recorded statuses.
 | `AI/Nullkiller2/Goals/ExploreNeighbourTile.h` | 44, 55 | unreviewed |
 | `AI/Nullkiller2/Helpers/ExplorationHelper.cpp` | 41, 42, 43, 44, 45, 70, 72, 76, 117, 118, 124, 166, 177, 179, 194, 195, 205, 246, 613, 647, 665, 666, 668, 669, 726, 773, 784, 788 | unreviewed |
 | `AI/Nullkiller2/Helpers/ExplorationHelper.h` | 51, 112 | unreviewed |
-| `AI/Nullkiller2/Pathfinding/AINodeStorage.cpp` | 47, 53, 418, 428, 1001, 1185, 1195, 1256, 1257, 1258, 1259, 1260, 1413 | partial: nearest-town planning fixed and tested after baseline; other candidates unreviewed |
+| `AI/Nullkiller2/Pathfinding/AINodeStorage.cpp` | 47, 53, 418, 428, 1001, 1185, 1195, 1256, 1257, 1258, 1259, 1260, 1413 | partial: nearest-town and Dimension Door planning fixed and tested after baseline; other candidates unreviewed |
 | `AI/Nullkiller2/Pathfinding/AINodeStorage.h` | 241, 310, 319, 320 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/AIPathfinder.cpp` | 97, 98 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/AIPathfinder.h` | 35, 36 | unreviewed |
@@ -318,7 +318,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/serializer/GameConnection.cpp` | 45, 49 | unreviewed |
 | `lib/spells/BattleSpellMechanics.cpp` | 50, 267 | unreviewed |
 | `lib/spells/ISpellMechanics.h` | 402 | unreviewed |
-| `lib/spells/adventure/AdventureSpellEffect.cpp` | 50, 61, 64 | unreviewed |
+| `lib/spells/adventure/AdventureSpellEffect.cpp` | 50, 61, 64 | partial: ranged spell check fixed and tested after baseline |
 | `lib/spells/adventure/AdventureSpellMechanics.cpp` | 109, 112 | unreviewed |
 | `lib/spells/adventure/AdventureSpellMechanics.h` | 40 | unreviewed |
 | `lib/spells/adventure/ReinforcementsEffect.cpp` | 72 | unreviewed |

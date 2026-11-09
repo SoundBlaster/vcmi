@@ -66,6 +66,7 @@ future opt-in design preserves it.
 | `vision_and_guards` | Sight, fog and adjacency guards work across edges and corners without leaking hidden information. | G7, G11 | partial: range, Visions bonus and guard lookups | partial: hidden range, guard positions, Visions range and one battle start | pending | [guard battle](evidence/topology-guard-battle-2026-11-09.md), [Visions range](evidence/topology-visions-spell-2026-11-09.md); complete guard and fog behavior unverified |
 | `vision_and_guards` | Object interaction across seams follows normal rules. | G10; additional object cases to specify | partial: server movement and visit logic | partial: one resource across a corner | pending | [resource record](evidence/topology-resource-visit-2026-11-09.md); object audit incomplete |
 | `vision_and_guards` | Nearest-town spell effects use toroidal distance. | spell case to specify | partial: shared nearest-town helper | partial: unskilled Town Portal, bounded and one seam | pending | [nearest-town record](evidence/topology-nearest-town-2026-11-09.md); Reinforcements and cross-level cases unverified |
+| `vision_and_guards` | Ranged adventure spell targeting uses wrapped displacement. | spell cases to specify | partial: common ranged check and Nullkiller2 Dimension Door candidate enumeration | partial: range check and one AI landing plan | pending | [ranged spell record](evidence/topology-ranged-spells-2026-11-09.md); live casts and spell-specific cases unverified |
 
 ## Presentation and interaction
 

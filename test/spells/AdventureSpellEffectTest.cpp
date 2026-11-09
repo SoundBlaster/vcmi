@@ -15,6 +15,7 @@
 #include "../../include/vcmi/spells/Caster.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapping/TerrainTile.h"
+#include "../../lib/mapping/CMapHeader.h"
 #include "../mock/mock_IGameInfoCallback.h"
 
 namespace
@@ -116,6 +117,25 @@ TEST(Spells_AdventureSpellRangedEffect, validatesTargetFromPlannedSource)
 	EXPECT_CALL(game, isInTheMap(source)).WillOnce(::testing::Return(true));
 	EXPECT_CALL(game, isInTheMap(outsideRange)).WillOnce(::testing::Return(true));
 	EXPECT_FALSE(effect.isTargetInRangeFrom(&game, &caster, source, outsideRange));
+}
+
+TEST(Spells_AdventureSpellRangedEffect, rangeWrapsAcrossToroidalEdgesAndCorners)
+{
+	TestRangedAdventureEffect effect(makeRangedConfig());
+	TestCaster caster;
+	IGameInfoCallbackMock game;
+	CMapHeader header;
+	header.width = 36;
+	header.height = 36;
+	header.toroidal = true;
+	EXPECT_CALL(game, getMapHeader()).WillRepeatedly(::testing::Return(&header));
+	EXPECT_CALL(game, isInTheMap(::testing::_)).WillRepeatedly(::testing::Return(true));
+	const int3 source(0, 0, 0);
+	EXPECT_TRUE(effect.isTargetInRangeFrom(&game, &caster, source, int3(35, 0, 0)));
+	EXPECT_TRUE(effect.isTargetInRangeFrom(&game, &caster, source, int3(35, 35, 0)));
+	EXPECT_FALSE(effect.isTargetInRangeFrom(&game, &caster, source, int3(32, 35, 0)));
+	header.toroidal = false;
+	EXPECT_FALSE(effect.isTargetInRangeFrom(&game, &caster, source, int3(35, 0, 0)));
 }
 
 TEST(Spells_AdventureSpellRangedEffect, rejectsTargetFromOutOfMapPlannedSource)

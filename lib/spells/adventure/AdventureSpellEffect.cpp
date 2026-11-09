@@ -14,6 +14,8 @@
 #include "../../json/JsonNode.h"
 #include "../../mapObjects/CGHeroInstance.h"
 #include "../../callback/IGameInfoCallback.h"
+#include "../../mapping/CMapHeader.h"
+#include "../../mapping/MapTopology.h"
 
 AdventureSpellRangedEffect::AdventureSpellRangedEffect(const JsonNode & config)
 	: rangeX(config["rangeX"].Integer())
@@ -62,6 +64,13 @@ bool AdventureSpellRangedEffect::isTargetInRangeFrom(const IGameInfoCallback * c
 		return false;
 
 	int3 diff = pos - source;
+	if(const auto * header = cb->getMapHeader(); header && header->toroidal)
+	{
+		// This range check historically compares only horizontal coordinates.
+		int3 target = pos;
+		target.z = source.z;
+		diff = header->getTopology().displacement(source, target);
+	}
 	return diff.x >= -rangeX && diff.x <= rangeX && diff.y >= -rangeY && diff.y <= rangeY;
 }
 

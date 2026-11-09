@@ -14,7 +14,9 @@
 
 #include "lib/callback/CCallback.h"
 #include "AI/Nullkiller2/Pathfinding/Actions/TownPortalAction.h"
+#include "AI/Nullkiller2/Pathfinding/Actions/DimensionDoorAction.h"
 #include "lib/mapObjects/CGTownInstance.h"
+#include "lib/mapping/TerrainTile.h"
 
 namespace
 {
@@ -226,5 +228,55 @@ TEST_F(Nullkiller2_AIGateway, plansUnskilledTownPortalToNearestTownAcrossSeam)
 				return dynamic_cast<const NK2AI::AIPathfinding::TownPortalAction *>(node.specialAction.get()) != nullptr;
 			});
 		})) << "AI should consider the same nearest town as the game spell";
+	}
+}
+
+TEST_F(Nullkiller2_AIGateway, plansDimensionDoorLandingAcrossToroidalSeam)
+{
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(PLAYER)
+		.hero({1, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.heroPrimary(10, 10, 10, 50)
+		.heroSecondarySkills({{SecondarySkill::AIR_MAGIC, 3}})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({SpellID(8)});
+	startWithMap(std::move(builder));
+	revealMap(PLAYER);
+	hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	hero->mana = 200;
+	hero->setMovementPoints(300);
+	for(int x : {35, 0, 1})
+		for(int y = 9; y <= 11; ++y)
+			if(x != 0 || y != 10)
+				map()->getTile(int3(x, y, 0)).terrainType = TerrainId::ROCK;
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
+		map()->toroidal = toroidal;
+		client = std::make_unique<ScriptedMovementClient>(gameState());
+		callback = makeCallback(PLAYER, client.get());
+		gateway = makeGateway(callback);
+		client->notify(*gateway);
+		const auto paths = withGameStateReadLock([&]
+		{
+			NK2AI::HeroMap<NK2AI::HeroRole> heroes;
+			heroes[hero] = NK2AI::HeroRole::MAIN;
+			NK2AI::PathfinderSettings settings;
+			settings.useHeroChain = false;
+			settings.useDimensionDoor = true;
+			gateway->nullkiller->pathfinder->updatePaths(heroes, settings);
+			return gateway->nullkiller->pathfinder->getPathInfo(int3(30, 10, 0));
+		});
+		const bool found = std::ranges::any_of(paths, [](const auto & path)
+		{
+			return path.turn() == 0 && std::ranges::any_of(path.nodes, [](const auto & node)
+			{
+				return dynamic_cast<const NK2AI::AIPathfinding::DimensionDoorAction *>(node.specialAction.get()) != nullptr;
+			});
+		});
+		EXPECT_EQ(found, toroidal) << "AI should enumerate the same landing the spell permits";
 	}
 }

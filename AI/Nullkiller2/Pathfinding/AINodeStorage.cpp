@@ -1259,22 +1259,35 @@ void AINodeStorage::calculateDimensionDoorTeleportationsForSpell(
 	const int maxX = std::min(mapSize.x - 1, source.node->coord.x + plan.effect->getRangeX());
 	const int minY = std::max(0, source.node->coord.y - plan.effect->getRangeY());
 	const int maxY = std::min(mapSize.y - 1, source.node->coord.y + plan.effect->getRangeY());
+	const bool toroidal = aiNk->cc->getMapHeader()->toroidal;
+	const auto xIntervals = toroidal
+		? MapTopology::splitWrappedInterval(source.node->coord.x - plan.effect->getRangeX(), 2 * plan.effect->getRangeX() + 1, mapSize.x)
+		: std::vector<std::pair<int, int>>{{minX, std::max(0, maxX - minX + 1)}};
+	const auto yIntervals = toroidal
+		? MapTopology::splitWrappedInterval(source.node->coord.y - plan.effect->getRangeY(), 2 * plan.effect->getRangeY() + 1, mapSize.y)
+		: std::vector<std::pair<int, int>>{{minY, std::max(0, maxY - minY + 1)}};
 
-	for(int x = minX; x <= maxX; ++x)
+	for(const auto & [xStart, xLength] : xIntervals)
 	{
-		for(int y = minY; y <= maxY; ++y)
+		for(int x = xStart; x < xStart + xLength; ++x)
 		{
-			const int3 destination(x, y, source.node->coord.z);
+			for(const auto & [yStart, yLength] : yIntervals)
+			{
+				for(int y = yStart; y < yStart + yLength; ++y)
+				{
+					const int3 destination(x, y, source.node->coord.z);
 
-			if(!isDimensionDoorDestinationValid(source, hero, destination, plan))
-				continue;
+					if(!isDimensionDoorDestinationValid(source, hero, destination, plan))
+						continue;
 
-			auto landing = getDimensionDoorLandingInfo(srcNode, hero, destination);
+					auto landing = getDimensionDoorLandingInfo(srcNode, hero, destination);
 
-			if(!landing.canLand)
-				continue;
+					if(!landing.canLand)
+						continue;
 
-			addDimensionDoorTeleportation(neighbours, source, srcNode, destination, plan, landing);
+					addDimensionDoorTeleportation(neighbours, source, srcNode, destination, plan, landing);
+				}
+			}
 		}
 	}
 }
