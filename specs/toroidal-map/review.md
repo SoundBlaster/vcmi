@@ -95,6 +95,9 @@ non-seam step over equivalent terrain.
 | E1 | Open/create a supported toroidal map | Seam terrain and passability can be authored coherently; if generation is advertised, generated seams meet the same topology. |
 | E2 | A supported random generator produces a toroidal map | Generated terrain, passages and any advertised roads and rivers respect the joined topology. Applicability depends on a supported generator being offered. |
 | E3 | A supported toroidal generator instantiates a guarded zone template | Ordinary land and boat routes, including across both seams and corners, obey the template and its guards. Deliberately blocked seams remain blocked to those modes; any advertised seam crossings are reachable. Account explicitly for permitted spells and teleports. Repeat over representative seeds and sizes. Applicability depends on template and generator support being offered. |
+| E4 | Convert a legacy map with an object footprint outside an edge or corner | Map its visible, blocking and visitable cells to the corresponding same-level canonical cells; retain the object and verify bounded behavior remains unchanged before opt-in. |
+| E5 | Wrapped footprint cells overlap empty ground, an obstacle or an interactive object | Keep the object and relevant masks; verify rendering and passability. Interactive overlap and accessibility require a reviewed selection/diagnostic policy before acceptance. |
+| E6 | Save, reload and play a converted map with wrapped object footprints | The canonical occupancy, visual ordering and interaction outcomes survive the round trip; retain unrelated objects and both levels. |
 
 Analytical witness A: on a 100 × 100 level, for `(0,0)` and direction
 `(-1,-1)`, independent wrapping produces `(99,99)` on the same level. This
@@ -102,13 +105,16 @@ establishes the intended arithmetic only; it is not runtime evidence.
 
 ## Open decisions and boundaries of the pilot
 
-1. **Seam-spanning static objects:** provisional pilot restriction: a static
+1. **Seam-spanning static objects:** the desired conversion policy is now to
+   wrap their visible, blocking and visitable cells, including corners. The
+   current provisional pilot restriction remains: a static
    object's visible, blocking or visitable cells must stay within the map.
    The editor reports violations and the JSON map writer and reader reject
    them. Empty mask cells outside the rectangle are allowed. This does not
-   implement objects occupying both sides of a seam; decide separately whether
-   to add that support. Hero and boat movement across seams remains required
-   and is not established by the exception from this validation.
+   fully support authoring objects on both sides of a seam. Overlap between
+   interactive objects needs a reviewed policy for visual ordering, target
+   selection and author diagnostics. Hero and boat movement across seams
+   remains required and is not established by the validation exception.
 2. **Minimum map dimensions:** the initial file-format implementation requires
    width and height of at least 3. Extents of 1 or 2 make distinct directions
    lead to the same canonical cell; supporting them remains a separate decision.

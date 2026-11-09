@@ -31,6 +31,30 @@ passability, scripts and object placement at the joined edges. In particular,
 the pilot currently rejects static objects whose visible, blocking or
 visitable footprint crosses a seam.
 
+## Agreed legacy footprint policy
+
+When the author explicitly converts a legacy map to toroidal topology, object
+footprint cells outside the old rectangle should appear at their corresponding
+same-level tiles across the seam, in both axes and at corners. This applies to
+visible, blocking and visitable cells. Overlap with empty terrain or a
+non-interactive obstacle is not by itself a reason to discard an object or its
+mask. The [demo-map diagnostic](evidence/topology-legacy-editor-2026-11-10.md)
+shows why this matters: many legacy objects already have outside footprints.
+
+VCMI already has per-cell drawing layers computed from each object's mask and
+an object `printPriority`; the branch adapts part of the ordering to wrapped
+coordinates. A tile also keeps separate blocking and visitable object lists.
+The server's `objectVisitedBy` selects the last visitable object, excluding a
+hero on top. Drawing order, movement passability and interaction selection
+are distinct mechanisms: their agreement on newly overlapping interactive
+objects must be investigated and tested. Whether and how to expose multiple
+targets or warn an author remains open. No automatic interactive-layer policy
+is accepted or implemented by this document.
+
+The pilot restriction above is still active until the implementation and its
+tests support the agreed policy. This policy does not turn legacy maps into
+toroidal maps unless an author explicitly opts in.
+
 ## What the shared layer does
 
 `CMapHeader::getTopology()` constructs a `MapTopology` from map dimensions,

@@ -19,7 +19,7 @@ scope:
     - Claiming the desired topology is implemented or tested in the baseline.
     - Changing tactical battlefields, generating game assets, or distributing Heroes III data.
     - Selecting an exact serialization field, user interface, release schedule, or map-generation algorithm.
-    - Declaring a concrete policy for static objects that physically span a seam before the open design decision is resolved.
+    - Choosing a final interaction or editor-resolution policy for overlapping interactive objects before that policy is reviewed.
 provides:
   capabilities:
     - id: vcmi.adventure_map.toroidal_contract
@@ -83,6 +83,9 @@ constraints:
   - id: bounded_compatibility
     level: MUST
     statement: Existing maps and saves without a toroidal topology declaration retain their existing bounded behavior. The new topology is opt-in and does not silently change existing maps.
+  - id: legacy_footprint_wrapping
+    level: MUST
+    statement: When a legacy map is explicitly converted to toroidal topology, visible, blocking and visitable object footprint cells outside the old rectangle map to the corresponding canonical cells on the same level, including across corners. Objects and their relevant masks remain represented when wrapped cells overlap empty tiles or non-interactive obstacles; the overlap alone must not cause their contents to be discarded.
   - id: authoring
     level: MUST
     statement: A supported toroidal map can be authored with passable and visually coherent seam crossings; any supported random generator must account for the topology rather than merely connecting unrelated generated edges after the fact.
