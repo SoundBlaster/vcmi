@@ -17,8 +17,10 @@ versioned requirements document. This file records their substance.
 
 **Evidence levels:** U = user-stated or user-confirmed goal; S = source reading
 on the pinned baseline; D = design obligation inferred from that goal; A =
-analytical example; R = runtime observation. There is no R evidence for this
-feature. Structural validation checks artifact format, not gameplay.
+analytical example; R = runtime observation. At the pinned source baseline
+there was no R evidence for this feature. Later, scoped runtime observations
+are linked from the implementation matrix. Structural validation checks
+artifact format, not gameplay.
 
 The [implementation matrix](implementation-matrix.md) tracks requirements,
 scenario coverage, implementation, verification, and acceptance separately.

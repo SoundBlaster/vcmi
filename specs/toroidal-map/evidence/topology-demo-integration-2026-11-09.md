@@ -97,5 +97,5 @@ the topology is bounded. It does not initiate combat or cover every guard
 rule. The test source SHA-256 at this run was
 `6609517d3400382a17861e19a5a4fd029cbf4577841ce7d2fb0653b52d63be46`.
 
-The real viewport, animated seam crossing, multiplayer and seam-spanning
-static objects still require additional work or verification.
+Player-mode viewport behavior, continuous animation, multiplayer and
+seam-spanning static objects still require additional work or verification.
