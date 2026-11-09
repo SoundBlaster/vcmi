@@ -37,6 +37,14 @@ it does not initialize or play a complete 3×3 map. The command ran from
 `toroidal-header-minimum-tests.log`. This later run supersedes the earlier
 failed attempt only for the named round-trip test, not network compatibility.
 
+A subsequent `vcmitest` build from `6f0cac1` plus a new gameplay test passed
+`HeroMovementTest.HeroCrossesMinimumToroidalMapCorner` alongside the minimum
+header test. The synthetic 3×3 SoD map was initialized and wrapping enabled;
+the pathfinder selected the direct `(0,0,0) -> (2,2,0)` step, which the server
+accepted with matching movement points. This is one server-side movement,
+not a complete 3×3 map loaded from a toroidal VMAP or a client rendering test.
+The TB5 build log is `toroidal-minimum-game-build.log`.
+
 SHA-256 of selected changed files at the time of the build:
 
 ```text
