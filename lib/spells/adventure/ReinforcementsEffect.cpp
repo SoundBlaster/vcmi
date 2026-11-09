@@ -67,7 +67,7 @@ ESpellCastResult ReinforcementsEffect::applyAdventureEffects(SpellCastEnvironmen
 
 	if(!allowTownSelection)
 	{
-		destination = findNearestTown(parameters, towns);
+		destination = findNearestTown(env, parameters, towns);
 	}
 	else if(env->getMap()->isInTheMap(parameters.pos))
 	{

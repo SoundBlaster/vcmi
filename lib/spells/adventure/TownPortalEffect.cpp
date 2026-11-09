@@ -66,7 +66,7 @@ ESpellCastResult TownPortalEffect::applyAdventureEffects(SpellCastEnvironment * 
 	if(!allowTownSelection)
 	{
 		std::vector<const CGTownInstance *> pool = getPlayerTeamTowns(env, parameters);
-		destination = findNearestTown(parameters, pool);
+		destination = findNearestTown(env, parameters, pool);
 
 		if(nullptr == destination)
 			return ESpellCastResult::ERROR;
@@ -162,7 +162,7 @@ void TownPortalEffect::endCast(SpellCastEnvironment * env, const AdventureSpellC
 	if(!allowTownSelection)
 	{
 		std::vector<const CGTownInstance *> pool = getPlayerTeamTowns(env, parameters);
-		destination = findNearestTown(parameters, pool);
+		destination = findNearestTown(env, parameters, pool);
 	}
 	else
 	{

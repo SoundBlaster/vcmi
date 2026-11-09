@@ -30,7 +30,7 @@ protected:
 
 	explicit TownRelatedAdventureSpellEffect(const CSpell * owner, bool allowTownSelection, bool skipOccupiedTowns);
 	std::vector<const CGTownInstance *> getPlayerTeamTowns(SpellCastEnvironment * env, const AdventureSpellCastParameters & parameters) const;
-	const CGTownInstance * findNearestTown(const AdventureSpellCastParameters & parameters, const std::vector<const CGTownInstance *> & pool) const;
+	const CGTownInstance * findNearestTown(SpellCastEnvironment * env, const AdventureSpellCastParameters & parameters, const std::vector<const CGTownInstance *> & pool) const;
 
 	virtual bool shouldOfferTownInDialog(const CGTownInstance * town) const;
 	virtual void configureDialogTitleAndDescription(MetaString & title, MetaString & description) const = 0;

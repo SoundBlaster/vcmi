@@ -19,6 +19,8 @@
 #include "../../callback/IGameInfoCallback.h"
 #include "../../mapObjects/CGHeroInstance.h"
 #include "../../mapObjects/CGTownInstance.h"
+#include "../../mapping/CMap.h"
+#include "../../mapping/MapTopology.h"
 #include "../../networkPacks/PacksForClient.h"
 
 namespace spells
@@ -42,17 +44,35 @@ std::vector<const CGTownInstance *> TownRelatedAdventureSpellEffect::getPlayerTe
 	return result;
 }
 
-const CGTownInstance * TownRelatedAdventureSpellEffect::findNearestTown(const AdventureSpellCastParameters & parameters, const std::vector<const CGTownInstance *> & pool) const
+const CGTownInstance * TownRelatedAdventureSpellEffect::findNearestTown(SpellCastEnvironment * env, const AdventureSpellCastParameters & parameters, const std::vector<const CGTownInstance *> & pool) const
 {
 	if(pool.empty() || !parameters.caster->getHeroCaster())
 		return nullptr;
 
+	const auto heroPos = parameters.caster->getHeroCaster()->visitablePos();
+	const auto * map = env->getMap();
+	const auto distanceTo = [&](const CGTownInstance * town)
+	{
+		auto townPos = town->visitablePos();
+		if(map->toroidal)
+		{
+			// The original 2D comparison ignores level, including for towns underground.
+			townPos.z = heroPos.z;
+			const auto topology = map->getTopology();
+			const auto from = topology.canonicalize(heroPos);
+			const auto to = topology.canonicalize(townPos);
+			if(from && to)
+				return int3(0, 0, 0).dist2dSQ(topology.displacement(*from, *to));
+		}
+		return townPos.dist2dSQ(heroPos);
+	};
+
 	auto nearest = pool.cbegin();
-	si32 distance = (*nearest)->visitablePos().dist2dSQ(parameters.caster->getHeroCaster()->visitablePos());
+	si32 distance = distanceTo(*nearest);
 
 	for(auto iter = nearest + 1; iter != pool.cend(); ++iter)
 	{
-		si32 currentDistance = (*iter)->visitablePos().dist2dSQ(parameters.caster->getHeroCaster()->visitablePos());
+		si32 currentDistance = distanceTo(*iter);
 
 		if(currentDistance < distance)
 		{
