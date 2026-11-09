@@ -1,5 +1,12 @@
 # Demo-based integration checks
 
+On 2026-11-10, the RoE and SoD seam integration tests at revision `70adbf5`
+plus added assertions confirmed that the server-applied hero direction is
+correct for crossing each edge in both directions and all four diagonal
+corners. Both tests passed with Complete data (`seam-direction-build.log`
+and `seam-direction-test.log` on TB5). This checks game state, not rendered
+animation frames.
+
 On 2026-11-10, an SoD synthetic map had cobblestone on both sides of a
 horizontal seam. `HeroMovementTest.RoadMovementCostAppliesAcrossToroidalSeam`
 checked that the pathfinder selects the direct step `(0,5,0) -> (35,5,0)`

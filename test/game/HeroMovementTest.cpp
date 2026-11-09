@@ -283,13 +283,14 @@ void HeroMovementTest::checkToroidalSeamMovement(EMapFormat format)
 	ASSERT_GT(straightCost, 0);
 	ASSERT_GT(diagonalCost, straightCost);
 
-	const std::vector<std::pair<int3, int3>> steps = {
-		{{0, 5, 0}, {35, 5, 0}}, {{35, 5, 0}, {0, 5, 0}},
-		{{5, 0, 0}, {5, 35, 0}}, {{5, 35, 0}, {5, 0, 0}},
-		{{0, 0, 0}, {35, 35, 0}}, {{35, 35, 0}, {0, 0, 0}},
-		{{35, 0, 0}, {0, 35, 0}}, {{0, 35, 0}, {35, 0, 0}}
+	struct Step { int3 from; int3 to; int direction; };
+	const std::vector<Step> steps = {
+		{{0, 5, 0}, {35, 5, 0}, 8}, {{35, 5, 0}, {0, 5, 0}, 4},
+		{{5, 0, 0}, {5, 35, 0}, 2}, {{5, 35, 0}, {5, 0, 0}, 6},
+		{{0, 0, 0}, {35, 35, 0}, 1}, {{35, 35, 0}, {0, 0, 0}, 5},
+		{{35, 0, 0}, {0, 35, 0}, 3}, {{0, 35, 0}, {35, 0, 0}, 7}
 	};
-	for(const auto & [from, to] : steps)
+	for(const auto & [from, to, direction] : steps)
 	{
 		SCOPED_TRACE(from.toString() + " -> " + to.toString());
 		moveTo(from);
@@ -302,6 +303,7 @@ void HeroMovementTest::checkToroidalSeamMovement(EMapFormat format)
 		ASSERT_NE(node->theNodeBefore, nullptr);
 		EXPECT_EQ(node->theNodeBefore->coord, from);
 		EXPECT_EQ(costFor(from, to), from.x != to.x && from.y != to.y ? diagonalCost : straightCost);
+		EXPECT_EQ(hero->moveDir, direction);
 	}
 }
 
