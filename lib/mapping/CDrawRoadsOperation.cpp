@@ -11,6 +11,7 @@
 #include "StdInc.h"
 #include "CDrawRoadsOperation.h"
 #include "CMap.h"
+#include "MapTopology.h"
 
 #include "../RoadHandler.h"
 #include "../RiverHandler.h"
@@ -197,10 +198,11 @@ void CDrawLinesOperation<T>::drawLines(CTerrainSelection selection, T type)
 	{
 		executeTile(map->getTile(pos), type);
 
-		auto rect = extendTileAroundSafely(pos);
-		rect.forEach([&invalidated](const int3 & pos)
+		extendTileAround(pos).forEach([&](const int3 & neighbor)
 		{
-			invalidated.insert(pos);
+			const auto tile = map->getTopology().canonicalize(neighbor);
+			if(tile)
+				invalidated.insert(*tile);
 		});
 	}
 
@@ -314,9 +316,8 @@ typename CDrawLinesOperation<T>::ValidationResult CDrawLinesOperation<T>::valida
 			int cx = pos.x + (i % 3) - 1;
 			int cy = pos.y + (i / 3) - 1;
 
-			int3 currentPos(cx, cy, pos.z);
-
-			bool hasSomething = map->isInTheMap(currentPos) && tileHasSomething(currentPos);
+			const auto currentPos = map->getTopology().canonicalize(int3(cx, cy, pos.z));
+			bool hasSomething = currentPos && tileHasSomething(*currentPos);
 
 			if(ruleIsSomething(flipped.data[i]))
 			{

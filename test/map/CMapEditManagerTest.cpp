@@ -154,6 +154,52 @@ TEST(MapManager, ToroidalTerrainBrushTreatsCornerAsInterior)
 	EXPECT_EQ(corner->getTile(int3(size - 1, 0, 0)).getTerrainID(), beforeUndo);
 }
 
+TEST(MapManager, ToroidalRoadAndRiverBrushConnectAcrossEdge)
+{
+	for(const bool road : {true, false})
+	for(const bool verticalSeam : {false, true})
+	{
+		auto map = std::make_unique<CMap>(nullptr);
+		map->width = 20;
+		map->height = 20;
+		map->toroidal = true;
+		map->initTerrain();
+		CRandomGenerator random;
+		auto * editor = map->getEditManager();
+		editor->clearTerrain(&random);
+		const auto paint = [&](const int3 & tile)
+		{
+			editor->getTerrainSelection().select(tile);
+			if(road)
+				editor->drawRoad(RoadId::DIRT_ROAD, &random);
+			else
+				editor->drawRiver(RiverId::WATER_RIVER, &random);
+		};
+		const int3 center = verticalSeam ? int3(5, 0, 0) : int3(0, 5, 0);
+		const int3 perpendicular = verticalSeam ? int3(6, 0, 0) : int3(0, 6, 0);
+		const int3 across = verticalSeam ? int3(5, 19, 0) : int3(19, 5, 0);
+		paint(center);
+		paint(perpendicular);
+		paint(across);
+		const auto & corner = map->getTile(center);
+		if(road)
+			EXPECT_LE(corner.roadDir, 1);
+		else
+			EXPECT_LE(corner.riverDir, 3);
+
+		editor->getUndoManager().undo();
+		if(road)
+			EXPECT_EQ(corner.roadDir, verticalSeam ? 15 : 14);
+		else
+			EXPECT_GE(corner.riverDir, 9);
+		editor->getUndoManager().redo();
+		if(road)
+			EXPECT_LE(corner.roadDir, 1);
+		else
+			EXPECT_LE(corner.riverDir, 3);
+	}
+}
+
 TEST(MapManager, DrawTerrain_View)
 {
 	try
