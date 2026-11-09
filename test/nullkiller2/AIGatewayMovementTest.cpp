@@ -45,6 +45,9 @@ protected:
 
 	NK2AI::HeroMovementResult moveHeroTo(const int3 & destination)
 	{
+		// AI turns normally enter movement with the game-state read lock held;
+		// waitTillFree temporarily releases and reacquires that lock.
+		std::shared_lock lock(CGameState::mutex);
 		return gateway->moveHeroToTile(destination, NK2AI::HeroPtr(hero, callback.get()));
 	}
 

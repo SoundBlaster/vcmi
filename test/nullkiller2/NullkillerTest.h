@@ -21,6 +21,7 @@ class NullkillerTestAccess
 public:
 	static bool executeTask(Nullkiller & ai, const Goals::TTask & task)
 	{
+		std::shared_lock lock(CGameState::mutex);
 		return ai.executeTask(task);
 	}
 
@@ -35,6 +36,13 @@ public:
 class NullkillerTest : public TinyMapGameTest
 {
 protected:
+	template<typename Action>
+	static decltype(auto) withGameStateReadLock(Action && action)
+	{
+		std::shared_lock lock(CGameState::mutex);
+		return std::forward<Action>(action)();
+	}
+
 	static NK2AI::AIPathNodeInfo pathNode(const CGHeroInstance & hero, const int3 & coordinate)
 	{
 		NK2AI::AIPathNodeInfo node{};

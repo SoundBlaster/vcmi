@@ -165,7 +165,7 @@ TEST_F(ResourceTradingTurnTest, tradesForArmyOnlyOncePerTurn)
 	TradingPhaseClient client(gameState(), PLAYER);
 	auto gateway = makeGateway(PLAYER, &client);
 
-	gateway->nullkiller->makeTurn();
+	withGameStateReadLock([&] { gateway->nullkiller->makeTurn(); });
 
 	EXPECT_GT(client.recruitmentRequests, 0)
 		<< "the fixture must consume traded gold by buying army";
@@ -182,7 +182,7 @@ TEST_F(ResourceTradingTurnTest, stopsTradingWhenServerRejectsTrade)
 	TradeRejectingClient client(gameState(), PLAYER);
 	auto gateway = makeGateway(PLAYER, &client);
 
-	gateway->nullkiller->makeTurn();
+	withGameStateReadLock([&] { gateway->nullkiller->makeTurn(); });
 
 	EXPECT_EQ(client.rejectedTrades, 1)
 		<< "a rejected trade must not be retried in the same trading step";

@@ -99,7 +99,7 @@ TEST_F(Nullkiller2_Behaviors_GatherArmyBehavior, upgradesPikemenCarriedByGarriso
 
 	GameHandlerTestClient client(gameState(), PLAYER);
 	const auto gateway = makeGateway(PLAYER, &client);
-	gateway->nullkiller->makeTurn();
+	withGameStateReadLock([&] { gateway->nullkiller->makeTurn(); });
 
 	ASSERT_NE(hero->getStackPtr(SlotID(0)), nullptr);
 	EXPECT_EQ(hero->getStackPtr(SlotID(0))->getCreatureID(), halberdier);

@@ -90,7 +90,7 @@ TEST_F(ExecuteHeroChainMovementTest, blockingVisitOnRouteStopsChainForReplanning
 	path.nodes.push_back(pathNode(*hero, SCROLL_POS));
 	path.nodes.push_back(pathNode(*hero, HERO_POS));
 
-	EXPECT_NO_THROW(NK2AI::Goals::ExecuteHeroChain(path).accept(gateway.get()));
+	EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(path).accept(gateway.get()); }));
 	EXPECT_EQ(gameState()->getObjInstance(scrollID), nullptr) << "the hero must pick up the scroll";
 	EXPECT_EQ(hero->visitablePos(), HERO_POS) << "picking up a scroll does not move the hero";
 	EXPECT_EQ(client.movementRequests, 1) << "the chain must stop after the pickup instead of following the stale route";
@@ -113,8 +113,8 @@ TEST_F(ExecuteHeroChainMovementTest, repeatedIdleChainFailsForReplanning)
 	path.chainMask = 1;
 	path.nodes.push_back(pathNode(*hero, HERO_POS));
 
-	EXPECT_NO_THROW(NK2AI::Goals::ExecuteHeroChain(path).accept(gateway.get()));
-	EXPECT_THROW(NK2AI::Goals::ExecuteHeroChain(path).accept(gateway.get()), NK2AI::cannotFulfillGoalException)
+	EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(path).accept(gateway.get()); }));
+	EXPECT_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(path).accept(gateway.get()); }), NK2AI::cannotFulfillGoalException)
 		<< "an idle chain counted as success would be selected again on every pass";
 	EXPECT_EQ(client.movementRequests, 0);
 }
@@ -140,7 +140,7 @@ TEST_F(ExecuteHeroChainMovementTest, multiTurnNodeLocksHeroWithoutMovementPoints
 	path.chainMask = 1;
 	path.nodes.push_back(node);
 
-	EXPECT_NO_THROW(NK2AI::Goals::ExecuteHeroChain(path).accept(gateway.get()));
+	EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(path).accept(gateway.get()); }));
 	EXPECT_TRUE(gateway->nullkiller->isHeroLocked(hero)) << "the hero must wait for the next turn instead of failing the route";
 	EXPECT_EQ(client.movementRequests, 0);
 }

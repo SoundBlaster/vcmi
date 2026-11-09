@@ -122,10 +122,10 @@ TEST_F(Nullkiller2_Pathfinding_QuestAction, addsInitialVisitBeforeCrossingUnopen
 		<< "an unopened gate must be visited before planning movement through it";
 	EXPECT_FALSE(actionNode->actionIsBlocked);
 
-	NK2AI::Goals::ExecuteHeroChain(path, nullptr).accept(gateway.get());
+	withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(path, nullptr).accept(gateway.get()); });
 	const auto remainingPaths = updateAndGetPaths(TARGET_POS, &client);
 	ASSERT_FALSE(remainingPaths.empty());
-	NK2AI::Goals::ExecuteHeroChain(remainingPaths.front(), nullptr).accept(gateway.get());
+	withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(remainingPaths.front(), nullptr).accept(gateway.get()); });
 	const auto * hero = findHeroByOwner(PLAYER);
 	ASSERT_NE(hero, nullptr);
 	EXPECT_EQ(hero->visitablePos(), TARGET_POS);

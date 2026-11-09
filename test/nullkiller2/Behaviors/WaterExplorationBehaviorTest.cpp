@@ -156,7 +156,7 @@ TEST_F(Nullkiller2_Behaviors_WaterExploration, missingBoatResourcesAreReservedOn
 
 	const auto reservation = findResourceReservation();
 	ASSERT_TRUE(reservation);
-	reservation->asTask()->accept(gateway.get());
+	withGameStateReadLock([&] { reservation->asTask()->accept(gateway.get()); });
 
 	EXPECT_EQ(ai().getLockedResources()[EGameResID::WOOD], 10);
 	EXPECT_FALSE(findResourceReservation());

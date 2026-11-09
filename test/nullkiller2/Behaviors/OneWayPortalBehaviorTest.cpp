@@ -373,7 +373,7 @@ TEST_F(Nullkiller2_Behaviors_OneWayPortal, exhaustedPortalRouteRetainsReservatio
 	ASSERT_EQ(probes.size(), 1);
 
 	client->drainMovement(0);
-	EXPECT_NO_THROW(probes.front()->asTask()->accept(gateway.get()));
+	EXPECT_NO_THROW(withGameStateReadLock([&] { probes.front()->asTask()->accept(gateway.get()); }));
 	EXPECT_NE(hero->visitablePos(), entrance->visitablePos());
 	EXPECT_EQ(
 		gateway->nullkiller->getHeroLockedReason(hero),
@@ -449,7 +449,7 @@ TEST_F(Nullkiller2_Behaviors_OneWayPortal, mainClearsEntranceGuard)
 	EXPECT_TRUE(std::ranges::none_of(goals, byScout))
 		<< "the scout must not be used to clear the entrance guard";
 
-	EXPECT_NO_THROW((*std::ranges::find_if(goals, byMain))->asTask()->accept(gateway.get()));
+	EXPECT_NO_THROW(withGameStateReadLock([&] { (*std::ranges::find_if(goals, byMain))->asTask()->accept(gateway.get()); }));
 	EXPECT_FALSE(client->requested(entrance->visitablePos()))
 		<< "clearing the guard must not move the main onto the portal entrance";
 }
@@ -647,7 +647,7 @@ TEST_F(Nullkiller2_Behaviors_OneWayPortal, landedHeroStepsOffExit)
 	ASSERT_NE(stepAside, goals.end())
 		<< "a hero left on the exit blocks every later arrival";
 
-	EXPECT_NO_THROW((*stepAside)->asTask()->accept(gateway.get()));
+	EXPECT_NO_THROW(withGameStateReadLock([&] { (*stepAside)->asTask()->accept(gateway.get()); }));
 	EXPECT_NE(landedScout->visitablePos(), exit->visitablePos());
 }
 
