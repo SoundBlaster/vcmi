@@ -1243,7 +1243,11 @@ TEST_F(HeroMovementTest, BoatCanSailAcrossToroidalCornerAndBothAxes)
 	ASSERT_TRUE(hero->inBoat());
 	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
 
-	for(const int3 destination : {int3(35, 35, 0), int3(0, 35, 0), int3(0, 0, 0)})
+	for(const int3 destination : {
+		int3(35, 35, 0), int3(0, 0, 0), // northwest and southeast
+		int3(35, 0, 0), int3(0, 35, 0), int3(35, 0, 0), int3(0, 0, 0), // west, northeast, southwest, east
+		int3(0, 35, 0), int3(0, 0, 0) // north and south
+	})
 	{
 		hero->setMovementPoints(3000);
 		CPathsInfo paths(gameState()->getMapSize(), hero);

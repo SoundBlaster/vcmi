@@ -1,5 +1,15 @@
 # Boat movement across a seam
 
+On 2026-11-10 the sailing fixture at revision `d163185` was extended to
+cross each axis in both directions and each of the four diagonal corner
+directions. For each step the pathfinder chose the direct same-turn route,
+and server position and remaining movement matched it. This test and the
+corner embark/disembark and blocked-corner tests passed on macOS arm64 with
+Complete data (`boat-all-seams-build.log`, `boat-all-seams-test.log` on TB5).
+This uses one synthetic corner layout and does not establish animation or
+all coast configurations. The same build produced `vcmiclient` and
+`vcmiserver`; it was not launched in the GUI.
+
 On 2026-11-09 on macOS arm64 with copied Complete data, an SoD fixture
 tested a hero embarking across the horizontal boundary, sailing back across
 it, and disembarking across it. Before each server movement, the pathfinder
