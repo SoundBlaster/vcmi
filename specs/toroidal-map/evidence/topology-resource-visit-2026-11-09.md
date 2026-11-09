@@ -48,3 +48,16 @@ from 224 suites, with three disabled (`full-suite-layer-authority.log` on
 TB5). The client, server and test targets built from `47f0cb7` plus this
 change (`unavailable-layer-after-build.log`). Other layer transitions and
 multiplayer remain unverified; this change does not alter bounded maps.
+
+In a further synthetic test, a hero standing on a blocking visitable object
+with no permitted exit directions could not find a path across the seam, but
+the server accepted that step. The server now checks the source object's
+direction for standard toroidal movement when neither flying nor water walking
+is available; in that case it can determine that the relevant source layer is
+ordinary land or sailing. The test now confirms rejection without changing
+position or movement points. The source layer is not tracked by the server,
+so this check deliberately does not claim coverage when flying or water
+walking is available. Thirty-seven movement, gate and demo tests passed;
+the full local suite passed 1,376 tests with three disabled
+(`full-suite-source-exit.log` on TB5). The build used `2bd0144` plus this
+change (`source-exit-direction-after-build.log`); bounded maps are unchanged.

@@ -747,6 +747,44 @@ TEST_F(HeroMovementTest, ServerRejectsForbiddenObjectEntranceAcrossToroidalSeam)
 	}
 }
 
+TEST_F(HeroMovementTest, PathfinderHonorsSourceObjectExitDirectionAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "ForbiddenSeamExit");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto object = std::make_shared<CGObjectInstance>(gameState().get());
+	object->pos = origin;
+	object->instanceName = "forbidden_seam_exit";
+	object->appearance = appearance;
+	map()->hideObject(hero);
+	map()->addNewObject(object);
+	map()->showObject(hero);
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	EXPECT_FALSE(paths.getNode(destination, EPathfindingLayer::LAND)->reachable());
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+}
+
 TEST_F(HeroMovementTest, HeroWithMovementBonusesUsesAirAndWaterLayersAcrossSeam)
 {
 	const PlayerColor player(0);
