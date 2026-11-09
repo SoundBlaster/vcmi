@@ -2734,6 +2734,29 @@ TEST_F(SummonBoatTopologyTest, canPlaceBoatOnWaterAcrossToroidalSeam)
 	EXPECT_EQ(boats.front()->visitablePos(), int3(35, 10, 0));
 }
 
+TEST_F(SummonBoatTopologyTest, shipyardBuildsBoatAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(8, 10, 0), HeroTypeID(0), player)
+		.shipyard(int3(2, 10, 0), player)
+		.terrain(int3(35, 10, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	const auto * shipyard = findFirst<CGShipyard>();
+	ASSERT_NE(shipyard, nullptr);
+	ASSERT_EQ(shipyard->visitablePos(), int3(1, 10, 0));
+	EXPECT_NE(shipyard->shipyardStatus(), IBoatGenerator::GOOD);
+	map()->toroidal = true;
+	ASSERT_EQ(shipyard->shipyardStatus(), IBoatGenerator::GOOD);
+	ASSERT_EQ(shipyard->bestLocation(), int3(35, 10, 0));
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.buildBoat(shipyard->id, player));
+	const auto boats = findAll<CGBoat>();
+	ASSERT_EQ(boats.size(), 1u);
+	EXPECT_EQ(boats.front()->visitablePos(), int3(35, 10, 0));
+}
+
 TEST_F(TownPortalTest, unskilledTownPortalChoosesNearestTownAcrossToroidalSeam)
 {
 	const PlayerColor player(0);

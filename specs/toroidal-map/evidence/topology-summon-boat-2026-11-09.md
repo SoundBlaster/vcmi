@@ -16,6 +16,16 @@ Both tests failed before their respective fixes. The final focused run passed
 24 tests across Summon Boat, movement and Town Portal suites.
 
 TB5 logs: `summon-boat-before-tests.log`, `summon-boat-final-build.log`,
-`summon-boat-final-tests.log`. The common boat-generator change also affects
-shipyards, but no shipyard interaction was exercised. Other levels, boat
-priority and ties, GUI effects and multiplayer remain unverified here.
+`summon-boat-final-tests.log`. At commit `b09b1e5`, the full suite passed
+1,353 tests with three disabled (`full-suite-summon-boat.log`).
+
+The subsequent `shipyardBuildsBoatAcrossToroidalSeam` test loads an H3M
+fixture with a real shipyard, switches the in-memory topology, and invokes
+`CGameHandler::buildBoat`. It checks that bounded mode cannot use the water
+tile across the seam and that toroidal mode builds a boat there. All three
+Summon Boat and shipyard cases passed (`shipyard-seam-tests.log`). This is a
+synthetic in-memory topology switch; it does not establish that the fixture
+passes the current authored-map restriction on static objects.
+
+Other levels, boat priority and ties, GUI effects and multiplayer remain
+unverified here.
