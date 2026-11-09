@@ -737,6 +737,40 @@ TEST_F(HeroMovementTest, ServerRejectsForbiddenObjectEntranceAcrossToroidalSeam)
 	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
 	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold);
 	EXPECT_NE(map()->getObject(resourceId), nullptr);
+	for(const auto layer : {EPathfindingLayer::AIR, EPathfindingLayer::WATER, EPathfindingLayer::AVIATE})
+	{
+		EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, layer));
+		EXPECT_EQ(hero->visitablePos(), origin);
+		EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+		EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold);
+		EXPECT_NE(map()->getObject(resourceId), nullptr);
+	}
+}
+
+TEST_F(HeroMovementTest, HeroWithMovementBonusesUsesAirAndWaterLayersAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.terrain(destination, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_EQ(hero->visitablePos(), destination);
+	map()->getTile(origin).terrainType = TerrainId::WATER;
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	EXPECT_EQ(hero->visitablePos(), origin);
 }
 
 TEST_F(HeroMovementTest, HeroCrossesMinimumToroidalMapCorner)

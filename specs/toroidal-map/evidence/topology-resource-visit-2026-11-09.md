@@ -36,3 +36,15 @@ and tests were built from `0c60cc5` plus this change. This covers destination
 entrance in the named scenario; source-object exit rules, other objects,
 multiplayer and GUI behavior remain unverified. Bounded server behavior was
 not changed.
+
+A follow-up revealed that the same hero could claim the `AIR` layer without a
+flying ability and bypass the entrance check. Standard toroidal moves now
+reject `AIR`, `WATER`, or `AVIATE` when the hero or vehicle lacks the relevant
+capability. The forbidden-entrance test covers all three requests without
+movement, resource collection or movement-point changes. A separate test
+confirms a hero with flying and water-walking bonuses can still cross a seam
+using those layers. Four focused tests passed, followed by 1,374 local tests
+from 224 suites, with three disabled (`full-suite-layer-authority.log` on
+TB5). The client, server and test targets built from `47f0cb7` plus this
+change (`unavailable-layer-after-build.log`). Other layer transitions and
+multiplayer remain unverified; this change does not alter bounded maps.

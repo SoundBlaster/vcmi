@@ -852,6 +852,11 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 
 	const bool canFly = ti->hasFlyingMovement() || (h->inBoat() && (h->getBoat()->layer == EPathfindingLayer::AIR || h->getBoat()->layer == EPathfindingLayer::AVIATE));
 	const bool canWalkOnSea = ti->hasWaterWalking() || (h->inBoat() && h->getBoat()->layer == EPathfindingLayer::WATER);
+	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
+		&& ((layer == EPathfindingLayer::AIR && !canFly)
+			|| (layer == EPathfindingLayer::WATER && !canWalkOnSea)
+			|| (layer == EPathfindingLayer::AVIATE && (!h->inBoat() || h->getBoat()->layer != EPathfindingLayer::AVIATE))))
+		return complainRet("Hero cannot use the requested movement layer!");
 	const bool usesMovementCost = movementMode == EMovementMode::STANDARD || embarking || disembarking;
 	const int cost = usesMovementCost
 		? pathfinderHelper->getMovementCost(h->visitablePos(), hmpos, layer, h->movementPointsRemaining())
