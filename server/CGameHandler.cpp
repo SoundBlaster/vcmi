@@ -852,10 +852,12 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 
 	const bool canFly = ti->hasFlyingMovement() || (h->inBoat() && (h->getBoat()->layer == EPathfindingLayer::AIR || h->getBoat()->layer == EPathfindingLayer::AVIATE));
 	const bool canWalkOnSea = ti->hasWaterWalking() || (h->inBoat() && h->getBoat()->layer == EPathfindingLayer::WATER);
+	const auto * embarkVehicle = embarking && !transit ? dynamic_cast<const CGBoat *>(objectToVisit) : nullptr;
+	const bool canEmbarkLayer = embarkVehicle && embarkVehicle->layer == layer;
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
-		&& ((layer == EPathfindingLayer::AIR && !canFly)
-			|| (layer == EPathfindingLayer::WATER && !canWalkOnSea)
-			|| (layer == EPathfindingLayer::AVIATE && (!h->inBoat() || h->getBoat()->layer != EPathfindingLayer::AVIATE))))
+		&& ((layer == EPathfindingLayer::AIR && !canFly && !canEmbarkLayer)
+			|| (layer == EPathfindingLayer::WATER && !canWalkOnSea && !canEmbarkLayer)
+			|| (layer == EPathfindingLayer::AVIATE && !canEmbarkLayer && (!h->inBoat() || h->getBoat()->layer != EPathfindingLayer::AVIATE))))
 		return complainRet("Hero cannot use the requested movement layer!");
 	const bool usesMovementCost = movementMode == EMovementMode::STANDARD || embarking || disembarking;
 	const int cost = usesMovementCost

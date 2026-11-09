@@ -70,3 +70,14 @@ The pathfinder finds a route whose final predecessor is not the forbidden
 neighbor. This test and the all-directions-forbidden entrance and exit tests
 passed (three tests), using `75cd77a` plus the new test
 (`directional-entrance-build.log` on TB5).
+
+The layer validation initially also rejected embarking an aviation vehicle,
+because the hero was not yet aboard. A follow-up permits a non-transit embark
+when the vehicle's own layer matches the requested layer. A synthetic boat
+whose layer was set to `AVIATE` can now be boarded across a seam; attempts to
+transit through it or claim `AIR` without flight are still rejected without
+movement or cost. Four focused tests passed, then all 1,379 local tests from
+224 suites passed with three disabled (`full-suite-aviation-embark.log` on
+TB5). The build used `a0609e2` plus the change
+(`aviation-embark-after-build.log`); this is not a test of a specific mod,
+its client presentation, or full airship path planning.

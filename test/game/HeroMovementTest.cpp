@@ -996,6 +996,34 @@ TEST_F(HeroMovementTest, BoatCannotCutAcrossLandAtToroidalCorner)
 	EXPECT_TRUE(hero->inBoat());
 }
 
+TEST_F(HeroMovementTest, HeroCanEmbarkAviationVehicleAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	const int3 destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.terrain(destination, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(destination, BoatId::CASTLE, player);
+	auto * vehicle = dynamic_cast<CGBoat *>(map()->getObject(map()->getTile(destination).topVisitableObj()));
+	ASSERT_NE(vehicle, nullptr);
+	vehicle->layer = EPathfindingLayer::AVIATE;
+	hero->setMovementPoints(3000);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AVIATE));
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::AIR));
+	EXPECT_FALSE(hero->inBoat());
+	EXPECT_EQ(hero->visitablePos(), int3(0, 5, 0));
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	EXPECT_TRUE(hero->inBoat());
+	EXPECT_EQ(hero->visitablePos(), destination);
+}
+
 TEST_F(HeroMovementTest, BoatCanSailAcrossToroidalCornerAndBothAxes)
 {
 	const PlayerColor player(0);
