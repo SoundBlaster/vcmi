@@ -22,6 +22,7 @@
 #include "../../lib/callback/CCallback.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/MapTopology.h"
 
 bool MapAudioPlayer::hasOngoingAnimations()
 {
@@ -163,11 +164,16 @@ void MapAudioPlayer::updateAmbientSounds()
 	};
 
 	int3 pos = currentSelection->getSightCenter();
+	const auto * map = GAME->map().getMap();
+	const auto topology = map->getTopology();
+	const auto canonicalPos = topology.canonicalize(pos);
 	FowTilesType tiles;
 	GAME->interface()->cb->getVisibleTilesInRange(tiles, pos, ENGINE->sound().ambientGetRange(), int3::DIST_CHEBYSHEV);
 	for(int3 tile : tiles)
 	{
-		int dist = pos.dist(tile, int3::DIST_CHEBYSHEV);
+		const int dist = map->toroidal && canonicalPos
+			? int3(0, 0, 0).dist(topology.displacement(*canonicalPos, tile), int3::DIST_CHEBYSHEV)
+			: pos.dist(tile, int3::DIST_CHEBYSHEV);
 
 		for(auto & soundName : getAmbientSounds(tile))
 			updateSounds(soundName, dist);

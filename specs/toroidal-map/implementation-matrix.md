@@ -123,6 +123,8 @@ The one-way portal AI changes are recorded in
 [`evidence/topology-portal-ai-2026-11-09.md`](evidence/topology-portal-ai-2026-11-09.md).
 The isolated sight-range enumeration checks are recorded in
 [`evidence/topology-range-2026-11-09.md`](evidence/topology-range-2026-11-09.md).
+The partial ambient-audio adjustment is recorded in
+[`evidence/topology-audio-2026-11-09.md`](evidence/topology-audio-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
