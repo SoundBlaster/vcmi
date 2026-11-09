@@ -1363,12 +1363,12 @@ Warning: levels cannot be removed once added.</source>
         <translation>Сложность</translation>
     </message>
     <message>
-        <source>Connect opposite map edges</source>
-        <translation>Соединить противоположные края карты</translation>
+        <source>Connect opposite map edges (experimental)</source>
+        <translation>Соединить противоположные края карты (экспериментально)</translation>
     </message>
     <message>
-        <source>North joins south and east joins west on each level. Design terrain and roads to match across the edges.</source>
-        <translation>На каждом уровне север соединяется с югом, а восток — с западом. Продумайте рельеф и дороги на стыках.</translation>
+        <source>North joins south and east joins west on each level. Design terrain and roads to match across the edges. Static objects cannot cross an edge. AI and multiplayer support are not yet verified.</source>
+        <translation>На каждом уровне север соединяется с югом, а восток — с западом. Продумайте рельеф и дороги на стыках. Неподвижные объекты не могут пересекать край карты. Поддержка AI и multiplayer пока не проверена.</translation>
     </message>
 </context>
 <context>

@@ -88,7 +88,7 @@ future opt-in design preserves it.
 | `authoring` | A supported authored map can have coherent passable seams. | E1 | partial: editor topology setting and static-footprint restriction | not run | pending | [editor record](evidence/topology-editor-2026-11-09.md); terrain seam validation and runtime unverified |
 | `authoring` | Any supported random generator respects topology. | E2 | not started | not run | pending | none; generator support is conditional |
 | `ai` | Each advertised supported AI can plan and act using legal wrapped routes. | A1 | partial: Nullkiller2 neighborhoods, exploration heuristics and portal tasks | not run | pending | [AI record](evidence/topology-ai-2026-11-09.md), [portal record](evidence/topology-portal-ai-2026-11-09.md); full AI audit and profile support undecided |
-| `ai` | Unsupported AI profiles are identified as unsupported. | A2 | not started | not run | pending | none |
+| `ai` | Unsupported AI profiles are identified as unsupported. | A2 | partial: editor warns AI is unverified | not run | pending | [editor status record](evidence/topology-editor-status-2026-11-09.md); no profile-specific selection warning |
 
 ## Specification evidence discipline
 
@@ -127,6 +127,8 @@ The partial ambient-audio adjustment is recorded in
 [`evidence/topology-audio-2026-11-09.md`](evidence/topology-audio-2026-11-09.md).
 The minimap interval checks are recorded in
 [`evidence/topology-minimap-2026-11-09.md`](evidence/topology-minimap-2026-11-09.md).
+The editor's experimental status is recorded in
+[`evidence/topology-editor-status-2026-11-09.md`](evidence/topology-editor-status-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

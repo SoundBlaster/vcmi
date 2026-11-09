@@ -126,10 +126,10 @@
    <item>
     <widget class="QCheckBox" name="toroidalMapCheck">
      <property name="toolTip">
-      <string>North joins south and east joins west on each level. Design terrain and roads to match across the edges.</string>
+      <string>North joins south and east joins west on each level. Design terrain and roads to match across the edges. Static objects cannot cross an edge. AI and multiplayer support are not yet verified.</string>
      </property>
      <property name="text">
-      <string>Connect opposite map edges</string>
+      <string>Connect opposite map edges (experimental)</string>
      </property>
     </widget>
    </item>
