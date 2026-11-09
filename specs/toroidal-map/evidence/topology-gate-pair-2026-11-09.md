@@ -13,6 +13,14 @@ the focused topology, movement and Town Portal run passed all 29 tests after
 it. Build and test logs are on TB5 as `gate-pair-after-build.log` and
 `gate-pair-after-tests.log` under the VCMI build root.
 
-The synthetic objects verify assigned channel IDs only. They do not establish
-channel membership or an actual hero traversal through a real gate; both
-remain to be checked.
+That first test verifies assigned channel IDs only.
+
+The later `SubterraneanGateTopologyTest.heroUsesGatePairedAcrossToroidalSeam`
+initializes synthetic gate objects as bidirectional teleports and invokes the
+actual pairing code. It verifies the channel connection, enters the surface
+gate with a real server movement, answers the teleport dialog, and checks that
+the hero appears at the underground gate across the seam. It then steps away,
+re-enters that gate and verifies the return to the surface. The focused run
+passed 28 tests from three suites (`gate-traversal-build.log` and
+`gate-traversal-tests.log` on TB5). These are synthetic templates in a test
+game state, not a GUI check of original gate graphics or all passage types.

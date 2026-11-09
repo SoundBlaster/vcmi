@@ -29,6 +29,10 @@
 #include "lib/bonuses/Bonus.h"
 #include "lib/CPlayerState.h"
 #include "lib/mapObjects/CGHeroInstance.h"
+#include "lib/mapObjects/MiscObjects.h"
+#include "lib/mapObjects/ObjectTemplate.h"
+#include "lib/modding/IdentifierResolver.h"
+#include "lib/callback/GameRandomizer.h"
 #include "lib/mapping/CMap.h"
 #include "lib/mapping/CMapEvent.h"
 #include "lib/GameLibrary.h"
@@ -2593,6 +2597,66 @@ namespace
 class TownPortalTest : public TinyMapGameTest
 {
 };
+
+class SubterraneanGateTopologyTest : public TinyMapGameTest
+{
+protected:
+	const Services * gameServices() override { return LIBRARY; }
+};
+}
+
+TEST_F(SubterraneanGateTopologyTest, heroUsesGatePairedAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(2, 5, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "GateTraversalTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	GameRandomizer randomizer(*gameState());
+	const auto addGate = [&](const int3 & pos, const std::string & name)
+	{
+		auto gate = std::make_shared<CGSubterraneanGate>(gameState().get());
+		gate->ID = Obj::SUBTERRANEAN_GATE;
+		gate->subID = MapObjectSubID(0);
+		gate->pos = pos;
+		gate->instanceName = name;
+		gate->appearance = appearance;
+		static_cast<CGObjectInstance *>(gate.get())->initObj(randomizer);
+		map()->addNewObject(gate);
+		return gate;
+	};
+	const auto surface = addGate(int3(0, 5, 0), "surface_gate");
+	const auto interior = addGate(int3(3, 5, 1), "interior_gate");
+	const auto across = addGate(int3(35, 5, 1), "across_gate");
+	CGSubterraneanGate::postInit(gameState().get());
+	ASSERT_EQ(surface->channel, across->channel);
+	ASSERT_NE(surface->channel, interior->channel);
+	ASSERT_TRUE(CGTeleport::isConnected(surface.get(), across.get()));
+
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(surface->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	auto dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(hero->visitablePos(), across->visitablePos());
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(34, 5, 1)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(across->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(hero->visitablePos(), surface->visitablePos());
 }
 
 TEST_F(TownPortalTest, unskilledTownPortalChoosesNearestTownAcrossToroidalSeam)
