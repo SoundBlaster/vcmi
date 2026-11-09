@@ -1,5 +1,13 @@
 # Battle with a guard across a seam
 
+On 2026-11-10 at source revision `177f97c` plus a new test, removing a
+monster at `(35,35,0)` through the server refreshed the cached guard position
+at `(0,0,0)`, `(0,35,0)` and `(35,0,0)`. The new test and the existing
+guard-position and corner-battle tests passed on macOS arm64 with Complete
+data. The TB5 build root contains `corner-guard-refresh-build.log` and
+`corner-guard-refresh-test.log`. This checks object removal, not combat
+completion or multiple overlapping guards.
+
 On 2026-11-10 a synthetic SoD scenario additionally placed the guard at
 `(35,35,0)` and moved the hero from `(0,1,0)` into `(0,0,0)`. The server
 started a battle with that guard as defender. The new corner test, the earlier

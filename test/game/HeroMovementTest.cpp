@@ -395,6 +395,30 @@ TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)
 	EXPECT_FALSE(guards(int3(0, 0, 0), int3(35, 35, 0)));
 }
 
+TEST_F(HeroMovementTest, removingCornerGuardRefreshesWrappedGuardCache)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.monster(int3(35, 35, 0), CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	map()->calculateGuardingGreaturePositions();
+
+	const int3 monsterPosition(35, 35, 0);
+	const auto guardID = map()->getTile(monsterPosition).topVisitableObj();
+	const auto * guard = map()->getObject(guardID);
+	ASSERT_NE(guard, nullptr);
+	for(const auto & tile : {int3(0, 0, 0), int3(0, 35, 0), int3(35, 0, 0)})
+		EXPECT_EQ(gameState()->guardingCreaturePosition(tile), monsterPosition);
+
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.removeObject(guard, player));
+	for(const auto & tile : {int3(0, 0, 0), int3(0, 35, 0), int3(35, 0, 0)})
+		EXPECT_EQ(gameState()->guardingCreaturePosition(tile), int3(-1, -1, -1));
+}
+
 TEST_F(HeroMovementTest, visionsRangeUsesToroidalDistance)
 {
 	const PlayerColor player(0);

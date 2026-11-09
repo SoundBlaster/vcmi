@@ -232,7 +232,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/filesystem/PngStripWriter.cpp` | 24, 27, 29, 30, 42, 43, 97, 100, 115 | unreviewed |
 | `lib/filesystem/PngStripWriter.h` | 32, 35 | unreviewed |
 | `lib/gameState/CGameState.cpp` | 527, 530, 536, 538, 545, 554, 598, 674, 795, 1001, 1007, 1074, 1291, 1310, 1333, 1335, 1336, 1343 | partial: Grail placement fixed and tested after baseline; other candidates unreviewed |
-| `lib/gameState/GameStatePackVisitor.cpp` | 322, 545, 551, 555, 559, 563, 567, 571, 575, 579, 787, 1655 | unreviewed |
+| `lib/gameState/GameStatePackVisitor.cpp` | 322, 545, 551, 555, 559, 563, 567, 571, 575, 579, 787, 1655 | partial: movement direction uses wrapped displacement; guard cache removal updates across one corner and both adjoining edges, other candidates unreviewed |
 | `lib/gameState/UpgradeInfo.cpp` | 24, 44, 46, 47 | unreviewed |
 | `lib/gameState/UpgradeInfo.h` | 45 | unreviewed |
 | `lib/int3.h` | 31, 32, 103, 108, 110, 112, 114, 121, 123, 124, 128, 130, 133, 135, 138, 140, 143, 145, 182, 196 | partial: `findClosestTile` is used only by the conditional, unsupported RMG; other general coordinate operations remain unchanged |
@@ -352,6 +352,6 @@ regenerating the index resets manually recorded statuses.
 | `server/NetPacksServer.cpp` | 328 | unreviewed |
 | `server/battles/BattleFlowProcessor.cpp` | 701, 861 | unreviewed |
 | `server/lobby/BattleOnlyMap.cpp` | 40, 41 | unreviewed |
-| `server/processors/NewTurnProcessor.cpp` | 579, 580 | unreviewed |
-| `server/processors/PlayerMessageProcessor.cpp` | 688, 689, 692, 693, 694, 819 | unreviewed |
+| `server/processors/NewTurnProcessor.cpp` | 579, 580 | reviewed: Grail rumor names an absolute region of the canonical map rectangle, not a distance from the hero |
+| `server/processors/PlayerMessageProcessor.cpp` | 688, 689, 692, 693, 694, 819 | reviewed: reveal cheat enumerates canonical tiles; teleport cheat explicitly accepts an in-map destination |
 | `server/processors/TurnOrderProcessor.cpp` | 132, 161, 162, 163, 177, 178, 179, 184, 185, 186 | unreviewed |
