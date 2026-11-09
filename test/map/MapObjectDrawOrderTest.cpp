@@ -206,3 +206,42 @@ TEST_F(MapObjectDrawOrderTest, OversizedToroidalFootprintOccupiesEachTileOnce)
 	for(int x = 0; x < map.width; ++x)
 		EXPECT_FALSE(vstd::contains(map.getTile(int3(x, 1, 0)).blockingObjects, object->id));
 }
+
+TEST_F(MapObjectDrawOrderTest, ChangingTopologyRebuildsShownButNotHiddenObjects)
+{
+	map.width = 10;
+	map.height = 10;
+	map.initTerrain();
+	for(int z = 0; z < map.levels(); ++z)
+		for(int x = 0; x < map.width; ++x)
+			for(int y = 0; y < map.height; ++y)
+				map.getTile(int3(x, y, z)).terrainType = ETerrainId::GRASS;
+
+	auto shown = std::make_shared<CGObjectInstance>(nullptr);
+	shown->id = ObjectInstanceID(0);
+	shown->pos = int3(0, 0, 0);
+	shown->appearance = makeTemplate(R"([ "BB", "BB" ])", 0);
+	auto hidden = std::make_shared<CGObjectInstance>(nullptr);
+	hidden->id = ObjectInstanceID(1);
+	hidden->pos = int3(5, 5, 0);
+	hidden->appearance = makeTemplate(R"([ "B" ])", 0);
+	auto overlapping = std::make_shared<CGObjectInstance>(nullptr);
+	overlapping->id = ObjectInstanceID(2);
+	overlapping->pos = int3(0, 0, 0);
+	overlapping->appearance = makeTemplate(R"([ "B" ])", 0);
+	map.objects.push_back(shown);
+	map.objects.push_back(hidden);
+	map.objects.push_back(overlapping);
+	map.showObject(overlapping.get());
+	map.showObject(shown.get());
+
+	map.setToroidalAndRebuild(true);
+	EXPECT_TRUE(vstd::contains(map.getTile(int3(9, 9, 0)).blockingObjects, shown->id));
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(5, 5, 0)).blockingObjects, hidden->id));
+	EXPECT_EQ(map.getTile(int3(0, 0, 0)).blockingObjects, (std::vector<ObjectInstanceID>{overlapping->id, shown->id}));
+	map.setToroidalAndRebuild(false);
+	EXPECT_TRUE(vstd::contains(map.getTile(int3(0, 0, 0)).blockingObjects, shown->id));
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 9, 0)).blockingObjects, shown->id));
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(5, 5, 0)).blockingObjects, hidden->id));
+	EXPECT_EQ(map.getTile(int3(0, 0, 0)).blockingObjects, (std::vector<ObjectInstanceID>{overlapping->id, shown->id}));
+}

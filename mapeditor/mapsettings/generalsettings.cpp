@@ -74,8 +74,9 @@ void GeneralSettings::update()
 	controller->map()->mapVersion = MetaString::createFromRawString(ui->mapVersionEdit->text().toStdString());
 	if(controller->map()->toroidal != ui->toroidalMapCheck->isChecked())
 	{
-		controller->map()->toroidal = ui->toroidalMapCheck->isChecked();
-		controller->map()->calculateGuardingGreaturePositions();
+		controller->map()->setToroidalAndRebuild(ui->toroidalMapCheck->isChecked());
+		controller->resetMapHandler();
+		controller->sceneForceUpdate();
 	}
 	if(ui->heroLevelLimitCheck->isChecked())
 		controller->map()->levelLimit = ui->heroLevelLimit->value();

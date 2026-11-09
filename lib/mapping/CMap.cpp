@@ -280,6 +280,46 @@ bool CMap::hasUnsupportedToroidalFootprint(const CGObjectInstance & object) cons
 	return false;
 }
 
+void CMap::setToroidalAndRebuild(bool enabled)
+{
+	if(toroidal == enabled)
+		return;
+
+	std::set<ObjectInstanceID> shownObjects;
+	using TileOrder = std::pair<std::vector<ObjectInstanceID>, std::vector<ObjectInstanceID>>;
+	std::map<int3, TileOrder> previousOrder;
+	for(int z = 0; z < levels(); ++z)
+		for(int x = 0; x < width; ++x)
+			for(int y = 0; y < height; ++y)
+			{
+				const int3 position(x, y, z);
+				auto & tile = getTile(position);
+				shownObjects.insert(tile.blockingObjects.begin(), tile.blockingObjects.end());
+				shownObjects.insert(tile.visitableObjects.begin(), tile.visitableObjects.end());
+				if(tile.blockingObjects.size() > 1 || tile.visitableObjects.size() > 1)
+					previousOrder.emplace(position, TileOrder{tile.blockingObjects, tile.visitableObjects});
+				tile.blockingObjects.clear();
+				tile.visitableObjects.clear();
+			}
+	toroidal = enabled;
+	for(const auto & id : shownObjects)
+		showObject(objects.at(id).get());
+	const auto restoreOrder = [](auto & current, const auto & previous)
+	{
+		std::stable_sort(current.begin(), current.end(), [&](const auto & lhs, const auto & rhs)
+		{
+			return std::find(previous.begin(), previous.end(), lhs) < std::find(previous.begin(), previous.end(), rhs);
+		});
+	};
+	for(const auto & [position, order] : previousOrder)
+	{
+		auto & tile = getTile(position);
+		restoreOrder(tile.blockingObjects, order.first);
+		restoreOrder(tile.visitableObjects, order.second);
+	}
+	calculateGuardingGreaturePositions();
+}
+
 void CMap::hideObject(CGObjectInstance * obj)
 {
 	if(obj->ID == Obj::HOLE)
