@@ -103,6 +103,10 @@ blanket conformance claim.
 
 The isolated helper tests are recorded in
 [`evidence/topology-unit-2026-11-09.md`](evidence/topology-unit-2026-11-09.md).
+The shared pixel wrapping and its arithmetic tests are recorded in
+[`evidence/topology-pixel-wrap-2026-11-09.md`](evidence/topology-pixel-wrap-2026-11-09.md).
+The asset-independent CTest target is recorded in
+[`evidence/topology-ctest-2026-11-09.md`](evidence/topology-ctest-2026-11-09.md).
 The format and save test attempt is recorded in
 [`evidence/topology-format-2026-11-09.md`](evidence/topology-format-2026-11-09.md).
 The gameplay movement test attempt is recorded in

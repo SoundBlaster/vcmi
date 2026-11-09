@@ -287,6 +287,19 @@ if(MOVE_ASSIGN)
 endif()
 add_subdirectory_with_folder("3rdparty" googletest EXCLUDE_FROM_ALL)
 
+# Coordinate arithmetic does not require game assets or VCMI's global test
+# environment. Keep it runnable even when an H3 installation is unavailable.
+add_executable(vcmi-map-topology-test map/MapTopologyTest.cpp)
+target_include_directories(vcmi-map-topology-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(vcmi-map-topology-test PRIVATE gtest_main gmock Boost::boost)
+if(TARGET TBB::tbb)
+	target_link_libraries(vcmi-map-topology-test PRIVATE TBB::tbb)
+endif()
+if(TARGET luajit::luajit)
+	target_link_libraries(vcmi-map-topology-test PRIVATE luajit::luajit)
+endif()
+add_test(NAME MapTopologyStandalone COMMAND vcmi-map-topology-test)
+
 add_executable(vcmitest ${test_SRCS} ${test_HEADERS} ${mock_HEADERS})
 # Tests link the constituent object libraries rather than the facade: that keeps
 # lib globals single-instance and lets classes needed only by tests stay
