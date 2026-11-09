@@ -245,7 +245,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/mapObjects/CGCreature.cpp` | 617 | unreviewed |
 | `lib/mapObjects/CGHeroInstance.cpp` | 164, 169, 1715 | partial: Visions range corrected |
 | `lib/mapObjects/CGHeroInstance.h` | 144 | unreviewed |
-| `lib/mapObjects/CGObjectInstance.cpp` | 91, 96, 101, 106, 134, 160, 206, 383 | unreviewed |
+| `lib/mapObjects/CGObjectInstance.cpp` | 91, 96, 101, 106, 134, 160, 206, 383 | partial: tile queries for wrapped footprints fixed and tested; other candidates unreviewed |
 | `lib/mapObjects/MapObjectDrawOrder.cpp` | 23, 24, 57, 59, 68 | unreviewed |
 | `lib/mapObjects/MapObjectDrawOrder.h` | 54 | unreviewed |
 | `lib/mapObjects/MiscObjects.cpp` | 613 | partial: pairing and server traversal of synthetic gates tested after baseline; GUI unverified |

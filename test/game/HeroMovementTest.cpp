@@ -337,6 +337,42 @@ TEST_F(HeroMovementTest, ObjectVisibilityUsesWrappedFootprintTiles)
 	EXPECT_FALSE(object.isVisibleFor(player));
 }
 
+TEST_F(HeroMovementTest, ObjectTileQueriesFindFootprintAcrossToroidalCorner)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "AA", "AA" ] })";
+	JsonNode definition(text.data(), text.size(), "ObjectTileQueryTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	CGObjectInstance object(gameState().get());
+	object.appearance = appearance;
+	object.pos = int3(0, 0, 0);
+	const int3 local(-1, -1, 0);
+	const int3 across(35, 35, 0);
+	ASSERT_TRUE(object.visitableAt(local));
+	ASSERT_TRUE(object.blockingAt(local));
+	ASSERT_TRUE(object.coveringAt(local));
+	EXPECT_FALSE(object.visitableAt(across));
+	EXPECT_FALSE(object.blockingAt(across));
+	EXPECT_FALSE(object.coveringAt(across));
+	map()->toroidal = true;
+	EXPECT_TRUE(object.visitableAt(across));
+	EXPECT_TRUE(object.blockingAt(across));
+	EXPECT_TRUE(object.coveringAt(across));
+	EXPECT_EQ(object.drawLayerAt(across), object.drawLayerAt(local));
+	EXPECT_FALSE(object.visitableAt(int3(34, 35, 0)));
+	EXPECT_FALSE(object.coveringAt(int3(35, 35, 1)));
+	EXPECT_FALSE(object.visitableAt(int3(36, 35, 0)));
+	EXPECT_FALSE(object.blockingAt(int3(-1, -1, -1)));
+	object.cb = nullptr;
+	EXPECT_FALSE(object.coveringAt(across));
+	EXPECT_TRUE(object.coveringAt(local));
+}
+
 TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
 {
 	const PlayerColor player(0);

@@ -86,24 +86,53 @@ int CGObjectInstance::getHeight() const
 	return appearance->getHeight();
 }
 
+// Tile queries also receive raw footprint positions from map construction.
+// Only reinterpret canonical map tiles; leave outside coordinates unchanged.
+static int3 footprintOffset(const CGObjectInstance & object, const int3 & tile)
+{
+	int3 offset = object.anchorPos() - tile;
+	if(offset.x >= 0 && offset.x < object.getWidth() && offset.y >= 0 && offset.y < object.getHeight())
+		return offset;
+
+	const auto * header = object.cb ? object.cb->getMapHeader() : nullptr;
+	if(header && header->toroidal && tile.x >= 0 && tile.x < header->width
+		&& tile.y >= 0 && tile.y < header->height && tile.z >= 0 && tile.z < header->levels()
+		&& object.getWidth() <= header->width && object.getHeight() <= header->height)
+	{
+		offset.x = MapTopology::wrapCoordinate(offset.x, header->width);
+		offset.y = MapTopology::wrapCoordinate(offset.y, header->height);
+	}
+	return offset;
+}
+
 bool CGObjectInstance::visitableAt(const int3 & testPos) const
 {
-	return anchorPos().z == testPos.z && appearance->isVisitableAt(anchorPos().x - testPos.x, anchorPos().y - testPos.y);
+	if(anchorPos().z != testPos.z)
+		return false;
+	const auto offset = footprintOffset(*this, testPos);
+	return appearance->isVisitableAt(offset.x, offset.y);
 }
 
 bool CGObjectInstance::blockingAt(const int3 & testPos) const
 {
-	return anchorPos().z == testPos.z && appearance->isBlockedAt(anchorPos().x - testPos.x, anchorPos().y - testPos.y);
+	if(anchorPos().z != testPos.z)
+		return false;
+	const auto offset = footprintOffset(*this, testPos);
+	return appearance->isBlockedAt(offset.x, offset.y);
 }
 
 bool CGObjectInstance::coveringAt(const int3 & testPos) const
 {
-	return anchorPos().z == testPos.z && appearance->isVisibleAt(anchorPos().x - testPos.x, anchorPos().y - testPos.y);
+	if(anchorPos().z != testPos.z)
+		return false;
+	const auto offset = footprintOffset(*this, testPos);
+	return appearance->isVisibleAt(offset.x, offset.y);
 }
 
 ui8 CGObjectInstance::drawLayerAt(const int3 & testPos) const
 {
-	return appearance->getDrawLayerAt(anchorPos().x - testPos.x, anchorPos().y - testPos.y);
+	const auto offset = footprintOffset(*this, testPos);
+	return appearance->getDrawLayerAt(offset.x, offset.y);
 }
 
 bool CGObjectInstance::isVisibleFor(PlayerColor player) const
