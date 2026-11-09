@@ -112,6 +112,13 @@ establishes the intended arithmetic only; it is not runtime evidence.
 3. **Topology configuration:** choose per-map or per-level representation,
    editor controls, VCMI map format and save compatibility/version negotiation.
    Existing `.h3m` compatibility cannot be assumed to carry a new flag.
+   The pilot currently gates toroidal sessions using a numeric serialization
+   version allocated locally after the inspected upstream baseline. That
+   rejects clients older than the baseline, but a future independent upstream
+   release could reuse that number for unrelated changes. Numeric ordering is
+   therefore not proof that a peer or save reader understands this fork's
+   topology. A distinct capability/format identity and compatibility tests
+   are still required before advertising multiplayer or safe interchange.
 4. **Generation and map art:** decide whether an initial release requires a
    wrap-aware random generator. Opposite cells need coherent transitions, not
    identical terrain; roads and rivers need suitable artwork and continuity.
