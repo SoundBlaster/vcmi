@@ -767,6 +767,38 @@ TEST_F(HeroMovementTest, HeroCanEmbarkAndDisembarkAcrossToroidalCorner)
 	}
 }
 
+TEST_F(HeroMovementTest, BoatCannotCutAcrossLandAtToroidalCorner)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 0, 0);
+	const int3 destination(35, 35, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(2, 0, 0), HeroTypeID(0), player)
+		.terrain(origin, TerrainId::WATER)
+		.terrain(destination, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(origin, BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	EXPECT_FALSE(paths.getNode(destination, EPathfindingLayer::SAIL)->reachable());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	EXPECT_TRUE(hero->inBoat());
+}
+
 TEST_F(HeroMovementTest, BoatCanSailAcrossToroidalCornerAndBothAxes)
 {
 	const PlayerColor player(0);

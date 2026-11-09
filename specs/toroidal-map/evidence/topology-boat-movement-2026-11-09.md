@@ -36,3 +36,17 @@ from `(0,0,0)` onto a boat at `(35,35,0)` and disembarked back onto the same
 shore; both steps had direct same-turn pathfinder predecessors and matching
 server movement points. The build log is `boat-corner-embark-build.log` on TB5.
 Other corners, blocked shores and visual animation remain unverified.
+
+On 2026-11-10, `HeroMovementTest.BoatCannotCutAcrossLandAtToroidalCorner`
+exposed a pathfinder/server disagreement: both orthogonal neighbors were land,
+so the sailing pathfinder rejected the diagonal `(0,0,0) -> (35,35,0)`, but
+the server accepted it and spent movement points. The server now reuses the
+pathfinder neighbor calculation for standard sailing on toroidal maps. The
+same test then passed, confirming the hero, boat and movement points remain
+unchanged, alongside three legal boat-transition tests and both movement-cost
+tests (six passed). `vcmitest`, `vcmiserver` and `vcmiclient` built from
+`c8de5ec` plus this change (`boat-blocked-corner-after-build.log` on TB5).
+This does not change the server's bounded-map behavior or establish all shore
+configurations, client animation, or multiplayer behavior.
+The full local `vcmitest` run after this change passed 1,372 tests from 224
+suites, with three disabled (`full-suite-boat-coast-fix.log` on TB5).

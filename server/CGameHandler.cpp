@@ -906,6 +906,14 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		const int3 source = h->visitablePos();
 		if(source.z != hmpos.z || !int3(0, 0, 0).areNeighbours(gameState().getMap().getTopology().displacement(source, hmpos)))
 			return complainRet("Tiles " + h->pos.toString()+ " and "+ dst.toString() +" are not neighboring!");
+
+		if(gameState().getMap().toroidal && h->inBoat() && h->getBoat()->layer == EPathfindingLayer::SAIL && layer == EPathfindingLayer::SAIL && t.isWater())
+		{
+			NeighbourTilesVector neighbours;
+			pathfinderHelper->getNeighbours(gameState().getMap().getTile(source), source, neighbours, true);
+			if(!vstd::contains(neighbours, hmpos))
+				return complainRet("Cannot sail diagonally across land!");
+		}
 	}
 
 	if(h->isGarrisoned())
