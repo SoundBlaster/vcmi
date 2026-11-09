@@ -14,11 +14,13 @@
 
 #include "../../lib/callback/EditorCallback.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
 
 #include "../../lib/VCMIDirs.h"
 
 #include "../JsonComparer.h"
+#include "../mock/TinyH3MBuilder.h"
 
 static void saveTestMap(CMemoryBuffer & serializeBuffer, const std::string & filename)
 {
@@ -197,4 +199,42 @@ TEST(MapFormat, ToroidalTopologyRoundTripsAndRequiresNewFormat)
 
 	header["topology"].String() = "unknown";
 	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
+}
+
+TEST(MapFormat, LegacyH3MCanBeOptedIntoToroidalVmap)
+{
+	const PlayerColor player(0);
+	auto bytes = TinyH3M::TinyH3MBuilder(EMapFormat::SOD)
+		.size(36, true)
+		.name("Legacy topology conversion")
+		.playerActive(player)
+		.hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.town(int3(20, 20, 0), FactionID(0), player)
+		.terrain(int3(8, 8, 0), TerrainId::WATER)
+		.buildAndDump("LegacyH3MCanBeOptedIntoToroidalVmap");
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("LegacyTopology", "core", "ASCII", &input);
+	auto legacy = loader.loadMap(&callback);
+	ASSERT_NE(legacy, nullptr);
+	callback.setMap(legacy.get());
+	ASSERT_FALSE(legacy->toroidal);
+	ASSERT_EQ(legacy->getHeroesOnMap().size(), 1u);
+	ASSERT_EQ(legacy->getAllTowns().size(), 1u);
+	legacy->setToroidalAndRebuild(true);
+	CMemoryBuffer output;
+	JsonNode header, objects, surface, underground;
+	loadActual(&output, legacy, header, objects, surface, underground);
+	EXPECT_EQ(header["versionMajor"].Integer(), CMapFormatJson::VERSION_MAJOR_TOROIDAL);
+	EXPECT_EQ(header["topology"].String(), "toroidal");
+	auto reopened = loadOriginal(header, objects, surface, underground);
+	ASSERT_TRUE(reopened->toroidal);
+	EXPECT_EQ(reopened->width, legacy->width);
+	EXPECT_EQ(reopened->height, legacy->height);
+	EXPECT_EQ(reopened->levels(), 2);
+	EXPECT_EQ(reopened->getHeroesOnMap().size(), legacy->getHeroesOnMap().size());
+	EXPECT_EQ(reopened->getAllTowns().size(), legacy->getAllTowns().size());
+	EXPECT_EQ(reopened->getTile(int3(8, 8, 0)).terrainType, TerrainId::WATER);
 }
