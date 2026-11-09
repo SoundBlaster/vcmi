@@ -20,3 +20,9 @@ and `cluster-center-after-tests.log`.
 
 This verifies the representative selected for one synthetic cluster, not the
 quality of all AI strategic decisions or gameplay across levels.
+
+At code commit `ae284db`, the complete local `vcmitest` run passed 1,350
+tests from 221 suites; three tests were disabled
+(`full-suite-ai-cluster-center.log`). `specpm validate . --json` reported zero
+errors and warnings, and Hypercode validation reported no issues. These do not
+replace live gameplay, frame-by-frame visual, or multiplayer verification.
