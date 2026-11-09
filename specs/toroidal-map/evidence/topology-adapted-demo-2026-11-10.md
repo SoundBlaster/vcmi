@@ -11,6 +11,16 @@ the process as running. These observations do not establish which file was
 being opened or whether an OS permission prompt caused the stall. This
 attempt does not verify the newer source changes in a running client.
 
+A later targeted macOS unified-log query found a removable-volume access
+request for this exact process at launch. TCC reported that the previously
+recorded code requirement did not match the newly signed application and
+recorded `AUTHREQ_PROMPTING`; the filtered log for that request contained no
+response through the time of inspection. Together with the `dyld` sample,
+this is evidence consistent with the launch waiting on that access request,
+but it does not independently show the prompt on screen or prove the cause
+of the blocked `open`. Filtered local logs are `tcc-lab-launch.log` and
+`tcc-lab-request.log` in the TB5 build root.
+
 ## Initial fixture and GUI observations
 
 `test/mock/ToroidalDemoMap.h` defines a deliberately sparse 36×36 grass map
