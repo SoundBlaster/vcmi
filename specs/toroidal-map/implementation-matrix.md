@@ -101,6 +101,10 @@ review remains pending. Future source links and successful executions must be
 scoped to exactly what they demonstrate; their presence must not be used as a
 blanket conformance claim.
 
+The [coordinate audit](coordinate-audit.md) and its [candidate index](coordinate-audit-index.md)
+track the ongoing source review. Search matches are not automatically defects,
+and the search does not prove that every relevant calculation has been found.
+
 ## Execution record
 
 The isolated helper tests are recorded in
