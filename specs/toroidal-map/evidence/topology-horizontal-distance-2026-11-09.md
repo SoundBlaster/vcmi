@@ -19,3 +19,9 @@ Before this refactor, the full `vcmitest` suite at commit `013514d` passed
 1,342 tests from 219 suites; three tests were disabled
 (`full-suite-after-topology-audit.log`). That full-suite result predates the
 refactor and is not evidence of a full post-refactor run.
+
+After the refactor and the later ranged-spell and AI-reach changes, the full
+`vcmitest` suite at code commit `f512e47` passed 1,346 tests from 219 suites;
+three tests were disabled (`full-suite-wrapped-spells.log`). The later
+`30c436e` commit changes documentation only. This local run does not establish
+visual continuity or multiplayer behavior.
