@@ -115,3 +115,12 @@ passed; the latter ran 1,382 tests with three disabled
 (`full-suite-aviation-blocked.log` on TB5). The client, server and tests were
 built from `6e3b605` plus this change (`aviation-blocked-after-build.log`).
 This synthetic vehicle does not establish support for a specific mod.
+
+The layer/terrain compatibility and blocked-object rules are now shared by
+`NodeStorage`, `PathfinderUtil` and the toroidal server checks instead of
+being repeated. The server retains the explicit matching-vehicle embark
+exception. The complete local suite passed 1,382 tests with three disabled
+(`full-suite-shared-layer-rules.log` on TB5). Client, server and test targets
+were built from `d34da7f` plus the refactor (`shared-layer-rules-build.log`).
+This run includes bounded-map tests but is not a complete bounded regression
+or multiplayer validation.

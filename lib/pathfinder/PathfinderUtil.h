@@ -20,6 +20,18 @@ namespace PathfinderUtil
 	using FoW = MapTilesStorage<uint8_t>;
 	using ELayer = EPathfindingLayer;
 
+	inline bool layerMatchesTerrain(const ELayer & layer, const TerrainTile & tile)
+	{
+		return !((layer == ELayer::LAND && tile.isWater())
+			|| ((layer == ELayer::SAIL || layer == ELayer::WATER) && !tile.isWater()));
+	}
+
+	inline bool layerBlockedByObjects(const ELayer & layer, const TerrainTile & tile)
+	{
+		return (layer == ELayer::WATER && tile.blocked())
+			|| (layer == ELayer::AVIATE && (tile.blocked() || tile.visitable()));
+	}
+
 	template<EPathfindingLayer::Type layer>
 	EPathAccessibility evaluateAccessibility(const int3 & pos, const TerrainTile & tinfo, const FoW & fow, const PlayerColor player, const IGameInfoCallback & gameInfo)
 	{
@@ -75,14 +87,14 @@ namespace PathfinderUtil
 			break;
 
 		case ELayer::WATER:
-			if(tinfo.blocked() || tinfo.isLand())
+			if(layerBlockedByObjects(ELayer::WATER, tinfo) || tinfo.isLand())
 				return EPathAccessibility::BLOCKED;
 
 			break;
 
 		case ELayer::AVIATE:
 			//cannot aviate over blocked and visitable tiles (use FLY layer instead)
-			if(tinfo.blocked() || tinfo.visitable())
+			if(layerBlockedByObjects(ELayer::AVIATE, tinfo))
 				return EPathAccessibility::BLOCKED;
 			return EPathAccessibility::ACCESSIBLE;
 			break;

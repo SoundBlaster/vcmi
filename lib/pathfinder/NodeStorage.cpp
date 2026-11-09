@@ -34,12 +34,9 @@ EPathAccessibility NodeStorage::evaluateAccessibility(
 	const EPathfindingLayer & layer) const
 {
 	const TerrainTile * tile = gameInfo->getTile(coord);
-	const bool isWater = tile->isWater();
-
-	if((layer == ELayer::LAND && isWater)
-		|| (layer == ELayer::SAIL && !isWater)
+	if(!PathfinderUtil::layerMatchesTerrain(layer, *tile)
 		|| (layer == ELayer::AIR && !useFlying)
-		|| (layer == ELayer::WATER && (!isWater || !useWaterWalking)))
+		|| (layer == ELayer::WATER && !useWaterWalking))
 		return EPathAccessibility::NOT_SET;
 
 	switch(layer.toEnum())

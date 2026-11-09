@@ -87,6 +87,7 @@
 
 #include "../lib/pathfinder/CPathfinder.h"
 #include "../lib/pathfinder/PathfinderOptions.h"
+#include "../lib/pathfinder/PathfinderUtil.h"
 #include "../lib/pathfinder/TurnInfo.h"
 
 #include "../lib/rmg/CMapGenOptions.h"
@@ -861,18 +862,14 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			|| (layer == EPathfindingLayer::AVIATE && !canEmbarkLayer && (!h->inBoat() || h->getBoat()->layer != EPathfindingLayer::AVIATE))))
 		return complainRet("Hero cannot use the requested movement layer!");
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
-		&& ((layer == EPathfindingLayer::LAND && t.isWater())
-			|| ((layer == EPathfindingLayer::SAIL || layer == EPathfindingLayer::WATER) && !t.isWater())))
+		&& !PathfinderUtil::layerMatchesTerrain(layer, t))
 		return complainRet("Movement layer does not match the destination terrain!");
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
 		&& layer == EPathfindingLayer::AIR && !transit && !canEmbarkLayer)
 		return complainRet("Flying movement must transit without visiting objects!");
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
-		&& layer == EPathfindingLayer::WATER && t.blocked() && !canEmbarkLayer)
-		return complainRet("Cannot walk on water through a blocked tile!");
-	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
-		&& layer == EPathfindingLayer::AVIATE && (t.blocked() || t.visitable()) && !canEmbarkLayer)
-		return complainRet("Cannot navigate an aviation vehicle onto an occupied tile!");
+		&& PathfinderUtil::layerBlockedByObjects(layer, t) && !canEmbarkLayer)
+		return complainRet("Movement layer cannot enter the occupied destination!");
 	const bool usesMovementCost = movementMode == EMovementMode::STANDARD || embarking || disembarking;
 	const int cost = usesMovementCost
 		? pathfinderHelper->getMovementCost(h->visitablePos(), hmpos, layer, h->movementPointsRemaining())
