@@ -215,7 +215,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/bonuses/BonusCustomTypes.cpp` | 34 | unreviewed |
 | `lib/bonuses/Limiters.cpp` | 270 | unreviewed |
 | `lib/bonuses/Limiters.h` | 296 | unreviewed |
-| `lib/callback/CCallback.cpp` | 393 | unreviewed |
+| `lib/callback/CCallback.cpp` | 393 | reviewed: guarding-creature query requires a canonical map tile and returns the invalid sentinel outside; neighbor enumeration is handled separately |
 | `lib/callback/CGameInfoCallback.cpp` | 391, 411, 509, 887, 889, 892 | unreviewed |
 | `lib/callback/CNonConstInfoCallback.cpp` | 21 | unreviewed |
 | `lib/callback/IGameInfoCallback.h` | 80, 104 | unreviewed |
@@ -235,14 +235,14 @@ regenerating the index resets manually recorded statuses.
 | `lib/gameState/GameStatePackVisitor.cpp` | 322, 545, 551, 555, 559, 563, 567, 571, 575, 579, 787, 1655 | unreviewed |
 | `lib/gameState/UpgradeInfo.cpp` | 24, 44, 46, 47 | unreviewed |
 | `lib/gameState/UpgradeInfo.h` | 45 | unreviewed |
-| `lib/int3.h` | 31, 32, 103, 108, 110, 112, 114, 121, 123, 124, 128, 130, 133, 135, 138, 140, 143, 145, 182, 196 | unreviewed |
+| `lib/int3.h` | 31, 32, 103, 108, 110, 112, 114, 121, 123, 124, 128, 130, 133, 135, 138, 140, 143, 145, 182, 196 | partial: `findClosestTile` is used only by the conditional, unsupported RMG; other general coordinate operations remain unchanged |
 | `lib/json/JsonBonus.cpp` | 725 | unreviewed |
 | `lib/json/JsonNode.cpp` | 29 | unreviewed |
 | `lib/json/JsonParser.cpp` | 49, 129, 165, 167, 174, 236, 242, 252, 257, 633 | unreviewed |
 | `lib/json/JsonValidator.cpp` | 34, 650, 668 | unreviewed |
 | `lib/json/JsonWriter.cpp` | 69, 79, 81, 85 | unreviewed |
 | `lib/mapObjectConstructors/DwellingInstanceConstructor.cpp` | 70, 73, 75, 76 | unreviewed |
-| `lib/mapObjects/CGCreature.cpp` | 617 | unreviewed |
+| `lib/mapObjects/CGCreature.cpp` | 617 | reviewed: coordinates seed a deterministic creature-upgrade choice, not a distance or neighborhood calculation |
 | `lib/mapObjects/CGHeroInstance.cpp` | 164, 169, 1715 | partial: Visions range corrected |
 | `lib/mapObjects/CGHeroInstance.h` | 144 | unreviewed |
 | `lib/mapObjects/CGObjectInstance.cpp` | 91, 96, 101, 106, 134, 160, 206, 383 | partial: tile queries for wrapped footprints fixed and tested; other candidates unreviewed |
@@ -251,7 +251,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/mapObjects/MiscObjects.cpp` | 613 | partial: pairing and server traversal of synthetic gates tested after baseline; GUI unverified |
 | `lib/mapObjects/ObjectTemplate.cpp` | 255, 256, 260, 341, 342, 347, 350, 351, 352, 365, 372, 375, 377, 429, 430, 444, 447, 552, 553 | unreviewed |
 | `lib/mapObjects/ObjectTemplate.h` | 72 | unreviewed |
-| `lib/mapObjects/Quest.cpp` | 590, 593, 594, 595, 596, 598 | unreviewed |
+| `lib/mapObjects/Quest.cpp` | 590, 593, 594, 595, 596, 598 | reviewed: seer-hut compass text divides the canonical map rectangle into absolute regions; relative toroidal directions are not computed |
 | `lib/mapping/CDrawRoadsOperation.cpp` | 316, 317 | unreviewed |
 | `lib/mapping/CMap.cpp` | 277, 292, 293, 331, 334, 354, 357, 366, 374, 395, 396, 412, 413, 459, 470, 497, 509, 525, 545, 547, 548, 608, 622, 653, 779, 783, 784, 786, 790, 908, 1003, 1231, 1236 | unreviewed |
 | `lib/mapping/CMap.h` | 107, 386, 390, 391, 397, 403 | unreviewed |
