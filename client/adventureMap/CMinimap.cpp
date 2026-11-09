@@ -32,6 +32,7 @@
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapping/TerrainTile.h"
 #include "../../lib/mapping/CMapHeader.h"
+#include "../../lib/mapping/MapTopology.h"
 #include "../../lib/texts/CGeneralTextHandler.h"
 
 ColorRGBA CMinimapInstance::getTileColor(const int3 & pos, bool minimapShowHeroes) const
@@ -236,9 +237,7 @@ void CMinimap::showAll(Canvas & to)
 					parts.emplace_back(0, extent);
 					return parts;
 				}
-				start %= extent;
-				if(start < 0)
-					start += extent;
+				start = MapTopology::wrapCoordinate(start, extent);
 				const int firstLength = std::min(length, extent - start);
 				parts.emplace_back(start, firstLength);
 				if(firstLength < length)

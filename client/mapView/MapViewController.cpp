@@ -70,12 +70,7 @@ void MapViewController::setViewCenter(const Point & position, int level)
 	Point betterPosition;
 	if(GAME->interface()->cb->getMapHeader()->toroidal && !worldViewContext && !puzzleMapContext)
 	{
-		auto wrap = [](int value, int extent)
-		{
-			const int remainder = value % extent;
-			return remainder < 0 ? remainder + extent : remainder;
-		};
-		betterPosition = {wrap(position.x, upperLimit.x), wrap(position.y, upperLimit.y)};
+		betterPosition = {MapTopology::wrapCoordinate(position.x, upperLimit.x), MapTopology::wrapCoordinate(position.y, upperLimit.y)};
 	}
 	else
 		betterPosition = {std::clamp(position.x, lowerLimit.x, upperLimit.x), std::clamp(position.y, lowerLimit.y, upperLimit.y)};

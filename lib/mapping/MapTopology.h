@@ -52,17 +52,18 @@ public:
 		return result;
 	}
 
+	static int wrapCoordinate(int value, int extent)
+	{
+		assert(extent > 0);
+		const int remainder = value % extent;
+		return remainder < 0 ? remainder + extent : remainder;
+	}
+
 private:
 	int width;
 	int height;
 	int levels;
 	bool wraps;
-
-	static int wrapCoordinate(int value, int extent)
-	{
-		const int remainder = value % extent;
-		return remainder < 0 ? remainder + extent : remainder;
-	}
 
 	static int shortestOffset(int offset, int extent)
 	{

@@ -47,3 +47,12 @@ TEST(MapTopology, UsesShortDisplacementAcrossSeams)
 	const MapTopology bounded(100, 80, 2, false);
 	EXPECT_EQ(bounded.displacement(int3(0, 0, 0), int3(99, 79, 0)), int3(99, 79, 0));
 }
+
+TEST(MapTopology, WrapsPixelCoordinatesAcrossMultiplePeriods)
+{
+	constexpr int extent = 100 * 32;
+	EXPECT_EQ(MapTopology::wrapCoordinate(-1, extent), extent - 1);
+	EXPECT_EQ(MapTopology::wrapCoordinate(extent, extent), 0);
+	EXPECT_EQ(MapTopology::wrapCoordinate(-2 * extent - 17, extent), extent - 17);
+	EXPECT_EQ(MapTopology::wrapCoordinate(3 * extent + 17, extent), 17);
+}

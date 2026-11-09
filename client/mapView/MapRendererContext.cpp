@@ -210,13 +210,8 @@ Point MapRendererBaseContext::objectImageOffset(ObjectInstanceID objectID, const
 	const auto * map = GAME->map().getMap();
 	if(map->toroidal && MapObjectDrawOrder::usesFixedDrawSlot(object))
 	{
-		auto wrap = [](int value, int extent)
-		{
-			const int remainder = value % extent;
-			return remainder < 0 ? remainder + extent : remainder;
-		};
-		offsetTiles.x = wrap(offsetTiles.x, map->width);
-		offsetTiles.y = wrap(offsetTiles.y, map->height);
+		offsetTiles.x = MapTopology::wrapCoordinate(offsetTiles.x, map->width);
+		offsetTiles.y = MapTopology::wrapCoordinate(offsetTiles.y, map->height);
 	}
 	return Point(offsetTiles) * Point(32, 32);
 }
