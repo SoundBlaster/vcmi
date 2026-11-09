@@ -106,6 +106,7 @@
 
 #include "../lib/mapping/CMap.h"
 #include "../lib/mapping/CMapHeader.h"
+#include "../lib/mapping/MapTopology.h"
 
 #include "../lib/networkPacks/PacksForClient.h"
 #include "../lib/networkPacks/PacksForClientBattle.h"
@@ -1432,7 +1433,8 @@ void CPlayerInterface::objectPropertyChanged(const SetObjectProperty * sop)
 		}
 
 		//redraw minimap if owner changed
-		std::set<int3> pos = obj->getBlockedPos();
+		const auto * mapHeader = cb->getMapHeader();
+		std::set<int3> pos = mapHeader->toroidal ? obj->getBlockedPosOnMap(mapHeader->getTopology()) : obj->getBlockedPos();
 		FowTilesType upos(pos.begin(), pos.end());
 		adventureInt->onMapTilesChanged(upos);
 

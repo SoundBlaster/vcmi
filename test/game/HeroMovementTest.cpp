@@ -25,6 +25,7 @@
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/TerrainTile.h"
+#include "../../lib/mapping/MapTopology.h"
 #include "../../lib/modding/IdentifierResolver.h"
 #include "../../lib/networkPacks/PacksForClient.h"
 #include "../../lib/spells/CSpellHandler.h"
@@ -361,7 +362,9 @@ TEST_F(HeroMovementTest, ObjectTileQueriesFindFootprintAcrossToroidalCorner)
 	EXPECT_FALSE(object.visitableAt(across));
 	EXPECT_FALSE(object.blockingAt(across));
 	EXPECT_FALSE(object.coveringAt(across));
+	EXPECT_EQ(object.getBlockedPosOnMap(map()->getTopology()), (std::set<int3>{int3(0, 0, 0)}));
 	map()->toroidal = true;
+	EXPECT_EQ(object.getBlockedPosOnMap(map()->getTopology()), (std::set<int3>{int3(0, 0, 0), int3(35, 0, 0), int3(0, 35, 0), int3(35, 35, 0)}));
 	EXPECT_TRUE(object.visitableAt(across));
 	EXPECT_TRUE(object.blockingAt(across));
 	EXPECT_TRUE(object.coveringAt(across));

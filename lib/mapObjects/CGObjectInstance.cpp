@@ -166,6 +166,15 @@ std::set<int3> CGObjectInstance::getBlockedPos() const
 	return ret;
 }
 
+std::set<int3> CGObjectInstance::getBlockedPosOnMap(const MapTopology & topology) const
+{
+	std::set<int3> result;
+	for(const auto & position : getBlockedPos())
+		if(const auto tile = topology.canonicalize(position))
+			result.insert(*tile);
+	return result;
+}
+
 const std::set<int3> & CGObjectInstance::getBlockedOffsets() const
 {
 	return appearance->getBlockedOffsets();

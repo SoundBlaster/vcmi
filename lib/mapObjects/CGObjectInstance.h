@@ -22,6 +22,7 @@
 struct Component;
 class JsonSerializeFormat;
 class ObjectTemplate;
+class MapTopology;
 class CMap;
 class CGameState;
 class Quest;
@@ -91,6 +92,8 @@ public:
 	virtual std::string getVisitScriptHandler() const { return {}; }
 
 	std::set<int3> getBlockedPos() const; //returns set of positions blocked by this object
+	/// Blocked map tiles, canonicalized according to an explicitly supplied topology.
+	std::set<int3> getBlockedPosOnMap(const MapTopology & topology) const;
 	const std::set<int3> & getBlockedOffsets() const; //returns set of relative positions blocked by this object
 
 	/// returns true if object is visitable

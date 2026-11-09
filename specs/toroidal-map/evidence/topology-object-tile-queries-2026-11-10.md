@@ -58,3 +58,21 @@ suite passed 1,358 tests from 222 suites, with three disabled
 the C++ interface; this local test does not establish ABI compatibility with
 separately built plugins or mixed versions. The [GUI conversion check](topology-legacy-editor-2026-11-10.md)
 used the earlier editor build, before this correction.
+
+## Blocked tiles in client and editor displays
+
+`getBlockedPos()` still returns raw footprint positions, which are used by the
+random map generator before placement. The new `getBlockedPosOnMap(topology)`
+explicitly converts those positions to canonical map tiles. Owner-change
+minimap refreshes and the editor's object-picker highlight use it in toroidal
+mode; the editor's minimap checks the topology-aware `blockingAt` instead of
+comparing against raw positions. Bounded update paths retain their previous
+behavior.
+
+The synthetic 2×2 object at `(0,0,0)` now also checks that the explicit
+map-tile result contains only `(0,0,0)` in bounded mode, but all four corner
+tiles in toroidal mode. Three related tile-query, blocker, and resource tests
+passed (`minimap-footprints-tests.log`); the client, editor, and test targets
+built (`minimap-footprints-build.log`). These tests do not exercise GUI
+minimap updates or editor highlighting. The editor's selection outline and
+static seam-object restriction remain separate, unresolved concerns.

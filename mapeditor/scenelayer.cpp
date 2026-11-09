@@ -13,6 +13,7 @@
 #include "mainwindow.h"
 #include "../lib/mapping/CMapEditManager.h"
 #include "../lib/mapping/CMap.h"
+#include "../lib/mapping/MapTopology.h"
 #include "inspector/inspector.h"
 #include "mapview.h"
 #include "mapcontroller.h"
@@ -407,7 +408,8 @@ QGraphicsItem * ObjectPickerLayer::draw(const QRectF & section)
 		if(obj->pos.z != scene->level)
 			continue;
 
-		for(const auto & pos : obj->getBlockedPos())
+		const auto positions = map->toroidal ? obj->getBlockedPosOnMap(map->getTopology()) : obj->getBlockedPos();
+		for(const auto & pos : positions)
 			painter.fillRect(pos.x * tileSize - offsetX, pos.y * tileSize - offsetY, tileSize, tileSize, QColor(255, 211, 0, 64));
 	}
 
