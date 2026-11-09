@@ -16,6 +16,7 @@
 #include "../Goals/ExecuteHeroChain.h"
 #include "../Goals/ExchangeSwapTownHeroes.h"
 #include "../../../lib/mapObjects/CGResource.h"
+#include "../../../lib/mapping/MapTopology.h"
 #include "../Engine/Nullkiller.h"
 
 namespace NK2AI
@@ -49,10 +50,14 @@ const CGHeroInstance * getNearestHero(const Nullkiller * aiNk, const CGTownInsta
 		return nullptr;
 
 	auto shortestPath = getShortestPath(town, paths);
+	if(shortestPath.nodes.size() > 1 || shortestPath.turn() != 0)
+		return nullptr;
 
-	if(shortestPath.nodes.size() > 1
-		|| shortestPath.turn() != 0
-		|| shortestPath.targetHero->visitablePos().dist2dSQ(town->visitablePos()) > 4
+	const auto heroPos = shortestPath.targetHero->visitablePos();
+	const auto townPos = town->visitablePos();
+	const auto distance = aiNk->cc->getMapHeader()->getTopology().horizontalDistanceSquaredIgnoringLevel(heroPos, townPos);
+
+	if(distance.value_or(heroPos.dist2dSQ(townPos)) > 4
 		|| (town->getGarrisonHero() && shortestPath.targetHero == town->getGarrisonHero()))
 		return nullptr;
 

@@ -35,7 +35,7 @@ regenerating the index resets manually recorded statuses.
 | `AI/Nullkiller2/Behaviors/EscapeBehavior.cpp` | 186 | unreviewed |
 | `AI/Nullkiller2/Behaviors/ExplorationBehavior.cpp` | 64, 65, 216, 217, 878 | unreviewed |
 | `AI/Nullkiller2/Behaviors/GatherArmyBehavior.cpp` | 235, 297 | unreviewed |
-| `AI/Nullkiller2/Behaviors/StartupBehavior.cpp` | 55, 105 | partial: nearest-hero threshold candidate |
+| `AI/Nullkiller2/Behaviors/StartupBehavior.cpp` | 55, 105 | reviewed: nearest-hero threshold uses topology; map width scales recruitment, not distance |
 | `AI/Nullkiller2/Engine/Nullkiller.cpp` | 378, 380 | unreviewed |
 | `AI/Nullkiller2/Engine/PriorityEvaluator.cpp` | 1651 | unreviewed |
 | `AI/Nullkiller2/Engine/Settings.cpp` | 29, 30, 31 | unreviewed |

@@ -18,6 +18,11 @@
 #include "lib/mapObjects/CGTownInstance.h"
 #include "lib/mapping/TerrainTile.h"
 
+namespace NK2AI
+{
+const CGHeroInstance * getNearestHero(const Nullkiller * aiNk, const CGTownInstance * town);
+}
+
 namespace
 {
 const PlayerColor PLAYER(0);
@@ -278,5 +283,44 @@ TEST_F(Nullkiller2_AIGateway, plansDimensionDoorLandingAcrossToroidalSeam)
 			});
 		});
 		EXPECT_EQ(found, toroidal) << "AI should enumerate the same landing the spell permits";
+	}
+}
+
+TEST_F(Nullkiller2_AIGateway, startupRecognizesHeroNearTownAcrossSeam)
+{
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(PLAYER)
+		.hero({6, 12, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.town({2, 11, 0}, FactionID(0), PLAYER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	hero = findHeroByOwner(PLAYER);
+	const auto * town = findFirst<CGTownInstance>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(town, nullptr);
+	TryMoveHero placement;
+	placement.id = hero->id;
+	placement.start = hero->pos;
+	placement.end = hero->convertFromVisitablePos(int3(35, 12, 0));
+	placement.movePoints = 2000;
+	placement.result = TryMoveHero::TELEPORTATION;
+	gameState()->apply(placement);
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
+		map()->setToroidalAndRebuild(toroidal);
+		client = std::make_unique<ScriptedMovementClient>(gameState());
+		callback = makeCallback(PLAYER, client.get());
+		gateway = makeGateway(callback);
+		client->notify(*gateway);
+		const auto * nearest = withGameStateReadLock([&]
+		{
+			preparePlanning(*gateway);
+			return NK2AI::getNearestHero(gateway->nullkiller.get(), town);
+		});
+		EXPECT_EQ(nearest, toroidal ? hero : nullptr);
 	}
 }
