@@ -25,6 +25,7 @@
 #include "../mapObjectConstructors/AObjectTypeHandler.h"
 #include "../mapObjectConstructors/CObjectClassesHandler.h"
 #include "../mapping/CMap.h"
+#include "../mapping/MapTopology.h"
 #include "../networkPacks/PacksForClient.h"
 #include "../serializer/JsonSerializeFormat.h"
 
@@ -108,12 +109,14 @@ ui8 CGObjectInstance::drawLayerAt(const int3 & testPos) const
 bool CGObjectInstance::isVisibleFor(PlayerColor player) const
 {
 	// otherwise visible when at least one covered tile is revealed
+	const auto topology = cb->getMapHeader()->getTopology();
 	for(int fy = 0; fy < getHeight(); ++fy)
 	{
 		for(int fx = 0; fx < getWidth(); ++fx)
 		{
 			int3 tile = anchorPos() + int3(-fx, -fy, 0);
-			if(coveringAt(tile) && cb->isVisibleFor(tile, player))
+			const auto canonical = topology.canonicalize(tile);
+			if(coveringAt(tile) && canonical && cb->isVisibleFor(*canonical, player))
 				return true;
 		}
 	}

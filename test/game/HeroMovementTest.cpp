@@ -13,9 +13,13 @@
 #include "../mock/TinyMapGameTest.h"
 
 #include "../../lib/GameLibrary.h"
+#include "../../lib/CPlayerState.h"
+#include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
+#include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/TerrainTile.h"
+#include "../../lib/modding/IdentifierResolver.h"
 #include "../../lib/networkPacks/PacksForClient.h"
 #include "../../lib/spells/CSpellHandler.h"
 #include "../../lib/spells/Problem.h"
@@ -181,6 +185,32 @@ TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)
 	map()->calculateGuardingGreaturePositions();
 	EXPECT_FALSE(guards(int3(0, 5, 0), int3(35, 5, 0)));
 	EXPECT_FALSE(guards(int3(0, 0, 0), int3(35, 35, 0)));
+}
+
+TEST_F(HeroMovementTest, ObjectVisibilityUsesWrappedFootprintTiles)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	setMapVisibility(player, false);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[int3(35, 35, 0)] = 1;
+
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "VV", "VV" ] })";
+	JsonNode definition(text.data(), text.size(), "ObjectVisibilityTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	CGObjectInstance object(gameState().get());
+	object.appearance = appearance;
+	object.pos = int3(0, 0, 0);
+
+	map()->toroidal = false;
+	EXPECT_FALSE(object.isVisibleFor(player));
+	map()->toroidal = true;
+	EXPECT_TRUE(object.isVisibleFor(player));
+	gameState()->getPlayerTeam(player)->fogOfWarMap[int3(35, 35, 0)] = 0;
+	EXPECT_FALSE(object.isVisibleFor(player));
 }
 
 TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)

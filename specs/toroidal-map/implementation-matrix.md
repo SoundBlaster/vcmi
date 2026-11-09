@@ -145,6 +145,8 @@ Client object stamping groundwork is recorded in
 [`evidence/topology-client-stamping-2026-11-09.md`](evidence/topology-client-stamping-2026-11-09.md).
 Editor object stamping groundwork is recorded in
 [`evidence/topology-editor-stamping-2026-11-09.md`](evidence/topology-editor-stamping-2026-11-09.md).
+Wrapped object-visibility checks are recorded in
+[`evidence/topology-object-visibility-2026-11-09.md`](evidence/topology-object-visibility-2026-11-09.md).
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
