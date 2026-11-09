@@ -1413,13 +1413,11 @@ struct TownPortalFinder
 			{
 				const CGTownInstance * nearestTown = *vstd::minElementByFun(targetTowns, [&](const CGTownInstance * t) -> int
 				{
-					int3 townPos = t->visitablePos();
+					const int3 townPos = t->visitablePos();
 					// Town Portal compares horizontal distance even across levels.
-					townPos.z = node->coord.z;
-					const auto from = topology.canonicalize(node->coord);
-					const auto to = topology.canonicalize(townPos);
-					if(from && to)
-						return int3(0, 0, 0).dist2dSQ(topology.displacement(*from, *to));
+					const auto distance = topology.horizontalDistanceSquaredIgnoringLevel(node->coord, townPos);
+					if(distance)
+						return *distance;
 					return node->coord.dist2dSQ(townPos);
 				});
 

@@ -57,12 +57,9 @@ const CGTownInstance * TownRelatedAdventureSpellEffect::findNearestTown(SpellCas
 		if(map->toroidal)
 		{
 			// The original 2D comparison ignores level, including for towns underground.
-			townPos.z = heroPos.z;
-			const auto topology = map->getTopology();
-			const auto from = topology.canonicalize(heroPos);
-			const auto to = topology.canonicalize(townPos);
-			if(from && to)
-				return int3(0, 0, 0).dist2dSQ(topology.displacement(*from, *to));
+			const auto distance = map->getTopology().horizontalDistanceSquaredIgnoringLevel(heroPos, townPos);
+			if(distance)
+				return *distance;
 		}
 		return townPos.dist2dSQ(heroPos);
 	};

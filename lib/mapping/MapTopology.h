@@ -55,6 +55,18 @@ public:
 		return result;
 	}
 
+	/// Compares horizontal positions while deliberately ignoring their level difference.
+	/// Callers must exclude sentinel coordinates before requesting toroidal wrapping.
+	std::optional<ui32> horizontalDistanceSquaredIgnoringLevel(const int3 & from, int3 to) const
+	{
+		to.z = from.z;
+		const auto canonicalFrom = canonicalize(from);
+		const auto canonicalTo = canonicalize(to);
+		if(!canonicalFrom || !canonicalTo)
+			return std::nullopt;
+		return int3(0, 0, 0).dist2dSQ(displacement(*canonicalFrom, *canonicalTo));
+	}
+
 	/// Visits each toroidal tile in range once, preserving the center's level.
 	/// The center may itself be a repeated image outside the canonical rectangle.
 	template<typename Visitor>

@@ -613,17 +613,14 @@ void CGSubterraneanGate::postInit(IGameInfoCallback * cb) //matches subterranean
 				continue;
 
 			const int3 from = objCurrent->visitablePos();
-			int3 to = checked->visitablePos();
+			const int3 to = checked->visitablePos();
 			si32 hlp = to.dist2dSQ(from);
 			if(map.toroidal)
 			{
 				// Gate pairing compares horizontal positions across different levels.
-				to.z = from.z;
-				const auto topology = map.getTopology();
-				const auto canonicalFrom = topology.canonicalize(from);
-				const auto canonicalTo = topology.canonicalize(to);
-				if(canonicalFrom && canonicalTo)
-					hlp = int3(0, 0, 0).dist2dSQ(topology.displacement(*canonicalFrom, *canonicalTo));
+				const auto distance = map.getTopology().horizontalDistanceSquaredIgnoringLevel(from, to);
+				if(distance)
+					hlp = *distance;
 			}
 			if(hlp < best.second)
 			{

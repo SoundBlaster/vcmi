@@ -48,6 +48,16 @@ TEST(MapTopology, UsesShortDisplacementAcrossSeams)
 	EXPECT_EQ(bounded.displacement(int3(0, 0, 0), int3(99, 79, 0)), int3(99, 79, 0));
 }
 
+TEST(MapTopology, HorizontalDistanceCanComparePositionsAcrossLevels)
+{
+	const MapTopology wrapped(36, 36, 2, true);
+	const MapTopology bounded(36, 36, 2, false);
+	EXPECT_EQ(wrapped.horizontalDistanceSquaredIgnoringLevel({0, 0, 0}, {35, 35, 1}), 2);
+	EXPECT_EQ(bounded.horizontalDistanceSquaredIgnoringLevel({0, 0, 0}, {35, 35, 1}), 2450);
+	EXPECT_FALSE(bounded.horizontalDistanceSquaredIgnoringLevel({0, 0, 0}, {36, 0, 1}));
+	EXPECT_FALSE(wrapped.horizontalDistanceSquaredIgnoringLevel({0, 0, -1}, {35, 0, 0}));
+}
+
 TEST(MapTopology, WrapsPixelCoordinatesAcrossMultiplePeriods)
 {
 	constexpr int extent = 100 * 32;

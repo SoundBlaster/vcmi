@@ -548,7 +548,7 @@ void CGameState::initGrailPosition(vstd::RNG & randomGenerator)
 					{
 						// The legacy radius comparison ignores the difference between levels.
 						const int3 center(map->grailPos.x, map->grailPos.y, z);
-						distanceSquared = int3(0, 0, 0).dist2dSQ(topology.displacement(center, position));
+						distanceSquared = *topology.horizontalDistanceSquaredIgnoringLevel(center, position);
 					}
 					if(!t.blocked()
 					   && !t.visitable()
