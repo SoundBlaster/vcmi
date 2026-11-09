@@ -1,5 +1,22 @@
 # Toroidal viewport: build record
 
+## Camera geometry check, 2026-11-10
+
+At source revision `0adab6f` plus the new standalone test,
+`MapViewModelTopologyTest.WrappedCameraPreservesPixelGeometryAcrossSeams`
+passed for one-pixel horizontal, vertical and diagonal camera moves across
+the seam, including a reverse diagonal move. It compares canonical tile
+coordinates and screen rectangles at sampled pixels for a 36×36 map and two
+viewport sizes, one larger than the map period. All 11 standalone topology
+tests passed without game assets. Build and test output are in the TB5 build
+root as `view-model-topology-build.log` and `view-model-topology-test.log`.
+
+This is a geometry check on `MapViewModel`, not an observation of controller
+normalization, rendered frames, sprite animation or interactive scrolling.
+Later game observations are recorded separately in the GUI evidence files.
+
+## Initial build, 2026-11-09
+
 On 2026-11-09 the adventure camera, render tile mapping, fog neighbor access,
 mouse input, route arrows, hero/boat sprite stamping and minimap radar received
 an initial toroidal implementation. The change is incomplete: static objects
