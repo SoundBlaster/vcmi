@@ -12,6 +12,8 @@
 #include "../Pathfinding/AINodeStorage.h"
 #include "../Engine/PriorityEvaluator.h"
 
+class MapTopology;
+
 namespace NK2AI
 {
 
@@ -27,7 +29,8 @@ struct DimensionDoorExpansionReach
 
 bool canReachWithDimensionDoor(
 	const std::vector<DimensionDoorExpansionReach> & dimensionDoorReach,
-	const int3 & destination);
+	const int3 & destination,
+	const MapTopology & topology);
 
 struct ClusterObjectInfo
 {

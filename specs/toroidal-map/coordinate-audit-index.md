@@ -31,7 +31,7 @@ regenerating the index resets manually recorded statuses.
 | `AI/Nullkiller2/AIUtility.h` | 144, 145, 147, 149, 160, 165, 172, 177 | unreviewed |
 | `AI/Nullkiller2/Analyzers/DangerHitMapAnalyzer.cpp` | 81, 83, 133, 219, 221, 257 | unreviewed |
 | `AI/Nullkiller2/Analyzers/HeroManager.cpp` | 146 | unreviewed |
-| `AI/Nullkiller2/Analyzers/ObjectClusterizer.cpp` | 22, 37, 60, 61, 97, 103, 496 | partial: Dimension Door reach and cluster centroid candidates |
+| `AI/Nullkiller2/Analyzers/ObjectClusterizer.cpp` | 22, 37, 60, 61, 97, 103, 496 | partial: Dimension Door reach fixed and tested after baseline; cluster centroid candidate remains |
 | `AI/Nullkiller2/Behaviors/EscapeBehavior.cpp` | 186 | unreviewed |
 | `AI/Nullkiller2/Behaviors/ExplorationBehavior.cpp` | 64, 65, 216, 217, 878 | unreviewed |
 | `AI/Nullkiller2/Behaviors/GatherArmyBehavior.cpp` | 235, 297 | unreviewed |

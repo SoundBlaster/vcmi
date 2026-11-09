@@ -13,6 +13,7 @@
 #include "../AIGateway.h"
 #include "../Engine/Nullkiller.h"
 #include "../Helpers/DimensionDoorUtils.h"
+#include "../../../lib/mapping/MapTopology.h"
 
 namespace NK2AI
 {
@@ -50,15 +51,21 @@ static std::vector<DimensionDoorExpansionReach> getDimensionDoorExpansionReach(
 
 bool canReachWithDimensionDoor(
 	const std::vector<DimensionDoorExpansionReach> & dimensionDoorReach,
-	const int3 & destination)
+	const int3 & destination,
+	const MapTopology & topology)
 {
 	for(const auto & reach : dimensionDoorReach)
 	{
 		if(destination.z != reach.source.z)
 			continue;
 
-		const int distanceX = std::abs(destination.x - reach.source.x);
-		const int distanceY = std::abs(destination.y - reach.source.y);
+		int3 displacement = destination - reach.source;
+		const auto source = topology.canonicalize(reach.source);
+		const auto target = topology.canonicalize(destination);
+		if(source && target)
+			displacement = topology.displacement(*source, *target);
+		const int distanceX = std::abs(displacement.x);
+		const int distanceY = std::abs(displacement.y);
 
 		if(distanceX <= reach.rangeX * reach.casts && distanceY <= reach.rangeY * reach.casts)
 			return true;
@@ -446,7 +453,7 @@ void ObjectClusterizer::clusterizeObject(
 	{
 		aiNk->pathfinder->calculateQuickPathsWithBlocker(pathCache, heroes, obj->visitablePos());
 
-		if(canReachWithDimensionDoor(dimensionDoorReach, obj->visitablePos()))
+		if(canReachWithDimensionDoor(dimensionDoorReach, obj->visitablePos(), aiNk->cc->getMapHeader()->getTopology()))
 		{
 			std::vector<AIPath> fullPathInfo;
 			aiNk->pathfinder->calculatePathInfo(fullPathInfo, obj->visitablePos(), false);

@@ -21,7 +21,12 @@ passed afterward. The focused run passed 51 tests from eight suites; logs
 on TB5 include `ranged-before-test.log`, `ai-dd-before-test.log`,
 `ai-dd-after-build.log` and `ai-dd-after-tests.log`.
 
+In a subsequent change, Nullkiller2's separate cluster reach heuristic also
+uses wrapped displacement. The focused run in `ai-dd-reach-tests.log` passed
+29 tests, including a new edge/corner case with bounded, out-of-range and
+different-level comparisons. This tests the heuristic, not an assembled
+cluster-selection decision.
+
 This is range validation and AI planning evidence, not a live spell cast or
-proof of the behavior of every ranged spell. AI's separate cluster reach
-heuristic remains a candidate for audit. Cross-level spell semantics,
+proof of the behavior of every ranged spell. Cross-level spell semantics,
 animation, visibility and multiplayer require further verification.
