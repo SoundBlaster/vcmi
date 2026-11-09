@@ -59,7 +59,10 @@ public:
 		if(afterMovement)
 			afterMovement();
 		if(gateway)
+		{
+			gateway->invalidatePaths();
 			gateway->heroMoved(reply, false);
+		}
 
 		return ++requestID;
 	}
