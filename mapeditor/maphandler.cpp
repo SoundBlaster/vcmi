@@ -16,6 +16,7 @@
 #include "../lib/RiverHandler.h"
 #include "../lib/TerrainHandler.h"
 #include "../lib/mapping/CMap.h"
+#include "../lib/mapping/MapTopology.h"
 #include "../lib/mapObjects/CGHeroInstance.h"
 #include "../lib/mapObjects/ObjectTemplate.h"
 #include "../lib/mapObjects/MapObjectDrawOrder.h"
@@ -286,10 +287,10 @@ std::vector<int3> MapHandler::getStampTiles(const CGObjectInstance * object) con
 	{
 		for(int fy = 0; fy < object->getHeight(); ++fy)
 		{
-			int3 tile(object->anchorPos().x - fx, object->anchorPos().y - fy, object->anchorPos().z);
-
-			if(map->isInTheMap(tile))
-				result.push_back(tile);
+			const int3 tile(object->anchorPos().x - fx, object->anchorPos().y - fy, object->anchorPos().z);
+			const auto canonical = map->getTopology().canonicalize(tile);
+			if(canonical && !vstd::contains(result, *canonical))
+				result.push_back(*canonical);
 		}
 	}
 	return result;
@@ -322,8 +323,8 @@ void MapHandler::restampTiles(const std::set<int3> & tiles)
 	// stamped again in the order of objects on the map, like when the map is loaded
 	for(const auto & object : map->objects)
 	{
-		if(!object || object->anchorPos().x < first.x || object->anchorPos().y < first.y
-			|| object->anchorPos().x - object->getWidth() >= last.x || object->anchorPos().y - object->getHeight() >= last.y)
+		if(!object || (!map->toroidal && (object->anchorPos().x < first.x || object->anchorPos().y < first.y
+			|| object->anchorPos().x - object->getWidth() >= last.x || object->anchorPos().y - object->getHeight() >= last.y)))
 			continue;
 
 		for(const auto & tile : getStampTiles(object.get()))
@@ -364,12 +365,13 @@ std::set<int3> MapHandler::addObject(const CGObjectInstance * object)
 					 tileSize,
 					 tileSize);
 
-			if( map->isInTheMap(currTile) && // within map
+			const auto tile = map->getTopology().canonicalize(currTile);
+			if( tile &&
 			   cr.x() + cr.width() > 0 &&    // image has data on this tile
 			   cr.y() + cr.height() > 0)
 			{
-				getObjects(currTile).emplace_back(object, cr);
-				tilesCache[object].insert(currTile);
+				if(tilesCache[object].insert(*tile).second)
+					getObjects(*tile).emplace_back(object, cr);
 			}
 		}
 	}
@@ -495,7 +497,8 @@ void MapHandler::drawImageSlice(QPainter & painter, const QImage & image, const 
 
 void MapHandler::drawObjectTile(QPainter & painter, const CGObjectInstance * obj, const int3 & tile, const QPoint & target, bool shadow, bool locked)
 {
-	const QPoint tilesFromAnchor(obj->anchorPos().x - tile.x, obj->anchorPos().y - tile.y);
+	const int3 offset = obj->anchorPos() - MapObjectDrawOrder::tileForObject(*map, obj, tile);
+	const QPoint tilesFromAnchor(offset.x, offset.y);
 
 	auto objData = findObjectBitmap(obj, 0, obj->ID == Obj::HERO ? 2 : 0);
 
@@ -571,7 +574,7 @@ void MapHandler::drawObjects(QPainter & painter, const QRectF & section, int z, 
 
 			MapObjectDrawOrder::drawTile(entries, *map, tile,
 				[](const ObjectRect & entry) { return entry.obj; },
-				[&](const CGObjectInstance * obj) { return Point((obj->anchorPos().x - x) * tileSize, (obj->anchorPos().y - y) * tileSize); },
+				[&](const CGObjectInstance * obj) { const auto offset = obj->anchorPos() - MapObjectDrawOrder::tileForObject(*map, obj, tile); return Point(offset.x * tileSize, offset.y * tileSize); },
 				[&](const CGObjectInstance * obj) { drawObjectTile(painter, obj, tile, target, true, locked.count(obj)); },
 				[&](const CGObjectInstance * obj) { drawObjectTile(painter, obj, tile, target, false, locked.count(obj)); });
 		}
