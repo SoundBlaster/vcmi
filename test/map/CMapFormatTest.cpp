@@ -16,11 +16,13 @@
 #include "../../lib/mapping/CMap.h"
 #include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
+#include "../../lib/mapping/TerrainTile.h"
 
 #include "../../lib/VCMIDirs.h"
 
 #include "../JsonComparer.h"
 #include "../mock/TinyH3MBuilder.h"
+#include "../mock/ToroidalDemoMap.h"
 
 static void saveTestMap(CMemoryBuffer & serializeBuffer, const std::string & filename)
 {
@@ -237,4 +239,49 @@ TEST(MapFormat, LegacyH3MCanBeOptedIntoToroidalVmap)
 	EXPECT_EQ(reopened->getHeroesOnMap().size(), legacy->getHeroesOnMap().size());
 	EXPECT_EQ(reopened->getAllTowns().size(), legacy->getAllTowns().size());
 	EXPECT_EQ(reopened->getTile(int3(8, 8, 0)).terrainType, TerrainId::WATER);
+}
+
+TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
+{
+	auto bytes = makeToroidalDemoMap().build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("ToroidSeamLaboratory", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	ASSERT_FALSE(map->toroidal);
+	map->setToroidalAndRebuild(true);
+	for(const auto & object : map->objects)
+		if(object)
+			ASSERT_FALSE(map->hasUnsupportedToroidalFootprint(*object)) << object->instanceName;
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&output);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	ASSERT_TRUE(reopened->toroidal);
+	EXPECT_EQ(reopened->getHeroesOnMap().size(), 2u);
+	EXPECT_EQ(reopened->getAllTowns().size(), 2u);
+	for(int x = 0; x < reopened->width; ++x)
+		for(int y = 0; y < reopened->height; ++y)
+			EXPECT_LE(reopened->getTile(int3(x, y, 0)).visitableObjects.size(), 1u) << x << "," << y;
+	EXPECT_EQ(reopened->getTile(int3(35, 35, 0)).visitableObjects.size(), 1u);
+	EXPECT_EQ(reopened->getTile(int3(35, 1, 0)).visitableObjects.size(), 1u);
+	EXPECT_EQ(reopened->getTile(int3(1, 35, 0)).visitableObjects.size(), 1u);
+	if(const char * outputPath = std::getenv("VCMI_TOROID_DEMO_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream file(outputPath, std::ios::binary);
+		ASSERT_TRUE(file);
+		file.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+		file.close();
+		ASSERT_TRUE(file);
+	}
 }

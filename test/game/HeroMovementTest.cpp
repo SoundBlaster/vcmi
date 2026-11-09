@@ -11,6 +11,7 @@
 
 #include "../mock/GameHandlerTestServer.h"
 #include "../mock/TinyMapGameTest.h"
+#include "../mock/ToroidalDemoMap.h"
 
 #include "../../lib/GameLibrary.h"
 #include "../../lib/CPlayerState.h"
@@ -48,6 +49,39 @@ protected:
 	void checkToroidalSightRange(EMapFormat format);
 	void checkBlockedToroidalStep(EMapFormat format);
 };
+
+class ToroidalDemoGameTest : public TinyMapGameTest
+{
+protected:
+	const Services * gameServices() override { return LIBRARY; }
+	void mapLoaded(CMap * loaded) override
+	{
+		TinyMapGameTest::mapLoaded(loaded);
+		loaded->setToroidalAndRebuild(true);
+	}
+};
+
+TEST_F(ToroidalDemoGameTest, HeroCrossesCornerAndBothEdges)
+{
+	const PlayerColor player(0);
+	startWithMap(makeToroidalDemoMap());
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	hero->setMovementPoints(3000);
+	const auto goldBefore = gameState()->players.at(player).resources[GameResID::GOLD];
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 35, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_GT(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore);
+	// The blocking resource is collected from the adjacent tile; the hero enters on the next step.
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 35, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(35, 35, 0));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 35, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(0, 0, 0));
+}
 
 class GrailTopologyTest : public TinyMapGameTest
 {
