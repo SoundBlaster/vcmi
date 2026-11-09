@@ -24,6 +24,7 @@
 #include "../CSkillHandler.h"
 #include "../gameState/CGameState.h"
 #include "../mapping/CMap.h"
+#include "../mapping/MapTopology.h"
 #include "../CPlayerState.h"
 #include "../StartInfo.h"
 #include "../serializer/JsonSerializeFormat.h"
@@ -561,7 +562,8 @@ void CGSubterraneanGate::postInit(IGameInfoCallback * cb) //matches subterranean
 {
 	// for > 2 layers it's still choosing the nearest in x/y axis independent from level
 	// collect all gates
-	auto allGates = cb->gameState().getMap().getObjects<CGSubterraneanGate>();
+	auto & map = cb->gameState().getMap();
+	auto allGates = map.getObjects<CGSubterraneanGate>();
 
 	// a gate that heroes can not enter, used by maps as decoration, gets a channel of its own instead of taking the pair of a real gate
 	auto isDecorative = [](const CGSubterraneanGate * gate){ return !gate->isVisitable(); };
@@ -610,7 +612,19 @@ void CGSubterraneanGate::postInit(IGameInfoCallback * cb) //matches subterranean
 			if(checked->visitablePos().z == objCurrent->visitablePos().z)
 				continue;
 
-			si32 hlp = checked->visitablePos().dist2dSQ(objCurrent->visitablePos());
+			const int3 from = objCurrent->visitablePos();
+			int3 to = checked->visitablePos();
+			si32 hlp = to.dist2dSQ(from);
+			if(map.toroidal)
+			{
+				// Gate pairing compares horizontal positions across different levels.
+				to.z = from.z;
+				const auto topology = map.getTopology();
+				const auto canonicalFrom = topology.canonicalize(from);
+				const auto canonicalTo = topology.canonicalize(to);
+				if(canonicalFrom && canonicalTo)
+					hlp = int3(0, 0, 0).dist2dSQ(topology.displacement(*canonicalFrom, *canonicalTo));
+			}
 			if(hlp < best.second)
 			{
 				best.first = static_cast<int>(j);

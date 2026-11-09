@@ -19,6 +19,7 @@
 #include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
+#include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/TerrainTile.h"
@@ -222,6 +223,44 @@ TEST_F(HeroMovementTest, visionsRangeUsesToroidalDistance)
 	EXPECT_FALSE(hero->hasVisions(&target, subtype));
 	target.pos = int3(35, 35, 1);
 	EXPECT_FALSE(hero->hasVisions(&target, subtype));
+}
+
+TEST_F(HeroMovementTest, subterraneanGatePairsWithNearestAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "GatePairingTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	const auto addGate = [&](const int3 & pos, const std::string & name)
+	{
+		auto gate = std::make_shared<CGSubterraneanGate>(gameState().get());
+		gate->ID = Obj::SUBTERRANEAN_GATE;
+		gate->pos = pos;
+		gate->instanceName = name;
+		gate->appearance = appearance;
+		map()->addNewObject(gate);
+		return gate;
+	};
+	auto surface = addGate(int3(0, 5, 0), "surface_gate");
+	auto interior = addGate(int3(3, 5, 1), "interior_gate");
+	auto across = addGate(int3(35, 5, 1), "across_gate");
+
+	map()->toroidal = false;
+	CGSubterraneanGate::postInit(gameState().get());
+	EXPECT_EQ(surface->channel, interior->channel);
+	EXPECT_NE(surface->channel, across->channel);
+	map()->teleportChannels.clear();
+	for(const auto & gate : {surface, interior, across})
+		gate->channel = TeleportChannelID();
+	map()->toroidal = true;
+	CGSubterraneanGate::postInit(gameState().get());
+	EXPECT_EQ(surface->channel, across->channel);
+	EXPECT_NE(surface->channel, interior->channel);
 }
 
 TEST_F(HeroMovementTest, ObjectVisibilityUsesWrappedFootprintTiles)

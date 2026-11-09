@@ -248,7 +248,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/mapObjects/CGObjectInstance.cpp` | 91, 96, 101, 106, 134, 160, 206, 383 | unreviewed |
 | `lib/mapObjects/MapObjectDrawOrder.cpp` | 23, 24, 57, 59, 68 | unreviewed |
 | `lib/mapObjects/MapObjectDrawOrder.h` | 54 | unreviewed |
-| `lib/mapObjects/MiscObjects.cpp` | 613 | partial: subterranean-gate pairing candidate |
+| `lib/mapObjects/MiscObjects.cpp` | 613 | partial: gate pairing fixed and tested after baseline; real traversal unverified |
 | `lib/mapObjects/ObjectTemplate.cpp` | 255, 256, 260, 341, 342, 347, 350, 351, 352, 365, 372, 375, 377, 429, 430, 444, 447, 552, 553 | unreviewed |
 | `lib/mapObjects/ObjectTemplate.h` | 72 | unreviewed |
 | `lib/mapObjects/Quest.cpp` | 590, 593, 594, 595, 596, 598 | unreviewed |
