@@ -13,6 +13,8 @@
 
 #include <algorithm>
 #include <optional>
+#include <utility>
+#include <vector>
 
 /// Converts explicitly requested map positions without changing level identity.
 class MapTopology
@@ -81,6 +83,24 @@ public:
 		assert(extent > 0);
 		const int remainder = value % extent;
 		return remainder < 0 ? remainder + extent : remainder;
+	}
+
+	/// Splits a wrapped interval into non-overlapping canonical portions.
+	/// Intervals spanning a full period cover the whole axis only once.
+	static std::vector<std::pair<int, int>> splitWrappedInterval(int start, int length, int extent)
+	{
+		assert(extent > 0);
+		std::vector<std::pair<int, int>> parts;
+		if(length <= 0)
+			return parts;
+		if(length >= extent)
+			return {{0, extent}};
+		start = wrapCoordinate(start, extent);
+		const int firstLength = std::min(length, extent - start);
+		parts.emplace_back(start, firstLength);
+		if(firstLength < length)
+			parts.emplace_back(0, length - firstLength);
+		return parts;
 	}
 
 private:

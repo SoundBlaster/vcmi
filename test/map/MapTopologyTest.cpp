@@ -101,3 +101,34 @@ TEST(MapTopology, WrappedRangeRejectsInvalidLevelsAndNegativeRadius)
 	topology.forEachWrappedTileInRange(int3(0, 0, 0), -1, int3::DIST_2D, visitor);
 	EXPECT_EQ(visits, 0);
 }
+
+TEST(MapTopology, WrappedIntervalsCoverExactlyTheVisibleAxis)
+{
+	for(int extent = 3; extent <= 12; ++extent)
+		for(int start = -2 * extent; start <= 2 * extent; ++start)
+			for(int length = 0; length <= 2 * extent; ++length)
+			{
+				std::set<int> expected;
+				for(int offset = 0; offset < length; ++offset)
+					expected.insert(((start + offset) % extent + extent) % extent);
+
+				std::set<int> actual;
+				int visits = 0;
+				const auto parts = MapTopology::splitWrappedInterval(start, length, extent);
+				ASSERT_LE(parts.size(), 2);
+				for(const auto & [partStart, partLength] : parts)
+				{
+					ASSERT_GE(partStart, 0);
+					ASSERT_GT(partLength, 0);
+					ASSERT_LE(partStart + partLength, extent);
+					for(int tile = partStart; tile < partStart + partLength; ++tile)
+					{
+						actual.insert(tile);
+						++visits;
+					}
+				}
+				EXPECT_EQ(actual, expected) << "extent=" << extent << " start=" << start << " length=" << length;
+				EXPECT_EQ(visits, actual.size());
+			}
+	EXPECT_TRUE(MapTopology::splitWrappedInterval(0, -1, 10).empty());
+}

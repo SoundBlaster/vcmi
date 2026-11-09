@@ -227,25 +227,8 @@ void CMinimap::showAll(Canvas & to)
 
 		if(GAME->interface()->cb->getMapHeader()->toroidal)
 		{
-			auto split = [](int start, int length, int extent)
-			{
-				std::vector<std::pair<int, int>> parts;
-				if(length <= 0)
-					return parts;
-				if(length >= extent)
-				{
-					parts.emplace_back(0, extent);
-					return parts;
-				}
-				start = MapTopology::wrapCoordinate(start, extent);
-				const int firstLength = std::min(length, extent - start);
-				parts.emplace_back(start, firstLength);
-				if(firstLength < length)
-					parts.emplace_back(0, length - firstLength);
-				return parts;
-			};
-			for(const auto & [x, width] : split(screenArea.x, screenArea.w, mapSizes.x))
-				for(const auto & [y, height] : split(screenArea.y, screenArea.h, mapSizes.y))
+			for(const auto & [x, width] : MapTopology::splitWrappedInterval(screenArea.x, screenArea.w, mapSizes.x))
+				for(const auto & [y, height] : MapTopology::splitWrappedInterval(screenArea.y, screenArea.h, mapSizes.y))
 				{
 					Rect radar{x * pos.w / mapSizes.x, y * pos.h / mapSizes.y,
 						std::max(0, (x + width) * pos.w / mapSizes.x - x * pos.w / mapSizes.x - 1),

@@ -75,7 +75,7 @@ future opt-in design preserves it.
 | `viewport_input` | Hover and clicks on visible copies address the same canonical location. | V2, V4 | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md) |
 | `viewport_input` | Destination selection remains correct across both seams and at wide zoom. | V2, V4; destination-specific case to specify | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); destination case unspecified |
 | `movement_presentation` | Hero and boat cross as a short continuous step with correct direction and path indicator. | V3; boat-animation case to specify | partial: camera and sprite offsets | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); runtime visual check required |
-| `minimap` | Visible area and map selection remain correct across one or both seams. | V5 | partial: split radar | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); wide-view case to specify |
+| `minimap` | Visible area and map selection remain correct across one or both seams. | V5 | partial: split radar | partial: isolated interval arithmetic | pending | [minimap record](evidence/topology-minimap-2026-11-09.md); rendering and selection unverified |
 
 ## Persistence, compatibility and supported profiles
 
@@ -125,6 +125,8 @@ The isolated sight-range enumeration checks are recorded in
 [`evidence/topology-range-2026-11-09.md`](evidence/topology-range-2026-11-09.md).
 The partial ambient-audio adjustment is recorded in
 [`evidence/topology-audio-2026-11-09.md`](evidence/topology-audio-2026-11-09.md).
+The minimap interval checks are recorded in
+[`evidence/topology-minimap-2026-11-09.md`](evidence/topology-minimap-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
