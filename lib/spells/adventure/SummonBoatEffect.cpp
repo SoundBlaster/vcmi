@@ -17,6 +17,7 @@
 #include "../../mapObjects/CGHeroInstance.h"
 #include "../../mapObjects/MiscObjects.h"
 #include "../../mapping/CMap.h"
+#include "../../mapping/MapTopology.h"
 #include "../../modding/LibraryLoadContext.h"
 #include "../../networkPacks/PacksForClient.h"
 
@@ -103,8 +104,19 @@ ESpellCastResult SummonBoatEffect::applyAdventureEffects(SpellCastEnvironment * 
 
 		auto rank = [&](const CGBoat * b)
 		{
-			const int3 boatPos = b->visitablePos();
-			const int dist = std::abs(boatPos.x - heroPos.x) + std::abs(boatPos.y - heroPos.y);
+			int3 boatPos = b->visitablePos();
+			int3 offset = boatPos - heroPos;
+			if(env->getMap()->toroidal)
+			{
+				// Summon Boat compares horizontal distance even between levels.
+				boatPos.z = heroPos.z;
+				const auto topology = env->getMap()->getTopology();
+				const auto from = topology.canonicalize(heroPos);
+				const auto to = topology.canonicalize(boatPos);
+				if(from && to)
+					offset = topology.displacement(*from, *to);
+			}
+			const int dist = std::abs(offset.x) + std::abs(offset.y);
 			return std::make_pair(b->getLastHeroID() != caster->id, dist);
 		};
 

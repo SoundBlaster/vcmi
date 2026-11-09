@@ -18,6 +18,8 @@
 #include "../callback/IGameInfoCallback.h"
 #include "../callback/IGameEventCallback.h"
 #include "CGHeroInstance.h"
+#include "../mapping/CMapHeader.h"
+#include "../mapping/MapTopology.h"
 #include "../mapping/TerrainTile.h"
 #include "../networkPacks/PacksForClient.h"
 
@@ -81,10 +83,18 @@ int3 IBoatGenerator::bestLocation() const
 {
 	std::vector<int3> offsets;
 	getOutOffsets(offsets);
+	const auto * mapHeader = getObject()->cb->getMapHeader();
 
 	for (auto & offset : offsets)
 	{
 		int3 targetTile = getObject()->visitablePos() + offset;
+		if(mapHeader && mapHeader->toroidal)
+		{
+			const auto canonical = mapHeader->getTopology().canonicalize(targetTile);
+			if(!canonical)
+				continue;
+			targetTile = *canonical;
+		}
 		const TerrainTile *tile = getObject()->cb->tryGetTile(targetTile);
 
 		if(!tile)

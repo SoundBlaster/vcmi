@@ -322,7 +322,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/spells/adventure/AdventureSpellMechanics.cpp` | 109, 112 | unreviewed |
 | `lib/spells/adventure/AdventureSpellMechanics.h` | 40 | unreviewed |
 | `lib/spells/adventure/ReinforcementsEffect.cpp` | 72 | unreviewed |
-| `lib/spells/adventure/SummonBoatEffect.cpp` | 107 | unreviewed |
+| `lib/spells/adventure/SummonBoatEffect.cpp` | 107 | reviewed: nearest-boat Manhattan distance uses topology; basic server casts tested |
 | `lib/spells/adventure/TownPortalEffect.cpp` | 86 | unreviewed |
 | `lib/spells/adventure/TownRelatedAdventureSpellEffect.cpp` | 65, 67, 71, 75 | partial: nearest-town helper corrected |
 | `lib/texts/TextOperations.cpp` | 357, 478, 512 | unreviewed |
