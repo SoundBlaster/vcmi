@@ -869,6 +869,28 @@ TEST_F(HeroMovementTest, PathfinderHonorsSourceObjectExitDirectionAcrossSeam)
 	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
 }
 
+TEST_F(HeroMovementTest, HeroOnFootCannotClaimSailingLayerAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), destination);
+}
+
 TEST_F(HeroMovementTest, HeroWithMovementBonusesUsesAirAndWaterLayersAcrossSeam)
 {
 	const PlayerColor player(0);

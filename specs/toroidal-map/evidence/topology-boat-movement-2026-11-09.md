@@ -50,3 +50,13 @@ This does not change the server's bounded-map behavior or establish all shore
 configurations, client animation, or multiplayer behavior.
 The full local `vcmitest` run after this change passed 1,372 tests from 224
 suites, with three disabled (`full-suite-boat-coast-fix.log` on TB5).
+
+On 2026-11-10, a hero on foot could request `SAIL` on a land-to-land seam
+step, and the server accepted it. Standard toroidal movement now requires a
+matching sailing vehicle or a non-transit embark onto one for that layer.
+The new test verifies the invalid request leaves the hero and points unchanged
+and that a subsequent `LAND` step succeeds. It passed with five legal and
+blocked boat/aviation scenarios; the full local suite passed 1,380 tests from
+224 suites, with three disabled (`full-suite-invalid-sail.log`). The build
+used `0660a28` plus this change (`invalid-sail-after-build.log` on TB5).
+This does not establish all vehicle types, layer transitions or multiplayer.
