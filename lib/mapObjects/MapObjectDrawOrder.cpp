@@ -13,12 +13,46 @@
 
 #include "ObjectTemplate.h"
 #include "../mapping/CMap.h"
+#include "../mapping/MapTopology.h"
+
+static int3 objectTile(const CMap & map, const CGObjectInstance * object, const int3 & tile)
+{
+	if(!map.toroidal)
+		return tile;
+	const auto anchor = object->anchorPos();
+	return int3(anchor.x - MapTopology::wrapCoordinate(anchor.x - tile.x, map.width),
+		anchor.y - MapTopology::wrapCoordinate(anchor.y - tile.y, map.height), tile.z);
+}
+
+ui8 MapObjectDrawOrder::layerAt(const CMap & map, const CGObjectInstance * object, const int3 & tile)
+{
+	return object->drawLayerAt(objectTile(map, object, tile));
+}
 
 /// Whether some tile covered by both objects has a lower layer of the first object than of the second one
 static bool isLowerInAnyTile(const CMap & map, const CGObjectInstance * object, const CGObjectInstance * other)
 {
 	const int3 anchor = object->anchorPos();
 	const int3 otherAnchor = other->anchorPos();
+	if(map.toroidal)
+	{
+		if(anchor.z != otherAnchor.z)
+			return false;
+		for(int x = 0; x < object->getWidth(); ++x)
+			for(int y = 0; y < object->getHeight(); ++y)
+			{
+				const int3 local = anchor - int3(x, y, 0);
+				const auto tile = map.getTopology().canonicalize(local);
+				if(!tile)
+					continue;
+				const int3 otherLocal = objectTile(map, other, *tile);
+				const int3 offset = otherAnchor - otherLocal;
+				if(offset.x < other->getWidth() && offset.y < other->getHeight()
+					&& object->drawLayerAt(local) < other->drawLayerAt(otherLocal))
+					return true;
+			}
+		return false;
+	}
 
 	const int left = std::max(anchor.x - object->getWidth() + 1, otherAnchor.x - other->getWidth() + 1);
 	const int right = std::min(anchor.x, otherAnchor.x);
@@ -68,8 +102,8 @@ bool MapObjectDrawOrder::isSpecialGround(const CGObjectInstance * object)
 
 bool MapObjectDrawOrder::goesBelow(const CMap & map, const CGObjectInstance * object, const CGObjectInstance * previous, const int3 & tile)
 {
-	const ui8 layer = object->drawLayerAt(tile);
-	const ui8 previousLayer = previous->drawLayerAt(tile);
+	const ui8 layer = layerAt(map, object, tile);
+	const ui8 previousLayer = layerAt(map, previous, tile);
 
 	return layer < previousLayer || (layer == previousLayer && isDrawnBelow(map, object, previous));
 }

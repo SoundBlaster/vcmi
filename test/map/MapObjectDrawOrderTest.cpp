@@ -54,16 +54,16 @@ protected:
 	}
 
 	/// Objects are put on the tile one after another, like H3 does when it loads the map
-	std::string draw(const std::vector<const CGObjectInstance *> & placed, int slotOffsetY = 0)
+	std::string draw(const std::vector<const CGObjectInstance *> & placed, int slotOffsetY = 0, const int3 & drawTile = tile)
 	{
 		std::vector<const CGObjectInstance *> onTile;
 
 		for(const auto * object : placed)
-			onTile.insert(MapObjectDrawOrder::findInsertPosition(onTile, map, object, tile, [](const CGObjectInstance * entry) { return entry; }), object);
+			onTile.insert(MapObjectDrawOrder::findInsertPosition(onTile, map, object, drawTile, [](const CGObjectInstance * entry) { return entry; }), object);
 
 		std::string result;
 
-		for(const auto & step : MapObjectDrawOrder::getDrawSteps(onTile, tile, [](const CGObjectInstance * entry) { return entry; }, [&](const CGObjectInstance *) { return Point(0, slotOffsetY); }))
+		for(const auto & step : MapObjectDrawOrder::getDrawSteps(onTile, map, drawTile, [](const CGObjectInstance * entry) { return entry; }, [&](const CGObjectInstance *) { return Point(0, slotOffsetY); }))
 		{
 			const char name = static_cast<char>(step.object->id.getNum());
 			result += step.isShadow ? static_cast<char>(std::tolower(name)) : name;
@@ -129,6 +129,17 @@ TEST_F(MapObjectDrawOrderTest, TopOfHeroIsBehindTreeCrown)
 
 	// the tile is above the row on which the hero stands, so only his head reaches it
 	EXPECT_EQ(draw({tree, hero}, MapObjectDrawOrder::fixedSlotBodyRowLimit), "tTH");
+}
+
+TEST_F(MapObjectDrawOrderTest, DrawOrderUsesObjectLayersAcrossToroidalSeam)
+{
+	map.width = 10;
+	map.height = 10;
+	map.toroidal = true;
+	const auto * tree = addObject('T', R"([ "V", "B" ])", int3(0, 0, 0));
+	const auto * rock = addObject('R', R"([ "B" ])", int3(0, 9, 0));
+	EXPECT_EQ(draw({tree, rock}, 0, int3(0, 9, 0)), "rtRT");
+	EXPECT_EQ(draw({rock, tree}, 0, int3(0, 9, 0)), "rtRT");
 }
 
 TEST_F(MapObjectDrawOrderTest, RejectsStaticOccupiedFootprintsAcrossToroidalSeams)

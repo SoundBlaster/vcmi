@@ -31,6 +31,9 @@ namespace MapObjectDrawOrder
 	/// Objects that change the terrain under them (cursed ground, magic plains...), drawn below all other objects
 	DLL_LINKAGE bool isSpecialGround(const CGObjectInstance * object);
 
+	/// Layer occupied by an object at a canonical tile.
+	DLL_LINKAGE ui8 layerAt(const CMap & map, const CGObjectInstance * object, const int3 & tile);
+
 	/// Whether the object stamped onto a tile goes below the one that is already there
 	DLL_LINKAGE bool goesBelow(const CMap & map, const CGObjectInstance * object, const CGObjectInstance * previous, const int3 & tile);
 
@@ -66,7 +69,7 @@ namespace MapObjectDrawOrder
 
 	/// Images of one tile in H3 draw order. The entries must be ordered by findInsertPosition
 	template<typename Entries, typename GetObject, typename SlotOffset>
-	DrawSteps getDrawSteps(const Entries & entries, const int3 & tile, GetObject getObject, SlotOffset slotOffset)
+	DrawSteps getDrawSteps(const Entries & entries, const CMap & map, const int3 & tile, GetObject getObject, SlotOffset slotOffset)
 	{
 		// Like in H3 heroes and boats are drawn between fixed layers of the tile. Each is kept
 		// with its horizontal offset, which orders neighbours from left to right
@@ -98,7 +101,7 @@ namespace MapObjectDrawOrder
 		{
 			for(const auto * object : ordered)
 			{
-				const ui8 layer = object->drawLayerAt(tile);
+				const ui8 layer = layerAt(map, object, tile);
 
 				if(layer >= lowest && layer <= highest)
 					steps.push_back({object, false});
@@ -136,9 +139,9 @@ namespace MapObjectDrawOrder
 
 	/// Calls drawShadow(object) or drawBody(object) for every image of the tile, see getDrawSteps
 	template<typename Entries, typename GetObject, typename SlotOffset, typename DrawShadow, typename DrawBody>
-	void drawTile(const Entries & entries, const int3 & tile, GetObject getObject, SlotOffset slotOffset, DrawShadow drawShadow, DrawBody drawBody)
+	void drawTile(const Entries & entries, const CMap & map, const int3 & tile, GetObject getObject, SlotOffset slotOffset, DrawShadow drawShadow, DrawBody drawBody)
 	{
-		for(const auto & step : getDrawSteps(entries, tile, getObject, slotOffset))
+		for(const auto & step : getDrawSteps(entries, map, tile, getObject, slotOffset))
 		{
 			if(step.isShadow)
 				drawShadow(step.object);

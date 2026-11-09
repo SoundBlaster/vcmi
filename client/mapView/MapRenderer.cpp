@@ -620,7 +620,7 @@ void MapRendererObjects::renderTile(IMapRendererContext & context, Canvas & targ
 	const CGObjectInstance * activeHero = nullptr;
 	bool activeHeroCovered = false;
 
-	MapObjectDrawOrder::drawTile(context.getObjects(coordinates), coordinates,
+	MapObjectDrawOrder::drawTile(context.getObjects(coordinates), *GAME->map().getMap(), coordinates,
 		[&](ObjectInstanceID objectID)
 		{
 			const auto * objectInstance = context.getObject(objectID);

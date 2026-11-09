@@ -569,7 +569,7 @@ void MapHandler::drawObjects(QPainter & painter, const QRectF & section, int z, 
 				}
 			}
 
-			MapObjectDrawOrder::drawTile(entries, tile,
+			MapObjectDrawOrder::drawTile(entries, *map, tile,
 				[](const ObjectRect & entry) { return entry.obj; },
 				[&](const CGObjectInstance * obj) { return Point((obj->anchorPos().x - x) * tileSize, (obj->anchorPos().y - y) * tileSize); },
 				[&](const CGObjectInstance * obj) { drawObjectTile(painter, obj, tile, target, true, locked.count(obj)); },
