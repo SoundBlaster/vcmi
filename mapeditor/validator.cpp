@@ -87,6 +87,10 @@ std::set<Validator::Issue> Validator::validate(const CMap * map)
 			if(!o)
 				continue;
 
+			if(map->hasUnsupportedToroidalFootprint(*o))
+				issues.emplace(tr("Object %1 crosses a map seam. Move it fully inside the map before using toroidal topology.")
+					.arg(o->instanceName.c_str()), true);
+
 			if(o->isVisitable() && !map->isInTheMap(o->visitablePos()))
 				issues.emplace(tr("Object's %1 visitable position %2 is outside of the map bounds")
 					.arg(o->instanceName.c_str())

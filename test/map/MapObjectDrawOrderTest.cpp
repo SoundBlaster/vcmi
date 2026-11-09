@@ -129,3 +129,26 @@ TEST_F(MapObjectDrawOrderTest, TopOfHeroIsBehindTreeCrown)
 	// the tile is above the row on which the hero stands, so only his head reaches it
 	EXPECT_EQ(draw({tree, hero}, MapObjectDrawOrder::fixedSlotBodyRowLimit), "tTH");
 }
+
+TEST_F(MapObjectDrawOrderTest, RejectsStaticOccupiedFootprintsAcrossToroidalSeams)
+{
+	map.width = 10;
+	map.height = 10;
+	map.toroidal = true;
+
+	const auto * inside = addObject('I', R"([ "BB", "BB" ])", int3(1, 1, 0));
+	const auto * west = addObject('W', R"([ "BB" ])", int3(0, 5, 0));
+	const auto * north = addObject('N', R"([ "V", "B" ])", int3(5, 0, 0));
+	const auto * corner = addObject('C', R"([ "VB", "BB" ])", int3(0, 0, 0));
+	const auto * blank = addObject('E', R"([ "0B" ])", int3(0, 5, 0));
+	const auto * hero = addObject('H', R"([ "BB" ])", int3(0, 5, 0), 0, Obj::HERO);
+
+	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*inside));
+	EXPECT_TRUE(map.hasUnsupportedToroidalFootprint(*west));
+	EXPECT_TRUE(map.hasUnsupportedToroidalFootprint(*north));
+	EXPECT_TRUE(map.hasUnsupportedToroidalFootprint(*corner));
+	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*blank));
+	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*hero));
+	map.toroidal = false;
+	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*corner));
+}

@@ -265,6 +265,21 @@ bool CMap::isHoleAt(const int3 & pos) const
 	return holePositions.contains(pos);
 }
 
+bool CMap::hasUnsupportedToroidalFootprint(const CGObjectInstance & object) const
+{
+	if(!toroidal || object.ID == Obj::HERO || object.ID == Obj::BOAT)
+		return false;
+
+	for(int fx = 0; fx < object.getWidth(); ++fx)
+		for(int fy = 0; fy < object.getHeight(); ++fy)
+		{
+			const int3 tile = object.anchorPos() - int3(fx, fy, 0);
+			if(!isInTheMap(tile) && (object.coveringAt(tile) || object.blockingAt(tile) || object.visitableAt(tile)))
+				return true;
+		}
+	return false;
+}
+
 void CMap::hideObject(CGObjectInstance * obj)
 {
 	if(obj->ID == Obj::HOLE)

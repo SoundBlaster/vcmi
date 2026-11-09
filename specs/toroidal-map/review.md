@@ -99,10 +99,13 @@ establishes the intended arithmetic only; it is not runtime evidence.
 
 ## Open decisions and boundaries of the pilot
 
-1. **Seam-spanning static objects:** decide whether an object may physically
-   occupy both sides of a seam. Until then, authoring can prohibit such
-   placement while rendering objects located near a seam correctly. Hero and
-   boat movement across seams remains required.
+1. **Seam-spanning static objects:** provisional pilot restriction: a static
+   object's visible, blocking or visitable cells must stay within the map.
+   The editor reports violations and the JSON map writer and reader reject
+   them. Empty mask cells outside the rectangle are allowed. This does not
+   implement objects occupying both sides of a seam; decide separately whether
+   to add that support. Hero and boat movement across seams remains required
+   and is not established by the exception from this validation.
 2. **Minimum map dimensions:** the initial file-format implementation requires
    width and height of at least 3. Extents of 1 or 2 make distinct directions
    lead to the same canonical cell; supporting them remains a separate decision.

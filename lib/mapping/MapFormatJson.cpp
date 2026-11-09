@@ -885,6 +885,9 @@ void CMapLoaderJson::readMap()
 	map->initTerrain();
 	readTerrain();
 	readObjects();
+	for(const auto & object : map->objects)
+		if(object && map->hasUnsupportedToroidalFootprint(*object))
+			throw std::runtime_error("Toroidal map object crosses an unsupported seam: " + object->instanceName);
 	readScript();
 
 	map->calculateGuardingGreaturePositions();
@@ -1400,6 +1403,9 @@ void CMapSaverJson::addToArchive(const JsonNode & data, const std::string & file
 
 void CMapSaverJson::saveMap(const std::unique_ptr<CMap>& map)
 {
+	for(const auto & object : map->objects)
+		if(object && map->hasUnsupportedToroidalFootprint(*object))
+			throw std::runtime_error("Toroidal map object crosses an unsupported seam: " + object->instanceName);
 	this->map = map.get();
 	this->mapHeader = this->map;
 	writeHeader();

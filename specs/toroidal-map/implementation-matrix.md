@@ -70,7 +70,7 @@ future opt-in design preserves it.
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `rendering` | Continuous terrain, roads, rivers, objects, overlays and fog at every edge and corner. | V1 | partial: viewport and renderer mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); static seam-spanning objects need work |
+| `rendering` | Continuous terrain, roads, rivers, objects, overlays and fog at every edge and corner. | V1 | partial: viewport and renderer mapping; static seam-spanning objects prohibited in the pilot | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); restriction and visual continuity need testing |
 | `rendering` | View spanning multiple map periods renders correct copies without erroneous duplicates. | V4 | partial: repeated tile mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); no visual run |
 | `viewport_input` | Hover and clicks on visible copies address the same canonical location. | V2, V4 | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md) |
 | `viewport_input` | Destination selection remains correct across both seams and at wide zoom. | V2, V4; destination-specific case to specify | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); destination case unspecified |
@@ -85,7 +85,7 @@ future opt-in design preserves it.
 | `persistence_and_network` | Supported multiplayer peers agree on movement and visibility. | P3 | not started | not run | pending | none |
 | `persistence_and_network` | Unsupported peers or readers cannot silently interpret topology incorrectly. | P4 | partial: versioned format and lobby start guard | not run | pending | [format record](evidence/topology-format-2026-11-09.md); behavior unverified |
 | `bounded_compatibility` | Existing maps and saves remain bounded; toroidal behavior is opt-in. | P2 | partial: versioned default | not run | pending | [format record](evidence/topology-format-2026-11-09.md); no legacy regression execution |
-| `authoring` | A supported authored map can have coherent passable seams. | E1 | partial: editor topology setting | not run | pending | [editor record](evidence/topology-editor-2026-11-09.md); seam validation and runtime unverified |
+| `authoring` | A supported authored map can have coherent passable seams. | E1 | partial: editor topology setting and static-footprint restriction | not run | pending | [editor record](evidence/topology-editor-2026-11-09.md); terrain seam validation and runtime unverified |
 | `authoring` | Any supported random generator respects topology. | E2 | not started | not run | pending | none; generator support is conditional |
 | `ai` | Each advertised supported AI can plan and act using legal wrapped routes. | A1 | partial: Nullkiller2 neighborhood and exploration heuristics | not run | pending | [AI record](evidence/topology-ai-2026-11-09.md); full AI audit and profile support undecided |
 | `ai` | Unsupported AI profiles are identified as unsupported. | A2 | not started | not run | pending | none |
@@ -117,6 +117,8 @@ The map-editor build is recorded in
 [`evidence/topology-editor-2026-11-09.md`](evidence/topology-editor-2026-11-09.md).
 The AI and combat-direction build is recorded in
 [`evidence/topology-ai-2026-11-09.md`](evidence/topology-ai-2026-11-09.md).
+The static seam-object restriction and its unexecuted integration test are recorded in
+[`evidence/topology-seam-validation-2026-11-09.md`](evidence/topology-seam-validation-2026-11-09.md).
 No gameplay scenario has been executed. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
