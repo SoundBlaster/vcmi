@@ -15,7 +15,7 @@
 #include "../mapping/CMap.h"
 #include "../mapping/MapTopology.h"
 
-static int3 objectTile(const CMap & map, const CGObjectInstance * object, const int3 & tile)
+int3 MapObjectDrawOrder::tileForObject(const CMap & map, const CGObjectInstance * object, const int3 & tile)
 {
 	if(!map.toroidal)
 		return tile;
@@ -26,7 +26,7 @@ static int3 objectTile(const CMap & map, const CGObjectInstance * object, const 
 
 ui8 MapObjectDrawOrder::layerAt(const CMap & map, const CGObjectInstance * object, const int3 & tile)
 {
-	return object->drawLayerAt(objectTile(map, object, tile));
+	return object->drawLayerAt(tileForObject(map, object, tile));
 }
 
 /// Whether some tile covered by both objects has a lower layer of the first object than of the second one
@@ -45,7 +45,7 @@ static bool isLowerInAnyTile(const CMap & map, const CGObjectInstance * object, 
 				const auto tile = map.getTopology().canonicalize(local);
 				if(!tile)
 					continue;
-				const int3 otherLocal = objectTile(map, other, *tile);
+				const int3 otherLocal = MapObjectDrawOrder::tileForObject(map, other, *tile);
 				const int3 offset = otherAnchor - otherLocal;
 				if(offset.x < other->getWidth() && offset.y < other->getHeight()
 					&& object->drawLayerAt(local) < other->drawLayerAt(otherLocal))

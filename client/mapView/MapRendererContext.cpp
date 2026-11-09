@@ -206,13 +206,8 @@ size_t MapRendererBaseContext::objectGroupIndex(ObjectInstanceID objectID) const
 Point MapRendererBaseContext::objectImageOffset(ObjectInstanceID objectID, const int3 & coordinates) const
 {
 	const CGObjectInstance * object = getObject(objectID);
-	int3 offsetTiles(object->anchorPos() - coordinates);
 	const auto * map = GAME->map().getMap();
-	if(map->toroidal && MapObjectDrawOrder::usesFixedDrawSlot(object))
-	{
-		offsetTiles.x = MapTopology::wrapCoordinate(offsetTiles.x, map->width);
-		offsetTiles.y = MapTopology::wrapCoordinate(offsetTiles.y, map->height);
-	}
+	const int3 offsetTiles = object->anchorPos() - MapObjectDrawOrder::tileForObject(*map, object, coordinates);
 	return Point(offsetTiles) * Point(32, 32);
 }
 

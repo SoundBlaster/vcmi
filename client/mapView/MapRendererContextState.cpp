@@ -78,7 +78,7 @@ void MapRendererContextState::updateVisibleObjects(const int3 & tile)
 	{
 		const auto * object = getMapObject(objectID);
 
-		if(object && object->coveringAt(tile))
+		if(object && object->coveringAt(MapObjectDrawOrder::tileForObject(*GAME->map().getMap(), object, tile)))
 			visible.push_back(objectID);
 	}
 
@@ -120,13 +120,16 @@ void MapRendererContextState::stampObject(const CGObjectInstance * obj, bool ord
 				continue;
 			}
 
-			if(!GAME->interface()->cb->isInTheMap(currTile))
+			const CMap & map = *GAME->map().getMap();
+			const auto tile = map.getTopology().canonicalize(currTile);
+			if(!tile)
 				continue;
 
 			// like in H3 every cell of the object takes part in ordering, even if nothing is drawn there
-			const CMap & map = *GAME->map().getMap();
-			auto & ordered = orderedObjects[currTile];
-			usedTiles[obj->id].push_back(currTile);
+			auto & ordered = orderedObjects[*tile];
+			if(vstd::contains(ordered, obj->id))
+				continue;
+			usedTiles[obj->id].push_back(*tile);
 
 			if(!orderTiles)
 			{
@@ -134,10 +137,10 @@ void MapRendererContextState::stampObject(const CGObjectInstance * obj, bool ord
 				continue;
 			}
 
-			ordered.insert(MapObjectDrawOrder::findInsertPosition(ordered, map, obj, currTile, [&](ObjectInstanceID id) { return map.getObject(id); }), obj->id);
+			ordered.insert(MapObjectDrawOrder::findInsertPosition(ordered, map, obj, *tile, [&](ObjectInstanceID id) { return map.getObject(id); }), obj->id);
 
 			if(obj->coveringAt(currTile))
-				updateVisibleObjects(currTile);
+				updateVisibleObjects(*tile);
 		}
 	}
 }

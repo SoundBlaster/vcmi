@@ -31,6 +31,9 @@ namespace MapObjectDrawOrder
 	/// Objects that change the terrain under them (cursed ground, magic plains...), drawn below all other objects
 	DLL_LINKAGE bool isSpecialGround(const CGObjectInstance * object);
 
+	/// Position of a map tile in the object's unwrapped footprint.
+	DLL_LINKAGE int3 tileForObject(const CMap & map, const CGObjectInstance * object, const int3 & tile);
+
 	/// Layer occupied by an object at a canonical tile.
 	DLL_LINKAGE ui8 layerAt(const CMap & map, const CGObjectInstance * object, const int3 & tile);
 

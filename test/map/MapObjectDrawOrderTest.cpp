@@ -138,6 +138,8 @@ TEST_F(MapObjectDrawOrderTest, DrawOrderUsesObjectLayersAcrossToroidalSeam)
 	map.toroidal = true;
 	const auto * tree = addObject('T', R"([ "V", "B" ])", int3(0, 0, 0));
 	const auto * rock = addObject('R', R"([ "B" ])", int3(0, 9, 0));
+	EXPECT_EQ(MapObjectDrawOrder::tileForObject(map, tree, int3(0, 9, 0)), int3(0, -1, 0));
+	EXPECT_EQ(MapObjectDrawOrder::tileForObject(map, rock, int3(0, 9, 0)), int3(0, 9, 0));
 	EXPECT_EQ(draw({tree, rock}, 0, int3(0, 9, 0)), "rtRT");
 	EXPECT_EQ(draw({rock, tree}, 0, int3(0, 9, 0)), "rtRT");
 }
