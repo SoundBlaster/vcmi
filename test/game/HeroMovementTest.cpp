@@ -19,6 +19,7 @@
 #include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
+#include "../../lib/mapObjects/CGResource.h"
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
@@ -416,6 +417,42 @@ TEST_F(HeroMovementTest, SeamSpanningBlockerPreventsMovementOnBothSides)
 	ASSERT_EQ(hero->visitablePos(), int3(1, 10, 0));
 	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 10, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->visitablePos(), int3(1, 10, 0));
+}
+
+TEST_F(HeroMovementTest, CollectsResourceWithVisitableTileAcrossSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(35, 10, 0), HeroTypeID(0), player)
+		.resource(int3(15, 15, 0), GameResID::GOLD, 10);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	auto * resource = findFirst<CGResource>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(resource, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(34, 10, 0));
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A0" ] })";
+	JsonNode definition(text.data(), text.size(), "SeamResourceTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	map()->hideObject(resource);
+	resource->pos = int3(0, 10, 0);
+	resource->appearance = appearance;
+	map()->showObject(resource);
+	const int3 destination(35, 10, 0);
+	ASSERT_EQ(resource->visitablePos(), int3(-1, 10, 0));
+	ASSERT_EQ(map()->getTile(destination).topVisitableObj(), resource->id);
+	const auto id = resource->id;
+	const auto gold = gameState()->players.at(player).resources[GameResID::GOLD];
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold + 1000);
+	EXPECT_EQ(map()->getObject(id), nullptr);
 }
 
 TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)

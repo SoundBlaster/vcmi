@@ -32,3 +32,14 @@ server rejects entry from each neighboring side. Both this test and the tile
 query test passed (`seam-blocker-tests.log`). It uses an in-memory fixture
 that bypasses the authored-map restriction; it is not a test of forest art,
 random template generation, or a diagonal opening around the blocker.
+
+`HeroMovementTest.CollectsResourceWithVisitableTileAcrossSeam` moves an actual
+resource onto a synthetic footprint whose raw visitable coordinate is
+`(-1,10,0)` and whose canonical tile is `(35,10,0)`. The game-state occupancy
+identifies the resource at the canonical tile, and a server movement into it
+collects and removes the resource. The broader related run passed 36 tests
+(`seam-visitable-related-tests.log`). `visitablePos()` itself still returns the
+raw coordinate in this case; a global change would need to account for object
+construction before the editor has attached a map. The single resource check
+does not prove that other consumers handle this raw value, and the authored
+static-object restriction remains in force.
