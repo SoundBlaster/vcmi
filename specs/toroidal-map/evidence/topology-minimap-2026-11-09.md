@@ -48,3 +48,10 @@ and compared that result over several map sizes, minimap sizes and pixels;
 the focused minimap and demo tests passed (`minimap-legacy-rounding-tests.log`)
 after rebuilding client and test targets (`minimap-legacy-rounding-build.log`).
 The full-suite result predates that follow-up.
+
+On 2026-11-10, the complete `vcmitest` suite was rerun from `cmake/bin`
+after the bounded-rounding follow-up and subsequent gameplay tests: 1,371
+tests from 224 suites passed, with three disabled. The build was made from
+`6f0cac1` plus the subsequently committed minimum-map test (`d3594c1`);
+the TB5 log is `full-suite-corner-and-minimum.log`. This local result does not
+replace GUI verification of minimap clicks or evidence from other platforms.
