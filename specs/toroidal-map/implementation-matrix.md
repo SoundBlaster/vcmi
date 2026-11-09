@@ -74,6 +74,7 @@ future opt-in design preserves it.
 | `rendering` | View spanning multiple map periods renders correct copies without erroneous duplicates. | V4 | partial: repeated tile mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); no visual run |
 | `viewport_input` | Hover and clicks on visible copies address the same canonical location. | V2, V4 | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md) |
 | `viewport_input` | Destination selection remains correct across both seams and at wide zoom. | V2, V4; destination-specific case to specify | partial: coordinate mapping | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); destination case unspecified |
+| `viewport_input` | Directional hero shortcuts select the adjacent tile across a seam. | directional-input case to specify | partial: wrapped destination before path selection | partial: topology and movement logic tests; handler not exercised | pending | [directional input record](evidence/topology-directional-input-2026-11-09.md); interactive check required |
 | `movement_presentation` | Hero and boat cross as a short continuous step with correct direction and path indicator. | V3; boat-animation case to specify | partial: camera and sprite offsets | not run | pending | [viewport record](evidence/topology-viewport-2026-11-09.md); runtime visual check required |
 | `minimap` | Visible area and map selection remain correct across one or both seams. | V5 | partial: split radar | partial: interval arithmetic and spectator and human-player displays | pending | [player GUI record](evidence/topology-gui-player-2026-11-09.md); selection and full boundary coverage unverified |
 
@@ -135,6 +136,8 @@ The spectator viewport observation is recorded in
 [`evidence/topology-gui-spectator-2026-11-09.md`](evidence/topology-gui-spectator-2026-11-09.md).
 The later human-player viewport observation is recorded in
 [`evidence/topology-gui-player-2026-11-09.md`](evidence/topology-gui-player-2026-11-09.md).
+The directional hero input change is recorded in
+[`evidence/topology-directional-input-2026-11-09.md`](evidence/topology-directional-input-2026-11-09.md).
 The wrapped terrain-brush checks are recorded in
 [`evidence/topology-terrain-brush-2026-11-09.md`](evidence/topology-terrain-brush-2026-11-09.md).
 The road and river brush checks are recorded in

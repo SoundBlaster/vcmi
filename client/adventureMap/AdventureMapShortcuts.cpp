@@ -44,6 +44,7 @@
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/MapTopology.h"
 #include "../../lib/pathfinder/CGPathNode.h"
 #include "../../lib/mapObjectConstructors/CObjectClassesHandler.h"
 
@@ -638,16 +639,17 @@ void AdventureMapShortcuts::moveHeroDirectional(const Point & direction)
 	if (GAME->map().hasOngoingAnimations())
 		return;
 
-	int3 dst = h->visitablePos() + int3(direction.x, direction.y, 0);
+	const auto dst = GAME->interface()->cb->getMapHeader()->getTopology().canonicalize(
+		h->visitablePos() + int3(direction.x, direction.y, 0));
 
-	if (!GAME->map().isInMap((dst)))
+	if (!dst)
 		return;
 
 	EPathfindingLayer destinationLayer = EPathfindingLayer::AUTO;
 	if (h->inBoat() && h->getBoat()->layer == EPathfindingLayer::AVIATE)
 		destinationLayer = EPathfindingLayer::AVIATE;
 
-	if (!GAME->interface()->localState->setPath(h, dst, destinationLayer))
+	if (!GAME->interface()->localState->setPath(h, *dst, destinationLayer))
 		return;
 
 	const CGPath & path = GAME->interface()->localState->getPath(h);
