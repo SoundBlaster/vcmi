@@ -690,6 +690,9 @@ TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
 
 	map()->getTile(west).terrainType = TerrainId::GRASS;
 	hero->setMovementPoints(3000);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(west), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), east);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
 	const int disembarkRemaining = routeRemaining(west, EPathfindingLayer::LAND);
 	ASSERT_GE(disembarkRemaining, 0);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(west), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
@@ -915,6 +918,11 @@ TEST_F(HeroMovementTest, HeroWithMovementBonusesUsesAirAndWaterLayersAcrossSeam)
 	hero->setMovementPoints(3000);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
 	EXPECT_EQ(hero->visitablePos(), origin);
+	map()->getTile(destination).terrainType = TerrainId::GRASS;
+	hero->setMovementPoints(3000);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::WATER));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
 }
 
 TEST_F(HeroMovementTest, HeroCrossesMinimumToroidalMapCorner)
@@ -1013,6 +1021,10 @@ TEST_F(HeroMovementTest, BoatCannotCutAcrossLandAtToroidalCorner)
 	pathfinder.calculatePaths();
 	EXPECT_FALSE(paths.getNode(destination, EPathfindingLayer::SAIL)->reachable());
 	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	EXPECT_TRUE(hero->inBoat());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->visitablePos(), origin);
 	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
 	EXPECT_TRUE(hero->inBoat());

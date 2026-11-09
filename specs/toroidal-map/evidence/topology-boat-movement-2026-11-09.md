@@ -60,3 +60,15 @@ blocked boat/aviation scenarios; the full local suite passed 1,380 tests from
 224 suites, with three disabled (`full-suite-invalid-sail.log`). The build
 used `0660a28` plus this change (`invalid-sail-after-build.log` on TB5).
 This does not establish all vehicle types, layer transitions or multiplayer.
+
+The blocked-corner test then exposed another bypass: a sailing hero could
+request the water destination as `LAND`, causing the server to accept the
+otherwise prohibited diagonal step. Standard toroidal moves now require
+`LAND` destinations to be land and `SAIL`/`WATER` destinations to be water,
+matching the pathfinder's layer/terrain classification. Tests verify all
+three mismatches are rejected without movement or cost, alongside legal
+disembarking and flight/water walking. Four focused tests and the complete
+local suite passed; the latter ran 1,380 tests with three disabled
+(`full-suite-layer-terrain.log` on TB5). Client, server and test targets
+were built from `9112115` plus this change (`layer-terrain-after-build.log`).
+Vehicle-specific rules and multiplayer remain only partially covered.
