@@ -1,5 +1,18 @@
 # Adapted toroidal demonstration map
 
+## Later client launch attempt
+
+After the observations below, a freshly copied and ad-hoc signed lab client
+was launched. It remained running for more than 50 minutes without reaching
+an observable game window or producing a new client log. A macOS `sample`
+showed its main thread in `dyld` while opening a dependency; `lsof` showed
+the executable and `dyld` but no loaded game libraries. Computer Use listed
+the process as running. These observations do not establish which file was
+being opened or whether an OS permission prompt caused the stall. This
+attempt does not verify the newer source changes in a running client.
+
+## Initial fixture and GUI observations
+
 `test/mock/ToroidalDemoMap.h` defines a deliberately sparse 36×36 grass map
 with two players, two towns, and resources positioned to exercise both seams
 and one corner. It is an experimental mechanics fixture, not a balanced game
