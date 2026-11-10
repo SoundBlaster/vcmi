@@ -678,11 +678,69 @@ TEST_F(HeroMovementTest, CornerMovementRevealsOnlyTheMovingTeamAndLevel)
 	ASSERT_NE(hero, nullptr);
 	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
 	hero->setMovementPoints(3000);
-	GameHandlerTestServer server(gameState(), movingPlayer);
+	const auto snapshot = gameState()->saveToMemory();
+	std::vector<std::shared_ptr<CGameState>> replicas;
+	for(int i = 0; i < 2; ++i)
+	{
+		auto replica = std::make_shared<CGameState>();
+		replica->preInit(LIBRARY);
+		replica->loadFromMemory(snapshot);
+		replicas.push_back(std::move(replica));
+	}
+	class Capture final : public INetworkConnection
+	{
+	public:
+		void sendPacket(const std::vector<std::byte> & packet) override { bytes = packet; }
+		void setAsyncWritesEnabled(bool) override {}
+		void close() override {}
+		std::vector<std::byte> bytes;
+	};
+	class MirrorServer final : public GameHandlerTestServer
+	{
+	public:
+		MirrorServer(const std::shared_ptr<CGameState> & state, PlayerColor player, const std::vector<std::shared_ptr<CGameState>> & replicas)
+			: GameHandlerTestServer(state, player), replicas(replicas), transport(std::make_shared<Capture>()), sender(transport), receiver(transport)
+		{
+			sender.setSerializationVersion(ESerializationVersion::CURRENT);
+			receiver.setSerializationVersion(ESerializationVersion::CURRENT);
+		}
+		void applyPack(CPackForClient & pack) override
+		{
+			if(dynamic_cast<TryMoveHero *>(&pack))
+			{
+				sender.sendPack(pack);
+				for(const auto & replica : replicas)
+				{
+					receiver.setCallback(*replica);
+					auto decoded = receiver.retrievePack(transport->bytes);
+					if(auto * movement = dynamic_cast<TryMoveHero *>(decoded.get()))
+					{
+						replica->apply(*movement);
+						++delivered;
+					}
+					else
+						ADD_FAILURE() << "Expected TryMoveHero after network decoding";
+				}
+			}
+			GameHandlerTestServer::applyPack(pack);
+		}
+		int delivered = 0;
+	private:
+		std::vector<std::shared_ptr<CGameState>> replicas;
+		std::shared_ptr<Capture> transport;
+		GameConnection sender;
+		GameConnection receiver;
+	} server(gameState(), movingPlayer, replicas);
 	CGameHandler handler(server, gameState());
 	const int3 destination(35, 35, 0);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, movingPlayer, EPathfindingLayer::LAND));
 	ASSERT_EQ(hero->visitablePos(), destination);
+	ASSERT_EQ(server.delivered, 2);
+	for(const auto & replica : replicas)
+	{
+		ASSERT_TRUE(replica->getMap().toroidal);
+		ASSERT_EQ(replica->getHero(hero->id)->visitablePos(), destination);
+	}
 	const int radius = hero->getSightRadius();
 	for(int z = 0; z < 2; ++z)
 		for(int x = 0; x < 36; ++x)
@@ -694,6 +752,11 @@ TEST_F(HeroMovementTest, CornerMovementRevealsOnlyTheMovingTeamAndLevel)
 				const int3 tile(x, y, z);
 				EXPECT_EQ(gameState()->isVisibleFor(tile, movingPlayer), expectedVisible) << tile.toString();
 				EXPECT_FALSE(gameState()->isVisibleFor(tile, otherPlayer)) << tile.toString();
+				for(const auto & replica : replicas)
+				{
+					EXPECT_EQ(replica->isVisibleFor(tile, movingPlayer), expectedVisible) << tile.toString();
+					EXPECT_FALSE(replica->isVisibleFor(tile, otherPlayer)) << tile.toString();
+				}
 			}
 }
 

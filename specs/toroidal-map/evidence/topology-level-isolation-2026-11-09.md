@@ -10,6 +10,16 @@ TB5). All 48 movement tests then passed (`toroidal-fog-team-movement-suite.log`)
 This is a server game-state check with simulated players, not network delivery,
 allied-team behavior or rendered fog.
 
+The test was then extended to serialize the resulting `TryMoveHero` through
+`GameConnection` and apply the decoded packet to each of two independently
+loaded game-state replicas. Both replicas retained the topology and hero
+position and matched the server's per-team fog on every cell. The movement and
+connection focused suites passed 56 tests, with one disabled
+(`toroidal-fog-two-replicas-build.log` and
+`toroidal-fog-two-replicas-test.log` on TB5). This uses an in-memory transport,
+not actual client processes, socket delivery or per-client information
+filtering; it does not prove confidentiality of hidden state.
+
 On 2026-11-09 on macOS arm64 with copied Complete data, a two-level SoD
 fixture moved a hero from (0,1,1) to (35,1,1) through the underground seam.
 The server kept the hero on level 1, revealed the destination there, and
