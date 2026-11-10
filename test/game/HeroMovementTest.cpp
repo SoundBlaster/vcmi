@@ -100,6 +100,96 @@ private:
 	const std::vector<ui8> & data;
 };
 
+TEST(ToroidalDemoVmapTest, StartingHeroUsesMainTownOutsideMap)
+{
+	for(const int3 rawAnchor : {int3(-1, 10, 0), int3(36, 10, 0), int3(-1, -1, 0), int3(36, 36, 0)})
+	for(const bool existingHero : {false, true})
+	{
+		SCOPED_TRACE(rawAnchor.toString());
+		SCOPED_TRACE(existingHero);
+		const PlayerColor player(0);
+		TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+		builder.size(36, false).playerActive(player)
+			.town(int3(10, 10, 0), FactionID::CASTLE, player)
+			.playerMainTown(player, int3(10, 10, 0), true);
+		if(existingHero)
+			builder.hero(int3(20, 20, 0), HeroTypeID(0), player);
+		const auto source = builder.build();
+		CMemoryBuffer legacyBytes;
+		legacyBytes.write(source.data(), static_cast<si64>(source.size()));
+		legacyBytes.seek(0);
+		EditorCallback editor(nullptr);
+		CMapLoaderH3M legacyLoader("WrappedMainTown", "core", "ASCII", &legacyBytes);
+		auto map = legacyLoader.loadMap(&editor);
+		editor.setMap(map.get());
+		CGTownInstance * town = nullptr;
+		for(const auto & object : map->objects)
+			if(auto * candidate = dynamic_cast<CGTownInstance *>(object.get()))
+				town = candidate;
+		ASSERT_NE(town, nullptr);
+		map->moveObject(town->id, rawAnchor);
+		map->players[0].hasMainTown = true;
+		map->players[0].generateHeroAtMainTown = true;
+		map->players[0].posOfMainTown = rawAnchor;
+		map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+		const int3 entrance = town->visitablePos();
+		ASSERT_TRUE(map->isInTheMap(entrance));
+		if(existingHero)
+		{
+			CGHeroInstance * placedHero = nullptr;
+			for(const auto & object : map->objects)
+				if(auto * candidate = dynamic_cast<CGHeroInstance *>(object.get()); candidate && candidate->getOwner() == player)
+					placedHero = candidate;
+			ASSERT_NE(placedHero, nullptr);
+			map->moveObject(placedHero->id, placedHero->convertFromVisitablePos(entrance));
+		}
+		CMemoryBuffer archive;
+		{
+			CMapSaverJson saver(&archive);
+			saver.saveMap(map);
+		}
+		ToroidalMemoryMapService service(archive.getBuffer());
+		auto header = service.loadMapHeader(ResourcePath("memory"));
+		ASSERT_TRUE(header->players[0].hasMainTown);
+		ASSERT_TRUE(header->players[0].generateHeroAtMainTown);
+		ASSERT_EQ(header->players[0].posOfMainTown, rawAnchor);
+		StartInfo info;
+		info.mapname = "memory";
+		info.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
+		info.mode = EStartMode::NEW_GAME;
+		auto & settings = info.playerInfos[player];
+		settings.color = player;
+		settings.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(0));
+		settings.name = "Player";
+		settings.castle = header->players[0].defaultCastle();
+		settings.hero = header->players[0].defaultHero();
+		settings.bonus = PlayerStartingBonus::GOLD;
+		auto state = std::make_shared<CGameState>();
+		state->preInit(LIBRARY);
+		GameRandomizer randomizer(*state);
+		Load::ProgressAccumulator progress;
+		state->init(&service, &info, randomizer, progress, false);
+		const CGHeroInstance * hero = nullptr;
+		const CGTownInstance * startedTown = nullptr;
+		int heroCount = 0;
+		for(const auto & object : state->getMap().objects)
+		{
+			if(auto * candidate = dynamic_cast<const CGHeroInstance *>(object.get()); candidate && candidate->getOwner() == player)
+			{
+				hero = candidate;
+				++heroCount;
+			}
+			if(auto * candidate = dynamic_cast<const CGTownInstance *>(object.get()); candidate && candidate->getOwner() == player)
+				startedTown = candidate;
+		}
+		ASSERT_NE(hero, nullptr);
+		EXPECT_EQ(heroCount, 1);
+		ASSERT_NE(startedTown, nullptr);
+		EXPECT_EQ(hero->visitablePos(), entrance);
+		EXPECT_EQ(startedTown->getVisitingHero(), hero);
+	}
+}
+
 TEST(ToroidalDemoVmapTest, ServerStartRejectsAnIncompatiblePeer)
 {
 	const auto directory = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-start-%%%%-%%%%");
