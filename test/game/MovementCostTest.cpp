@@ -43,6 +43,27 @@ class MovementCostTest : public GameStateTest
 {
 };
 
+TEST_F(MovementCostTest, helperOwnsItsPathfinderOptions)
+{
+	static_assert(!std::is_reference_v<decltype(CPathfinderHelper::options)>);
+	startTestGame();
+	const auto heroes = gameState->getPlayerState(PlayerColor(0))->getHeroes();
+	ASSERT_FALSE(heroes.empty());
+	const auto * hero = heroes.front();
+	auto helper = [&]()
+	{
+		PathfinderOptions options(*gameState);
+		options.ignoreGuards = true;
+		options.useFlying = false;
+		return std::make_unique<CPathfinderHelper>(*gameState, hero, options);
+	}();
+	EXPECT_TRUE(helper->options.ignoreGuards);
+	EXPECT_FALSE(helper->options.useFlying);
+	const int3 source = hero->visitablePos();
+	const int3 destination = source + int3(1, 0, 0);
+	EXPECT_GT(helper->getMovementCost(source, destination, EPathfindingLayer::LAND, 1000, false), 0);
+}
+
 TEST_F(MovementCostTest, usesExplicitDestinationLayer)
 {
 	startTestGame();

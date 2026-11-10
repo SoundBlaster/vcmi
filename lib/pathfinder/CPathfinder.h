@@ -10,13 +10,13 @@
 #pragma once
 
 #include "CGPathNode.h"
+#include "PathfinderOptions.h"
 
 class IGameInfoCallback;
 class PathfinderConfig;
 class CGWhirlpool;
 class TurnInfo;
 class CGTeleport;
-struct PathfinderOptions;
 
 using FowTilesType = std::set<int3>;
 
@@ -84,7 +84,8 @@ public:
 	PlayerColor owner;
 	const CGHeroInstance * hero;
 	std::vector<std::unique_ptr<TurnInfo>> turnsInfo;
-	const PathfinderOptions & options;
+	// The helper may outlive the caller's options, including a temporary.
+	const PathfinderOptions options;
 	bool canCastFly;
 	bool canCastWaterWalk;
 	bool whirlpoolProtection;
