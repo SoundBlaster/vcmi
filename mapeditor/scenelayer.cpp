@@ -11,6 +11,7 @@
 #include "StdInc.h"
 #include "scenelayer.h"
 #include "TerrainViewTopology.h"
+#include "ObjectViewTopology.h"
 #include "mainwindow.h"
 #include "../lib/mapping/CMapEditManager.h"
 #include "../lib/mapping/CMap.h"
@@ -186,7 +187,8 @@ void AbstractViewportLayer::redraw(const std::set<CGObjectInstance *> & objects)
 	areas.reserve(objects.size());
 	for (const CGObjectInstance * object : objects)
 	{
-		areas.push_back(getObjectArea(object));
+		const auto copies = getObjectAreas(getObjectArea(object));
+		areas.insert(areas.end(), copies.begin(), copies.end());
 	}
 	redraw(areas);
 }
@@ -214,6 +216,19 @@ QRectF AbstractViewportLayer::getObjectArea(const CGObjectInstance * object) con
 	int y = ((pos.y + 1) * tileSize) - (object->getHeight() * tileSize);
 	QRectF objectArea(x, y, object->getWidth() * tileSize, object->getHeight() * tileSize);
 	return objectArea;
+}
+
+std::vector<QRectF> AbstractViewportLayer::getObjectAreas(const QRectF & area) const
+{
+	if(!map->toroidal)
+		return {area};
+	const auto xs = ObjectViewTopology::visibleStarts(toInt(area.x()), toInt(area.width()), mapWidthPx());
+	const auto ys = ObjectViewTopology::visibleStarts(toInt(area.y()), toInt(area.height()), mapHeightPx());
+	std::vector<QRectF> result;
+	for(int x : xs)
+		for(int y : ys)
+			result.emplace_back(x, y, area.width(), area.height());
+	return result;
 }
 
 void AbstractViewportLayer::addSector(QGraphicsItem * sector)
@@ -583,8 +598,7 @@ void ObjectsLayer::setLockObject(const CGObjectInstance * object, bool lock)
 		lockedObjects.insert(object);
 	else
 		lockedObjects.erase(object);
-	QRectF area = getObjectArea(object);
-	redraw({area});
+	redraw(getObjectAreas(getObjectArea(object)));
 }
 
 void ObjectsLayer::unlockAll()
@@ -614,7 +628,7 @@ QGraphicsItem * SelectionObjectsLayer::draw(const QRectF & section)
 		for(auto * obj : selectedObjects)
 		{
 			auto objectArea = getObjectArea(obj);
-			if(obj != newObject.get() && section.intersects(objectArea))
+			if(obj != newObject.get())
 			{
 				auto pos = obj->anchorPos();
 				QRectF bbox(pos.x, pos.y, 1, 1);
@@ -629,19 +643,23 @@ QGraphicsItem * SelectionObjectsLayer::draw(const QRectF & section)
 				//with displaying a box on a border of two sectors. Bite me.
 
 				painter.setOpacity(1.0);
-				QRectF rect((bbox.x() * tileSize + 1) - offset.x(), (bbox.y() * tileSize + 1) - offset.y(), (bbox.width() * tileSize) - 2, (bbox.height() * tileSize) - 2);
-				painter.drawRect(rect);
+				QRectF rect(bbox.x() * tileSize + 1, bbox.y() * tileSize + 1, bbox.width() * tileSize - 2, bbox.height() * tileSize - 2);
+				for(const auto & copy : getObjectAreas(objectArea))
+					if(section.intersects(copy))
+						painter.drawRect(rect.translated(copy.topLeft() - objectArea.topLeft() - offset));
 			}
 
 			if(selectionMode == SelectionMode::MOVEMENT && (shift.x() || shift.y()))
 			{
 				objectArea.moveTo(objectArea.topLeft() + (shift * tileSize));
-				if (section.intersects(objectArea))
-				{
-					painter.setOpacity(0.7);
-					auto newPos = QPoint(obj->anchorPos().x, obj->anchorPos().y) + shift;
-					handler->drawObjectAt(painter, obj, newPos.x(), newPos.y(), offset);
-				}
+				for(const auto & copy : getObjectAreas(objectArea))
+					if(section.intersects(copy))
+					{
+						painter.setOpacity(0.7);
+						auto newPos = QPoint(obj->anchorPos().x, obj->anchorPos().y) + shift;
+						newPos += QPoint(toInt(copy.x() - objectArea.x()) / tileSize, toInt(copy.y() - objectArea.y()) / tileSize);
+						handler->drawObjectAt(painter, obj, newPos.x(), newPos.y(), offset);
+					}
 			}
 		}
 	}
@@ -783,7 +801,8 @@ void SelectionObjectsLayer::setShift(int x, int y)
 		{
 			QRectF formerArea = getObjectArea(selectedObject);
 			formerArea.moveTo(formerArea.topLeft() + (shift * tileSize));
-			areas.emplace_back(formerArea);
+			const auto copies = getObjectAreas(formerArea);
+			areas.insert(areas.end(), copies.begin(), copies.end());
 		}
 	}
 
@@ -792,7 +811,8 @@ void SelectionObjectsLayer::setShift(int x, int y)
 	{
 		QRectF area = getObjectArea(selectedObject);
 		area.moveTo(area.topLeft() + (shift * tileSize));
-		areas.emplace_back(area);
+		const auto copies = getObjectAreas(area);
+		areas.insert(areas.end(), copies.begin(), copies.end());
 	}
 	redraw(areas);
 }

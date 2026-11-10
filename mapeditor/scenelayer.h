@@ -75,6 +75,7 @@ protected:
 	void redraw(const std::set<CGObjectInstance *> & objects);
 	void redraw(const std::vector<QRectF> & areas);
 	QRectF getObjectArea(const CGObjectInstance * object) const;
+	std::vector<QRectF> getObjectAreas(const QRectF & area) const;
 private:
 	void addSector(QGraphicsItem * item);
 	void removeSector(QGraphicsItem * item);

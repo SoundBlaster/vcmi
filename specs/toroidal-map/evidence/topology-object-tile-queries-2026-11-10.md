@@ -100,8 +100,10 @@ map-tile result contains only `(0,0,0)` in bounded mode, but all four corner
 tiles in toroidal mode. Three related tile-query, blocker, and resource tests
 passed (`minimap-footprints-tests.log`); the client, editor, and test targets
 built (`minimap-footprints-build.log`). These tests do not exercise GUI
-minimap updates or editor highlighting. The editor's selection outline and
-static seam-object restriction remain separate, unresolved concerns.
+minimap updates or editor highlighting. Subsequent work permits supported
+static seam objects and updates selection-outline geometry; see the
+[VMAP](topology-wrapped-footprint-vmap-2026-11-10.md) and
+[selection geometry](topology-editor-object-selection-2026-11-10.md) records.
 
 The synthetic `HeroMovementTest.SpecialTerrainCoversOppositeCornerOnToroidalMap`
 places a 2×2 `CGTerrainPatch` across a corner and calls the actual game-state

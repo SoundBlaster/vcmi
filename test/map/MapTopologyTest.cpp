@@ -12,6 +12,24 @@
 #include "../../lib/mapping/MapTopology.h"
 #include "../../client/adventureMap/MinimapPosition.h"
 #include "../../mapeditor/TerrainViewTopology.h"
+#include "../../mapeditor/ObjectViewTopology.h"
+
+TEST(MapTopology, EditorObjectCopiesCoverTheCanonicalAxis)
+{
+	for(int extent = 3; extent <= 9; ++extent)
+		for(int length = 1; length <= 2 * extent; ++length)
+			for(int start = -2 * extent; start <= 2 * extent; ++start)
+			{
+				std::vector<int> actual(extent, 0), expected(extent, 0);
+				for(int position = start; position < start + length; ++position)
+					++expected[MapTopology::wrapCoordinate(position, extent)];
+				for(int copy : ObjectViewTopology::visibleStarts(start, length, extent))
+					for(int position = std::max(0, copy); position < std::min(extent, copy + length); ++position)
+						++actual[position];
+				EXPECT_EQ(actual, expected) << extent << ", " << start << ", " << length;
+			}
+	EXPECT_TRUE(ObjectViewTopology::visibleStarts(0, 0, 3).empty());
+}
 
 TEST(MapTopology, EditorRoadAndRedrawCrossToroidalSeams)
 {
