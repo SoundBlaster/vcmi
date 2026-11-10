@@ -36,6 +36,12 @@ The targeted TCC log showed an All Files preflight but no removable-volume
 prompt for that attempt. The test process was closed through Activity Monitor.
 This observation does not establish that the two launch failures share a cause.
 
+Later inspection through System Settings showed the Removable Volumes switch
+enabled for both `VCMI Toroid Lab.app` and `VCMI Toroid Test.app`. No privacy
+setting was changed. This is the setting currently displayed by macOS; it does
+not resolve the earlier logged code-requirement mismatch or establish why the
+new processes stalled before opening their game windows.
+
 ## Initial fixture and GUI observations
 
 `test/mock/ToroidalDemoMap.h` defines a deliberately sparse 36×36 grass map
