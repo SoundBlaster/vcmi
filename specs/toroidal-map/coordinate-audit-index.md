@@ -66,7 +66,7 @@ regenerating the index resets manually recorded statuses.
 | `client/adventureMap/CList.cpp` | 217, 230, 288, 289, 297, 298, 329, 330, 336, 341 | unreviewed |
 | `client/adventureMap/CMinimap.cpp` | 79, 82, 83, 91, 114, 115, 117, 118, 132, 134, 135, 142, 144, 145, 147, 148, 155, 208, 233, 234, 235, 243, 244, 245, 246 | unreviewed |
 | `client/adventureMap/CResDataBar.cpp` | 39, 40, 108 | unreviewed |
-| `client/adventureMap/MapAudioPlayer.cpp` | 85, 87, 99, 114, 175, 176, 210 | unreviewed |
+| `client/adventureMap/MapAudioPlayer.cpp` | 85, 87, 99, 114, 175, 176, 210 | partial: wrapped attenuation and object source cells fixed and tested after baseline; audible playback unverified |
 | `client/adventureMap/TurnTimerWidget.cpp` | 40, 52, 75 | unreviewed |
 | `client/battle/BattleAnimationClasses.cpp` | 303, 311, 403, 404, 408, 409, 473, 712, 732, 733, 737, 738, 742, 743, 1008, 1009, 1010, 1049, 1052, 1055, 1057, 1175 | unreviewed |
 | `client/battle/BattleConsole.cpp` | 56, 57, 94, 134, 140, 141, 152 | unreviewed |

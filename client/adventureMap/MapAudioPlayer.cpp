@@ -9,6 +9,7 @@
  */
 #include "StdInc.h"
 #include "MapAudioPlayer.h"
+#include "MapAudioSources.h"
 
 #include "../CPlayerInterface.h"
 #include "../GameEngine.h"
@@ -75,47 +76,9 @@ void MapAudioPlayer::onObjectInstantRemove(const CGObjectInstance * obj, const P
 
 void MapAudioPlayer::addObject(const CGObjectInstance * obj)
 {
-	if(obj->isTile2Terrain())
-	{
-		// terrain overlay - all covering tiles act as sound source
-		for(int fx = 0; fx < obj->getWidth(); ++fx)
-		{
-			for(int fy = 0; fy < obj->getHeight(); ++fy)
-			{
-				int3 currTile(obj->anchorPos().x - fx, obj->anchorPos().y - fy, obj->anchorPos().z);
-
-				if(GAME->interface()->cb->isInTheMap(currTile) && obj->coveringAt(currTile))
-					objects[currTile.z][currTile.x][currTile.y].push_back(obj->id);
-			}
-		}
-		return;
-	}
-
-	if(obj->isVisitable())
-	{
-		// visitable object - visitable tile acts as sound source
-		int3 currTile = obj->visitablePos();
-
-		if(GAME->interface()->cb->isInTheMap(currTile))
-			objects[currTile.z][currTile.x][currTile.y].push_back(obj->id);
-
-		return;
-	}
-
-	if(!obj->isVisitable())
-	{
-		// static object - blocking tiles act as sound source
-		auto tiles = obj->getBlockedOffsets();
-
-		for(const auto & tile : tiles)
-		{
-			int3 currTile = obj->anchorPos() + tile;
-
-			if(GAME->interface()->cb->isInTheMap(currTile))
-				objects[currTile.z][currTile.x][currTile.y].push_back(obj->id);
-		}
-		return;
-	}
+	const auto topology = GAME->map().getMap()->getTopology();
+	for(const auto & tile : mapAmbientSourceTiles(*obj, topology))
+		objects[tile.z][tile.x][tile.y].push_back(obj->id);
 }
 
 void MapAudioPlayer::removeObject(const CGObjectInstance * obj)

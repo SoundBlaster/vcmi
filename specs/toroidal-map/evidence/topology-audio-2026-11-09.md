@@ -17,3 +17,21 @@ not proof of audible continuity.
 ```text
 dd695276da49f2a904faa1be29e6854f7045868eba2ea219914066d1f071daf8  client/adventureMap/MapAudioPlayer.cpp
 ```
+
+## Object sound sources across a seam
+
+On 2026-11-10, `MapAudioPlayer::addObject` still clipped sound sources to the
+rectangular map. This discarded the wrapped portions of terrain overlays and
+static blocking objects. The player now indexes source positions through
+the map topology, deduplicating repeated canonical tiles. Visitable objects
+continue to use their visitable tile; bounded maps still discard off-map
+positions.
+
+`HeroMovementTest.AmbientSoundSourcesFollowWrappedObjectFootprints` checks an
+overlay, blocker and visitable object at a corner of the underground level,
+including bounded comparisons. That test and two related object and terrain
+tests passed. The macOS arm64 client and test targets built; the linker
+reported existing duplicate-library and missing Conan search-path warnings.
+The extracted source-tile calculation was exercised, not the sound mixer or
+actual audible playback. Original assets were found after the earlier note,
+but audible continuity is still unverified.

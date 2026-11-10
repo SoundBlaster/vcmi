@@ -12,6 +12,7 @@
 #include "../mock/GameHandlerTestServer.h"
 #include "../mock/TinyMapGameTest.h"
 #include "../mock/ToroidalDemoMap.h"
+#include "../../client/adventureMap/MapAudioSources.h"
 
 #include "../../lib/GameLibrary.h"
 #include "../../lib/CPlayerState.h"
@@ -1606,6 +1607,41 @@ TEST_F(HeroMovementTest, ObjectTileQueriesFindFootprintAcrossToroidalCorner)
 	EXPECT_NO_THROW(EXPECT_FALSE(object.coveringAt(across)));
 	unboundEditor.setMap(map());
 	EXPECT_TRUE(object.coveringAt(across));
+}
+
+TEST_F(HeroMovementTest, AmbientSoundSourcesFollowWrappedObjectFootprints)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	const auto makeAppearance = [](const std::string & mask)
+	{
+		const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": )" + mask + " }";
+		JsonNode definition(text.data(), text.size(), "AmbientSourceTest");
+		auto appearance = std::make_shared<ObjectTemplate>();
+		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+		appearance->readJson(definition, resolver, false);
+		return appearance;
+	};
+	CGTerrainPatch overlay(gameState().get());
+	overlay.appearance = makeAppearance(R"([ "VV", "VV" ])");
+	overlay.pos = int3(0, 0, 1);
+	CGObjectInstance blocker(gameState().get());
+	blocker.appearance = makeAppearance(R"([ "BB", "BB" ])");
+	blocker.pos = overlay.pos;
+	CGObjectInstance visitable(gameState().get());
+	visitable.appearance = makeAppearance(R"([ "A0", "00" ])");
+	visitable.pos = overlay.pos;
+	const std::set<int3> bounded{int3(0, 0, 1)};
+	const std::set<int3> wrapped{int3(0, 0, 1), int3(35, 0, 1), int3(0, 35, 1), int3(35, 35, 1)};
+	EXPECT_EQ(mapAmbientSourceTiles(overlay, map()->getTopology()), bounded);
+	EXPECT_EQ(mapAmbientSourceTiles(blocker, map()->getTopology()), bounded);
+	EXPECT_TRUE(mapAmbientSourceTiles(visitable, map()->getTopology()).empty());
+	map()->toroidal = true;
+	EXPECT_EQ(mapAmbientSourceTiles(overlay, map()->getTopology()), wrapped);
+	EXPECT_EQ(mapAmbientSourceTiles(blocker, map()->getTopology()), wrapped);
+	EXPECT_EQ(mapAmbientSourceTiles(visitable, map()->getTopology()), (std::set<int3>{int3(35, 35, 1)}));
 }
 
 TEST_F(HeroMovementTest, VisitablePositionWrapsCornerWithoutChangingLevel)
