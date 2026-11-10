@@ -66,6 +66,7 @@ protected:
 	void checkToroidalSeamMovement(EMapFormat format);
 	void checkToroidalSightRange(EMapFormat format);
 	void checkBlockedToroidalStep(EMapFormat format);
+	void checkDimensionDoorAcrossToroidalSeam(const int3 & start, const int3 & destination);
 };
 
 class ToroidalDemoGameTest : public TinyMapGameTest
@@ -2025,6 +2026,45 @@ TEST_F(HeroMovementTest, noVisitFromWaterToHeroStandingOnObject)
 
 	ASSERT_TRUE(paths.getNode(island + int3(0, 1, 0), EPathfindingLayer::WATER)->reachable());
 	EXPECT_FALSE(paths.getNode(island, EPathfindingLayer::LAND)->reachable());
+}
+
+void HeroMovementTest::checkDimensionDoorAcrossToroidalSeam(const int3 & start, const int3 & destination)
+{
+	const PlayerColor player(0);
+	const SpellID spell(SpellID::decode("core:dimensionDoor"));
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(start + int3(1, 0, 0), HeroTypeID(0), player)
+		.heroSpells({spell})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroPrimary(0, 0, 20, 20);
+	startWithMap(std::move(builder));
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), start);
+	hero->mana = 1000;
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.castSpell(hero, spell, destination);
+	EXPECT_EQ(hero->visitablePos(), start);
+	EXPECT_EQ(hero->mana, 1000);
+	map()->toroidal = true;
+	handler.castSpell(hero, spell, destination);
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_LT(hero->mana, 1000);
+	EXPECT_LT(hero->movementPointsRemaining(), 3000);
+}
+
+TEST_F(HeroMovementTest, DimensionDoorCastsAcrossToroidalSeam)
+{
+	checkDimensionDoorAcrossToroidalSeam(int3(0, 10, 0), int3(35, 10, 0));
+}
+
+TEST_F(HeroMovementTest, DimensionDoorCastsAcrossToroidalCorner)
+{
+	checkDimensionDoorAcrossToroidalSeam(int3(0, 0, 0), int3(35, 35, 0));
 }
 
 TEST_F(HeroMovementTest, cursedGroundBlocksHighLevelAdventureSpells)

@@ -1,5 +1,12 @@
 # Ranged adventure spells and AI landing candidates
 
+Two later SoD tests invoke the real server Dimension Door spell handler on
+revealed grass. From `(0,10)` to `(35,10)` and from `(0,0)` to `(35,35)`,
+the bounded map rejects the out-of-range cast without spending mana; the
+toroidal map moves the hero to the destination and spends mana and movement
+points. Both tests passed on macOS arm64. They do not verify the client cursor,
+animation, hidden destinations, guards, other terrain or other spells.
+
 The common ranged-adventure-spell check now compares shortest wrapped x/y
 displacements on toroidal maps. It continues to check whether source and
 target are on the map, retains existing visibility checks, and preserves the
@@ -30,6 +37,6 @@ cluster-selection decision.
 The later [rectangle-enumeration change](topology-rectangle-enumeration-2026-11-09.md)
 also adapts the AI's separate exploration and continuation scans.
 
-This is range validation and AI planning evidence, not a live spell cast or
-proof of the behavior of every ranged spell. Cross-level spell semantics,
-animation, visibility and multiplayer require further verification.
+These checks do not prove the behavior of every ranged spell. Cross-level
+spell semantics, animation, visibility and multiplayer require further
+verification.
