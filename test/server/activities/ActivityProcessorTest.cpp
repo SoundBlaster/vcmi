@@ -34,11 +34,15 @@
 #include "lib/mapObjects/ObjectTemplate.h"
 #include "lib/modding/IdentifierResolver.h"
 #include "lib/callback/GameRandomizer.h"
+#include "lib/callback/CCallback.h"
 #include "lib/mapping/CMap.h"
 #include "lib/mapping/CMapEvent.h"
 #include "lib/GameLibrary.h"
 #include "lib/CSkillHandler.h"
 #include "lib/spells/adventure/ReinforcementsEffect.h"
+#include "lib/spells/CSpell.h"
+#include "lib/spells/ISpellMechanics.h"
+#include "lib/spells/Problem.h"
 
 namespace
 {
@@ -2895,6 +2899,38 @@ TEST_F(SummonBoatTopologyTest, scuttleBoatTargetsBoatAcrossToroidalSeam)
 	handler.castSpell(hero, spell, destination);
 	EXPECT_EQ(map()->getObject(boatID), nullptr);
 	EXPECT_LT(hero->mana, 1000);
+}
+
+TEST_F(SummonBoatTopologyTest, scuttleBoatPlayerTargetCheckDoesNotExposeHiddenBoatAcrossSeam)
+{
+	const PlayerColor player(0);
+	const SpellID spell(SpellID::decode("core:scuttleBoat"));
+	const int3 destination(35, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player)
+		.heroSpells({spell})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID(ArtifactID::SPELLBOOK)}})
+		.terrain(destination, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->mana = 1000;
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(destination, BoatId::CASTLE, PlayerColor::NEUTRAL);
+	ASSERT_EQ(findAll<CGBoat>().size(), 1u);
+	auto callback = makeCallback(player);
+	const auto & mechanics = spell.toSpell()->getAdventureMechanics();
+	spells::detail::ProblemImpl problem;
+	ASSERT_TRUE(mechanics.canBeCastAt(problem, callback.get(), hero, destination));
+	gameState()->getPlayerTeam(player)->fogOfWarMap[destination] = 0;
+	ASSERT_EQ(callback->tryGetTile(destination), nullptr);
+	EXPECT_FALSE(mechanics.canBeCastAt(problem, callback.get(), hero, destination));
+	EXPECT_TRUE(mechanics.canBeCastAt(problem, gameState().get(), hero, destination));
+	gameState()->getPlayerTeam(player)->fogOfWarMap[destination] = 1;
+	EXPECT_TRUE(mechanics.canBeCastAt(problem, callback.get(), hero, destination));
 }
 
 TEST_F(SummonBoatTopologyTest, shipyardBuildsBoatAcrossToroidalSeam)

@@ -16,6 +16,7 @@
 #include "../../callback/IGameInfoCallback.h"
 #include "../../mapObjects/CGHeroInstance.h"
 #include "../../mapping/CMap.h"
+#include "../../mapping/CMapHeader.h"
 #include "../../networkPacks/PacksForClient.h"
 #include "../../modding/LibraryLoadContext.h"
 
@@ -45,6 +46,12 @@ std::string RemoveObjectEffect::getCursorForTarget(const IGameInfoCallback * cb,
 bool RemoveObjectEffect::canBeCastAtImpl(spells::Problem & problem, const IGameInfoCallback * cb, const spells::Caster * caster, const int3 & pos) const
 {
 	if (!isTargetInRange(cb, caster, pos))
+		return false;
+
+	// A player-side target preview must not reveal objects on hidden toroidal
+	// tiles. The unrestricted server callback retains the authoritative check.
+	const auto * header = cb->getMapHeader();
+	if(header && header->toroidal && !ignoresFogOfWar() && !cb->tryGetTile(pos))
 		return false;
 
 	const TerrainTile * t = cb->getTileUnchecked(pos);
