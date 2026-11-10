@@ -114,6 +114,9 @@ and the search does not prove that every relevant calculation has been found.
 
 ## Execution record
 
+The [current full-suite record](evidence/topology-full-suite-2026-11-10.md)
+includes the three optional historical-format fixtures; four tests remain disabled.
+
 The isolated helper tests are recorded in
 [`evidence/topology-unit-2026-11-09.md`](evidence/topology-unit-2026-11-09.md).
 The shared pixel wrapping and its arithmetic tests are recorded in
