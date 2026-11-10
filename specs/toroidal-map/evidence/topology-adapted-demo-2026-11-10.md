@@ -54,6 +54,32 @@ still running. System Settings showed older Lab and Test permissions enabled,
 but did not show an entry for this new development bundle. The observation
 does not establish whether or where the prompt was visible on screen.
 
+The user subsequently approved the request. TCC recorded a successful
+removable-volume authorization response and the already-running client
+continued to its main menu. The player used Computer Use to load the existing
+Toroid Seam Laboratory save directly from the isolated TB5 profile. With the
+client reporting `1.8.0.4255569`, the hero crossed the northwest corner; after
+ending the turn to restore movement points, it crossed the east and south
+seams. The minimap showed the corresponding opposite corners. The embedded
+server log recorded hero-anchor moves `(1,0,0) -> (36,35,0) -> (1,35,0) ->
+(1,0,0)`; visitable tile x coordinates are one less than these anchors.
+Independent Ctrl+Right and Ctrl+Down key holds shifted the camera and minimap
+viewport while the hero remained in place. These are discrete screenshots of
+one grass/fog fixture, not continuous frame capture or proof of smoothness at
+all speeds and with all terrain. The session was closed without saving its
+manual changes. Its log is `gui-seams-4255569.log` on TB5.
+
+The signed client executable and library used in that session had SHA-256
+`5abd8adb460cc0a23366ccf10072a177dfbb73b32fb46556a7912968d1a2bb99` and
+`4f66a5e2662b0d748220115cb3ca1ca97ffe7dcabe9ea75460e4067d212cbdf9`.
+After that session closed, the separately sealed development bundle without
+the diagnostic launcher was opened. Its designated requirement was mutually
+compatible with the authorized bundle. It opened the normal log on TB5 and
+reached the intro window; TCC returned the existing removable-volume grant
+without `AUTHREQ_PROMPTING` for that request. This demonstrates grant reuse
+between these two bundle variants, not across certificate renewal or every
+future source rebuild. The second client was then closed.
+
 For comparison, the existing ad-hoc signed `VCMI Toroid Lab.app` had a
 designated requirement based on its code-directory hash. The earlier macOS
 log below recorded a mismatch between its saved requirement and the newly
