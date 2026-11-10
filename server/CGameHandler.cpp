@@ -985,6 +985,13 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 	if(h->movementPointsRemaining() < cost && dst != h->pos && movementMode == EMovementMode::STANDARD)
 		return complainRet(boost::str(boost::format("Hero doesn't have enough movement points to move from %s to %s: has %d, needs %d!") % h->pos.toString() % dst.toString() % h->movementPointsRemaining() % cost));
 
+	// A turn cannot end on a transient layer. Do not accept a step that
+	// certainly exhausts movement there, leaving no way to land this turn.
+	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
+		&& dst != h->pos && cost > 0 && cost >= h->movementPointsRemaining()
+		&& (layer == EPathfindingLayer::AIR || layer == EPathfindingLayer::WATER))
+		return complainRet("Cannot exhaust movement points while flying or walking on water!");
+
 	if (transit && !canFly && !(canWalkOnSea && t.isWater()) && !CGTeleport::isTeleport(objectToVisit))
 		return complainRet("Hero cannot transit over this tile!");
 

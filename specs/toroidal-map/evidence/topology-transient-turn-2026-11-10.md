@@ -26,8 +26,25 @@ remote peers and bonus removal outside this tested day transition remain open.
 The ordinary client plans routes to a LAND or SAIL stopping point. A malformed
 or interrupted request could nevertheless exhaust movement while the hero is
 in AIR or WATER; the new guard can then prevent ending the turn without a
-recovery mechanism. Server-side route validation or another recoverable policy
-is still required before considering this case complete.
+recovery mechanism. A subsequent server check rejects a standard toroidal AIR
+or WATER step that would consume all remaining movement points. The
+`HeroMovementTest.ToroidalTransientStepCannotConsumeLastMovementPoints` test
+reproduced the exhausted AIR state before the check and now covers both AIR
+and WATER with 100 and 150 points, and a successful WATER crossing and return
+with more points. `BoundedTransientStepKeepsExistingLastMovementRule` checks
+the prior behavior on a bounded map.
+
+This is a partial safeguard, not a reachability guarantee: a hero may retain
+some points but lack a legal route to LAND or SAIL, and older saves may already
+contain stranded heroes. Preventing or recovering from those cases, including
+when the turn timer expires, is still required before considering G12 complete.
+The safeguard does not search hidden map cells or report their contents.
+The client, server and tests built successfully with the safeguard on macOS
+arm64. The full suite passed 1,473 tests from 226 suites without skips; four
+remain disabled. The prototype save and VMAP and the Complete legacy map
+were supplied. The log is `full-suite-transient-last-step-2026-11-10.log` in
+the TB5 runtime directory. This does not establish graphical play or remote
+network behavior for the new rejection.
 
 On macOS arm64, `vcmitest`, `vcmiserver` and `vcmiclient` built from `7d1fa3f` plus this
 change. The full suite passed 1,471 tests from 226 suites without skips; four
