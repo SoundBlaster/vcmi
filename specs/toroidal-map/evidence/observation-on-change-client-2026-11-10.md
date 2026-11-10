@@ -68,7 +68,10 @@ The session was closed without saving. It produced 11 complete snapshots
 totaling 350,391 bytes. This checks one owned hero and resource change, not
 all player state, UI changes, multiplayer confidentiality or agent access.
 
-The trace is `runtime/observation-player-c2457bd.jsonl`, SHA-256
-`0a94c8677f43a0af1481fa529eaa534731679a5bb25b5c0659750fcdbb90439c`;
-the signed client SHA-256 is
+The trace is `runtime/observation-player-c2457bd.jsonl`. The SHA-256 of its
+first 11 complete lines, corresponding to this run, is
+`0a94c8677f43a0af1481fa529eaa534731679a5bb25b5c0659750fcdbb90439c`.
+Later activity appended more observations to the same file, including the
+[Screener integration check](screener-vcmi-window-2026-11-10.md), so its
+whole-file digest differs. The signed client SHA-256 is
 `6fc7ba9da0c413e1c88d63ca7ba4454b6329eec7e7c4bf8fabe4dd9c047f4756`.
