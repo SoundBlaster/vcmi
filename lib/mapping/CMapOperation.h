@@ -11,6 +11,7 @@
 #pragma once
 
 #include "../int3.h"
+#include "CMapHeader.h"
 #include "MapEditUtils.h"
 
 class CGObjectInstance;
@@ -154,7 +155,15 @@ private:
 	int3 initialPos;
 	int3 targetPos;
 	std::vector<size_t> mainTownPlayers;
+	struct ObjectiveReference
+	{
+		std::string eventIdentifier;
+		EventCondition original;
+		int3 targetPosition;
+	};
+	std::vector<ObjectiveReference> objectiveReferences;
 	void updateMainTownPositions(const int3 & from, const int3 & to);
+	void updateObjectivePositions(bool forward);
 };
 
 /// The CRemoveObjectOperation class removes object from the map

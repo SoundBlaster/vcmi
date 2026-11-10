@@ -16,6 +16,7 @@
 #include "../MapLayerHandler.h"
 #include "../mapObjects/CGObjectInstance.h"
 #include "../mapObjects/CGTownInstance.h"
+#include "../mapObjects/CGHeroInstance.h"
 #include "CMap.h"
 #include "MapTopology.h"
 #include "MapEditUtils.h"
@@ -655,6 +656,45 @@ CMoveObjectOperation::CMoveObjectOperation(CMap* map, CGObjectInstance * obj, co
 		for(size_t i = 0; i < map->players.size(); ++i)
 			if(map->players[i].hasMainTown && map->players[i].posOfMainTown == initialPos)
 				mainTownPlayers.push_back(i);
+	const auto topology = map->getTopology();
+	for(const auto & event : map->triggeredEvents)
+	{
+		event.trigger.morph([&](const EventCondition & condition) -> EventExpression::Variant
+		{
+			const auto tile = topology.canonicalize(condition.position);
+			if(!tile || (!condition.objectInstanceName.empty() && condition.objectInstanceName != obj->instanceName))
+				return condition;
+			MapObjectID type;
+			switch(condition.condition)
+			{
+			case EventCondition::HAVE_BUILDING:
+			case EventCondition::TRANSPORT:
+				type = Obj::TOWN;
+				break;
+			case EventCondition::CONTROL:
+			case EventCondition::CONTROL_CURRENT:
+			case EventCondition::DESTROY:
+				type = condition.objectType.as<MapObjectID>();
+				break;
+			default:
+				return condition;
+			}
+			const bool heroAlias = type == Obj::HERO && (obj->ID == Obj::PRISON || obj->ID == Obj::HERO_PLACEHOLDER);
+			if(type != obj->ID && !heroAlias)
+				return condition;
+			if(topology.canonicalize(obj->anchorPos()) != tile && !obj->visitableAt(*tile)
+				&& !(heroAlias && map->isHeroPlaceholderObjective(condition) == obj))
+				return condition;
+			const CGObjectInstance * resolved = nullptr;
+			if(heroAlias && obj->ID == Obj::HERO_PLACEHOLDER)
+				resolved = map->isHeroPlaceholderObjective(condition);
+			else
+				resolved = map->getObjectiveObjectFrom(condition.position, heroAlias ? Obj::PRISON : Obj(type));
+			if(resolved == obj)
+				objectiveReferences.push_back({event.identifier, condition, condition.position + targetPos - initialPos});
+			return condition;
+		});
+	}
 }
 
 void CMoveObjectOperation::updateMainTownPositions(const int3 & from, const int3 & to)
@@ -667,16 +707,42 @@ void CMoveObjectOperation::updateMainTownPositions(const int3 & from, const int3
 	}
 }
 
+void CMoveObjectOperation::updateObjectivePositions(bool forward)
+{
+	for(auto & event : map->triggeredEvents)
+	{
+		event.trigger = event.trigger.morph([&](EventCondition condition) -> EventExpression::Variant
+		{
+			for(const auto & reference : objectiveReferences)
+			{
+				const auto & original = reference.original;
+				const auto & expectedPosition = forward ? original.position : reference.targetPosition;
+				if(event.identifier == reference.eventIdentifier && condition.position == expectedPosition
+					&& condition.condition == original.condition && condition.value == original.value
+					&& condition.objectType == original.objectType && condition.objectID == original.objectID
+					&& condition.objectInstanceName == original.objectInstanceName)
+				{
+					condition.position = forward ? reference.targetPosition : original.position;
+					break;
+				}
+			}
+			return condition;
+		});
+	}
+}
+
 void CMoveObjectOperation::execute()
 {
 	map->moveObject(obj->id, targetPos);
 	updateMainTownPositions(initialPos, targetPos);
+	updateObjectivePositions(true);
 }
 
 void CMoveObjectOperation::undo()
 {
 	map->moveObject(obj->id, initialPos);
 	updateMainTownPositions(targetPos, initialPos);
+	updateObjectivePositions(false);
 }
 
 void CMoveObjectOperation::redo()

@@ -132,6 +132,14 @@ TEST(ToroidalDemoVmapTest, StartingHeroUsesMainTownOutsideMap)
 		ASSERT_TRUE(map->players[0].generateHeroAtMainTown);
 		ASSERT_EQ(map->players[0].posOfMainTown, town->anchorPos());
 		const auto originalAnchor = town->anchorPos();
+		EventCondition objective(EventCondition::CONTROL_CURRENT);
+		objective.objectType = MapObjectID(Obj::TOWN);
+		objective.position = originalAnchor;
+		TriggeredEvent objectiveEvent;
+		objectiveEvent.identifier = "moved_town_control";
+		objectiveEvent.effect.type = EventEffect::VICTORY;
+		objectiveEvent.trigger = EventExpression(EventExpression::Variant(objective));
+		map->triggeredEvents.push_back(objectiveEvent);
 		map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
 		map->getEditManager()->moveObject(town, rawAnchor);
 		ASSERT_EQ(map->players[0].posOfMainTown, rawAnchor);
@@ -196,6 +204,20 @@ TEST(ToroidalDemoVmapTest, StartingHeroUsesMainTownOutsideMap)
 		ASSERT_NE(startedTown, nullptr);
 		EXPECT_EQ(hero->visitablePos(), entrance);
 		EXPECT_EQ(startedTown->getVisitingHero(), hero);
+		const auto event = std::ranges::find_if(state->getMap().triggeredEvents, [](const TriggeredEvent & candidate)
+		{
+			return candidate.identifier == "moved_town_control";
+		});
+		ASSERT_NE(event, state->getMap().triggeredEvents.end());
+		EventCondition resolved;
+		event->trigger.test([&](const EventCondition & condition)
+		{
+			resolved = condition;
+			return true;
+		});
+		EXPECT_EQ(resolved.position, rawAnchor);
+		EXPECT_EQ(resolved.objectID, startedTown->id);
+		EXPECT_TRUE(state->checkForVictory(player, resolved));
 	}
 }
 
@@ -2985,6 +3007,159 @@ TEST_F(HeroMovementTest, ObjectiveResolvesTownAnchorAcrossToroidalSeams)
 	}
 	map()->toroidal = false;
 	EXPECT_EQ(resolve(EventCondition::CONTROL_CURRENT, town->anchorPos()), ObjectInstanceID::NONE);
+}
+
+TEST_F(HeroMovementTest, EditorMovePreservesObjectTargetedObjectives)
+{
+	const PlayerColor player(0);
+	const PlayerColor opponent(1);
+	const int3 original(10, 10, 0), destination(-1, -1, 0), other(20, 20, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent)
+		.town(original, FactionID::CASTLE, player)
+		.town(other, FactionID::CASTLE, opponent)
+		.hero(int3(25, 25, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	auto * town = expectAt<CGTownInstance>(original);
+	ASSERT_NE(town, nullptr);
+	auto * otherTown = expectAt<CGTownInstance>(other);
+	ASSERT_NE(otherTown, nullptr);
+	map()->setToroidalAndRebuild(true);
+	const int3 entrance = town->visitablePos();
+	EventExpression::OperatorAll all;
+	EventExpression::OperatorAny nested;
+	for(const auto type : {EventCondition::CONTROL_CURRENT, EventCondition::HAVE_BUILDING,
+		EventCondition::TRANSPORT, EventCondition::DESTROY})
+	{
+		EventCondition condition(type);
+		if(type == EventCondition::HAVE_BUILDING)
+			condition.objectType = BuildingID(0);
+		else if(type == EventCondition::TRANSPORT)
+			condition.objectType = ArtifactID(0);
+		else
+			condition.objectType = MapObjectID(Obj::TOWN);
+		condition.position = type == EventCondition::TRANSPORT ? entrance : original;
+		if(type == EventCondition::CONTROL_CURRENT)
+			all.expressions.emplace_back(condition);
+		else
+			nested.expressions.emplace_back(condition);
+	}
+	all.expressions.emplace_back(nested);
+	EventCondition unrelated(EventCondition::CONTROL_CURRENT);
+	unrelated.objectType = MapObjectID(Obj::TOWN);
+	unrelated.position = other;
+	all.expressions.emplace_back(unrelated);
+	EventCondition generic(EventCondition::CONTROL_CURRENT);
+	generic.objectType = MapObjectID(Obj::TOWN);
+	all.expressions.emplace_back(generic);
+	TriggeredEvent event;
+	event.identifier = "town_move_objectives";
+	event.effect.type = EventEffect::VICTORY;
+	event.trigger = EventExpression(all);
+	map()->triggeredEvents.clear();
+	map()->triggeredEvents.push_back(event);
+	const auto positions = [&]()
+	{
+		std::vector<int3> result;
+		map()->triggeredEvents[0].trigger.morph([&](const EventCondition & condition) -> EventExpression::Variant
+		{
+			result.push_back(condition.position);
+			return condition;
+		});
+		return result;
+	};
+	const std::vector<int3> before{original, original, entrance, original, other, int3(-1, -1, -1)};
+	const int3 shiftedEntrance = entrance + destination - original;
+	const std::vector<int3> after{destination, destination, shiftedEntrance, destination, other, int3(-1, -1, -1)};
+	ASSERT_EQ(positions(), before);
+	auto * editor = map()->getEditManager();
+	editor->moveObject(town, destination);
+	EXPECT_EQ(positions(), after);
+	editor->getUndoManager().undo();
+	EXPECT_EQ(positions(), before);
+	editor->getUndoManager().redo();
+	EXPECT_EQ(positions(), after);
+	const auto snapshot = gameState()->saveToMemory();
+	auto restored = std::make_shared<CGameState>();
+	restored->preInit(LIBRARY);
+	restored->loadFromMemory(snapshot);
+	restored->getMap().checkForObjectives();
+	std::vector<EventCondition> resolved;
+	restored->getMap().triggeredEvents[0].trigger.morph([&](const EventCondition & condition) -> EventExpression::Variant
+	{
+		resolved.push_back(condition);
+		return condition;
+	});
+	ASSERT_EQ(resolved.size(), 6u);
+	for(size_t i = 0; i < 4; ++i)
+		EXPECT_EQ(resolved[i].objectID, town->id);
+	EXPECT_EQ(resolved[4].objectID, otherTown->id);
+	EXPECT_EQ(resolved[5].objectID, ObjectInstanceID::NONE);
+	EXPECT_TRUE(restored->checkForVictory(player, resolved[0]));
+	EXPECT_FALSE(restored->checkForVictory(player, resolved[4]));
+	map()->triggeredEvents[0].trigger = map()->triggeredEvents[0].trigger.morph([](EventCondition condition) -> EventExpression::Variant
+	{
+		if(condition.condition == EventCondition::TRANSPORT)
+			condition.value = 42;
+		return condition;
+	});
+	editor->getUndoManager().undo();
+	auto expected = before;
+	expected[2] = shiftedEntrance;
+	EXPECT_EQ(positions(), expected);
+}
+
+TEST_F(HeroMovementTest, EditorMoveTracksHeroPrisonAndPlaceholderObjectives)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(10, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	const auto check = [&](CGObjectInstance * target, int3 destination)
+	{
+		EventCondition condition(EventCondition::DESTROY);
+		condition.objectType = MapObjectID(Obj::HERO);
+		condition.position = target->anchorPos();
+		const auto original = condition.position;
+		TriggeredEvent event;
+		event.identifier = "hero_target";
+		event.effect.type = EventEffect::VICTORY;
+		event.trigger = EventExpression(EventExpression::Variant(condition));
+		map()->triggeredEvents = {event};
+		const auto position = [&]()
+		{
+			int3 result;
+			map()->triggeredEvents[0].trigger.test([&](const EventCondition & current)
+			{
+				result = current.position;
+				return true;
+			});
+			return result;
+		};
+		auto * editor = map()->getEditManager();
+		editor->moveObject(target, destination);
+		EXPECT_EQ(position(), destination);
+		editor->getUndoManager().undo();
+		EXPECT_EQ(position(), original);
+	};
+	check(hero, int3(-1, 10, 0));
+	map()->hideObject(hero);
+	hero->ID = Obj::PRISON;
+	map()->showObject(hero);
+	check(hero, int3(10, -1, 0));
+	map()->hideObject(hero);
+	hero->ID = Obj::HERO;
+	map()->showObject(hero);
+	auto placeholder = std::make_shared<CGHeroPlaceholder>(gameState().get());
+	placeholder->ID = Obj::HERO_PLACEHOLDER;
+	placeholder->appearance = hero->appearance;
+	placeholder->pos = int3(15, 15, 0);
+	placeholder->instanceName = "objective_placeholder";
+	map()->addNewObject(placeholder);
+	check(placeholder.get(), int3(-1, -1, 0));
 }
 
 /// Two towns that share an entrance tile, as found on some SoD maps. The pathfinder only considers the top town.
