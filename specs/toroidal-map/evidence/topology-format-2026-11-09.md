@@ -20,6 +20,22 @@ bytes, but neither that check nor this loader validation proves all such
 peers are safely distinguished. Explicit capability negotiation and upstream
 version allocation remain unresolved.
 
+An in-memory `GameConnection` test subsequently serialized the real
+`LobbyUpdateMapInfo` packet. With both codecs set to the current version the
+toroidal flag survives; with both set to the preceding version the flag is
+omitted. A deliberately mismatched codec experiment rejected the older wire
+layout when read as current, but the reverse direction accepted the current
+layout without an error while reading the map header as bounded. This is a
+simulation using two versions of the current binary, not a test of an actual
+old or future peer. It demonstrates why the numeric-version collision cannot
+be dismissed as a framing error. The expected fail-closed regression is
+recorded as disabled until explicit capability negotiation exists. TB5 logs:
+`lobby-packet-final-build.log`, `lobby-packet-final-test.log`, and the
+intentionally failing `lobby-packet-conflict-test.log`.
+The normal full suite passed 1,397 tests with four disabled
+(`full-suite-lobby-packet.log`); the fourth disabled test is this newly
+recorded unresolved safety regression.
+
 On 2026-11-09 a versioned topology flag was added to the map header, JSON map
 header and binary serialization. A version-4 map header signals `toroidal`;
 legacy maps and older save formats default to bounded. The server checks a
