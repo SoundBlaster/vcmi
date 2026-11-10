@@ -89,7 +89,8 @@ experimental until a real client session and focused tests verify it.
    version truncated every tree and wrote 53 MB in one session. The
    [change-driven revision](evidence/observation-on-change-client-2026-11-10.md)
    produced 24 snapshots in a separate client session; its world-view object
-   enumeration hit the former 4,096-tile limit. The larger limit and the
-   bounded inspection frequency still require a new client-session check.
+   enumeration hit the former 4,096-tile limit. A later client session with
+   bounded inspection and a larger tile limit reported complete enumeration
+   at that same world-view scale; other viewports and densities remain open.
    Define stable semantics and actionable roles only where the
    game supplies them. Consider a future protocol adapter separately.

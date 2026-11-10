@@ -33,3 +33,24 @@ The signed client's SHA-256 is
 The focused topology suite passed 22 tests; build and test logs are
 `observation-on-change-build.log` and `observation-on-change-tests.log` in
 the TB5 build root.
+
+## Bounded inspection and wider world view
+
+The later signed client from `28348ef` used a 100 ms minimum interval between
+map inspections and a 20,000-tile scan limit. On the same save, Computer Use
+opened world view, returned to the map and scrolled right before quitting
+without saving. The trace held 12 snapshots across show counts 0 through
+2,678, totaling 482,969 bytes. The smallest interval between consecutive
+snapshot timestamps was 100.15 ms. All emitted records reported both map and
+GUI enumeration complete. At the 7×7 world-view scale the largest snapshot
+contained 440 candidate tile/object pairs and 303 GUI nodes. This establishes
+the limit was sufficient for this viewport and fixture, not for every zoom,
+map or object density. The diagnostic overhead itself was not benchmarked.
+
+The trace is `runtime/observation-budget-28348ef.jsonl`, SHA-256
+`f9d1e28e7f03d87367bd5cb6fc2d9e17084c99827ff08a0a68566fc56b83e5e7`;
+the signed client SHA-256 is
+`cdfc5ae038e7fccde60463d71f23a35fcb383e107ef5f3b9acd9942320a039ce`.
+The standalone topology suite passed 23 tests; see
+`observation-budget-build.log` and `observation-budget-tests.log` under the
+TB5 build root. Changes shorter than the inspection interval can be missed.
