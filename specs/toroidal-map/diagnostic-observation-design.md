@@ -38,7 +38,8 @@ a resource or selected-hero change can trigger a snapshot even if the map and
 widget geometry are unchanged. Other players' private state is not requested;
 when no valid player callback exists, `player_state` is null. Resource IDs are
 numeric engine identifiers, and omitted resources have amount zero. This
-extension has built locally but still needs a running-game check.
+extension has been exercised for one resource pickup and one selected hero;
+see [the client evidence](evidence/observation-on-change-client-2026-11-10.md).
 
 The subsequent prototype revision can include the top window's widget tree
 when that window derives from `CIntObject`. Nodes have per-record indices and
