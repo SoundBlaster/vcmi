@@ -63,6 +63,42 @@ TEST(MapViewModelTopologyTest, ObservationDistinguishesVisibleCopiesAndHonorsFog
 	EXPECT_EQ(observations.size(), 4u);
 }
 
+TEST(MapViewModelTopologyTest, ObservationRecordsVisibleRunsAndFogChanges)
+{
+	MapViewModel model;
+	model.setTileSize(Point(10, 10));
+	model.setViewDimensions(Point(40, 40));
+	model.setViewCenter(Point(0, 0));
+	model.setLevel(0);
+	const MapTopology torus(3, 3, 1, true);
+	bool revealOne = false;
+	const auto capture = [&]()
+	{
+		std::vector<MapObservationVisibleRun> runs;
+		const bool complete = forEachObservedMapTile(model, torus, 16,
+			[&](const int3 & displayed)
+			{
+				return displayed.y == -1 && (displayed.x == -2 || displayed.x == 0 || (revealOne && displayed.x == -1));
+			},
+			[&](const int3 & displayed, const int3 &, const Rect &)
+			{
+				appendObservedVisibleTile(runs, displayed);
+			});
+		EXPECT_TRUE(complete);
+		return formatObservedVisibleRuns(runs);
+	};
+	MapObservationGate gate;
+	const auto hidden = capture();
+	EXPECT_EQ(hidden, "[[-1,-2,-1],[-1,0,1]]");
+	EXPECT_TRUE(gate.shouldRecord(hidden, Point(0, 0)));
+	EXPECT_FALSE(gate.shouldRecord(hidden, Point(0, 0)));
+	revealOne = true;
+	const auto revealed = capture();
+	EXPECT_EQ(revealed, "[[-1,-2,1]]");
+	EXPECT_TRUE(gate.shouldRecord(revealed, Point(0, 0)));
+	EXPECT_FALSE(gate.shouldRecord(revealed, Point(0, 0)));
+}
+
 TEST(MapViewModelTopologyTest, ObservationWidgetTraversalKeepsParentsAndReportsLimits)
 {
 	struct Widget { std::vector<Widget *> children; };

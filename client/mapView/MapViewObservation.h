@@ -9,7 +9,42 @@
 #include "../../lib/mapping/MapTopology.h"
 #include <cstddef>
 #include <chrono>
+#include <sstream>
 #include <string>
+#include <vector>
+
+/// Consecutive visible displayed tiles in one row, with an exclusive end.
+struct MapObservationVisibleRun
+{
+	int y;
+	int beginX;
+	int endX;
+};
+
+/// forEachObservedMapTile visits tiles in row-major order.
+inline void appendObservedVisibleTile(std::vector<MapObservationVisibleRun> & runs, const int3 & displayed)
+{
+	if(!runs.empty() && runs.back().y == displayed.y && runs.back().endX == displayed.x)
+		++runs.back().endX;
+	else
+		runs.push_back({displayed.y, displayed.x, displayed.x + 1});
+}
+
+inline std::string formatObservedVisibleRuns(const std::vector<MapObservationVisibleRun> & runs)
+{
+	std::ostringstream out;
+	out << '[';
+	bool first = true;
+	for(const auto & run : runs)
+	{
+		if(!first)
+			out << ',';
+		first = false;
+		out << '[' << run.y << ',' << run.beginX << ',' << run.endX << ']';
+	}
+	out << ']';
+	return out.str();
+}
 
 class MapObservationSampler
 {

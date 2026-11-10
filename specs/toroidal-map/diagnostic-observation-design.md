@@ -90,6 +90,23 @@ camera movement and sprite animation alone do not cause snapshots; each
 emitted record retains precise geometry at its own observation time. The
 `show_count` field identifies how many map-show calls have been examined.
 
+The version 3 prototype also reports `visible_runs`: row-major runs of
+displayed tile coordinates `[y, begin_x, end_x]`, with an exclusive end. A
+run is emitted only for cells visible to both the renderer context and the
+player callback; repeated map copies remain separate displayed cells. These
+runs participate in change detection, including when empty terrain becomes
+visible without an object or camera change. A false `complete` flag means the
+viewport scan or candidate list was truncated; missing cells cannot then be
+assumed hidden. Visibility is sampled at most every 100 ms, so short changes
+can still be missed. This is a diagnostic viewport observation, not an
+authoritative or complete player-world model.
+
+On macOS arm64, the client and standalone topology test targets built from
+`0b6a396` plus this change, and all 24 standalone tests passed, including a
+fog-only change with a stationary camera. The linker reported duplicate
+libraries and missing Conan search-path warnings. Version 3 has not yet been
+checked in a running client; earlier runtime evidence below is for version 2.
+
 Snapshots are observations of renderer inputs, not proof of pixels presented
 by the OS or a replacement for screenshots/video. Sequence numbers and
 monotonic timestamps help order recorded changes; pixel gaps, sprite clipping, flicker and perceived

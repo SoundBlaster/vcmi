@@ -134,6 +134,7 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 	bool first = true;
 	bool candidatesComplete = true;
 	std::size_t candidateCount = 0;
+	std::vector<MapObservationVisibleRun> visibleRuns;
 	const bool tilesComplete = forEachObservedMapTile(model, topology, 20000,
 		[&](const int3 & displayed)
 		{
@@ -142,6 +143,7 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 		},
 		[&](const int3 & displayed, const int3 & canonical, const Rect & area)
 		{
+			appendObservedVisibleTile(visibleRuns, displayed);
 			for(const auto & id : context.getObjects(displayed))
 			{
 				if(!callback->tryGetObj(id))
@@ -163,7 +165,9 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 					<< "],\"image_offset\":[" << offset.x << ',' << offset.y << "]}";
 			}
 		});
-	out << "],\"complete\":" << (tilesComplete && candidatesComplete ? "true" : "false");
+	const auto visibleData = formatObservedVisibleRuns(visibleRuns);
+	out << "],\"visible_runs\":" << visibleData << ",\"complete\":" << (tilesComplete && candidatesComplete ? "true" : "false");
+	key << ":v" << visibleData;
 	key << ':' << tilesComplete << ':' << candidatesComplete;
 	const auto window = ENGINE->windows().topWindow<CIntObject>();
 	if(trace.guiData.empty() || trace.previousWindow != window.get() || now - trace.lastGuiScan >= std::chrono::milliseconds(200))
@@ -194,7 +198,7 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 	--trace.remaining;
 	const auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
 	const auto guiTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(trace.lastGuiScan.time_since_epoch()).count();
-	trace.file << "{\"version\":2,\"session\":" << trace.session << ",\"sequence\":" << trace.sequence++
+	trace.file << "{\"version\":3,\"session\":" << trace.session << ",\"sequence\":" << trace.sequence++
 		<< ",\"show_count\":" << showCount << ",\"monotonic_ns\":" << timestamp << ",\"gui_observed_ns\":" << guiTimestamp
 		<< out.str() << playerData << trace.guiData << "}\n";
 	trace.file.flush();
