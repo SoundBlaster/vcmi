@@ -15,6 +15,7 @@
 #include "../../IGameSettings.h"
 #include "../../callback/IGameInfoCallback.h"
 #include "../../mapObjects/CGHeroInstance.h"
+#include "../../mapping/CMapHeader.h"
 #include "../../mapping/TerrainTile.h"
 #include "../../networkPacks/PacksForClient.h"
 
@@ -53,6 +54,17 @@ std::string DimensionDoorEffect::getCursorForTarget(const IGameInfoCallback * cb
 {
 	if(!cb->getSettings().getBoolean(EGameSettings::SPELLS_DIMENSION_DOOR_TRIGGERS_GUARDS))
 		return cursor;
+
+	if(const auto * header = cb->getMapHeader(); header && header->toroidal)
+	{
+		const auto player = caster->getCasterOwner();
+		if(!cb->isVisibleFor(pos, player) || !cb->tryGetTile(pos))
+			return cursor;
+		for(const auto * guard : cb->getGuardingCreatures(pos))
+			if(cb->isVisibleFor(guard->visitablePos(), player))
+				return cursorGuarded;
+		return cursor;
+	}
 
 	// A hidden landing may be invalid or safe; only visible guarded landings need an attack cursor.
 	if(!exposeFow && !cb->isVisibleFor(pos, caster->getCasterOwner()))

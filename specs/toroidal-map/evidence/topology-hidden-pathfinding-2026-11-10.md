@@ -79,3 +79,24 @@ tests, skipped three optional external-input tests and reported five disabled
 tests; no TCP case was excluded. Logs are `hidden-callback-before-test.log`,
 `hidden-callback-final-tests.log` and `full-suite-hidden-callback.log` in the
 TB5 build root. These are synthetic tests, not a graphical AI playthrough.
+
+## Dimension Door guard cursor
+
+With guarded Dimension Door landings enabled, the cursor used an unchecked
+guard query. A synthetic test showed the guarded cursor on a visible seam
+tile even when both adjacent monsters were hidden; it also exposed a guard
+on an unseen destination when `exposeFow` was enabled. The test reproduced
+the first case with both player and unrestricted callbacks.
+
+For toroidal maps, the cursor now requires a visible destination and a guard
+visible to the caster's owner. It still displays the guarded cursor when a
+second guard is visible, including through an unrestricted callback. The test
+also checks that the bounded cursor retains its prior behavior. It does not
+establish that every spell-target validation path, mod configuration, or GUI
+interaction preserves fog confidentiality.
+
+The client, server, editor and tests built on macOS arm64. Twenty-one focused
+guard and spell tests passed, as did 1,450 tests in the complete enabled suite;
+three optional external-input tests were skipped and five tests remain
+disabled. No TCP test was excluded. The test and suite logs are
+`hidden-cursor-final-tests.log` and `full-suite-hidden-cursor.log` on TB5.

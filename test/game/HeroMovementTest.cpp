@@ -15,6 +15,7 @@
 #include "../../client/adventureMap/MapAudioSources.h"
 
 #include "../../lib/GameLibrary.h"
+#include "../../lib/IGameSettings.h"
 #include "../../lib/CPlayerState.h"
 #include "../../lib/battle/BattleInfo.h"
 #include "../../lib/campaign/CampaignState.h"
@@ -48,6 +49,7 @@
 #include "../../lib/spells/CSpellHandler.h"
 #include "../../lib/spells/Problem.h"
 #include "../../lib/spells/adventure/AdventureSpellMechanics.h"
+#include "../../lib/spells/adventure/DimensionDoorEffect.h"
 #include "../../lib/bonuses/Bonus.h"
 #include "../../lib/pathfinder/CPathfinder.h"
 #include "../../lib/pathfinder/PathfinderOptions.h"
@@ -1328,6 +1330,43 @@ TEST_F(HeroMovementTest, WrappedPlayerGuardQueriesDoNotRevealHiddenGuards)
 	EXPECT_EQ(callback->guardingCreaturePosition(boundedTarget), actualGuard);
 	EXPECT_EQ(callback->getGuardingCreaturePosition(boundedTarget), actualGuard);
 	EXPECT_FALSE(callback->getGuardingCreatures(boundedTarget).empty());
+}
+
+TEST_F(HeroMovementTest, WrappedDimensionDoorCursorDoesNotRevealHiddenGuard)
+{
+	const PlayerColor player(0);
+	const int3 hiddenGuard(35, 10, 0), visibleGuard(35, 11, 0), target(0, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(3, 10, 0), HeroTypeID(0), player)
+		.monster(hiddenGuard, CreatureID(0), 10).monster(visibleGuard, CreatureID(0), 10);
+	overrideSettingBeforeInit(EGameSettings::SPELLS_DIMENSION_DOOR_TRIGGERS_GUARDS, true);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto & fog = gameState()->getPlayerTeam(player)->fogOfWarMap;
+	fog[hiddenGuard] = 0;
+	fog[visibleGuard] = 0;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	auto callback = makeCallback(player);
+	JsonNode config;
+	config["cursor"].String() = "ordinary";
+	config["cursorGuarded"].String() = "guarded";
+	config["exposeFow"].Bool() = true;
+	DimensionDoorEffect effect(nullptr, config);
+	const IAdventureSpellEffect & view = effect;
+	EXPECT_EQ(view.getCursorForTarget(callback.get(), hero, target), "ordinary");
+	EXPECT_EQ(view.getCursorForTarget(gameState().get(), hero, target), "ordinary");
+	fog[visibleGuard] = 1;
+	EXPECT_EQ(view.getCursorForTarget(callback.get(), hero, target), "guarded");
+	EXPECT_EQ(view.getCursorForTarget(gameState().get(), hero, target), "guarded");
+	fog[target] = 0;
+	EXPECT_EQ(view.getCursorForTarget(callback.get(), hero, target), "ordinary");
+	fog[target] = 1;
+	map()->setToroidalAndRebuild(false);
+	const int3 boundedTarget(34, 10, 0);
+	fog[visibleGuard] = 0;
+	EXPECT_EQ(view.getCursorForTarget(callback.get(), hero, boundedTarget), "guarded");
 }
 
 TEST_F(HeroMovementTest, WrappedPathfindingRecognizesVisibleGuardBesideHiddenGuard)
