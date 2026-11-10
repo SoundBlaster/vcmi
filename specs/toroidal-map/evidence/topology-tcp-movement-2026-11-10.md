@@ -39,3 +39,21 @@ the hero in place; an adjacent legal tile returns `result=true` and moves
 the hero. This and the TCP scenario passed together on a build from
 `f85437a` plus the bounded-map test. This provides a topology-independent
 regression for the acknowledgement fix.
+
+## TCP lobby start and turns
+
+A second test connects two test listeners to a real `CVCMIServer` over TCP
+loopback and negotiates the topology capability. It writes a small adapted
+toroidal VMAP and configures its player slots directly in the server lobby;
+the host then sends the ordinary `LobbyStartGame` packet. The server loads
+the VMAP, starts the game and sends its initialized state to both listeners.
+Both received a toroidal 36×36 map and the red hero at the expected corner.
+
+With both listeners applying the server's client packets, the host sent the
+corner visit: each state and the server gained 1,000 gold while the hero
+remained at the starting tile. A second request crossed the corner. The host
+then ended its turn; the guest became active and moved its own hero west
+across the horizontal seam. Both replicas matched the server after each
+step. The final test passed five consecutive runs on macOS arm64, built from
+`8d71f38` plus the test. The real graphical clients, lobby UI, mixed-version
+start, remote hosts and network confidentiality are outside this check.
