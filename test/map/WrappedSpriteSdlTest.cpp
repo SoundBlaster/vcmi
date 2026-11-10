@@ -109,26 +109,43 @@ TEST(WrappedSpriteSdl, CompositesPeriodicFragmentsThroughTexturePath)
 				canvas.drawPoint(Point(x, y), ColorRGBA(x, y, 90, 255));
 	}
 	image->prepare();
-	{
-		auto canvas = Canvas::createFromRenderTarget(target.get(), Point(32, 32), CanvasScalingPolicy::IGNORE);
-		forEachWrappedImageFragment(Point(-16, -16), image->dimensions(), Point(96, 96), [&](const Point & position, const Rect & source)
-		{
-			canvas.draw(image, position, source);
-		});
-	}
 	using Surface = std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)>;
-	Surface pixels(SDL_RenderReadPixels(renderer, nullptr), SDL_DestroySurface);
-	ASSERT_NE(pixels, nullptr);
-	std::vector<uint8_t> rgba(32 * 32 * 4);
-	ASSERT_TRUE(SDL_ConvertPixels(32, 32, pixels->format, pixels->pixels, pixels->pitch, SDL_PIXELFORMAT_RGBA32, rgba.data(), 32 * 4));
-	for(int y = 0; y < 32; ++y)
-		for(int x = 0; x < 32; ++x)
+	const MapTopology topology(3, 3, 1, true);
+	for(int dx : {-1, 0, 1})
+	for(int dy : {-1, 0, 1})
+	{
+		if(dx == 0 && dy == 0)
+			continue;
+		for(int progressPixels = 0; progressPixels <= 32; ++progressPixels)
 		{
-			const auto index = static_cast<size_t>((y * 32 + x) * 4);
-			EXPECT_EQ(rgba[index], (80 + x) % 96);
-			EXPECT_EQ(rgba[index + 1], (80 + y) % 96);
-			EXPECT_EQ(rgba[index + 2], 90);
-			EXPECT_EQ(rgba[index + 3], 255);
+			SCOPED_TRACE(::testing::Message() << "direction=" << dx << "," << dy << " progress=" << progressPixels);
+			const int3 from(dx < 0 ? 0 : 2, dy < 0 ? 0 : 2, 0);
+			const auto destination = *topology.canonicalize(from + int3(dx, dy, 0));
+			const auto offset = movingObjectImageOffset(topology, true, from, destination, destination, progressPixels / 32.0);
+			ASSERT_TRUE(SDL_SetRenderTarget(renderer, target.get()));
+			ASSERT_TRUE(SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0));
+			ASSERT_TRUE(SDL_RenderClear(renderer));
+			{
+				auto canvas = Canvas::createFromRenderTarget(target.get(), Point(32, 32), CanvasScalingPolicy::IGNORE);
+				forEachWrappedImageFragment(offset, image->dimensions(), Point(96, 96), [&](const Point & position, const Rect & source)
+				{
+					canvas.draw(image, position, source);
+				});
+			}
+			Surface pixels(SDL_RenderReadPixels(renderer, nullptr), SDL_DestroySurface);
+			ASSERT_NE(pixels, nullptr);
+			std::vector<uint8_t> rgba(32 * 32 * 4);
+			ASSERT_TRUE(SDL_ConvertPixels(32, 32, pixels->format, pixels->pixels, pixels->pitch, SDL_PIXELFORMAT_RGBA32, rgba.data(), 32 * 4));
+			for(int y = 0; y < 32; ++y)
+				for(int x = 0; x < 32; ++x)
+				{
+					const auto index = static_cast<size_t>((y * 32 + x) * 4);
+					EXPECT_EQ(rgba[index], MapTopology::wrapCoordinate(96 - offset.x - 32 + x, 96));
+					EXPECT_EQ(rgba[index + 1], MapTopology::wrapCoordinate(96 - offset.y - 32 + y, 96));
+					EXPECT_EQ(rgba[index + 2], 90);
+					EXPECT_EQ(rgba[index + 3], 255);
+				}
 		}
+	}
 	SDL_SetRenderTarget(renderer, nullptr);
 }

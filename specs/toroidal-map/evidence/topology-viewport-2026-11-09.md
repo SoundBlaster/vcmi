@@ -31,6 +31,22 @@ crossing (`wrapped-sprite-texture-build.log` and
 `wrapped-sprite-texture-test.log` on TB5). This exercises the texture API
 with a software renderer, not a hardware GPU or a running game.
 
+On 2026-11-10, source `5d572ca` plus the texture-test change expanded that
+check to every integer pixel position in a 32-pixel step, for all four edge
+directions and all four corner directions (264 samples). Each sample clears
+the target first and checks every RGBA pixel against the expected periodic
+synthetic image. The `vcmi-wrapped-sprite-sdl-test` target built and CTest
+`WrappedSpriteSdl` passed on macOS arm64, with the CMake tree on TB5. The
+linker reported duplicate libraries and missing Conan search-path warnings.
+This tests an SDL software renderer through the texture API, at scale 1;
+it does not establish full map composition, real artwork, a hardware GPU,
+presented frames, frame timing or perceived scrolling smoothness.
+
+```sh
+cmake --build <TB5-build>/cmake --target vcmi-wrapped-sprite-sdl-test -j 4
+ctest --test-dir <TB5-build>/cmake -R '^WrappedSpriteSdl$' --output-on-failure
+```
+
 At revision `406969f` plus the movement-offset extraction, the same sprite
 offset calculation used by the adventure renderer was checked for all eight
 seam directions, including all four corners. Five interpolation positions
