@@ -2742,6 +2742,59 @@ TEST_F(HeroMovementTest, PathfinderHonorsSourceObjectExitDirectionAcrossSeam)
 	EXPECT_EQ(hero->visitablePos(), destination);
 }
 
+TEST_F(HeroMovementTest, SailingHeroWithFlightStillHonorsSourceExitAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 source(0, 5, 0), destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(2, 5, 0), HeroTypeID(0), player)
+		.terrain(source, TerrainId::WATER).terrain(destination, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(source, BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(source), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	const auto boatId = hero->getBoat()->id;
+
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "ForbiddenSailingExit");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto object = std::make_shared<CGObjectInstance>(gameState().get());
+	object->pos = source;
+	object->appearance = appearance;
+	object->instanceName = "forbidden_sailing_exit";
+	map()->hideObject(hero);
+	map()->addNewObject(object);
+	map()->showObject(hero);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * node = paths.getNode(destination, EPathfindingLayer::SAIL);
+	if(node->reachable() && node->theNodeBefore)
+		EXPECT_NE(node->theNodeBefore->coord, source);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), source);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	ASSERT_TRUE(hero->inBoat());
+	EXPECT_EQ(hero->getBoat()->id, boatId);
+	map()->hideObject(object.get());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_TRUE(hero->inBoat());
+}
+
 TEST_F(HeroMovementTest, HeroOnFootCannotClaimSailingLayerAcrossSeam)
 {
 	const PlayerColor player(0);

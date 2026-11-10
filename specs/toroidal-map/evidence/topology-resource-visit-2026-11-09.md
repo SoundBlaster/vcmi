@@ -108,6 +108,27 @@ For a hero with Flight, or Water Walk while on water, the source-exit case
 remains ambiguous and is not resolved by this change. This fixture does not
 establish GUI, multiplayer, airship or all direction behavior.
 
+### Sailing with movement bonuses and source exits
+
+`HeroMovementTest.SailingHeroWithFlightStillHonorsSourceExitAcrossSeam`
+places a synthetic blocking visitable object with no permitted exit under a
+hero aboard a sailing boat. Even with both Flight and Water Walk bonuses,
+the pathfinder does not take a direct sailing step across the seam. Before
+the fix, the server accepted that step and spent movement points. The server
+now applies the source exit rule to a hero in a sailing boat regardless of
+those bonuses: the toroidal movement checks reject switching directly from
+that boat to AIR, WATER or AVIATE. After rejection, the test removes the
+synthetic obstacle and confirms the boat can sail through the same seam.
+
+Six focused movement tests passed. On macOS arm64, the TB5 build from
+`5d3cea7` plus this change ran the full suite: 1,466 passed, two optional
+prototype-file cases were skipped, and four tests remain disabled. The test
+for a legacy Complete map received `Dead and Buried.h3m`. The log is
+`full-suite-sailing-source-exit-2026-11-10.log` in the TB5 runtime directory.
+This uses an artificial overlapping object and boat to exercise the rule;
+it does not demonstrate GUI or multiplayer behavior or resolve ambiguous
+source layers for on-foot flight, water walking, or aviation vehicles.
+
 An additional SoD test uses a resource that forbids entry from the north but
 permits it from the west. Across the north/south seam the server rejects the
 forbidden step without collecting or spending movement; after a short route
