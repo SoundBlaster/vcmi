@@ -33,7 +33,9 @@ the tagged value with its own untagged, lower ordinary version.
 This is not authentication: a modified peer can claim the tag without
 implementing the behavior. The separate [save marker](save-format-design.md)
 protects newly written branch saves but leaves untagged prototype saves
-ambiguous; VMAP version allocation also remains unresolved. This does not
-prove interoperability with arbitrary future forks. Packet-level tests,
+ambiguous. New toroidal VMAPs now carry a separate branch-local major-version
+marker; earlier version-4 prototypes remain ambiguous and neither marker is
+an upstream allocation. This does not prove interoperability with arbitrary
+future forks. Packet-level tests,
 server preparation tests and real multi-peer sessions are separate evidence
 requirements.

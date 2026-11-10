@@ -22,8 +22,9 @@ reported no errors or warnings. This is not an upstream CI result.
 
 The marker is experimental and not reserved upstream. Old untagged prototype
 saves remain readable but cannot be distinguished reliably from an unrelated
-future format using the same ordinal. VMAP major-version collisions and GUI
-save/reload on the new build are also unverified. No existing save was
+future format using the same ordinal. New VMAPs subsequently received a
+separate branch-local marker; untagged version-4 prototypes remain ambiguous.
+GUI save/reload on the new build is also unverified. No existing save was
 rewritten by this change.
 
 The optional `ToroidalDemoVmapTest.DecodesExternalUntaggedPrototypeSave` was

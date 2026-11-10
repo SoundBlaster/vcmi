@@ -1,5 +1,31 @@
 # Map topology format: build and test attempt
 
+## Tagged VMAP writer
+
+New toroidal VMAP headers use integer major version `0x54520004` and retain
+`topology: "toroidal"`. The loader accepts that marker and the branch's old
+version-4 prototypes; a different marker, a tagged header with invalid
+topology, and a toroidal value in a legacy version are rejected. Bounded maps
+continue to use version 3. Before the writer change, two tests failed because
+the generated header contained untagged `4`. An intermediate implementation
+using a JSON float rounded the marker during writing; storing it as a JSON
+integer fixed the round trip. Eight focused map and demo tests passed, with one
+optional unrelated save test skipped. Client, server, editor and test targets
+built on macOS arm64. A further regression demonstrated that a 64-bit unknown
+version could truncate to the marker before validation; the loader now checks
+the original value and rejects that case and negative versions. Logs
+`vmap-marker-before-test.log`, `vmap-overflow-before-test.log`,
+`vmap-marker-validated-build.log`, and `vmap-marker-validated-test.log` are
+on TB5.
+The full `vcmitest` run passed 1,415 tests, skipped the optional external-save
+test and retained four disabled tests (`full-suite-vmap-marker.log` on TB5).
+`specpm validate . --json` reported no errors or warnings.
+
+The original version-3 source rejects a larger major version, but no old
+binary was run. Existing untagged version-4 prototypes are still ambiguous,
+and this marker is not allocated by upstream. The focused tests load a
+synthetic version-4 header, not the previously authored on-disk demo map.
+
 On 2026-11-10 the format test at revision `8384c5d` showed that a version-3
 header with an unknown string or boolean `topology` was silently loaded as a
 bounded map. Both new assertions failed before the fix. The loader now

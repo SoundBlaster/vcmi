@@ -240,6 +240,7 @@ namespace TerrainDetail
 ///CMapFormatJson
 const int CMapFormatJson::VERSION_MAJOR = 3;
 const int CMapFormatJson::VERSION_MAJOR_TOROIDAL = 4;
+const int CMapFormatJson::VERSION_MAJOR_TOROIDAL_TAGGED = 0x54520004;
 const int CMapFormatJson::VERSION_MINOR = 0;
 
 const std::string CMapFormatJson::HEADER_FILE_NAME = "header.json";
@@ -909,27 +910,27 @@ void CMapLoaderJson::readHeader(const bool complete)
 	JsonNode header = getFromArchive(HEADER_FILE_NAME);
 	header.setModScope(ModScope::scopeGame());
 
-	fileVersionMajor = static_cast<int>(header["versionMajor"].Integer());
-
-	if(fileVersionMajor > VERSION_MAJOR_TOROIDAL)
+	const auto rawVersionMajor = header["versionMajor"].Integer();
+	if(rawVersionMajor < 0 || (rawVersionMajor > VERSION_MAJOR_TOROIDAL && rawVersionMajor != VERSION_MAJOR_TOROIDAL_TAGGED))
 	{
-		logGlobal->error("Unsupported map format version: %d", fileVersionMajor);
+		logGlobal->error("Unsupported map format version: %s", std::to_string(rawVersionMajor));
 		throw std::runtime_error("Unsupported map format version");
 	}
+	fileVersionMajor = static_cast<int>(rawVersionMajor);
 
 	fileVersionMinor = static_cast<int>(header["versionMinor"].Integer());
 	const bool hasTopology = header.Struct().contains("topology");
 	const JsonNode & topology = static_cast<const JsonNode &>(header)["topology"];
-	if(fileVersionMajor == VERSION_MAJOR_TOROIDAL)
+	if(fileVersionMajor == VERSION_MAJOR_TOROIDAL || fileVersionMajor == VERSION_MAJOR_TOROIDAL_TAGGED)
 	{
 		if(!topology.isString() || topology.String() != "toroidal")
-			throw std::runtime_error("Invalid or missing topology in map format version 4");
+			throw std::runtime_error("Invalid or missing topology in toroidal map format");
 		mapHeader->toroidal = true;
 	}
 	else
 	{
 		if(topology.isString() && topology.String() == "toroidal")
-			throw std::runtime_error("Toroidal topology requires map format version 4");
+			throw std::runtime_error("Toroidal topology requires a toroidal map format");
 		if(hasTopology && (!topology.isString() || topology.String() != "bounded"))
 			throw std::runtime_error("Unsupported or invalid map topology");
 		mapHeader->toroidal = false;
@@ -1437,7 +1438,7 @@ void CMapSaverJson::writeHeader()
 	JsonNode header;
 	JsonSerializer handler(mapObjectResolver.get(), header);
 
-	header["versionMajor"].Float() = mapHeader->toroidal ? VERSION_MAJOR_TOROIDAL : VERSION_MAJOR;
+	header["versionMajor"].Integer() = mapHeader->toroidal ? VERSION_MAJOR_TOROIDAL_TAGGED : VERSION_MAJOR;
 	header["versionMinor"].Float() = VERSION_MINOR;
 	if(mapHeader->toroidal)
 		header["topology"].String() = "toroidal";

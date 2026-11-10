@@ -195,9 +195,19 @@ TEST(MapFormat, ToroidalTopologyRoundTripsAndRequiresNewFormat)
 	JsonNode actualSurface;
 	JsonNode actualUnderground;
 	loadActual(&buffer, toroidal, actualHeader, actualObjects, actualSurface, actualUnderground);
-	EXPECT_EQ(actualHeader["versionMajor"].Integer(), CMapFormatJson::VERSION_MAJOR_TOROIDAL);
+	EXPECT_EQ(actualHeader["versionMajor"].Integer(), CMapFormatJson::VERSION_MAJOR_TOROIDAL_TAGGED);
 	EXPECT_EQ(actualHeader["topology"].String(), "toroidal");
 	EXPECT_TRUE(loadOriginal(actualHeader, actualObjects, actualSurface, actualUnderground)->toroidal);
+
+	actualHeader["versionMajor"].Integer() = CMapFormatJson::VERSION_MAJOR_TOROIDAL_TAGGED + 1;
+	EXPECT_THROW(loadOriginal(actualHeader, actualObjects, actualSurface, actualUnderground), std::runtime_error);
+	actualHeader["versionMajor"].Integer() = static_cast<int64_t>(CMapFormatJson::VERSION_MAJOR_TOROIDAL_TAGGED) + (int64_t{1} << 32);
+	EXPECT_THROW(loadOriginal(actualHeader, actualObjects, actualSurface, actualUnderground), std::runtime_error);
+	actualHeader["versionMajor"].Integer() = -1;
+	EXPECT_THROW(loadOriginal(actualHeader, actualObjects, actualSurface, actualUnderground), std::runtime_error);
+	actualHeader["versionMajor"].Integer() = CMapFormatJson::VERSION_MAJOR_TOROIDAL_TAGGED;
+	actualHeader["topology"].String() = "bounded";
+	EXPECT_THROW(loadOriginal(actualHeader, actualObjects, actualSurface, actualUnderground), std::runtime_error);
 
 	header["topology"].String() = "unknown";
 	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
@@ -269,7 +279,7 @@ TEST(MapFormat, LegacyH3MCanBeOptedIntoToroidalVmap)
 	CMemoryBuffer output;
 	JsonNode header, objects, surface, underground;
 	loadActual(&output, legacy, header, objects, surface, underground);
-	EXPECT_EQ(header["versionMajor"].Integer(), CMapFormatJson::VERSION_MAJOR_TOROIDAL);
+	EXPECT_EQ(header["versionMajor"].Integer(), CMapFormatJson::VERSION_MAJOR_TOROIDAL_TAGGED);
 	EXPECT_EQ(header["topology"].String(), "toroidal");
 	auto reopened = loadOriginal(header, objects, surface, underground);
 	ASSERT_TRUE(reopened->toroidal);

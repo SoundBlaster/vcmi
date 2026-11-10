@@ -17,11 +17,14 @@ never changes the level.
 Existing `.h3m` maps have no declaration for this new topology, and legacy
 content without the field remains bounded. The editor can open `.h3m` and
 `.vmap` files and has a topology control; its Save As format is `.vmap`.
-In this branch a toroidal `.vmap` header uses `versionMajor: 4` and
-`topology: "toroidal"`. A missing topology on older format versions means
-bounded behavior. These are local pilot format choices, not upstream-approved
-format allocations. The actual editor workflow and full legacy gameplay
-coverage are still being verified.
+New toroidal `.vmap` headers use the branch-local integer major version
+`0x54520004` and `topology: "toroidal"`. This marker makes newly written
+maps distinguishable from an unrelated future ordinary version 4. The reader
+also accepts this branch's earlier untagged version-4 prototypes; their
+origin cannot be established from their version alone. A missing topology on
+older format versions means bounded behavior. These are pilot format choices,
+not upstream-approved allocations. The actual editor workflow and full
+legacy gameplay coverage are still being verified.
 
 A session-wide override for any old map is possible in principle, but would
 change that map's rules and needs an explicit choice shared by the server,

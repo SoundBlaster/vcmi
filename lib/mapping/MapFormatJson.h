@@ -36,6 +36,7 @@ class DLL_LINKAGE CMapFormatJson
 public:
 	static const int VERSION_MAJOR;
 	static const int VERSION_MAJOR_TOROIDAL;
+	static const int VERSION_MAJOR_TOROIDAL_TAGGED;
 	static const int VERSION_MINOR;
 
 	static const std::string HEADER_FILE_NAME;
