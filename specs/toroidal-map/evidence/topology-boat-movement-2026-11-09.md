@@ -121,3 +121,18 @@ local suite passed; the latter ran 1,380 tests with three disabled
 (`full-suite-layer-terrain.log` on TB5). Client, server and test targets
 were built from `9112115` plus this change (`layer-terrain-after-build.log`).
 Vehicle-specific rules and multiplayer remain only partially covered.
+
+## Boat corner save and restoration
+
+`HeroMovementTest.BoatCanCrossToroidalCornerAfterSaveAndRestore` creates an
+embarked hero on a synthetic 36×36 toroidal map, sails diagonally from
+`(0,0)` to `(35,35)`, and writes game state and header chunks into a save
+file. After loading the game-state chunk, the test checks topology, hero and
+boat identity, position, and remaining movement points, then sends an ordinary
+server movement request back to `(0,0)` and verifies the hero remains aboard.
+
+The new test and `HeroMovementTest.BoatCanSailAcrossToroidalCornerAndBothAxes`
+passed using the separate TB5 build based on `0150dbd` plus this test. This
+checks the serialized game-state chunk and a subsequent server move; the test
+does not exercise the server save/load entry points, multiplayer, or GUI
+presentation.

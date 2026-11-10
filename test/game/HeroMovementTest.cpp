@@ -3000,6 +3000,72 @@ TEST_F(HeroMovementTest, BoatCanSailAcrossToroidalCornerAndBothAxes)
 	}
 }
 
+TEST_F(HeroMovementTest, BoatCanCrossToroidalCornerAfterSaveAndRestore)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(2, 0, 0), HeroTypeID(0), player)
+		.terrain(int3(0, 0, 0), TerrainId::WATER)
+		.terrain(int3(35, 0, 0), TerrainId::WATER)
+		.terrain(int3(0, 35, 0), TerrainId::WATER)
+		.terrain(int3(35, 35, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(int3(0, 0, 0), BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 35, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_EQ(hero->visitablePos(), int3(35, 35, 0));
+	ASSERT_NE(hero->getBoat(), nullptr);
+	const auto heroID = hero->id;
+	const auto boatID = hero->getBoat()->id;
+	const auto movement = hero->movementPointsRemaining();
+
+	CMemorySerializer stateBytes, headerBytes;
+	gameState()->saveGame(stateBytes.oser);
+	gameState()->saveHeader(headerBytes.oser);
+	const auto path = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-boat-corner-save-%%%%-%%%%.vsgm1");
+	struct TemporarySave
+	{
+		boost::filesystem::path path;
+		~TemporarySave() { boost::filesystem::remove(path); }
+	} temporarySave{path};
+	CSaveFile save;
+	save.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*gameState()).toBytes());
+	save.addChunk(SaveFileFormat::CHUNK_HEADER, headerBytes.extractBuffer());
+	save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, stateBytes.extractBuffer());
+	save.write(path);
+	CLoadFile load(path);
+	auto restored = std::make_shared<CGameState>();
+	restored->preInit(LIBRARY);
+	auto chunk = load.openChunk(SaveFileFormat::CHUNK_GAMESTATE, restored.get());
+	restored->loadGame(chunk->iser);
+	ASSERT_TRUE(chunk->isFullyRead());
+	ASSERT_TRUE(restored->getMap().toroidal);
+	auto * restoredHero = dynamic_cast<CGHeroInstance *>(restored->getMap().getObject(heroID));
+	ASSERT_NE(restoredHero, nullptr);
+	ASSERT_TRUE(restoredHero->inBoat());
+	ASSERT_NE(restoredHero->getBoat(), nullptr);
+	EXPECT_EQ(restoredHero->getBoat()->id, boatID);
+	EXPECT_EQ(restoredHero->visitablePos(), int3(35, 35, 0));
+	EXPECT_EQ(restoredHero->movementPointsRemaining(), movement);
+
+	GameHandlerTestServer restoredServer(restored, player);
+	CGameHandler restoredHandler(restoredServer, restored);
+	ASSERT_TRUE(restoredHandler.moveHero(heroID, restoredHero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_TRUE(restoredHero->inBoat());
+	EXPECT_EQ(restoredHero->getBoat()->id, boatID);
+	EXPECT_EQ(restoredHero->visitablePos(), int3(0, 0, 0));
+	EXPECT_LT(restoredHero->movementPointsRemaining(), movement);
+}
+
 TEST_F(HeroMovementTest, UndergroundSeamPreservesLevelAndFogIsolation)
 {
 	const PlayerColor player(0);
