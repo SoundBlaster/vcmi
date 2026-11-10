@@ -139,3 +139,53 @@ TEST(MapViewModelTopologyTest, MovingSpriteTakesOneStepAcrossEachSeam)
 	const MapTopology bounded(extent, extent, 2, false);
 	EXPECT_EQ(movingObjectImageOffset(bounded, false, int3(0, 0, 1), int3(35, 35, 1), int3(0, 0, 1), 0.5), Point(560, 560));
 }
+
+TEST(MapViewModelTopologyTest, MovingSpriteDrawsBothCopiesInSmallMapTile)
+{
+	const MapTopology topology(3, 3, 1, true);
+	for(const int dx : {-1, 1})
+	for(const int dy : {-1, 1})
+	{
+		const int3 from(dx < 0 ? 0 : 2, dy < 0 ? 0 : 2, 0);
+		const int3 destination = *topology.canonicalize(from + int3(dx, dy, 0));
+		for(int progressPixels = 0; progressPixels <= 32; progressPixels += 8)
+		{
+			const auto offset = movingObjectImageOffset(topology, true, from, destination, destination, progressPixels / 32.0);
+			int coverage[32][32]{};
+			int fragments = 0;
+			forEachWrappedImageFragment(offset, Point(96, 96), Point(96, 96), [&](const Point & target, const Rect & source)
+			{
+				++fragments;
+				ASSERT_GT(source.w, 0);
+				ASSERT_GT(source.h, 0);
+				for(int y = 0; y < source.h; ++y)
+					for(int x = 0; x < source.w; ++x)
+					{
+						const int screenX = target.x + x;
+						const int screenY = target.y + y;
+						ASSERT_GE(screenX, 0);
+						ASSERT_LT(screenX, 32);
+						ASSERT_GE(screenY, 0);
+						ASSERT_LT(screenY, 32);
+						++coverage[screenY][screenX];
+						EXPECT_EQ(source.x + x, MapTopology::wrapCoordinate(96 - offset.x - 32 + screenX, 96));
+						EXPECT_EQ(source.y + y, MapTopology::wrapCoordinate(96 - offset.y - 32 + screenY, 96));
+					}
+			});
+			for(const auto & row : coverage)
+				for(const int count : row)
+					EXPECT_EQ(count, 1);
+			if(progressPixels > 0 && progressPixels < 32)
+				EXPECT_EQ(fragments, (offset.x < 0 ? 2 : 1) * (offset.y < 0 ? 2 : 1));
+		}
+	}
+	int fragments = 0;
+	forEachWrappedImageFragment(Point(-16, 0), Point(64, 32), Point(96, 96), [&](const Point & target, const Rect & source)
+	{
+		++fragments;
+		EXPECT_EQ(target, Point(0, 0));
+		EXPECT_EQ(source.topLeft(), Point(48, 0));
+		EXPECT_EQ(source.dimensions(), Point(16, 32));
+	});
+	EXPECT_EQ(fragments, 1);
+}

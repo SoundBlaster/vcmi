@@ -2,6 +2,19 @@
 
 ## Camera geometry check, 2026-11-10
 
+On a 3×3 torus, a sprite as wide as a map period can cover the same canonical
+tile with two image copies while moving; at a corner, four fragments may be
+needed. The previous renderer used only one image offset for that tile. The
+toroidal renderer now enumerates overlapping periodic copies and clips each
+source rectangle and destination position to the tile. A geometry test checks
+every pixel at five movement samples across all four corners for a 96×96
+image on a 96×96 period, plus one partially visible smaller image. The
+standalone topology suite passed 14 tests and `vcmiclient` built on macOS
+arm64 (`wrapped-sprite-fragments-final-build.log` and
+`wrapped-sprite-fragments-final-test.log` on TB5). These checks establish
+fragment geometry; actual SDL compositing, game frames and performance have
+not been measured.
+
 At revision `406969f` plus the movement-offset extraction, the same sprite
 offset calculation used by the adventure renderer was checked for all eight
 seam directions, including all four corners. Five interpolation positions

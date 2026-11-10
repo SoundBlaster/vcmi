@@ -12,6 +12,7 @@
 #include "MapRenderer.h"
 
 #include "IMapRendererContext.h"
+#include "MapViewMovement.h"
 #include "mapHandler.h"
 
 #include "../CPlayerInterface.h"
@@ -576,6 +577,17 @@ void MapRendererObjects::renderImage(IMapRendererContext & context, Canvas & tar
 	}
 
 	Point offsetPixels = context.objectImageOffset(object->id, coordinates);
+
+	const auto * map = GAME->map().getMap();
+	if(map->toroidal)
+	{
+		const Point period(map->width * 32, map->height * 32);
+		forEachWrappedImageFragment(offsetPixels, image->dimensions(), period, [&](const Point & destination, const Rect & source)
+		{
+			target.draw(image, destination, source);
+		});
+		return;
+	}
 
 	if ( offsetPixels.x < image->dimensions().x && offsetPixels.y < image->dimensions().y)
 	{
