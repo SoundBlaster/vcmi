@@ -1757,6 +1757,53 @@ TEST_F(HeroMovementTest, HeroCollectsResourceAcrossToroidalCorner)
 	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
 }
 
+TEST_F(HeroMovementTest, HeroCapturesMineAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	const int3 minePosition(10, 35, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 0, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(10, 0, 0));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	auto object = handler.createNewObject(minePosition, Obj::MINE, MapObjectSubID(0));
+	auto * mine = dynamic_cast<CGMine *>(object.get());
+	ASSERT_NE(mine, nullptr);
+	ASSERT_EQ(mine->visitablePos(), minePosition);
+	for(int x = 0; x < mine->getWidth(); ++x)
+		for(int y = 0; y < mine->getHeight(); ++y)
+		{
+			const int3 tile = mine->anchorPos() - int3(x, y, 0);
+			if(!map()->isInTheMap(tile))
+				ASSERT_FALSE(mine->coveringAt(tile) || mine->blockingAt(tile) || mine->visitableAt(tile));
+		}
+	mine->setOwner(PlayerColor::NEUTRAL);
+	handler.newObject(object, player);
+	ASSERT_EQ(mine->getOwner(), PlayerColor::NEUTRAL);
+	map()->toroidal = false;
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(minePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(mine->getOwner(), PlayerColor::NEUTRAL);
+	EXPECT_EQ(hero->visitablePos(), int3(10, 0, 0));
+	map()->toroidal = true;
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * destination = paths.getNode(minePosition, EPathfindingLayer::LAND);
+	ASSERT_TRUE(destination->reachable());
+	ASSERT_NE(destination->theNodeBefore, nullptr);
+	EXPECT_EQ(destination->theNodeBefore->coord, hero->visitablePos());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(minePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(mine->getOwner(), player);
+	EXPECT_EQ(hero->visitablePos(), minePosition);
+}
+
 TEST_F(HeroMovementTest, MonsterGuardAcrossSeamStartsBattle)
 {
 	const PlayerColor player(0);

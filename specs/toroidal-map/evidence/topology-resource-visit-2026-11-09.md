@@ -1,5 +1,18 @@
 # Resource interaction across a corner
 
+On 2026-11-10 a synthetic SoD game placed a hero at `(10,0)` and a neutral,
+unguarded mine with its visitable cell at `(10,35)`. The test checked that
+the mine has no visible, blocking or visitable cells outside the map. On a
+bounded map the direct move was rejected without changing owner or hero
+position. With wrapping enabled, the pathfinder chose the direct step, and
+the real server move entered the mine and changed its owner to the hero's
+player. Three focused interaction and guard tests passed on macOS arm64
+(`toroidal-mine-final-build.log` and `toroidal-mine-final-test.log` on TB5).
+All 47 `HeroMovementTest` cases subsequently passed
+(`toroidal-mine-movement-suite.log`).
+The mine was created through the server in an in-memory fixture. This does
+not verify GUI input, multiplayer, guarded mines, or future resource income.
+
 On 2026-11-10 a synthetic impassable object across a seam exposed another
 pathfinder/server disagreement at revision `24b52c8`: a hero with flying
 ability could request `LAND` movement and enter the blocker. The regression
