@@ -231,7 +231,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/filesystem/FileInfo.cpp` | 22 | unreviewed |
 | `lib/filesystem/PngStripWriter.cpp` | 24, 27, 29, 30, 42, 43, 97, 100, 115 | unreviewed |
 | `lib/filesystem/PngStripWriter.h` | 32, 35 | unreviewed |
-| `lib/gameState/CGameState.cpp` | 527, 530, 536, 538, 545, 554, 598, 674, 795, 1001, 1007, 1074, 1291, 1310, 1333, 1335, 1336, 1343 | partial: Grail placement fixed and tested; guard neighborhood wraps; Favorable Winds initialization still clips a seam-spanning footprint, which is outside the adapted-map pilot; other candidates unreviewed |
+| `lib/gameState/CGameState.cpp` | 527, 530, 536, 538, 545, 554, 598, 674, 795, 1001, 1007, 1074, 1291, 1310, 1333, 1335, 1336, 1343 | partial: Grail placement and Favorable Winds initialization use topology and have focused tests; guard neighborhood wraps; other candidates unreviewed |
 | `lib/gameState/GameStatePackVisitor.cpp` | 322, 545, 551, 555, 559, 563, 567, 571, 575, 579, 787, 1655 | partial: movement direction uses wrapped displacement; guard cache removal updates across one corner and both adjoining edges, other candidates unreviewed |
 | `lib/gameState/UpgradeInfo.cpp` | 24, 44, 46, 47 | unreviewed |
 | `lib/gameState/UpgradeInfo.h` | 45 | unreviewed |

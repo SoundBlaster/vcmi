@@ -227,6 +227,96 @@ protected:
 	}
 };
 
+class FavorableWindsTopologyTest : public TinyMapGameTest
+{
+protected:
+	bool toroidal = true;
+	bool sailing = false;
+
+	const Services * gameServices() override { return LIBRARY; }
+	void mapLoaded(CMap * loaded) override
+	{
+		TinyMapGameTest::mapLoaded(loaded);
+		loaded->setToroidalAndRebuild(toroidal);
+	}
+
+	void startGame()
+	{
+		TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+		builder.size(36, false).playerActive(PlayerColor(0)).hero(sailing ? int3(2, 35, 0) : int3(11, 10, 0), HeroTypeID(0), PlayerColor(0))
+			.terrainOverlay(int3(0, 0, 0), Obj::FAVORABLE_WINDS);
+		if(sailing)
+			builder.terrain(int3(0, 35, 0), TerrainId::WATER).terrain(int3(35, 35, 0), TerrainId::WATER);
+		startWithMap(std::move(builder));
+	}
+};
+
+TEST_F(FavorableWindsTopologyTest, InitializesWindAreaAcrossCorner)
+{
+	startGame();
+	const auto objects = map()->getObjects();
+	const auto winds = std::ranges::find_if(objects, [](const auto & object)
+	{
+		return object && object->ID == Obj::FAVORABLE_WINDS;
+	});
+	ASSERT_NE(winds, objects.end());
+	ASSERT_GE((*winds)->getWidth(), 2);
+	ASSERT_GE((*winds)->getHeight(), 2);
+	for(const auto & tile : {int3(0, 0, 0), int3(35, 0, 0), int3(0, 35, 0), int3(35, 35, 0)})
+		EXPECT_NE(map()->getTile(tile).extTileFlags & 128, 0) << tile.toString();
+	EXPECT_EQ(map()->getTile(int3(15, 15, 0)).extTileFlags & 128, 0);
+}
+
+TEST_F(FavorableWindsTopologyTest, BoundedMapStillClipsWindArea)
+{
+	toroidal = false;
+	startGame();
+	EXPECT_NE(map()->getTile(int3(0, 0, 0)).extTileFlags & 128, 0);
+	for(const auto & tile : {int3(35, 0, 0), int3(0, 35, 0), int3(35, 35, 0)})
+		EXPECT_EQ(map()->getTile(tile).extTileFlags & 128, 0) << tile.toString();
+}
+
+TEST_F(FavorableWindsTopologyTest, WindChangesSailingCostAcrossSeam)
+{
+	sailing = true;
+	startGame();
+	const PlayerColor player(0);
+	const int3 source(0, 35, 0);
+	const int3 destination(35, 35, 0);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(source, BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(source), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	hero->setMovementPoints(3000);
+	const TerrainTile windy = map()->getTile(source);
+	ASSERT_TRUE(windy.hasFavorableWinds());
+	TerrainTile calm = windy;
+	calm.extTileFlags &= ~128;
+	const TerrainTile destinationTile = map()->getTile(destination);
+	CPathfinderHelper helper(*gameState(), hero, PathfinderOptions(*gameState()));
+	const int windyCost = helper.getMovementCost(source, destination, EPathfindingLayer::SAIL, 3000, false, &windy, &destinationTile);
+	const int calmCost = helper.getMovementCost(source, destination, EPathfindingLayer::SAIL, 3000, false, &calm, &destinationTile);
+	ASSERT_GT(calmCost, 0);
+	EXPECT_EQ(windyCost, static_cast<int>(calmCost * 2.0 / 3));
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * node = paths.getNode(destination, EPathfindingLayer::SAIL);
+	ASSERT_TRUE(node->reachable());
+	ASSERT_NE(node->theNodeBefore, nullptr);
+	ASSERT_EQ(node->theNodeBefore->coord, source);
+	EXPECT_EQ(node->moveRemains, 3000 - windyCost);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_EQ(hero->movementPointsRemaining(), node->moveRemains);
+}
+
 TEST_F(GrailTopologyTest, boundedMapKeepsBorderExclusion)
 {
 	toroidal = false;

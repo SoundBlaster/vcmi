@@ -602,12 +602,14 @@ void CGameState::randomizeMapObjects(IGameRandomizer & gameRandomizer)
 		//handle Favouring Winds - mark tiles under it
 		if(object->ID == Obj::FAVORABLE_WINDS)
 		{
+			const auto topology = map->getTopology();
 			for (int i = 0; i < object->getWidth() ; i++)
 			{
 				for (int j = 0; j < object->getHeight() ; j++)
 				{
-					int3 pos = object->anchorPos() - int3(i,j,0);
-					if(map->isInTheMap(pos)) map->getTile(pos).extTileFlags |= 128;
+					const auto pos = topology.canonicalize(object->anchorPos() - int3(i,j,0));
+					if(pos)
+						map->getTile(*pos).extTileFlags |= 128;
 				}
 			}
 		}

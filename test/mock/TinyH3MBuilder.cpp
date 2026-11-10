@@ -1294,6 +1294,7 @@ void TinyH3MBuilder::writeObjects(TinyH3MWriter & w) const
 
 			case Obj::CURSED_GROUND1:
 			case Obj::MAGIC_PLAINS1:
+			case Obj::FAVORABLE_WINDS:
 				break; // terrain overlays carry no object data
 
 			default:

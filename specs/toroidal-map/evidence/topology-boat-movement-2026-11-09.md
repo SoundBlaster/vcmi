@@ -1,5 +1,20 @@
 # Boat movement across a seam
 
+On 2026-11-10 an in-memory SoD fixture placed Favorable Winds at `(0,0,0)`
+before game initialization, with its footprint crossing both seams. At source
+revision `e966ad1`, the toroidal test failed for all three opposite-edge and
+corner cells; the bounded control passed. Initialization now canonicalizes
+the footprint through map topology, and both cases pass together with the
+existing movement-cost and sailing tests (`winds-wrap-before-test.log`,
+`winds-wrap-after-build.log`, `winds-wrap-after-test.log` on TB5). A later
+test used the initialized wind area for a westward sailing step from
+`(0,35,0)` to `(35,35,0)`; it verified the wind discount against a calm
+copy of the source tile and matching pathfinder/server movement points
+(`winds-voyage-build.log`, `winds-voyage-test.log`). These in-memory tests
+do not establish authored seam-spanning map support.
+The full local suite passed 1,389 tests with three disabled
+(`full-suite-winds-wrap.log`).
+
 On 2026-11-10 an SoD fixture at revision `ab458e7` plus a new test checked
 coast classification with the only water tile at `(35,35,0)`: the opposite
 corner and two adjoining edges were coastal with toroidal topology and not
