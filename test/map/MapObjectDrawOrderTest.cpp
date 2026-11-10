@@ -275,6 +275,34 @@ TEST_F(MapObjectDrawOrderTest, DISABLED_ChangingTopologyRestoresClippedShownObje
 	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 6, 0)).visitableObjects, hidden->id));
 }
 
+TEST_F(MapObjectDrawOrderTest, AuthoringTopologyRebuildIncludesClippedObjects)
+{
+	map.width = 10;
+	map.height = 10;
+	map.initTerrain();
+	for(int z = 0; z < map.levels(); ++z)
+		for(int x = 0; x < map.width; ++x)
+			for(int y = 0; y < map.height; ++y)
+				map.getTile(int3(x, y, z)).terrainType = ETerrainId::GRASS;
+
+	auto object = std::make_shared<CGObjectInstance>(nullptr);
+	object->id = ObjectInstanceID(0);
+	object->pos = int3(0, 5, 0);
+	object->appearance = makeTemplate(R"([ "A0" ])", 0);
+	map.objects = {object, nullptr};
+	map.showObject(object.get());
+
+	for(int iteration = 0; iteration < 2; ++iteration)
+	{
+		map.setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+		EXPECT_TRUE(vstd::contains(map.getTile(int3(9, 5, 0)).visitableObjects, object->id));
+		EXPECT_TRUE(vstd::contains(map.getTile(int3(9, 5, 0)).blockingObjects, object->id));
+		map.setToroidalAndRebuild(false, CMap::TopologyRebuildObjects::AllMapObjects);
+		EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 5, 0)).visitableObjects, object->id));
+		EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 5, 0)).blockingObjects, object->id));
+	}
+}
+
 TEST_F(MapObjectDrawOrderTest, WrappedInteractiveOverlapCanHaveDifferentVisualAndVisitOrder)
 {
 	map.width = 10;

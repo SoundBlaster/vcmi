@@ -74,7 +74,7 @@ void GeneralSettings::update()
 	controller->map()->mapVersion = MetaString::createFromRawString(ui->mapVersionEdit->text().toStdString());
 	if(controller->map()->toroidal != ui->toroidalMapCheck->isChecked())
 	{
-		controller->map()->setToroidalAndRebuild(ui->toroidalMapCheck->isChecked());
+		controller->map()->setToroidalAndRebuild(ui->toroidalMapCheck->isChecked(), CMap::TopologyRebuildObjects::AllMapObjects);
 		controller->resetMapHandler();
 		controller->sceneForceUpdate();
 	}

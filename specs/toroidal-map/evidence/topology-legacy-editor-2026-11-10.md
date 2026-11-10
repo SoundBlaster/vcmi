@@ -77,3 +77,19 @@ index, which cannot distinguish these two cases when no indexed cells remain.
 This is one reason the static-footprint save/load restriction must not yet be
 lifted. The test is synthetic and does not establish how many objects in the
 demo H3M are affected. It does not test rendering or map serialization.
+
+The editor subsequently gained an explicit authoring rebuild mode that takes
+all non-null entries in the map's object list as placed objects. Its synthetic
+test checks that the clipped blocking and visitable cells appear after enabling
+the torus and disappear after returning to bounded topology, for two cycles.
+The default rebuild mode still uses the pre-existing occupancy index and its
+test verifies that an explicitly hidden object stays hidden. The broader
+shown-versus-hidden case remains a disabled regression for the default mode.
+
+The editor and test targets built on macOS arm64, and the focused run of map
+draw-order and legacy-conversion tests passed 14 tests with the one regression
+disabled. This checks the map model and the editor build, not interaction with
+the editor UI. The static-footprint load/save restriction remains in force.
+The full local suite passed 1,427 tests, skipped two optional prototype-input
+tests and reported five disabled tests (`full-suite-authoring-rebuild.log` on
+TB5). SpecPM validation reported no errors or warnings.

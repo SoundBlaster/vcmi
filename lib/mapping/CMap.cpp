@@ -280,7 +280,7 @@ bool CMap::hasUnsupportedToroidalFootprint(const CGObjectInstance & object) cons
 	return false;
 }
 
-void CMap::setToroidalAndRebuild(bool enabled)
+void CMap::setToroidalAndRebuild(bool enabled, TopologyRebuildObjects objectScope)
 {
 	if(toroidal == enabled)
 		return;
@@ -301,6 +301,10 @@ void CMap::setToroidalAndRebuild(bool enabled)
 				tile.blockingObjects.clear();
 				tile.visitableObjects.clear();
 			}
+	if(objectScope == TopologyRebuildObjects::AllMapObjects)
+		for(const auto & object : objects)
+			if(object)
+				shownObjects.insert(object->id);
 	toroidal = enabled;
 	for(const auto & id : shownObjects)
 		showObject(objects.at(id).get());

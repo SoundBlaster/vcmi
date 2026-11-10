@@ -162,8 +162,15 @@ public:
 	/// Hides object from map without actually removing it from object list
 	void hideObject(CGObjectInstance * obj);
 
-	/// Changes topology and rebuilds the occupancy index of objects currently shown on the map.
-	void setToroidalAndRebuild(bool enabled);
+	enum class TopologyRebuildObjects
+	{
+		PreviouslyIndexed,
+		AllMapObjects
+	};
+	/// Changes topology and rebuilds occupancy. AllMapObjects is for authoring
+	/// maps where every object in the map's object list is placed, including
+	/// objects whose entire occupancy was clipped by the previous topology.
+	void setToroidalAndRebuild(bool enabled, TopologyRebuildObjects objectScope = TopologyRebuildObjects::PreviouslyIndexed);
 
 	/// Shows previously hiiden object on map
 	void showObject(CGObjectInstance * obj);
