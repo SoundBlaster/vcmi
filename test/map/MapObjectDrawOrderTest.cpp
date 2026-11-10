@@ -10,6 +10,7 @@
 
 #include "StdInc.h"
 
+#include "../../client/mapView/MapViewOverlay.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGObjectInstance.h"
 #include "../../lib/mapObjects/MapObjectDrawOrder.h"
@@ -142,6 +143,17 @@ TEST_F(MapObjectDrawOrderTest, DrawOrderUsesObjectLayersAcrossToroidalSeam)
 	EXPECT_EQ(MapObjectDrawOrder::tileForObject(map, rock, int3(0, 9, 0)), int3(0, 9, 0));
 	EXPECT_EQ(draw({tree, rock}, 0, int3(0, 9, 0)), "rtRT");
 	EXPECT_EQ(draw({rock, tree}, 0, int3(0, 9, 0)), "rtRT");
+}
+
+TEST_F(MapObjectDrawOrderTest, WorldViewObjectQueryUsesCanonicalOverlayTile)
+{
+	const MapTopology topology(5, 7, 1, true);
+	const auto * object = addObject('O', R"([ "A" ])", int3(4, 0, 0));
+	for(const int3 displayed : {int3(-1, 0, 0), int3(9, 0, 0), int3(-1, -7, 0)})
+	{
+		EXPECT_FALSE(object->visitableAt(displayed));
+		EXPECT_TRUE(object->visitableAt(mapOverlayTile(topology, displayed)));
+	}
 }
 
 TEST_F(MapObjectDrawOrderTest, DetectsStaticOccupiedFootprintsAcrossToroidalSeams)

@@ -14,6 +14,8 @@
 #include "IMapRendererContext.h"
 #include "MapRenderer.h"
 #include "MapViewModel.h"
+#include "MapViewOverlay.h"
+#include "mapHandler.h"
 
 #include "render/CAnimation.h"
 #include "render/CanvasImage.h"
@@ -24,11 +26,13 @@
 #include "render/Graphics.h"
 
 #include "../GameEngine.h"
+#include "../GameInstance.h"
 #include "render/IScreenHandler.h"
 #include "../widgets/TextControls.h"
 
 #include "../../lib/filesystem/PngStripWriter.h"
 #include "../../lib/int3.h"
+#include "../../lib/mapping/CMap.h"
 
 MapViewCache::~MapViewCache()
 {
@@ -108,7 +112,8 @@ Canvas MapViewCache::getTile(const int3 & coordinates)
 
 std::shared_ptr<IImage> MapViewCache::getOverlayImageForTile(const std::shared_ptr<IMapRendererContext> & context, const int3 & coordinates)
 {
-	size_t imageIndex = context->overlayImageIndex(coordinates);
+	const auto tile = mapOverlayTile(GAME->map().getMap()->getTopology(), coordinates);
+	size_t imageIndex = context->overlayImageIndex(tile);
 
 	if(imageIndex < iconsStorage->size())
 		return iconsStorage->getImage(imageIndex);
@@ -389,19 +394,21 @@ void MapViewCache::render(const std::shared_ptr<IMapRendererContext> & context, 
 	if(textOverlayVisible)
 	{
 		const auto & font = ENGINE->renderHandler().loadFont(FONT_TINY);
+		const auto topology = GAME->map().getMap()->getTopology();
 
 		for(int y = dimensions.top(); y < dimensions.bottom(); ++y)
 		{
 			for(int x = dimensions.left(); x < dimensions.right(); ++x)
 			{
 				int3 tile(x, y, model->getLevel());
-				auto overlay = context->overlayText(tile);
+				const auto overlayTile = mapOverlayTile(topology, tile);
+				auto overlay = context->overlayText(overlayTile);
 
 				if(!overlay.text.empty())
 				{
 					Rect targetRect = model->getTargetTileArea(tile);
 					Point position = targetRect.center();
-					if (x % 2 == 0)
+					if (overlayTile.x % 2 == 0)
 						position.y += targetRect.h / 4;
 					else
 						position.y -= targetRect.h / 4;

@@ -9,6 +9,7 @@
 #include "StdInc.h"
 
 #include "../../client/mapView/MapViewModel.h"
+#include "../../client/mapView/MapViewOverlay.h"
 #include "../../client/adventureMap/MapScrollAccumulator.h"
 
 TEST(MapScrollAccumulatorTest, SlowScrollingAccumulatesSubpixelUpdates)
@@ -32,6 +33,25 @@ TEST(MapScrollAccumulatorTest, DirectionChangesAndResetDiscardOldRemainder)
 }
 #include "../../client/mapView/MapViewMovement.h"
 #include "../../lib/mapping/MapTopology.h"
+
+TEST(MapViewModelTopologyTest, RepeatedCopiesUseTheSameOverlayTileAndLabelParity)
+{
+	const MapTopology torus(5, 7, 2, true);
+	const MapTopology bounded(5, 7, 2, false);
+	const int3 canonical(4, 0, 1);
+	const std::map<int3, int> spellIcons{{canonical, 42}};
+	for(const int3 displayed : {canonical, int3(-1, 0, 1), int3(9, 0, 1),
+		int3(-1, -7, 1), int3(9, 14, 1)})
+	{
+		const auto tile = mapOverlayTile(torus, displayed);
+		ASSERT_EQ(tile, canonical);
+		EXPECT_EQ(spellIcons.at(tile), 42);
+		EXPECT_EQ(tile.x % 2, canonical.x % 2);
+	}
+	EXPECT_EQ(mapOverlayTile(torus, int3(-1, 0, 2)), int3(-1, 0, 2));
+	EXPECT_EQ(mapOverlayTile(bounded, int3(-1, 0, 1)), int3(-1, 0, 1));
+	EXPECT_EQ(mapOverlayTile(bounded, canonical), canonical);
+}
 
 TEST(MapViewModelTopologyTest, WrappedCameraPreservesPixelGeometryAcrossSeams)
 {
