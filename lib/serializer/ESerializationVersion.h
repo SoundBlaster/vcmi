@@ -80,13 +80,14 @@ enum class ESerializationVersion : int32_t
 	ARMAGEDDONS_BLADE_BEARER, // campaign scenario may allow only one hero to equip Armageddon's Blade
 	CAMPAIGN_ENEMY_HERO_CARRIED_OVER, // campaign scenario may carry over a hero that the player does not own
 	TOROIDAL_MAP, // map header stores the adventure map topology
+	TOROIDAL_UNINDEXED_OBJECTS, // shown objects with no indexed occupancy
 
 	RELEASE_170 = HOTA_MAP_STACK_COUNT,
 	RELEASE_174 = CUSTOM_GARRISON_TITLE,
 
 	MINIMAL = RELEASE_170,
 	MINIMAL_LOBBY = LOBBY_SCENARIO_LIST, // client and server of lobby reject each other below this version
-	CURRENT = TOROIDAL_MAP,
+	CURRENT = TOROIDAL_UNINDEXED_OBJECTS,
 };
 
 static_assert(ESerializationVersion::MINIMAL <= ESerializationVersion::CURRENT, "Invalid serialization version definition!");

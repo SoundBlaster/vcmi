@@ -291,6 +291,38 @@ bool CMap::hasStaticFootprintAcrossToroidalSeam(const CGObjectInstance & object)
 	return false;
 }
 
+bool CMap::hasUnindexedShownObjects() const
+{
+	return !unindexedShownObjects.empty();
+}
+
+void CMap::restoreUnindexedShownObjects(const std::vector<ObjectInstanceID> & ids)
+{
+	unindexedShownObjects.clear();
+	for(const auto & id : ids)
+	{
+		if(!id.hasValue() || id.getNum() >= objects.size() || !objects.at(id.getNum()))
+			throw std::runtime_error("Invalid unindexed shown object ID in saved map");
+		const auto * object = objects.at(id.getNum()).get();
+		if(object->id != id || !unindexedShownObjects.insert(object).second)
+			throw std::runtime_error("Duplicate or inconsistent unindexed shown object ID in saved map");
+		bool hasOccupancy = false;
+		for(int fx = 0; fx < object->getWidth(); ++fx)
+			for(int fy = 0; fy < object->getHeight(); ++fy)
+			{
+				const int3 footprint = object->anchorPos() - int3(fx, fy, 0);
+				if(object->visitableAt(footprint) || object->blockingAt(footprint))
+				{
+					hasOccupancy = true;
+					if(getTopology().canonicalize(footprint))
+						throw std::runtime_error("Indexed object listed as unindexed in saved map");
+				}
+			}
+		if(!hasOccupancy)
+			throw std::runtime_error("Object without occupancy listed as unindexed in saved map");
+	}
+}
+
 void CMap::setToroidalAndRebuild(bool enabled, TopologyRebuildObjects objectScope)
 {
 	if(toroidal == enabled)

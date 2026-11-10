@@ -54,12 +54,17 @@ constexpr uint32_t TOROIDAL_VERSION_TAG = 0x54520000u;
 constexpr uint32_t VERSION_TAG_MASK = 0xffff0000u;
 constexpr uint32_t VERSION_VALUE_MASK = 0x0000ffffu;
 static_assert(static_cast<uint32_t>(ESerializationVersion::CURRENT) <= VERSION_VALUE_MASK);
-static_assert(ESerializationVersion::CURRENT == ESerializationVersion::TOROIDAL_MAP,
+static_assert(ESerializationVersion::CURRENT == ESerializationVersion::TOROIDAL_UNINDEXED_OBJECTS,
 	"Reassess bounded-save compatibility when adding serialization features");
 
 constexpr ESerializationVersion versionForTopology(bool toroidal)
 {
 	return toroidal ? ESerializationVersion::CURRENT : ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
+}
+
+constexpr ESerializationVersion versionForState(bool toroidal, bool unindexedShownObjects)
+{
+	return versionForTopology(toroidal || unindexedShownObjects);
 }
 
 constexpr uint32_t encodeVersion(ESerializationVersion version)

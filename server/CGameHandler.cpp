@@ -1881,7 +1881,8 @@ void CGameHandler::save(const std::string & filename, PlayerColor playerToNotify
 		if(!CResourceHandler::get("local")->createResource(savefname))
 			throw std::runtime_error("Failed to create save file " + savefname);
 
-		const auto serializationVersion = SaveFileFormat::versionForTopology(gameState().getMap().toroidal);
+		const auto & map = gameState().getMap();
+		const auto serializationVersion = SaveFileFormat::versionForState(map.toroidal, map.hasUnindexedShownObjects());
 		CMemorySerializer header;
 		header.oser.version = serializationVersion;
 		gameState().saveHeader(header.oser);

@@ -619,10 +619,26 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
-	for(const bool toroidal : {false, true})
+	for(const int scenario : {0, 1, 2})
 	{
-		map()->toroidal = toroidal;
-		const std::string name = "Saves/" + directory.filename().string() + (toroidal ? "-toroidal" : "-bounded");
+		const bool toroidal = scenario == 1;
+		map()->setToroidalAndRebuild(toroidal);
+		ObjectInstanceID shownID, hiddenID;
+		if(scenario == 2)
+		{
+			std::vector<CGObjectInstance *> resources;
+			for(const auto & object : map()->objects)
+				if(object && object->ID == Obj::RESOURCE)
+					resources.push_back(object.get());
+			ASSERT_GE(resources.size(), 2u);
+			shownID = resources[0]->id;
+			hiddenID = resources[1]->id;
+			map()->moveObject(shownID, int3(-2, 10, 0));
+			map()->moveObject(hiddenID, int3(-2, 12, 0));
+			map()->hideObject(resources[1]);
+			ASSERT_TRUE(map()->hasUnindexedShownObjects());
+		}
+		const std::string name = "Saves/" + directory.filename().string() + "-" + std::to_string(scenario);
 		const auto path = directory / (name + ".vsgm1");
 		ASSERT_TRUE(loader->createResource(name + ".vsgm1"));
 		ASSERT_TRUE(local->createResource(name + ".vsgm1"));
@@ -634,7 +650,7 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 		ASSERT_TRUE(boost::filesystem::equivalent(*selectedPath, path));
 		handler.save(name, PlayerColor::NEUTRAL, 0);
 		ASSERT_TRUE(boost::filesystem::exists(path));
-		const auto expectedVersion = SaveFileFormat::versionForTopology(toroidal);
+		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::TOROIDAL_UNINDEXED_OBJECTS;
 		EXPECT_EQ(CLoadFile::readVersion(path), expectedVersion);
 		std::ifstream file(path.c_str(), std::ios::binary);
 		std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
@@ -654,6 +670,20 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 		auto game = loaded.openChunk(SaveFileFormat::CHUNK_GAMESTATE, loadedState.get());
 		loadedState->loadGame(game->iser);
 		EXPECT_EQ(loadedState->getMap().toroidal, toroidal);
+		if(scenario == 2)
+		{
+			auto & restoredMap = loadedState->getMap();
+			ASSERT_TRUE(restoredMap.hasUnindexedShownObjects());
+			const auto shownPos = restoredMap.getObject(shownID)->visitablePos();
+			const auto hiddenPos = restoredMap.getObject(hiddenID)->visitablePos();
+			restoredMap.setToroidalAndRebuild(true);
+			const auto shownTile = restoredMap.getTopology().canonicalize(shownPos);
+			const auto hiddenTile = restoredMap.getTopology().canonicalize(hiddenPos);
+			ASSERT_TRUE(shownTile);
+			ASSERT_TRUE(hiddenTile);
+			EXPECT_TRUE(vstd::contains(restoredMap.getTile(*shownTile).visitableObjects, shownID));
+			EXPECT_FALSE(vstd::contains(restoredMap.getTile(*hiddenTile).visitableObjects, hiddenID));
+		}
 		StartInfo loadInfo = *gameState()->getStartInfo();
 		loadInfo.mapname = name;
 		CGameHandler reloaded(server, gameState());

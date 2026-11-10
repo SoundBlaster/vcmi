@@ -171,6 +171,7 @@ public:
 	/// maps where every object in the map's object list is placed, including
 	/// objects whose entire occupancy was clipped by the previous topology.
 	void setToroidalAndRebuild(bool enabled, TopologyRebuildObjects objectScope = TopologyRebuildObjects::PreviouslyIndexed);
+	bool hasUnindexedShownObjects() const;
 
 	/// Shows previously hiiden object on map
 	void showObject(CGObjectInstance * obj);
@@ -328,8 +329,9 @@ private:
 
 	/// holes are neither visitable nor blocking, so tiles do not know about them
 	std::unordered_set<int3> holePositions;
-	/// Shown objects whose blocking and visitable cells are all outside the map; not serialized.
+	/// Shown objects whose blocking and visitable cells are all outside the map.
 	std::unordered_set<const CGObjectInstance *> unindexedShownObjects;
+	void restoreUnindexedShownObjects(const std::vector<ObjectInstanceID> & ids);
 
 public:
 	template <typename Handler>
@@ -360,11 +362,23 @@ public:
 
 		h & objects;
 		h & heroesOnMap;
+		if(h.hasFeature(Handler::Version::TOROIDAL_UNINDEXED_OBJECTS))
+		{
+			std::vector<ObjectInstanceID> unindexed;
+			if(h.saving)
+				for(const auto & object : objects)
+					if(object && unindexedShownObjects.contains(object.get()))
+						unindexed.push_back(object->id);
+			h & unindexed;
+			if(!h.saving)
+				restoreUnindexedShownObjects(unindexed);
+		}
+		else if(!h.saving)
+			unindexedShownObjects.clear();
 
 		if(!h.saving)
 		{
 			holePositions.clear();
-			unindexedShownObjects.clear();
 			for(const auto & object : objects)
 			{
 				if(object && object->ID == Obj::HOLE)

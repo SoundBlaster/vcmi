@@ -18,13 +18,13 @@ wrapped blocking and visitable occupancy, a hidden peer remaining hidden,
 a transition back to bounded, and explicitly hiding the clipped object before
 a second transition.
 
-The tracking set is in-memory state and is cleared when a game save is read.
-A save containing a shown but entirely clipped object does not distinguish it
-from a hidden one on later default topology changes. This change does not add
-a save format or network version, and does not resolve that case. Normal map
-format loading and the editor's explicit all-objects authoring path remain
-separate from this save-game limitation. No GUI verification of this change
-was performed.
+At revision `d6e25b0` the tracking set was in-memory state and was cleared
+when a game save was read, so an old save could not distinguish a shown but
+fully clipped object from a hidden one. The subsequent [versioned-save
+change](topology-clipped-save-2026-11-10.md) preserves this state in newly
+written tagged saves; older files still lack it. Normal map format loading
+and the editor's explicit all-objects authoring path are separate. No GUI
+verification of the rebuild change was performed.
 
 On macOS arm64, source `ca955bd` plus this change built `vcmitest` on TB5.
 The focused related run passed 20 tests, including wrapped VMAP round-trip,

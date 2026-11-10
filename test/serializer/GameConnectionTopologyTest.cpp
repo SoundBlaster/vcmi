@@ -94,6 +94,16 @@ TEST(GameConnectionTopologyTest, PreviousVersionOmitsToroidalMapHeader)
 	EXPECT_FALSE(topologyAfterPacketRoundTrip(ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER));
 }
 
+TEST(GameConnectionTopologyTest, PreviousTaggedToroidalPeerNegotiatesItsOwnVersion)
+{
+	const auto prior = ESerializationVersion::TOROIDAL_MAP;
+	const auto accepted = LobbyTopologyCapability::negotiateClient(LobbyTopologyCapability::encode(prior));
+	EXPECT_TRUE(accepted.toroidal);
+	EXPECT_EQ(accepted.version, prior);
+	EXPECT_TRUE(LobbyTopologyCapability::isSafeServerGreeting(accepted));
+	EXPECT_TRUE(topologyAfterPacketRoundTrip(prior, prior));
+}
+
 TEST(GameConnectionTopologyTest, CapabilityGreetingSurvivesLobbyPacketSerialization)
 {
 	auto transport = std::make_shared<PacketCapture>();

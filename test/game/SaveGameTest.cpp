@@ -52,7 +52,7 @@ void SaveGameTest::checkSavedGameIsRestored(bool toroidal, bool untaggedPrototyp
 	const auto saveFile = directory / "test.vsgm1";
 
 	{
-		const auto version = SaveFileFormat::versionForTopology(toroidal);
+		const auto version = untaggedPrototype ? ESerializationVersion::TOROIDAL_MAP : SaveFileFormat::versionForTopology(toroidal);
 		CMemorySerializer header;
 		header.oser.version = version;
 		gameState->saveHeader(header.oser);
@@ -77,7 +77,7 @@ void SaveGameTest::checkSavedGameIsRestored(bool toroidal, bool untaggedPrototyp
 	}
 
 	CLoadFile loader(saveFile);
-	EXPECT_EQ(CLoadFile::readVersion(saveFile), SaveFileFormat::versionForTopology(toroidal));
+	EXPECT_EQ(CLoadFile::readVersion(saveFile), untaggedPrototype ? ESerializationVersion::TOROIDAL_MAP : SaveFileFormat::versionForTopology(toroidal));
 	JsonValidator validator;
 
 	const JsonNode metadata = SaveMetadata::parse(loader.readChunk(SaveFileFormat::CHUNK_METADATA), "test", validator);
