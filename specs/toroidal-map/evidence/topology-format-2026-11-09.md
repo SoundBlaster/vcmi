@@ -64,8 +64,15 @@ server's topology guard: the tagged peer alone was eligible; after the
 untagged peer joined, a toroidal map was rejected while a bounded map remained
 eligible. The individual test and seven-test focused suite passed
 (`lobby-internal-build.log`, `lobby-internal-test.log`,
-`lobby-internal-suite.log` on TB5). This does not start a full game, exercise
-TCP, or run actual old or separate-process client binaries.
+`lobby-internal-suite.log` on TB5). This does not start a full game or run
+actual old or separate-process client binaries.
+
+The same negotiation and guard-method check was subsequently exercised over
+TCP on `127.0.0.1`, with the real server and two probe clients in one process.
+The server accepted a tagged peer, downgraded an untagged peer, rejected the
+toroidal header for the mixed set, and still allowed a bounded header. The
+focused suite passed eight tests with one disabled. This is a loopback transport
+check, not a game start or a multiplayer session between actual clients.
 
 On 2026-11-09 a versioned topology flag was added to the map header, JSON map
 header and binary serialization. A version-4 map header signals `toroidal`;

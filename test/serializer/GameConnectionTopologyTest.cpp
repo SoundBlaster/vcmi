@@ -229,6 +229,46 @@ TEST(GameConnectionTopologyTest, InternalConnectionsNegotiateBeforeToroidalStart
 	EXPECT_TRUE(server.supportsMapTopology(map));
 }
 
+TEST(GameConnectionTopologyTest, TcpConnectionsNegotiateBeforeToroidalStartGuard)
+{
+	CVCMIServer server(0, true);
+	const auto port = server.prepare(false, true);
+	ASSERT_NE(port, 0);
+	auto clientNetwork = INetworkHandler::createHandler();
+	LobbyProbe tagged("tagged-tcp", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	LobbyProbe untagged("untagged-tcp", ESerializationVersion::CURRENT);
+	const auto waitForGreeting = [&](const LobbyProbe & probe)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		while(!probe.ack && probe.failure.empty() && std::chrono::steady_clock::now() < deadline)
+		{
+			clientNetwork->getContext().restart();
+			clientNetwork->getContext().poll();
+			server.getNetworkHandler().getContext().restart();
+			server.getNetworkHandler().getContext().poll();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+	};
+	clientNetwork->connectToRemote(tagged, "127.0.0.1", port);
+	waitForGreeting(tagged);
+	ASSERT_TRUE(tagged.failure.empty()) << tagged.failure;
+	ASSERT_TRUE(tagged.ack.has_value());
+	EXPECT_TRUE(tagged.ack->toroidal);
+	EXPECT_EQ(tagged.ack->version, ESerializationVersion::CURRENT);
+	CMapHeader map;
+	map.toroidal = true;
+	EXPECT_TRUE(server.supportsMapTopology(map));
+	clientNetwork->connectToRemote(untagged, "127.0.0.1", port);
+	waitForGreeting(untagged);
+	ASSERT_TRUE(untagged.failure.empty()) << untagged.failure;
+	ASSERT_TRUE(untagged.ack.has_value());
+	EXPECT_FALSE(untagged.ack->toroidal);
+	EXPECT_EQ(untagged.ack->version, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	EXPECT_FALSE(server.supportsMapTopology(map));
+	map.toroidal = false;
+	EXPECT_TRUE(server.supportsMapTopology(map));
+}
+
 // The raw codec still relies on correct negotiation; keep the desired
 // fail-closed behavior visible as a separate defense-in-depth regression.
 TEST(GameConnectionTopologyTest, DISABLED_RejectsConflictingTopologyWireLayouts)
