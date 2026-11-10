@@ -2,6 +2,24 @@
 
 ## Later client launch attempt
 
+### Development signing and removable-volume authorization
+
+The user authorized use of their Apple Development signing identity for local
+test builds. A separate `VCMI Toroid Development.app` was prepared on TB5
+from the existing diagnostic bundle, with bundle identifier
+`local.vcmi.toroid.development` and `vcmiclient` as its executable. Its
+signature passed deep, strict verification. A second copy with an altered
+bundle version was independently signed with the same development identity;
+each bundle satisfied the other's designated requirement. This checks code
+identity across two different bundle seals, not a source rebuild or retention
+of a macOS privacy authorization. Neither copy was launched in this check.
+
+For comparison, the existing ad-hoc signed `VCMI Toroid Lab.app` had a
+designated requirement based on its code-directory hash. The earlier macOS
+log below recorded a mismatch between its saved requirement and the newly
+signed app. Stable development signing addresses that identity change, but
+does not establish the cause of later filesystem stalls or guarantee access.
+
 After the observations below, a freshly copied and ad-hoc signed lab client
 was launched. It remained running for more than 50 minutes without reaching
 an observable game window or producing a new client log. A macOS `sample`
