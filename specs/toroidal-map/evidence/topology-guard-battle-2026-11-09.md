@@ -1,5 +1,21 @@
 # Battle with a guard across a seam
 
+On 2026-11-10 an SoD fixture with a water monster at `(35,5,0)` showed that
+the `WATER` pathfinder rejected guarded `(0,5,0)`, while the server accepted
+a Water Walking transit into it. The regression failed at revision
+`c0b1d78`. Standard toroidal `WATER` movement now rejects a guarded
+destination, except for the existing matching-vehicle embark handling. The
+test also checks non-transit rejection and a legal neighboring water step
+with the same remaining movement as the pathfinder. Focused tests passed on
+macOS arm64 with Complete data (`water-guard-before-test.log`,
+`water-guard-after-build.log`, `water-guard-after-test.log` on TB5). This
+does not establish every water vehicle, guard combination or multiplayer case.
+The complete local suite passed 1,391 tests, with three disabled
+(`full-suite-water-guard.log`). A subsequent extension also verified that an
+`AIR` step can pass over the guarded water tile; the focused tests and the
+client, server and test builds passed (`water-guard-final-build.log`,
+`water-guard-final-test.log`).
+
 On 2026-11-10 a server regression test at source revision `7ba620b` showed
 that a flying-capable hero could request `LAND` transit and bypass a guard
 across the corner. The test failed before the fix. On toroidal maps the

@@ -1154,6 +1154,62 @@ TEST_F(HeroMovementTest, WaterWalkingCannotVisitBlockingObjectAcrossSeam)
 	EXPECT_NE(map()->getObject(resourceId), nullptr);
 }
 
+TEST_F(HeroMovementTest, WaterWalkingCannotEnterGuardedWaterAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 6, 0);
+	const int3 destination(0, 5, 0);
+	const int3 guardPosition(35, 5, 0);
+	const int3 unguarded(1, 6, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 6, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.terrain(destination, TerrainId::WATER).terrain(guardPosition, TerrainId::WATER).terrain(unguarded, TerrainId::WATER)
+		.monster(guardPosition, CreatureID(27), 100);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(destination), guardPosition);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	EXPECT_FALSE(paths.getNode(destination, EPathfindingLayer::WATER)->reachable());
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	EXPECT_EQ(gameState()->getBattle(player), nullptr);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::WATER));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	const auto * node = paths.getNode(unguarded, EPathfindingLayer::WATER);
+	ASSERT_TRUE(node->reachable());
+	ASSERT_NE(node->theNodeBefore, nullptr);
+	ASSERT_EQ(node->theNodeBefore->coord, origin);
+	const int remaining = node->moveRemains;
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(unguarded), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	EXPECT_EQ(hero->visitablePos(), unguarded);
+	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(3000);
+	CPathsInfo flyingPaths(gameState()->getMapSize(), hero);
+	auto flyingConfig = std::make_shared<SingleHeroPathfinderConfig>(flyingPaths, *gameState(), hero);
+	CPathfinder flyingPathfinder(*gameState(), flyingConfig);
+	flyingPathfinder.calculatePaths();
+	EXPECT_TRUE(flyingPaths.getNode(destination, EPathfindingLayer::AIR)->reachable());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_EQ(gameState()->getBattle(player), nullptr);
+}
+
 TEST_F(HeroMovementTest, HeroCrossesMinimumToroidalMapCorner)
 {
 	const PlayerColor player(0);

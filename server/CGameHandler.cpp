@@ -870,6 +870,9 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
 		&& PathfinderUtil::layerBlockedByObjects(layer, t) && !canEmbarkLayer)
 		return complainRet("Movement layer cannot enter the occupied destination!");
+	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
+		&& layer == EPathfindingLayer::WATER && !canEmbarkLayer && gameInfo().isInTheMap(guardPos))
+		return complainRet("Cannot walk on guarded water!");
 	const bool usesMovementCost = movementMode == EMovementMode::STANDARD || embarking || disembarking;
 	const int cost = usesMovementCost
 		? pathfinderHelper->getMovementCost(h->visitablePos(), hmpos, layer, h->movementPointsRemaining())
