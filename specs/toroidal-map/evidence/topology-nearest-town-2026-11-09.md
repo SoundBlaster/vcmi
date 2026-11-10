@@ -15,6 +15,13 @@ and `TownPortalTest.*:HeroMovementTest.*:MapTopology.*` passed 28 tests with
 copied Complete data (`town-portal-after-tests.log`). Reinforcements,
 cross-level town selection and GUI casting were not exercised in this run.
 
+A subsequent SoD test places the closer wrapped town underground and another
+town on the surface. Without wrapping, unskilled Town Portal reaches the
+surface town; with wrapping, it selects and reaches the underground town.
+`TownPortalTest.*` passed four tests on macOS arm64. This exercises one
+cross-level choice through the server spell handler, not Reinforcements or
+the game UI.
+
 Source baseline `cd847d3` with local changes:
 
 ```text

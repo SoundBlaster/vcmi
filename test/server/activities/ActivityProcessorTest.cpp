@@ -2919,6 +2919,39 @@ TEST_F(TownPortalTest, unskilledTownPortalChoosesNearestTownAcrossToroidalSeam)
 	EXPECT_EQ(hero->visitablePos(), (*across)->visitablePos());
 }
 
+TEST_F(TownPortalTest, unskilledTownPortalChoosesCrossLevelTownAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true)
+		.playerActive(player)
+		.hero(int3(1, 10, 0), HeroTypeID(0), player)
+		.heroSpells({SpellID(SpellID::decode("core:townPortal"))})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID(ArtifactID::SPELLBOOK)}})
+		.heroPrimary(0, 0, 20, 20)
+		.town(int3(9, 10, 0), FactionID(0), player)
+		.town(int3(35, 10, 1), FactionID(0), player);
+	startWithMap(std::move(builder));
+	const auto towns = findAll<CGTownInstance>();
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(towns.size(), 2u);
+	const auto underground = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().z == 1; });
+	ASSERT_NE(underground, towns.end());
+	const auto surface = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().z == 0; });
+	ASSERT_NE(surface, towns.end());
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.castSpell(hero, SpellID(SpellID::decode("core:townPortal")), int3(-1, -1, -1));
+	ASSERT_EQ(hero->visitablePos(), (*surface)->visitablePos());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 10, 0)), EMovementMode::MONOLITH, false, PlayerColor::NEUTRAL, EPathfindingLayer::LAND));
+	hero->setMovementPoints(3000);
+	map()->toroidal = true;
+	handler.castSpell(hero, SpellID(SpellID::decode("core:townPortal")), int3(-1, -1, -1));
+	EXPECT_EQ(hero->visitablePos(), (*underground)->visitablePos());
+}
+
 TEST_F(TownPortalTest, castingPausesToAskWhichTownAndFinishesAtTheChosenOne)
 {
 	const PlayerColor player(0);
