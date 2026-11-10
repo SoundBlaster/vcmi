@@ -21,11 +21,12 @@ CFilesystemLoader::CFilesystemLoader(std::string _mountPoint, boost::filesystem:
 	recursiveDepth(depth),
 	initial(initial)
 {
+	logGlobal->trace("Loading filesystem %s", TextOperations::filesystemPathToUtf8(this->baseDirectory));
 	try {
 		fileList = listFiles(mountPoint, depth, initial);
 	}
 	catch (const boost::filesystem::filesystem_error & e) {
-		throw DataLoadingException("Failed to load content of '" + TextOperations::filesystemPathToUtf8(baseDirectory) + "'. Reason: " + e.what());
+		throw DataLoadingException("Failed to load content of '" + TextOperations::filesystemPathToUtf8(this->baseDirectory) + "'. Reason: " + e.what());
 	}
 
 	logGlobal->trace("File system loaded, %d files found", fileList.size());

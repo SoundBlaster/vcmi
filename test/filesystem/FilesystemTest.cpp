@@ -12,6 +12,7 @@
 
 #include "../../lib/filesystem/CFilesystemLoader.h"
 #include "../../lib/filesystem/ResourcePath.h"
+#include "../../lib/ExceptionsCommon.h"
 
 namespace test
 {
@@ -76,6 +77,23 @@ TEST_F(FilesystemTest, FindsFileWithRepeatedExtensionByItsName)
 	const ResourcePath storedName(ResourcePath("Test/example.h3m.h3m").getOriginalName(), EResType::MAP);
 	EXPECT_TRUE(loader.existsResource(storedName));
 }
+
+#ifndef _WIN32
+TEST_F(FilesystemTest, ReportsDirectoryPathWhenScanningFails)
+{
+	const auto loop = getDirectory() / "cyclic-link";
+	boost::filesystem::create_symlink(loop, loop);
+	try
+	{
+		CFilesystemLoader loader("Test/", loop);
+		FAIL() << "Expected a filesystem error";
+	}
+	catch(const DataLoadingException & error)
+	{
+		EXPECT_NE(std::string(error.what()).find("Failed to load content of '" + loop.string() + "'. Reason:"), std::string::npos);
+	}
+}
+#endif
 
 TEST(ResourcePathTest, KeepsExtensionOfDifferentType)
 {
