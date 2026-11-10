@@ -7,6 +7,12 @@ toroidal map moves the hero to the destination and spends mana and movement
 points. Both tests passed on macOS arm64. They do not verify the client cursor,
 animation, hidden destinations, guards, other terrain or other spells.
 
+An additional SoD test casts Scuttle Boat through the server handler at a
+revealed boat across the horizontal seam. The bounded map rejects the
+out-of-range cast without spending mana; with toroidal topology the cast
+spends mana and removes the boat. The test uses expert Water Magic and does
+not cover hidden targets, other schools or client animation.
+
 The common ranged-adventure-spell check now compares shortest wrapped x/y
 displacements on toroidal maps. It continues to check whether source and
 target are on the map, retains existing visibility checks, and preserves the

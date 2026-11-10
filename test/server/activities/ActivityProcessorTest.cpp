@@ -2865,6 +2865,38 @@ TEST_F(SummonBoatTopologyTest, canPlaceBoatOnWaterAcrossToroidalSeam)
 	EXPECT_EQ(boats.front()->visitablePos(), int3(35, 10, 0));
 }
 
+TEST_F(SummonBoatTopologyTest, scuttleBoatTargetsBoatAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	const SpellID spell(SpellID::decode("core:scuttleBoat"));
+	const int3 destination(35, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player)
+		.heroSpells({spell})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID(ArtifactID::SPELLBOOK)}})
+		.heroSecondarySkills({{SecondarySkill::WATER_MAGIC, 3}})
+		.heroPrimary(0, 0, 20, 20)
+		.terrain(destination, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->mana = 1000;
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(destination, BoatId::CASTLE, player);
+	const auto boats = findAll<CGBoat>();
+	ASSERT_EQ(boats.size(), 1u);
+	const auto boatID = boats.front()->id;
+	handler.castSpell(hero, spell, destination);
+	ASSERT_NE(map()->getObject(boatID), nullptr);
+	EXPECT_EQ(hero->mana, 1000);
+	map()->toroidal = true;
+	handler.castSpell(hero, spell, destination);
+	EXPECT_EQ(map()->getObject(boatID), nullptr);
+	EXPECT_LT(hero->mana, 1000);
+}
+
 TEST_F(SummonBoatTopologyTest, shipyardBuildsBoatAcrossToroidalSeam)
 {
 	const PlayerColor player(0);
