@@ -106,15 +106,13 @@ establishes the intended arithmetic only; it is not runtime evidence.
 ## Open decisions and boundaries of the pilot
 
 1. **Seam-spanning static objects:** the desired conversion policy is now to
-   wrap their visible, blocking and visitable cells, including corners. The
-   current provisional pilot restriction remains: a static
-   object's visible, blocking or visitable cells must stay within the map.
-   The editor reports violations and the JSON map writer and reader reject
-   them. Empty mask cells outside the rectangle are allowed. This does not
-   fully support authoring objects on both sides of a seam. Overlap between
-   interactive objects needs a reviewed policy for visual ordering, target
-   selection and author diagnostics. Hero and boat movement across seams
-   remains required and is not established by the validation exception.
+   wrap their visible, blocking and visitable cells, including corners. VMAP
+   now allows seam-crossing footprints that fit within one map period. A
+   synthetic round trip and a resource interaction pass; one real town sprite
+   was visually inspected. The editor warns when static visitable objects
+   overlap across a seam, but visual ordering and target selection need a
+   reviewed policy. Footprints larger than the map period remain rejected.
+   Hero and boat movement across seams remains a separate requirement.
 2. **Minimum map dimensions:** the initial file-format implementation requires
    width and height of at least 3. Extents of 1 or 2 make distinct directions
    lead to the same canonical cell; supporting them remains a separate decision.

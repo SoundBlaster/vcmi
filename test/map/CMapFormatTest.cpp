@@ -14,11 +14,14 @@
 
 #include "../../lib/callback/EditorCallback.h"
 #include "../../lib/CRandomGenerator.h"
+#include "../../lib/GameLibrary.h"
+#include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/CMap.h"
 #include "../../lib/mapping/CMapEditManager.h"
 #include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/mapping/TerrainTile.h"
+#include "../../lib/modding/IdentifierResolver.h"
 
 #include "../../lib/VCMIDirs.h"
 
@@ -341,6 +344,135 @@ TEST(MapFormat, LegacyH3MCanBeOptedIntoToroidalVmap)
 	EXPECT_EQ(reopened->getTile(int3(8, 8, 0)).terrainType, TerrainId::WATER);
 }
 
+TEST(MapFormat, ToroidalWrappedFootprintsSurviveVmapRoundTrip)
+{
+	const PlayerColor player(0);
+	auto bytes = TinyH3M::TinyH3MBuilder(EMapFormat::SOD)
+		.size(36, true)
+		.playerActive(player)
+		.hero(int3(10, 10, 0), HeroTypeID(0), player)
+		.resource(int3(15, 15, 0), GameResID::GOLD, 10)
+		.terrainOverlay(int3(20, 20, 0), Obj::CURSED_GROUND1)
+		.terrainOverlay(int3(20, 20, 1), Obj::CURSED_GROUND1)
+		.terrainOverlay(int3(21, 20, 1), Obj::CURSED_GROUND1)
+		.build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("WrappedFootprintRoundTrip", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	CGObjectInstance * resource = nullptr;
+	std::vector<CGObjectInstance *> obstacles;
+	for(const auto & object : map->objects)
+	{
+		if(object && object->ID == Obj::RESOURCE)
+			resource = object.get();
+		if(object && object->ID == Obj::CURSED_GROUND1)
+			obstacles.push_back(object.get());
+	}
+	ASSERT_NE(resource, nullptr);
+	ASSERT_EQ(obstacles.size(), 3u);
+	auto * obstacle = obstacles[0];
+	auto * corner = obstacles[1];
+	auto * outside = obstacles[2];
+	const auto makeAppearance = [](const std::string & mask)
+	{
+		const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": )" + mask + " }";
+		JsonNode definition(text.data(), text.size(), "WrappedFootprintRoundTrip");
+		auto result = std::make_shared<ObjectTemplate>();
+		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+		result->readJson(definition, resolver, false);
+		return result;
+	};
+	map->hideObject(resource);
+	resource->pos = int3(0, 10, 0);
+	resource->appearance = makeAppearance(R"([ "A0" ])");
+	map->showObject(resource);
+	map->hideObject(obstacle);
+	obstacle->pos = int3(35, 10, 0);
+	obstacle->appearance = makeAppearance(R"([ "B" ])");
+	map->showObject(obstacle);
+	map->hideObject(corner);
+	corner->pos = int3(0, 0, 1);
+	corner->appearance = makeAppearance(R"([ "BB", "BB" ])");
+	map->showObject(corner);
+	map->hideObject(outside);
+	outside->pos = int3(36, 5, 1);
+	outside->appearance = makeAppearance(R"([ "B" ])");
+	map->showObject(outside);
+	const auto resourceName = resource->instanceName;
+	const auto obstacleName = obstacle->instanceName;
+	const auto cornerName = corner->instanceName;
+	const auto outsideName = outside->instanceName;
+	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+	const int3 wrapped(35, 10, 0);
+	ASSERT_TRUE(vstd::contains(map->getTile(wrapped).visitableObjects, resource->id));
+	ASSERT_TRUE(vstd::contains(map->getTile(wrapped).blockingObjects, obstacle->id));
+
+	CMemoryBuffer archive;
+	{
+		CMapSaverJson saver(&archive);
+		ASSERT_NO_THROW(saver.saveMap(map));
+	}
+	archive.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&archive);
+	std::unique_ptr<CMap> reopened;
+	ASSERT_NO_THROW(reopened = reader.loadMap(&reopenedCallback));
+	reopenedCallback.setMap(reopened.get());
+	ASSERT_TRUE(reopened->toroidal);
+	ASSERT_EQ(reopened->levels(), 2);
+	CGObjectInstance * reopenedResource = nullptr;
+	CGObjectInstance * reopenedObstacle = nullptr;
+	CGObjectInstance * reopenedCorner = nullptr;
+	CGObjectInstance * reopenedOutside = nullptr;
+	for(const auto & object : reopened->objects)
+	{
+		if(object && object->instanceName == resourceName)
+			reopenedResource = object.get();
+		if(object && object->instanceName == obstacleName)
+			reopenedObstacle = object.get();
+		if(object && object->instanceName == cornerName)
+			reopenedCorner = object.get();
+		if(object && object->instanceName == outsideName)
+			reopenedOutside = object.get();
+	}
+	ASSERT_NE(reopenedResource, nullptr);
+	ASSERT_NE(reopenedObstacle, nullptr);
+	ASSERT_NE(reopenedCorner, nullptr);
+	ASSERT_NE(reopenedOutside, nullptr);
+	EXPECT_EQ(reopenedResource->anchorPos(), int3(0, 10, 0));
+	EXPECT_EQ(reopenedResource->visitablePos(), wrapped);
+	EXPECT_TRUE(vstd::contains(reopened->getTile(wrapped).visitableObjects, reopenedResource->id));
+	EXPECT_TRUE(vstd::contains(reopened->getTile(wrapped).blockingObjects, reopenedResource->id));
+	EXPECT_TRUE(vstd::contains(reopened->getTile(wrapped).blockingObjects, reopenedObstacle->id));
+	for(const auto & tile : {int3(0, 0, 1), int3(35, 0, 1), int3(0, 35, 1), int3(35, 35, 1)})
+		EXPECT_TRUE(vstd::contains(reopened->getTile(tile).blockingObjects, reopenedCorner->id)) << tile.toString();
+	EXPECT_EQ(reopenedOutside->anchorPos(), int3(36, 5, 1));
+	EXPECT_TRUE(vstd::contains(reopened->getTile(int3(0, 5, 1)).blockingObjects, reopenedOutside->id));
+	EXPECT_FALSE(vstd::contains(reopened->getTile(int3(0, 5, 0)).blockingObjects, reopenedOutside->id));
+
+	// More than one image slice would occupy a canonical tile; the renderer
+	// cannot yet represent this case and the format must reject it explicitly.
+	obstacle->appearance = makeAppearance("[ \"" + std::string(37, 'B') + "\" ]");
+	CMemoryBuffer unsupported;
+	CMapSaverJson unsupportedSaver(&unsupported);
+	EXPECT_THROW(unsupportedSaver.saveMap(map), std::runtime_error);
+
+	// The same oversized template remains legal on a bounded map, but a VMAP
+	// claiming toroidal topology must also be rejected when read.
+	map->setToroidalAndRebuild(false, CMap::TopologyRebuildObjects::AllMapObjects);
+	CMemoryBuffer boundedArchive;
+	JsonNode header, objects, surface, underground;
+	loadActual(&boundedArchive, map, header, objects, surface, underground);
+	EXPECT_NO_THROW(loadOriginal(header, objects, surface, underground));
+	header["versionMajor"].Integer() = CMapFormatJson::VERSION_MAJOR_TOROIDAL_TAGGED;
+	header["topology"].String() = "toroidal";
+	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
+}
+
 TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
 {
 	auto bytes = makeToroidalDemoMap().build();
@@ -355,7 +487,7 @@ TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
 	map->setToroidalAndRebuild(true);
 	for(const auto & object : map->objects)
 		if(object)
-			ASSERT_FALSE(map->hasUnsupportedToroidalFootprint(*object)) << object->instanceName;
+			ASSERT_FALSE(map->hasStaticFootprintAcrossToroidalSeam(*object)) << object->instanceName;
 	CMemoryBuffer output;
 	{
 		CMapSaverJson saver(&output);
@@ -450,6 +582,50 @@ TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 		std::ofstream file(outputPath, std::ios::binary);
 		ASSERT_TRUE(file);
 		file.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+		file.close();
+		ASSERT_TRUE(file);
+	}
+}
+
+TEST(MapFormat, ToroidalVisualWrappedTownFixtureRoundTrips)
+{
+	auto bytes = makeToroidalDemoMap().build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("ToroidVisualWrappedTown", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	ASSERT_EQ(map->getAllTowns().size(), 2u);
+	auto * town = map->getObject(map->getAllTowns().back());
+	ASSERT_NE(town, nullptr);
+	map->hideObject(town);
+	town->pos = int3(0, 4, 0);
+	map->showObject(town);
+	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+	map->name = MetaString::createFromRawString("Toroid Wrapped Town");
+	ASSERT_TRUE(map->hasStaticFootprintAcrossToroidalSeam(*town));
+	const auto name = town->instanceName;
+	CMemoryBuffer archive;
+	{
+		CMapSaverJson saver(&archive);
+		saver.saveMap(map);
+	}
+	archive.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&archive);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	const auto found = reopened->instanceNames.find(name);
+	ASSERT_NE(found, reopened->instanceNames.end());
+	EXPECT_TRUE(reopened->hasStaticFootprintAcrossToroidalSeam(*found->second));
+	if(const char * outputPath = std::getenv("VCMI_TOROID_VISUAL_TOWN_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream file(outputPath, std::ios::binary);
+		ASSERT_TRUE(file);
+		file.write(reinterpret_cast<const char *>(archive.getBuffer().data()), archive.getSize());
 		file.close();
 		ASSERT_TRUE(file);
 	}

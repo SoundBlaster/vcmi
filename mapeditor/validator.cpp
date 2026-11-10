@@ -87,8 +87,9 @@ std::set<Validator::Issue> Validator::validate(const CMap * map)
 			if(!o)
 				continue;
 
-			if(map->hasUnsupportedToroidalFootprint(*o))
-				issues.emplace(tr("Object %1 crosses a map seam. Move it fully inside the map before using toroidal topology.")
+			if(map->toroidal && o->ID != Obj::HERO && o->ID != Obj::BOAT
+				&& (o->getWidth() > map->width || o->getHeight() > map->height))
+				issues.emplace(tr("Object %1 is larger than the toroidal map. Reduce its footprint before saving.")
 					.arg(o->instanceName.c_str()), true);
 
 			if(o->isVisitable() && !map->isInTheMap(o->visitablePos()))
@@ -227,6 +228,30 @@ std::set<Validator::Issue> Validator::validate(const CMap * map)
 				}
 			}
 		}
+
+		if(map->toroidal)
+			for(int z = 0; z < map->levels(); ++z)
+				for(int x = 0; x < map->width; ++x)
+					for(int y = 0; y < map->height; ++y)
+					{
+						const int3 pos(x, y, z);
+						const auto & visitable = map->getTile(pos).visitableObjects;
+						if(visitable.size() < 2)
+							continue;
+						int staticCount = 0;
+						bool crossesSeam = false;
+						for(const auto & id : visitable)
+						{
+							const auto * object = map->getObject(id);
+							if(!object || object->ID == Obj::HERO || object->ID == Obj::BOAT)
+								continue;
+							++staticCount;
+							crossesSeam |= map->hasStaticFootprintAcrossToroidalSeam(*object);
+						}
+						if(staticCount > 1 && crossesSeam)
+							issues.emplace(tr("Interactive objects overlap across a map seam at %1. Check which object can be visited.")
+								.arg(QString::fromStdString(pos.toString())), false);
+					}
 
 		//verification of starting towns
 		for (const auto & [player, counter] : amountOfTowns)

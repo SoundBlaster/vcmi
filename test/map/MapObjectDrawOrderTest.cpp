@@ -144,7 +144,7 @@ TEST_F(MapObjectDrawOrderTest, DrawOrderUsesObjectLayersAcrossToroidalSeam)
 	EXPECT_EQ(draw({rock, tree}, 0, int3(0, 9, 0)), "rtRT");
 }
 
-TEST_F(MapObjectDrawOrderTest, RejectsStaticOccupiedFootprintsAcrossToroidalSeams)
+TEST_F(MapObjectDrawOrderTest, DetectsStaticOccupiedFootprintsAcrossToroidalSeams)
 {
 	map.width = 10;
 	map.height = 10;
@@ -157,14 +157,14 @@ TEST_F(MapObjectDrawOrderTest, RejectsStaticOccupiedFootprintsAcrossToroidalSeam
 	const auto * blank = addObject('E', R"([ "0B" ])", int3(0, 5, 0));
 	const auto * hero = addObject('H', R"([ "BB" ])", int3(0, 5, 0), 0, Obj::HERO);
 
-	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*inside));
-	EXPECT_TRUE(map.hasUnsupportedToroidalFootprint(*west));
-	EXPECT_TRUE(map.hasUnsupportedToroidalFootprint(*north));
-	EXPECT_TRUE(map.hasUnsupportedToroidalFootprint(*corner));
-	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*blank));
-	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*hero));
+	EXPECT_FALSE(map.hasStaticFootprintAcrossToroidalSeam(*inside));
+	EXPECT_TRUE(map.hasStaticFootprintAcrossToroidalSeam(*west));
+	EXPECT_TRUE(map.hasStaticFootprintAcrossToroidalSeam(*north));
+	EXPECT_TRUE(map.hasStaticFootprintAcrossToroidalSeam(*corner));
+	EXPECT_FALSE(map.hasStaticFootprintAcrossToroidalSeam(*blank));
+	EXPECT_FALSE(map.hasStaticFootprintAcrossToroidalSeam(*hero));
 	map.toroidal = false;
-	EXPECT_FALSE(map.hasUnsupportedToroidalFootprint(*corner));
+	EXPECT_FALSE(map.hasStaticFootprintAcrossToroidalSeam(*corner));
 }
 
 TEST_F(MapObjectDrawOrderTest, ToroidalObjectFootprintOccupiesAndClearsWrappedTiles)

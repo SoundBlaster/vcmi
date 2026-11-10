@@ -265,7 +265,7 @@ bool CMap::isHoleAt(const int3 & pos) const
 	return holePositions.contains(pos);
 }
 
-bool CMap::hasUnsupportedToroidalFootprint(const CGObjectInstance & object) const
+bool CMap::hasStaticFootprintAcrossToroidalSeam(const CGObjectInstance & object) const
 {
 	if(!toroidal || object.ID == Obj::HERO || object.ID == Obj::BOAT)
 		return false;

@@ -30,9 +30,8 @@ A session-wide override for any old map is possible in principle, but would
 change that map's rules and needs an explicit choice shared by the server,
 clients and saves. The current implementation does not offer such an
 override. Conversion also requires checking terrain transitions, roads,
-passability, scripts and object placement at the joined edges. In particular,
-the pilot currently rejects static objects whose visible, blocking or
-visitable footprint crosses a seam.
+passability, scripts and object placement at the joined edges. The pilot can
+now save and load static objects that cross a seam, with limits described below.
 
 ## Agreed legacy footprint policy
 
@@ -50,20 +49,20 @@ coordinates. A tile also keeps separate blocking and visitable object lists.
 The server's `objectVisitedBy` selects the last visitable object, excluding a
 hero on top. Drawing order, movement passability and interaction selection
 are distinct mechanisms: their agreement on newly overlapping interactive
-objects must be investigated and tested. Whether and how to expose multiple
-targets or warn an author remains open. No automatic interactive-layer policy
-is accepted or implemented by this document.
+objects must be investigated and tested. The editor now warns about multiple
+static visitable objects sharing a tile when one crosses a seam. This warning
+does not resolve selection or establish a general interactive-layer policy.
 
-The pilot restriction above is still active until the implementation and its
-tests support the agreed policy. This policy does not turn legacy maps into
-toroidal maps unless an author explicitly opts in.
+The pilot rejects static footprints wider or taller than the map period, since
+their repeated image slices are not supported. The wrapped-footprint work does
+not turn legacy maps into toroidal maps unless an author explicitly opts in.
 
 The initial demonstration is experimental and uses maps adapted to the
 topology, without ambiguous interactive-object overlaps at the seams. General
 conversion of arbitrary legacy content and resolution of those overlaps are
 follow-on compatibility work, not prerequisites for demonstrating such a map.
-The agreed footprint-wrapping policy remains the target for that work; the
-current static-footprint restriction is an implementation limitation.
+The agreed footprint-wrapping policy remains the target for that work; complete
+visual and gameplay compatibility is not yet established.
 
 ## What the shared layer does
 

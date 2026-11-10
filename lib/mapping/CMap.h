@@ -105,9 +105,9 @@ public:
 	inline const TerrainTile & getTile(const int3 & tile) const;
 	bool isCoastalTile(const int3 & pos) const;
 	inline bool isInTheMap(const int3 & pos) const;
-	/// Static objects crossing the rectangular boundary are not yet supported
-	/// on toroidal maps. Heroes and boats use the moving-object renderer.
-	bool hasUnsupportedToroidalFootprint(const CGObjectInstance & object) const;
+	/// Whether a static object's occupied footprint crosses a toroidal seam.
+	/// Heroes and boats use the moving-object renderer.
+	bool hasStaticFootprintAcrossToroidalSeam(const CGObjectInstance & object) const;
 
 	bool canMoveBetween(const int3 &src, const int3 &dst) const;
 	bool checkForVisitableDir(const int3 & src, const TerrainTile * pom, const int3 & dst) const;

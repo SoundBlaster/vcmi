@@ -5328,8 +5328,13 @@ Guard: %3</source>
     <name>Validator</name>
     <message>
         <location filename="../validator.cpp"/>
-        <source>Object %1 crosses a map seam. Move it fully inside the map before using toroidal topology.</source>
-        <translation>Объект %1 пересекает край карты. Для замкнутой карты переместите его целиком внутрь границ.</translation>
+        <source>Object %1 is larger than the toroidal map. Reduce its footprint before saving.</source>
+        <translation>Объект %1 больше тороидальной карты. Уменьшите его размер перед сохранением.</translation>
+    </message>
+    <message>
+        <location filename="../validator.cpp"/>
+        <source>Interactive objects overlap across a map seam at %1. Check which object can be visited.</source>
+        <translation>Интерактивные объекты перекрываются через край карты в точке %1. Проверьте, какой объект можно посетить.</translation>
     </message>
     <message>
         <location filename="../validator.ui" line="17"/>

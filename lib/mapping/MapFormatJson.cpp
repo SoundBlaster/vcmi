@@ -41,6 +41,16 @@
 #include "../texts/Languages.h"
 #include "../texts/TextOperations.h"
 
+static void validateToroidalFootprintSizes(const CMap & map)
+{
+	if(!map.toroidal)
+		return;
+	for(const auto & object : map.objects)
+		if(object && object->ID != Obj::HERO && object->ID != Obj::BOAT
+			&& (object->getWidth() > map.width || object->getHeight() > map.height))
+			throw std::runtime_error("Toroidal map object footprint exceeds the map period: " + object->instanceName);
+}
+
 class MapObjectResolver: public IInstanceResolver
 {
 public:
@@ -886,9 +896,7 @@ void CMapLoaderJson::readMap()
 	map->initTerrain();
 	readTerrain();
 	readObjects();
-	for(const auto & object : map->objects)
-		if(object && map->hasUnsupportedToroidalFootprint(*object))
-			throw std::runtime_error("Toroidal map object crosses an unsupported seam: " + object->instanceName);
+	validateToroidalFootprintSizes(*map);
 	readScript();
 
 	map->calculateGuardingGreaturePositions();
@@ -1408,9 +1416,7 @@ void CMapSaverJson::addToArchive(const JsonNode & data, const std::string & file
 
 void CMapSaverJson::saveMap(const std::unique_ptr<CMap>& map)
 {
-	for(const auto & object : map->objects)
-		if(object && map->hasUnsupportedToroidalFootprint(*object))
-			throw std::runtime_error("Toroidal map object crosses an unsupported seam: " + object->instanceName);
+	validateToroidalFootprintSizes(*map);
 	this->map = map.get();
 	this->mapHeader = this->map;
 	writeHeader();

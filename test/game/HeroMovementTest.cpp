@@ -82,6 +82,22 @@ protected:
 	}
 };
 
+class ToroidalMemoryMapService : public CMapService
+{
+public:
+	explicit ToroidalMemoryMapService(const std::vector<ui8> & data) : data(data) {}
+	std::unique_ptr<CMap> loadMap(const ResourcePath &, IGameInfoCallback * callback) const override
+	{
+		return CMapService::loadMap(data.data(), static_cast<int>(data.size()), "ToroidSeamLaboratory", "core", "ASCII", callback);
+	}
+	std::unique_ptr<CMapHeader> loadMapHeader(const ResourcePath &, bool = false) const override
+	{
+		return CMapService::loadMapHeader(data.data(), static_cast<int>(data.size()), "ToroidSeamLaboratory", "core", "ASCII");
+	}
+private:
+	const std::vector<ui8> & data;
+};
+
 TEST(ToroidalDemoVmapTest, ServerStartRejectsAnIncompatiblePeer)
 {
 	const auto directory = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-start-%%%%-%%%%");
@@ -536,22 +552,7 @@ TEST(ToroidalDemoVmapTest, SavedMapStartsAndSupportsCornerVisit)
 		CMapSaverJson saver(&archive);
 		saver.saveMap(legacy);
 	}
-	class DemoMapService : public CMapService
-	{
-	public:
-		explicit DemoMapService(const std::vector<ui8> & data) : data(data) {}
-		std::unique_ptr<CMap> loadMap(const ResourcePath &, IGameInfoCallback * callback) const override
-		{
-			return CMapService::loadMap(data.data(), static_cast<int>(data.size()), "ToroidSeamLaboratory", "core", "ASCII", callback);
-		}
-		std::unique_ptr<CMapHeader> loadMapHeader(const ResourcePath &, bool = false) const override
-		{
-			return CMapService::loadMapHeader(data.data(), static_cast<int>(data.size()), "ToroidSeamLaboratory", "core", "ASCII");
-		}
-	private:
-		const std::vector<ui8> & data;
-	};
-	DemoMapService service(archive.getBuffer());
+	ToroidalMemoryMapService service(archive.getBuffer());
 	auto header = service.loadMapHeader(ResourcePath("memory"));
 	ASSERT_TRUE(header->toroidal);
 	StartInfo info;
@@ -630,6 +631,85 @@ TEST(ToroidalDemoVmapTest, SavedMapStartsAndSupportsCornerVisit)
 	CGameHandler restoredHandler(restoredServer, restored);
 	ASSERT_TRUE(restoredHandler.moveHero(heroID, restoredHero->convertFromVisitablePos(int3(0, 35, 0)), EMovementMode::STANDARD, false, PlayerColor(0), EPathfindingLayer::LAND));
 	EXPECT_EQ(restoredHero->visitablePos(), int3(0, 35, 0));
+}
+
+TEST(ToroidalDemoVmapTest, SavedWrappedResourceCanBeCollected)
+{
+	const PlayerColor player(0);
+	auto source = TinyH3M::TinyH3MBuilder(EMapFormat::SOD)
+		.size(36, false).playerActive(player)
+		.hero(int3(35, 10, 0), HeroTypeID(0), player)
+		.resource(int3(15, 15, 0), GameResID::GOLD, 10).build();
+	CMemoryBuffer legacyBytes;
+	legacyBytes.write(source.data(), static_cast<si64>(source.size()));
+	legacyBytes.seek(0);
+	EditorCallback editor(nullptr);
+	CMapLoaderH3M legacyLoader("WrappedResource", "core", "ASCII", &legacyBytes);
+	auto legacy = legacyLoader.loadMap(&editor);
+	editor.setMap(legacy.get());
+	CGResource * resource = nullptr;
+	for(const auto & object : legacy->objects)
+		if(auto * candidate = dynamic_cast<CGResource *>(object.get()))
+			resource = candidate;
+	ASSERT_NE(resource, nullptr);
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ "A0" ] })";
+	JsonNode definition(text.data(), text.size(), "WrappedResource");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	legacy->hideObject(resource);
+	resource->pos = int3(0, 10, 0);
+	resource->appearance = appearance;
+	legacy->showObject(resource);
+	legacy->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+	CMemoryBuffer archive;
+	{
+		CMapSaverJson saver(&archive);
+		ASSERT_NO_THROW(saver.saveMap(legacy));
+	}
+	ToroidalMemoryMapService service(archive.getBuffer());
+	auto header = service.loadMapHeader(ResourcePath("memory"));
+	ASSERT_TRUE(header->toroidal);
+	StartInfo info;
+	info.mapname = "memory";
+	info.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
+	info.mode = EStartMode::NEW_GAME;
+	const auto & playerInfo = header->players[player.getNum()];
+	auto & settings = info.playerInfos[player];
+	settings.color = player;
+	settings.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(0));
+	settings.name = "Player";
+	settings.castle = playerInfo.defaultCastle();
+	settings.hero = playerInfo.defaultHero();
+	settings.bonus = PlayerStartingBonus::GOLD;
+	auto state = std::make_shared<CGameState>();
+	state->preInit(LIBRARY);
+	GameRandomizer randomizer(*state);
+	Load::ProgressAccumulator progress;
+	ASSERT_NO_THROW(state->init(&service, &info, randomizer, progress, false));
+	CGHeroInstance * hero = nullptr;
+	resource = nullptr;
+	for(const auto & object : state->getMap().objects)
+	{
+		if(auto * candidate = dynamic_cast<CGHeroInstance *>(object.get()); candidate && candidate->getOwner() == player)
+			hero = candidate;
+		if(auto * candidate = dynamic_cast<CGResource *>(object.get()))
+			resource = candidate;
+	}
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(resource, nullptr);
+	const int3 destination(35, 10, 0);
+	ASSERT_EQ(hero->visitablePos(), int3(34, 10, 0));
+	ASSERT_EQ(resource->visitablePos(), destination);
+	ASSERT_EQ(state->getMap().getTile(destination).topVisitableObj(), resource->id);
+	const auto resourceID = resource->id;
+	const auto gold = state->players.at(player).resources[GameResID::GOLD];
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(state, player);
+	CGameHandler handler(server, state);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(state->players.at(player).resources[GameResID::GOLD], gold + 1000);
+	EXPECT_EQ(state->getMap().getObject(resourceID), nullptr);
 }
 
 class GrailTopologyTest : public TinyMapGameTest

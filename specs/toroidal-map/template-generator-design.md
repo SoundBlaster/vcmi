@@ -46,9 +46,9 @@ the application identity is recorded in the [legacy editor check](evidence/topol
    zones themselves to span a seam, but is a broader change to the generator.
 
 A compatible implementation could combine these approaches per template.
-The map topology flag alone does not select or verify them. Objects spanning a
-seam remain restricted in the current pilot, so a forest border also needs to
-be made with supported terrain and footprints until that restriction changes.
+The map topology flag alone does not select or verify them. Seam-crossing
+objects have partial pilot support, but a forest border still needs its
+passability and visuals checked on both sides of each seam.
 
 ## Verification needed before advertising support
 
