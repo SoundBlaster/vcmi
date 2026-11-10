@@ -299,3 +299,23 @@ exercised in this GUI run. The focused map topology test executable passed
 16 tests, including fractional accumulation and reset on direction changes.
 The temporary resources were removed after exit and the prior test-profile
 settings and links were restored.
+
+## Revealed terrain camera samples
+
+The rebuilt client stamped `d1d5403` loaded the same isolated laboratory
+save, with the hero at the starting corner. The `vcmimap` cheat revealed the
+map for this unsaved test session. At 100 pixels/second, two 200 ms holds of
+the temporary west binding and two 200 ms holds of the temporary north
+binding were followed by 200 ms holds of the default east and south bindings.
+Computer Use screenshots after the holds showed the stationary hero, ore,
+wood and both towns shifting together in the expected directions, with their
+relative arrangement preserved. The minimap viewport changed across both
+map edges. At the sampled positions, the revealed grass filled the map view
+without an obvious gap.
+
+These are discrete observations of one grass-only fixture, not a continuous
+frame capture or a measurement of smoothness. They do not establish the
+appearance of roads, rivers, fog, other terrain or artwork spanning a seam.
+The client was closed without saving; the temporary game-data copies were
+removed and the previous test-profile settings, key bindings and TB5 data
+links were restored.
