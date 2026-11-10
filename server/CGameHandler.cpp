@@ -939,9 +939,12 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			&& !pathfinderHelper->canMoveBetween(source, hmpos))
 			return complainRet("Cannot approach the destination from this direction!");
 
-		// The server does not track the source pathfinding layer. Apply the
-		// source-object exit rule only when air and water walking are impossible.
-		if(gameState().getMap().toroidal && !canFly && !canWalkOnSea && !pathfinderHelper->canMoveBetween(hmpos, source))
+		// The server does not track the source layer. Water walking alone does
+		// not make a land tile a WATER node, so an on-foot hero there must
+		// still obey its source object's exit directions.
+		if(gameState().getMap().toroidal && !canFly
+			&& (!canWalkOnSea || (!h->inBoat() && gameState().getMap().getTile(source).isLand()))
+			&& !pathfinderHelper->canMoveBetween(hmpos, source))
 			return complainRet("Cannot leave the source from this direction!");
 
 		if(gameState().getMap().toroidal && h->inBoat() && h->getBoat()->layer == EPathfindingLayer::SAIL && layer == EPathfindingLayer::SAIL && t.isWater())

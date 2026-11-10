@@ -2720,6 +2720,26 @@ TEST_F(HeroMovementTest, PathfinderHonorsSourceObjectExitDirectionAcrossSeam)
 	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->visitablePos(), origin);
 	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+
+	// Water walking cannot change the source layer while the hero is on land.
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	CPathsInfo waterPaths(gameState()->getMapSize(), hero);
+	auto waterConfig = std::make_shared<SingleHeroPathfinderConfig>(waterPaths, *gameState(), hero);
+	CPathfinder waterPathfinder(*gameState(), waterConfig);
+	waterPathfinder.calculatePaths();
+	EXPECT_FALSE(waterPaths.getNode(destination, EPathfindingLayer::LAND)->reachable());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+
+	// A hero that has actually flown over that object can continue in the air.
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(int3(1, 5, 0)));
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_EQ(hero->visitablePos(), origin);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	EXPECT_EQ(hero->visitablePos(), destination);
 }
 
 TEST_F(HeroMovementTest, HeroOnFootCannotClaimSailingLayerAcrossSeam)

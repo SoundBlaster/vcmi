@@ -86,6 +86,28 @@ the full local suite passed 1,376 tests with three disabled
 (`full-suite-source-exit.log` on TB5). The build used `2bd0144` plus this
 change (`source-exit-direction-after-build.log`); bounded maps are unchanged.
 
+### Water walking on land and source exits
+
+The source-exit test now also gives the hero Water Walk while it stands on
+land. The pathfinder still rejects a prohibited exit across the seam, but
+the server previously accepted it and spent 100 movement points. Water Walk
+alone cannot put an on-foot hero on the WATER layer while standing on land.
+The server therefore applies the source-object exit rule in that case too.
+This applies only to standard toroidal movement and preserves bounded behavior.
+
+The same fixture then gives the hero Flight and moves it in the AIR layer over
+the restricted object and across the seam; both server steps succeed. Five
+focused movement tests passed. The full local macOS arm64 suite from `7af7780`
+plus this change ran 1,467 tests: 1,465 passed, two optional prototype-file
+cases were skipped and four remain disabled. The Complete `Dead and Buried`
+map was supplied for its optional legacy test. The log is
+`full-suite-water-walk-exit-2026-11-10.log` in the TB5 runtime directory.
+
+The server still does not store the hero's actual source pathfinding layer.
+For a hero with Flight, or Water Walk while on water, the source-exit case
+remains ambiguous and is not resolved by this change. This fixture does not
+establish GUI, multiplayer, airship or all direction behavior.
+
 An additional SoD test uses a resource that forbids entry from the north but
 permits it from the west. Across the north/south seam the server rejects the
 forbidden step without collecting or spending movement; after a short route
