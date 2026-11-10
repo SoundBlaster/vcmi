@@ -57,6 +57,16 @@ old-binary multiplayer session. The raw-codec mismatch regression remains
 disabled as defense in depth: bypassing the handshake can still misinterpret
 the packet.
 
+A subsequent test at revision `8f81ff1` used VCMI's real internal connection
+and network event loops to connect a tagged and an untagged simulated client
+to `CVCMIServer`. It received both lobby acknowledgments and checked the
+server's topology guard: the tagged peer alone was eligible; after the
+untagged peer joined, a toroidal map was rejected while a bounded map remained
+eligible. The individual test and seven-test focused suite passed
+(`lobby-internal-build.log`, `lobby-internal-test.log`,
+`lobby-internal-suite.log` on TB5). This does not start a full game, exercise
+TCP, or run actual old or separate-process client binaries.
+
 On 2026-11-09 a versioned topology flag was added to the map header, JSON map
 header and binary serialization. A version-4 map header signals `toroidal`;
 legacy maps and older save formats default to bounded. The server checks a

@@ -30,6 +30,40 @@ public:
 	bool closed = false;
 };
 
+class LobbyProbe final : public INetworkClientListener
+{
+public:
+	LobbyProbe(std::string uuid, ESerializationVersion offered) : uuid(std::move(uuid)), offered(offered) {}
+	void onConnectionFailed(const std::string & error) override { failure = error; }
+	void onDisconnected(const std::shared_ptr<INetworkConnection> &, const std::string & error) override { failure = error; }
+	void onConnectionEstablished(const std::shared_ptr<INetworkConnection> & connection) override
+	{
+		transport = connection;
+		codec = std::make_unique<GameConnection>(transport);
+		LobbyClientConnected greeting;
+		greeting.uuid = uuid;
+		greeting.mode = EStartMode::NEW_GAME;
+		greeting.version = offered;
+		codec->sendPack(greeting);
+	}
+	void onPacketReceived(const std::shared_ptr<INetworkConnection> &, const std::vector<std::byte> & bytes) override
+	{
+		auto packet = codec->retrievePack(bytes);
+		const auto * connected = dynamic_cast<const LobbyClientConnected *>(packet.get());
+		if(connected && connected->uuid == uuid)
+		{
+			ack = LobbyTopologyCapability::decode(connected->version);
+			codec->setSerializationVersion(ack->version);
+		}
+	}
+	std::string uuid;
+	ESerializationVersion offered;
+	std::string failure;
+	std::optional<LobbyTopologyCapability::Greeting> ack;
+	std::shared_ptr<INetworkConnection> transport;
+	std::unique_ptr<GameConnection> codec;
+};
+
 bool topologyAfterPacketRoundTrip(ESerializationVersion senderVersion, ESerializationVersion receiverVersion)
 {
 	auto transport = std::make_shared<PacketCapture>();
@@ -157,6 +191,42 @@ TEST(GameConnectionTopologyTest, ServerRejectsClientBelowMinimumLobbyVersion)
 	EXPECT_FALSE(visitor.getResult());
 	EXPECT_TRUE(transport->closed);
 	EXPECT_TRUE(server.activeConnections.empty());
+}
+
+TEST(GameConnectionTopologyTest, InternalConnectionsNegotiateBeforeToroidalStartGuard)
+{
+	CVCMIServer server(0, true);
+	server.prepare(false, false);
+	LobbyProbe tagged("tagged-internal", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	LobbyProbe untagged("untagged-internal", ESerializationVersion::CURRENT);
+	auto clientNetwork = INetworkHandler::createHandler();
+	const auto pump = [&]
+	{
+		clientNetwork->getContext().restart();
+		clientNetwork->getContext().poll();
+		server.getNetworkHandler().getContext().restart();
+		server.getNetworkHandler().getContext().poll();
+		clientNetwork->getContext().restart();
+		clientNetwork->getContext().poll();
+	};
+	clientNetwork->createInternalConnection(tagged, server.getNetworkServer());
+	pump();
+	ASSERT_TRUE(tagged.failure.empty()) << tagged.failure;
+	ASSERT_TRUE(tagged.ack.has_value());
+	EXPECT_TRUE(tagged.ack->toroidal);
+	EXPECT_EQ(tagged.ack->version, ESerializationVersion::CURRENT);
+	CMapHeader map;
+	map.toroidal = true;
+	EXPECT_TRUE(server.supportsMapTopology(map));
+	clientNetwork->createInternalConnection(untagged, server.getNetworkServer());
+	pump();
+	ASSERT_TRUE(untagged.failure.empty()) << untagged.failure;
+	ASSERT_TRUE(untagged.ack.has_value());
+	EXPECT_FALSE(untagged.ack->toroidal);
+	EXPECT_EQ(untagged.ack->version, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	EXPECT_FALSE(server.supportsMapTopology(map));
+	map.toroidal = false;
+	EXPECT_TRUE(server.supportsMapTopology(map));
 }
 
 // The raw codec still relies on correct negotiation; keep the desired
