@@ -25,3 +25,15 @@ saves remain readable but cannot be distinguished reliably from an unrelated
 future format using the same ordinal. VMAP major-version collisions and GUI
 save/reload on the new build are also unverified. No existing save was
 rewritten by this change.
+
+The optional `ToroidalDemoVmapTest.DecodesExternalUntaggedPrototypeSave` was
+also run against the earlier GUI save `НОВАЯ ИГРА.vsgm1` in the isolated
+TB5 laboratory data. Its raw version was 940 and its SHA-256 was
+`ad2a9df20f1995f62ffd215d62a6e8fa8cb4856443aa9302144f19d864d3ca73`.
+The test read it without writing it, fully decoded the saved header, game
+state and server state, and confirmed toroidal topology and map dimensions.
+The normal `CGameHandler::load` attempt first failed its mod-compatibility
+check because the test preset and saved game differ; direct decoding does not
+prove that the normal loader accepts the saved mod set or that play can resume.
+Set `VCMI_TOROID_PROTOTYPE_SAVE` to the path of an appropriate old save to
+repeat this optional test; it is skipped when no path is supplied.

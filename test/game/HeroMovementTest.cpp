@@ -18,6 +18,7 @@
 #include "../../lib/battle/BattleInfo.h"
 #include "../../lib/campaign/CampaignState.h"
 #include "../../lib/callback/EditorCallback.h"
+#include "../../lib/callback/GameRandomizer.h"
 #include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/filesystem/CMemoryBuffer.h"
 #include "../../lib/filesystem/CFilesystemLoader.h"
@@ -52,6 +53,11 @@
 #include "../../lib/serializer/GameConnection.h"
 #include "../../server/CGameHandler.h"
 #include "../../server/CVCMIServer.h"
+#include "../../server/TurnTimerHandler.h"
+#include "../../server/battles/BattleProcessor.h"
+#include "../../server/processors/HeroPoolProcessor.h"
+#include "../../server/processors/PlayerMessageProcessor.h"
+#include "../../server/processors/TurnOrderProcessor.h"
 
 class HeroMovementTest : public TinyMapGameTest
 {
@@ -152,6 +158,41 @@ TEST(ToroidalDemoVmapTest, ServerStartRejectsAnIncompatiblePeer)
 	configure(incompatible, false);
 	EXPECT_FALSE(incompatible.prepareToStartGame());
 	EXPECT_EQ(incompatible.gh, nullptr);
+}
+
+TEST(ToroidalDemoVmapTest, DecodesExternalUntaggedPrototypeSave)
+{
+	const char * suppliedPath = std::getenv("VCMI_TOROID_PROTOTYPE_SAVE");
+	if(!suppliedPath || !*suppliedPath)
+		GTEST_SKIP() << "Set VCMI_TOROID_PROTOTYPE_SAVE to a branch-era saved game";
+	const boost::filesystem::path path(suppliedPath);
+	ASSERT_TRUE(boost::filesystem::is_regular_file(path));
+	ASSERT_EQ(CLoadFile::readVersion(path), ESerializationVersion::TOROIDAL_MAP);
+	std::ifstream file(path.c_str(), std::ios::binary);
+	std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
+	file.read(reinterpret_cast<char *>(fileHeader.data()), fileHeader.size());
+	ASSERT_TRUE(file.good());
+	ASSERT_EQ(SaveFileFormat::readUInt32(fileHeader.data() + SaveFileFormat::FILE_MAGIC.size()), static_cast<uint32_t>(ESerializationVersion::TOROIDAL_MAP));
+	CLoadFile saved(path);
+	CMapHeader header;
+	StartInfo info;
+	auto headerChunk = saved.openChunk(SaveFileFormat::CHUNK_HEADER, nullptr);
+	headerChunk->iser & header;
+	headerChunk->iser & info;
+	ASSERT_TRUE(headerChunk->isFullyRead());
+	ASSERT_TRUE(header.toroidal);
+	// The global test preset may not match the save's mods. Decode the chunks
+	// directly without claiming the normal mod-compatibility gate accepted it.
+	auto state = std::make_shared<CGameState>();
+	GameHandlerTestServer server(state);
+	CGameHandler handler(server, state);
+	auto game = saved.openChunk(SaveFileFormat::CHUNK_GAMESTATE, state.get());
+	ASSERT_NO_THROW(state->loadGame(game->iser));
+	ASSERT_NO_THROW(game->iser & handler);
+	EXPECT_TRUE(game->isFullyRead());
+	EXPECT_TRUE(state->getMap().toroidal);
+	EXPECT_EQ(state->getMap().width, header.width);
+	EXPECT_EQ(state->getMap().height, header.height);
 }
 
 TEST_F(ToroidalDemoGameTest, HeroCrossesCornerAndBothEdges)
