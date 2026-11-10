@@ -69,6 +69,18 @@ explicit contracts and focused checks before consumers rely on them.
 `VisualLogger` already accepts map lines and text for an on-screen overlay;
 it is not a complete entity/GUI snapshot and need not be repurposed.
 
+## Possible later agent integration
+
+The user proposes using an ASP Agent Grant to bind an agent to an authorized
+player perspective. A future adapter could use that authority to request a
+game-provided, player-filtered observation and submit only separately allowed
+actions. The game must enforce fog, team visibility and legal actions before
+data or results are returned; the local trace is a diagnostic aid, not a
+security boundary. Multiplayer also needs authoritative identity, lifetime,
+revocation and reconciliation with the server's rules. Exact ASP semantics,
+SDK integration and the agent interface remain deferred until the actual ASP
+specification and SDK are reviewed; this note does not define those semantics.
+
 ## Evidence and limits
 
 Version 2 emits an initial snapshot, then only when player state, level,
