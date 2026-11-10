@@ -16,8 +16,9 @@ legacy unknown-layer situation. It initially skipped heroes with both Flight
 and Water Walk; the later [layer-switch change](topology-transient-switches-2026-11-10.md)
 models the tested on-foot transitions and removes that exclusion. The
 prospective search cannot predict all object-leave effects,
-newly revealed cells or concurrent world changes. A previously stranded hero
-can still be unable to end the turn, including when a turn timer expires.
+newly revealed cells or concurrent world changes. A later [timer change](topology-timer-landing-2026-11-10.md)
+can follow a clear known route, but a previously stranded hero can still be
+unable to end the turn when no such route exists.
 G12 remains pending; this is not a general recovery guarantee.
 
 `ToroidalWaterWalkRejectsStepThatLosesKnownLanding` and

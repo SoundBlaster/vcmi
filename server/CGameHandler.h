@@ -269,6 +269,7 @@ public:
 
 	void onPlayerTurnEnded(PlayerColor which);
 	bool hasHeroInTransientMovement(PlayerColor player) const;
+	bool tryAutoLandTransientHero(PlayerColor player);
 	void onNewTurn();
 	void addStatistics(StatisticDataSet &stat) const;
 	void sendQuestionResolved(QuestionID questionID);

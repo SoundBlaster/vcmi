@@ -22,9 +22,12 @@ class TurnTimerHandler
 {	
 	CGameHandler & gameHandler;
 	static constexpr int turnTimePropagateFrequency = 1000;
+	static constexpr int transientLandingRetryIntervalMs = 1000;
 	std::map<PlayerColor, TurnTimerInfo> timers;
 	std::map<PlayerColor, int> lastUpdate;
 	std::map<PlayerColor, bool> endTurnAllowed;
+	// Transient runtime throttle; a restored game may retry immediately.
+	std::map<PlayerColor, int> transientLandingRetryMs;
 	
 	void onPlayerMakingTurn(PlayerColor player, int waitTime);
 	void onBattleLoop(const BattleID & battleID, int waitTime);

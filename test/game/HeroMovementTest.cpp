@@ -66,6 +66,7 @@
 #include "../../server/CGameHandler.h"
 #include "../../server/CVCMIServer.h"
 #include "../../server/TurnTimerHandler.h"
+#include "../../server/activities/ActivityProcessor.h"
 #include "../../server/battles/BattleProcessor.h"
 #include "../../server/processors/HeroPoolProcessor.h"
 #include "../../server/processors/PlayerMessageProcessor.h"
@@ -783,6 +784,65 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_FALSE(replicaHero->hasBonusOfType(BonusType::WATER_WALKING));
 		EXPECT_EQ(replicaHero->getPathfindingStartLayer(), EPathfindingLayer::LAND);
 	}
+
+	// Expire a real server timer while the hero is airborne over water.
+	GiveBonus timedFlight;
+	timedFlight.id = hero->id;
+	timedFlight.bonus = Bonus(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID());
+	server.gh->giveHeroBonus(&timedFlight);
+	server.gh->setMovePoints(hero->id, 300);
+	FowTilesType landingArea;
+	const auto topology = server.gh->gameState().getMap().getTopology();
+	for(int dx = -3; dx <= 3; ++dx)
+		for(int dy = -3; dy <= 3; ++dy)
+			landingArea.insert(*topology.canonicalize(airborne + int3(dx, dy, 0)));
+	server.gh->changeFogOfWar(landingArea, red, ETileVisibility::REVEALED);
+	pumpUntil([&] {
+		return host.state->getHero(hero->id)->movementPointsRemaining() == 300
+			&& guest.state->getHero(hero->id)->movementPointsRemaining() == 300
+			&& host.state->getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT)
+			&& guest.state->getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT)
+			&& std::all_of(landingArea.begin(), landingArea.end(), [&](const int3 & tile) {
+				return host.state->isVisibleFor(tile, red) && guest.state->isVisibleFor(tile, red);
+			});
+	});
+	flight.requestID = 26;
+	host.codec->sendPack(flight);
+	pumpUntil([&] {
+		return host.results.contains(26)
+			&& host.state->getHero(hero->id)->visitablePos() == airborne
+			&& guest.state->getHero(hero->id)->visitablePos() == airborne;
+	});
+	ASSERT_TRUE(host.results.contains(26)) << host.failure;
+	ASSERT_TRUE(host.results.at(26));
+	ASSERT_EQ(server.gh->gameState().getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::AIR);
+	auto * startInfo = server.gh->gameInfo().gameState().getStartInfo();
+	startInfo->turnTimerInfo.turnTimer = 1;
+	startInfo->turnTimerInfo.baseTimer = 0;
+	server.gh->turnTimerHandler->onGameplayStart(red);
+	server.gh->turnTimerHandler->onPlayerGetTurn(red);
+	server.gh->turnTimerHandler->update(1);
+	ASSERT_EQ(server.gh->gameState().getHero(hero->id)->visitablePos(), airborne);
+	server.gh->turnTimerHandler->update(1);
+	pumpUntil([&] {
+		return host.state->getHero(hero->id)->getPathfindingStartLayer() == EPathfindingLayer::LAND
+			&& guest.state->getHero(hero->id)->getPathfindingStartLayer() == EPathfindingLayer::LAND;
+	});
+	const auto * landed = server.gh->gameState().getHero(hero->id);
+	ASSERT_EQ(landed->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+	ASSERT_NE(landed->visitablePos(), airborne);
+	EXPECT_TRUE(int3(0, 0, 0).areNeighbours(topology.displacement(airborne, landed->visitablePos())));
+	EXPECT_EQ(landed->movementPointsRemaining(), 100);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), landed->visitablePos());
+		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), landed->movementPointsRemaining());
+	}
+	server.gh->turnTimerHandler->update(1);
+	pumpUntil([&] { return host.state->actingPlayers.contains(blue) && guest.state->actingPlayers.contains(blue); });
+	ASSERT_TRUE(server.gh->gameState().actingPlayers.contains(blue));
+	ASSERT_TRUE(host.state->actingPlayers.contains(blue));
+	ASSERT_TRUE(guest.state->actingPlayers.contains(blue));
 }
 
 TEST(ToroidalDemoVmapTest, DecodesExternalUntaggedPrototypeSave)
@@ -3572,6 +3632,207 @@ TEST_F(HeroMovementTest, ToroidalTransientLandingSearchWorksOn252Map)
 		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(land), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	}
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
+TEST_F(HeroMovementTest, AutomaticLandingAdvancesOneOrdinaryStepAtATime)
+{
+	const PlayerColor player(0);
+	const int3 land(0, 5, 0), first(35, 5, 0), second(34, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player);
+	for(int x = 33; x <= 35; ++x)
+		for(int y = 4; y <= 6; ++y)
+			builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(500);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(first), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(second), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	ASSERT_EQ(hero->movementPointsRemaining(), 300);
+	ASSERT_TRUE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->visitablePos(), first);
+	EXPECT_EQ(hero->getPathfindingStartLayer(), EPathfindingLayer::WATER);
+	EXPECT_EQ(hero->movementPointsRemaining(), 200);
+	ASSERT_TRUE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->visitablePos(), land);
+	EXPECT_EQ(hero->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(hero->movementPointsRemaining(), 100);
+	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
+}
+
+TEST_F(HeroMovementTest, ExpiredTimerWaitsWhenNoSafeLandingExists)
+{
+	const PlayerColor player(0);
+	const int3 land(0, 5, 0), water(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player).terrain(water, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			map()->getTile(int3(x, y, 0)).terrainType = TerrainId::WATER;
+	const auto remaining = hero->movementPointsRemaining();
+	gameState()->players.at(player).human = true;
+	gameState()->players.at(player).status = EPlayerStatus::INGAME;
+	gameState()->actingPlayers.insert(player);
+	gameState()->getStartInfo()->turnTimerInfo.turnTimer = 1;
+	gameState()->getStartInfo()->turnTimerInfo.baseTimer = 0;
+	handler.turnTimerHandler->onGameplayStart(player);
+	handler.turnTimerHandler->onPlayerGetTurn(player);
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	EXPECT_EQ(hero->visitablePos(), water);
+	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+	EXPECT_TRUE(handler.hasHeroInTransientMovement(player));
+	EXPECT_TRUE(gameState()->actingPlayers.contains(player));
+	// Recheck after the retry interval, without searching on every server tick.
+	map()->getTile(land).terrainType = TerrainId::GRASS;
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	EXPECT_EQ(hero->visitablePos(), water);
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(999));
+	EXPECT_EQ(hero->visitablePos(), land);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
+TEST_F(HeroMovementTest, AutomaticLandingCanSkipAStrandedHero)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 firstWater(35, 5, 0), secondWater(35, 15, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(1, 15, 0), HeroTypeID(1), player)
+		.hero(int3(11, 10, 0), HeroTypeID(2), opponent)
+		.terrain(firstWater, TerrainId::WATER).terrain(secondWater, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * first = findHeroAt(int3(1, 5, 0));
+	auto * second = findHeroAt(int3(1, 15, 0));
+	ASSERT_NE(first, nullptr);
+	ASSERT_NE(second, nullptr);
+	for(auto * hero : {first, second})
+	{
+		hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+		hero->setMovementPoints(300);
+	}
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(first->id, first->convertFromVisitablePos(firstWater), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	ASSERT_TRUE(handler.moveHero(second->id, second->convertFromVisitablePos(secondWater), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	for(const int x : {33, 34, 35, 0, 1})
+		for(int y = 3; y <= 7; ++y)
+			map()->getTile(int3(x, y, 0)).terrainType = TerrainId::WATER;
+	ASSERT_TRUE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(first->visitablePos(), firstWater);
+	EXPECT_EQ(first->getPathfindingStartLayer(), EPathfindingLayer::WATER);
+	EXPECT_EQ(second->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+	EXPECT_TRUE(handler.hasHeroInTransientMovement(player));
+}
+
+TEST_F(HeroMovementTest, ExpiredTimerWaitsUntilAutomaticLandingIsAllowed)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 water(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), opponent).terrain(water, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	gameState()->players.at(player).human = true;
+	gameState()->players.at(player).status = EPlayerStatus::INGAME;
+	gameState()->actingPlayers.insert(player);
+	gameState()->getStartInfo()->turnTimerInfo.turnTimer = 1;
+	gameState()->getStartInfo()->turnTimerInfo.baseTimer = 0;
+	handler.turnTimerHandler->onGameplayStart(player);
+	handler.turnTimerHandler->onPlayerGetTurn(player);
+	ASSERT_TRUE(handler.turnTimerHandler->isTimerEnabled(player));
+	ASSERT_TRUE(gameState()->isPlayerMakingTurn(player));
+	ASSERT_EQ(gameState()->players.at(player).status, EPlayerStatus::INGAME);
+	ASSERT_EQ(handler.activities->topActivity(player), nullptr);
+	handler.turnTimerHandler->setEndTurnAllowed(player, false);
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	EXPECT_EQ(hero->visitablePos(), water);
+	EXPECT_TRUE(handler.hasHeroInTransientMovement(player));
+	handler.turnTimerHandler->setEndTurnAllowed(player, true);
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+	EXPECT_TRUE(gameState()->actingPlayers.contains(player));
+}
+
+TEST_F(HeroMovementTest, AutomaticLandingDoesNotTriggerAnEvent)
+{
+	const PlayerColor player(0);
+	const int3 land(0, 5, 0), water(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player).terrain(water, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			map()->getTile(int3(x, y, 0)).terrainType = TerrainId::WATER;
+	map()->getTile(land).terrainType = TerrainId::GRASS;
+	const std::string text = R"({ "animation": "test.def", "mask": [ "V" ] })";
+	JsonNode definition(text.data(), text.size(), "AutomaticLandingEvent");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	appearance->id = Obj::EVENT;
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto event = std::make_shared<CGObjectInstance>(gameState().get());
+	event->ID = Obj::EVENT;
+	event->pos = land;
+	event->instanceName = "automatic_landing_event";
+	event->appearance = appearance;
+	map()->addNewObject(event);
+	ASSERT_TRUE(map()->getTile(land).visitable());
+	ASSERT_FALSE(map()->getTile(land).blocked());
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * landing = paths.getNode(land, EPathfindingLayer::LAND);
+	ASSERT_TRUE(landing->reachable());
+	ASSERT_EQ(landing->turns, 0);
+	ASSERT_EQ(landing->action, EPathNodeAction::NORMAL);
+	const auto remaining = hero->movementPointsRemaining();
+	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->visitablePos(), water);
+	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+	EXPECT_NE(map()->getObject(event->id), nullptr);
 }
 
 TEST_F(HeroMovementTest, ProposedWaterWalkStartMatchesActualStateAcrossSeam)

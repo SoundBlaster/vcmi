@@ -114,10 +114,11 @@
 namespace
 {
 enum class KnownLanding { FOUND, NONE, UNKNOWN };
+using LandingStep = std::pair<int3, EPathfindingLayer>;
 
 // Only consider routes whose tiles and guard neighborhoods are already known
 // to the player. Unknown terrain cannot become a server-side information leak.
-KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHeroInstance * hero, const std::optional<PathfinderStart> & start)
+KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHeroInstance * hero, const std::optional<PathfinderStart> & start, std::vector<LandingStep> * plainRoute = nullptr)
 {
 	const auto * team = gameState.getPlayerTeam(hero->getOwner());
 	if(!team)
@@ -155,6 +156,7 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 	};
 	const int z = start ? start->position.z : hero->visitablePos().z;
 	bool unknownFrontier = !team->fogOfWarMap[start ? start->position : hero->visitablePos()];
+	const CGPathNode * bestPlainLanding = nullptr;
 	for(int x = 0; x < paths.sizes.x; ++x)
 		for(int y = 0; y < paths.sizes.y; ++y)
 		{
@@ -163,7 +165,20 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 			if(node->turns == 0 && node->theNodeBefore
 				&& (node->action == EPathNodeAction::NORMAL || node->action == EPathNodeAction::VISIT || node->action == EPathNodeAction::BATTLE)
 				&& pathIsKnown(node))
-				return KnownLanding::FOUND;
+			{
+				if(!plainRoute)
+					return KnownLanding::FOUND;
+				bool plain = node->action == EPathNodeAction::NORMAL;
+				for(const auto * step = node; plain && step; step = step->theNodeBefore)
+				{
+					const auto * stepTile = gameState.getTile(step->coord);
+					if(stepTile->objectVisitedBy(hero->id).hasValue()
+						|| gameState.guardingCreaturePosition(step->coord).isValid())
+						plain = false;
+				}
+				if(plain && (!bestPlainLanding || node->getCost() < bestPlainLanding->getCost()))
+					bestPlainLanding = node;
+			}
 			if(!unknownFrontier && team->fogOfWarMap[tile])
 				for(const auto layer : {EPathfindingLayer::AIR, EPathfindingLayer::WATER})
 				{
@@ -182,6 +197,14 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 						}
 				}
 		}
+	if(bestPlainLanding)
+	{
+		plainRoute->clear();
+		for(const auto * step = bestPlainLanding; step->theNodeBefore; step = step->theNodeBefore)
+			plainRoute->emplace_back(step->coord, step->layer);
+		std::reverse(plainRoute->begin(), plainRoute->end());
+		return KnownLanding::FOUND;
+	}
 	return unknownFrontier ? KnownLanding::UNKNOWN : KnownLanding::NONE;
 }
 }
@@ -663,6 +686,28 @@ bool CGameHandler::hasHeroInTransientMovement(PlayerColor player) const
 	for(const auto * hero : state->getHeroes())
 		if(hero->getConfirmedMovementLayer() == EPathfindingLayer::AIR || hero->getConfirmedMovementLayer() == EPathfindingLayer::WATER)
 			return true;
+	return false;
+}
+
+bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
+{
+	if(!gameState().getMap().toroidal)
+		return false;
+	const auto * state = gameState().getPlayerState(player);
+	if(!state)
+		return false;
+	for(const auto * hero : state->getHeroes())
+	{
+		const auto layer = hero->getConfirmedMovementLayer();
+		if(hero->inBoat() || (layer != EPathfindingLayer::AIR && layer != EPathfindingLayer::WATER))
+			continue;
+		std::vector<LandingStep> route;
+		if(findKnownTransientLanding(gameState(), hero, std::nullopt, &route) != KnownLanding::FOUND || route.empty())
+			continue;
+		const auto & [destination, nextLayer] = route.front();
+		const bool transit = nextLayer == EPathfindingLayer::AIR || nextLayer == EPathfindingLayer::WATER;
+		return moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, transit, player, nextLayer);
+	}
 	return false;
 }
 

@@ -40,6 +40,7 @@ void TurnTimerHandler::onGameplayStart(PlayerColor player)
 		timers[player].remainingMovementPointsPercent = 0;
 		lastUpdate[player] = std::numeric_limits<int>::max();
 		endTurnAllowed[player] = true;
+		transientLandingRetryMs[player] = 0;
 	}
 }
 
@@ -65,6 +66,7 @@ void TurnTimerHandler::setEndTurnAllowed(PlayerColor player, bool enabled)
 void TurnTimerHandler::onEndTurn(PlayerColor player)
 {
 	assert(player.isValidPlayer());
+	transientLandingRetryMs[player] = 0;
 	auto & timer = timers[player];
 	timer.isTurnEnded = true;
 	sendTimerUpdate(player);
@@ -86,6 +88,7 @@ void TurnTimerHandler::onPlayerGetTurn(PlayerColor player)
 		if(si->turnTimerInfo.isEnabled())
 		{
 			endTurnAllowed[player] = true;
+			transientLandingRetryMs[player] = 0;
 			auto & timer = timers[player];
 			timer.isTurnStart = true;
 			timer.isTurnEnded = false;
@@ -111,6 +114,8 @@ void TurnTimerHandler::update(int waitTimeMs)
 
 	for(PlayerColor player(0); player < PlayerColor::PLAYER_LIMIT; ++player)
 	{
+		if(!gameHandler.gameInfo().tryGetPlayerState(player))
+			continue;
 		if(gameHandler.gameState().isPlayerMakingTurn(player))
 			onPlayerMakingTurn(player, waitTimeMs);
 		
@@ -174,9 +179,25 @@ void TurnTimerHandler::onPlayerMakingTurn(PlayerColor player, int waitTime)
 		if(timerCountDown(timer.baseTimer, si->turnTimerInfo.baseTimer, player, waitTime))
 			return;
 
-		if(endTurnAllowed[state->color] && !gameHandler.activities->topActivity(state->color)
-			&& !gameHandler.hasHeroInTransientMovement(state->color)) // wait for activities and transient movement
+		if(endTurnAllowed[state->color] && !gameHandler.activities->topActivity(state->color))
+		{
+			if(gameHandler.hasHeroInTransientMovement(state->color))
+			{
+				// Advance at most one ordinary, known and unoccupied landing step
+				// per tick; activities and world changes are checked again next time.
+				auto & retryMs = transientLandingRetryMs[state->color];
+				if(retryMs > 0)
+				{
+					retryMs = std::max(0, retryMs - waitTime);
+					if(retryMs > 0)
+						return;
+				}
+				if(!gameHandler.tryAutoLandTransientHero(state->color))
+					retryMs = transientLandingRetryIntervalMs;
+				return;
+			}
 			gameHandler.turnOrder->onPlayerEndsTurn(state->color);
+		}
 	}
 }
 

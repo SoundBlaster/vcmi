@@ -19,8 +19,9 @@ consecutive repetitions.
 `HeroMovementTest.TransientMovementGuardChecksAllOwnedHeroes` exercises a
 real Water Walk step, checks player isolation, checks that another owned hero
 is considered, and compares bounded behavior. The second hero's AIR layer is
-set directly in this fixture. The automatic timer's actual countdown was not
-exercised. Unknown layers in older saves, aviation vehicles, graphical play,
+set directly in this fixture. That earlier test did not exercise a countdown;
+the later [timer landing test](topology-timer-landing-2026-11-10.md) drives one
+explicitly. Unknown layers in older saves, aviation vehicles, graphical play,
 remote peers and bonus removal outside this tested day transition remain open.
 
 The ordinary client plans routes to a LAND or SAIL stopping point. A malformed
