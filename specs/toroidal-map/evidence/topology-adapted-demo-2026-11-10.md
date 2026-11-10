@@ -29,6 +29,13 @@ the new process showed an All Files preflight but no new removable-volume
 prompt or response. The reason for this second stall is therefore unconfirmed.
 This retry did not verify the current source revision in the GUI.
 
+The separate `VCMI Toroid Test` bundle, which had reached a game window in an
+earlier session, was also launched through Computer Use. Its launch timed out
+without an observable window; Activity Monitor showed a one-thread process.
+The targeted TCC log showed an All Files preflight but no removable-volume
+prompt for that attempt. The test process was closed through Activity Monitor.
+This observation does not establish that the two launch failures share a cause.
+
 ## Initial fixture and GUI observations
 
 `test/mock/ToroidalDemoMap.h` defines a deliberately sparse 36×36 grass map
