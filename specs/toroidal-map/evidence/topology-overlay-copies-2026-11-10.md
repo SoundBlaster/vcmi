@@ -28,5 +28,29 @@ built. Nineteen topology tests and fifteen map draw-order tests passed; the
 draw-order suite also reported one existing disabled regression. Logs are
 `overlay-copies-build.log`, `overlay-copies-tests.log`,
 `overlay-object-build.log`, and `overlay-object-tests.log` under the TB5
-build root. Actual world-view and spell-view icons, label placement in the
-GUI, other overlays, and continuous frames remain unverified.
+build root.
+
+## Running-game comparison
+
+On macOS arm64, the same 36×36 `Toroid Seam Laboratory` saved game was
+loaded in signed development builds `4255569` (before) and `0043287`
+(after). In each, the world view was opened with `v` at its initial zoom.
+The view showed several copies of the same revealed area on both axes.
+Before the change, the hero, town flag, wood and ore overlay icons appeared
+on individual copies but were absent on the corresponding other copies.
+After the change, those icons appeared at the corresponding locations on
+the visible copies. Both clients returned to the adventure view and quit
+without saving. The newer build loaded the game without a new disk-access
+prompt during this observation.
+
+The game's F3 screenshots stay in the local TB5 runtime, since they contain
+original game assets; they are not committed:
+
+| Build | Screenshot under `runtime/user-data/extracted/screenshots/` | SHA-256 |
+| --- | --- | --- |
+| `4255569` | `screenshot-20261110T100314.png` | `897afd73af2f950c8f09fd27689eebe435039a1578dc939a3d63637d21cea04d` |
+| `0043287` | `screenshot-20261110T100105.png` | `67109693098a695b8f5ff82cc0802678054d3553331beb7068cd8135fb80319f` |
+
+These are static world-view observations, not a continuous-scroll or
+animation test. Spell-view icons, label placement in the GUI, other overlay
+types, different zoom levels and maps remain unverified.
