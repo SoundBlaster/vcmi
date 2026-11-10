@@ -1321,6 +1321,45 @@ TEST_F(HeroMovementTest, grailCanBeDugAfterCrossingToroidalCorner)
 	EXPECT_FALSE(handler.dig(hero));
 }
 
+TEST_F(HeroMovementTest, aiPatrolRadiusUsesWrappedManhattanDistance)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 0, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	revealMap(player);
+	gameState()->players.at(player).human = false;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	hero->setMovementPoints(3000);
+	hero->patrol.patrolling = true;
+	hero->patrol.initialPos = hero->visitablePos();
+	hero->patrol.patrolRadius = 2;
+
+	const auto check = [&](bool toroidal)
+	{
+		map()->setToroidalAndRebuild(toroidal);
+		CPathsInfo paths(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+		CPathfinder pathfinder(*gameState(), config);
+		pathfinder.calculatePaths();
+		const auto reachable = [&](int x, int y)
+		{
+			return paths.getNode(int3(x, y, 0), EPathfindingLayer::LAND)->reachable();
+		};
+		EXPECT_TRUE(reachable(1, 0));
+		EXPECT_TRUE(reachable(1, 1));
+		EXPECT_FALSE(reachable(2, 1));
+		EXPECT_EQ(reachable(35, 0), toroidal);
+		EXPECT_EQ(reachable(0, 35), toroidal);
+		EXPECT_EQ(reachable(35, 35), toroidal);
+		EXPECT_FALSE(reachable(34, 35));
+	};
+	check(false);
+	check(true);
+}
+
 TEST_F(HeroMovementTest, visionsRangeUsesToroidalDistance)
 {
 	const PlayerColor player(0);
