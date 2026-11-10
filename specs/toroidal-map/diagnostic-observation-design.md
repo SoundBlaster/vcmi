@@ -102,6 +102,33 @@ version has the local source's APIs, that screen capture will work on this
 machine, or that sparse stills can prove smooth scrolling. The user's existing
 video remains separate evidence of the recorded presentation.
 
+The local experimental bridge
+[`tools/screener_observation_bridge.py`](tools/screener_observation_bridge.py)
+starts a separate Screener server with its window-recording mode enabled,
+selects the sole visible window for an explicit bundle ID, and requests one
+checkpoint for each newly appended observation. It starts reading at the end
+of the existing JSONL file and suppresses consecutive duplicate observation
+identities. Frame names carry the VCMI session, sequence and source monotonic
+timestamp. The image is captured after the event, not atomically with it;
+rapid changes can overtake capture. A replaced, truncated, invalid or overly
+large input fails explicitly. Screen permission, a visible unique window and
+the new Screener MCP executable are prerequisites. Ctrl-C stops the session.
+
+```sh
+python3 specs/toroidal-map/tools/screener_observation_bridge.py \
+  --server <screener-mcp-executable> \
+  --observation-file <existing-vcmi-jsonl> \
+  --recordings-dir <local-screener-trace-directory> \
+  --bundle-id <vcmi-application-bundle-id>
+```
+
+The bridge was checked with a fake MCP server and temporary observations on
+macOS arm64: old, incomplete and duplicate records did not create checkpoints;
+a new event produced one request and Ctrl-C closed the session. File truncation
+was rejected. These checks do not establish capture of a real game window or
+cross-process timestamp synchronization. The corresponding Screener code is
+on the separate `codex/mcp-window-recording` branch, initially `ab05569`.
+
 ## Evidence and limits
 
 Version 2 emits an initial snapshot, then only when player state, level,
