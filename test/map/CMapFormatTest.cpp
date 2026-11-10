@@ -13,7 +13,9 @@
 #include "../../lib/filesystem/Filesystem.h"
 
 #include "../../lib/callback/EditorCallback.h"
+#include "../../lib/CRandomGenerator.h"
 #include "../../lib/mapping/CMap.h"
+#include "../../lib/mapping/CMapEditManager.h"
 #include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/mapping/TerrainTile.h"
@@ -374,6 +376,75 @@ TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
 	EXPECT_EQ(reopened->getTile(int3(35, 1, 0)).visitableObjects.size(), 1u);
 	EXPECT_EQ(reopened->getTile(int3(1, 35, 0)).visitableObjects.size(), 1u);
 	if(const char * outputPath = std::getenv("VCMI_TOROID_DEMO_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream file(outputPath, std::ios::binary);
+		ASSERT_TRUE(file);
+		file.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+		file.close();
+		ASSERT_TRUE(file);
+	}
+}
+
+TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
+{
+	auto bytes = makeToroidalDemoMap().build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("ToroidVisualSeams", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	map->setToroidalAndRebuild(true);
+	map->name = MetaString::createFromRawString("Toroid Visual Seams");
+
+	CRandomGenerator random(12345);
+	auto * editor = map->getEditManager();
+	std::vector<int3> terrain;
+	for(int x : {33, 34, 35, 0, 1, 2})
+		for(int y = 10; y <= 15; ++y)
+			terrain.emplace_back(x, y, 0);
+	editor->getTerrainSelection().setSelection(terrain);
+	editor->drawTerrain(ETerrainId::DIRT, 0, &random);
+
+	std::vector<int3> road, river;
+	for(int n : {33, 34, 35, 0, 1, 2, 3})
+	{
+		road.emplace_back(n, 3, 0);
+		river.emplace_back(5, n, 0);
+	}
+	editor->getTerrainSelection().setSelection(road);
+	editor->drawRoad(RoadId::DIRT_ROAD, &random);
+	editor->getTerrainSelection().setSelection(river);
+	editor->drawRiver(RiverId::WATER_RIVER, &random);
+
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&output);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	ASSERT_TRUE(reopened->toroidal);
+	for(const auto & pos : road)
+		EXPECT_EQ(reopened->getTile(pos).getRoadID(), RoadId::DIRT_ROAD) << pos.toString();
+	for(const auto & pos : river)
+		EXPECT_EQ(reopened->getTile(pos).getRiverID(), RiverId::WATER_RIVER) << pos.toString();
+	for(const int x : {35, 0})
+		EXPECT_EQ(reopened->getTile(int3(x, 12, 0)).getTerrainID(), ETerrainId::DIRT);
+	for(const auto & pos : {int3(35, 3, 0), int3(0, 3, 0), int3(5, 35, 0), int3(5, 0, 0)})
+	{
+		const auto & before = map->getTile(pos);
+		const auto & after = reopened->getTile(pos);
+		EXPECT_EQ(after.roadDir, before.roadDir);
+		EXPECT_EQ(after.riverDir, before.riverDir);
+		EXPECT_EQ(after.extTileFlags, before.extTileFlags);
+	}
+	if(const char * outputPath = std::getenv("VCMI_TOROID_VISUAL_OUTPUT"))
 	{
 		ASSERT_FALSE(boost::filesystem::exists(outputPath));
 		std::ofstream file(outputPath, std::ios::binary);
