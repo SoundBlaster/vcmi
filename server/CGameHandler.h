@@ -268,6 +268,7 @@ public:
 	void load(const StartInfo &info);
 
 	void onPlayerTurnEnded(PlayerColor which);
+	bool hasHeroInTransientMovement(PlayerColor player) const;
 	void onNewTurn();
 	void addStatistics(StatisticDataSet &stat) const;
 	void sendQuestionResolved(QuestionID questionID);

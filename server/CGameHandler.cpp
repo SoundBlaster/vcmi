@@ -578,6 +578,19 @@ void CGameHandler::setPortalDwelling(const CGTownInstance * town, bool forced=fa
 		}
 }
 
+bool CGameHandler::hasHeroInTransientMovement(PlayerColor player) const
+{
+	if(!gameState().getMap().toroidal)
+		return false;
+	const auto * state = gameState().getPlayerState(player);
+	if(!state)
+		return false;
+	for(const auto * hero : state->getHeroes())
+		if(hero->getConfirmedMovementLayer() == EPathfindingLayer::AIR || hero->getConfirmedMovementLayer() == EPathfindingLayer::WATER)
+			return true;
+	return false;
+}
+
 void CGameHandler::onPlayerTurnEnded(PlayerColor which)
 {
 	turnTimerHandler->onEndTurn(which);

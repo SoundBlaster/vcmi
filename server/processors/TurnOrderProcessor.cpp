@@ -416,6 +416,11 @@ bool TurnOrderProcessor::onPlayerEndsTurn(PlayerColor which)
 		gameHandler->complain("Cannot end turn before resolving activities!");
 		return false;
 	}
+	if(gameHandler->hasHeroInTransientMovement(which))
+	{
+		gameHandler->complain("Cannot end turn while a hero is flying or walking on water!");
+		return false;
+	}
 
 	gameHandler->onPlayerTurnEnded(which);
 

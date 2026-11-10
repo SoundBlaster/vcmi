@@ -81,6 +81,7 @@ non-seam step over equivalent terrain.
 | G9 | Cross each type of seam on surface and underground, then use an existing inter-level passage | Each crossing stays on its original level; the passage changes levels according to its ordinary rules. |
 | G10 | Cross equivalent seam and non-seam steps over matching terrain and roads, including a visitable object and limited movement points | Normal costs, visit direction, object events and movement-point effects agree; blocked or illegal entry is not applied. |
 | G11 | Place revealed and hidden cells and a guard across a seam and at a corner | Sight and guard interaction follow ordinary rules without revealing hidden information outside the legitimate sight range. |
+| G12 | Attempt to end a turn while an owned hero is in AIR or WATER transit, then reach a legal stopping layer | The server does not advance the turn during transit; after a legal landing it accepts end turn. Expiring movement abilities and any stranded hero require a recoverable outcome. |
 | V1 | Scroll slowly and continuously across each edge and corner | The viewport shows adjacent opposite-side content with no border strip or discontinuous jump; paths, objects and fog align. |
 | V2 | Hover and left/right-click an object displayed across each seam | The same canonical tile/object is selected or described as at its ordinary location, subject to visibility. |
 | V3 | Animate a hero crossing an edge and a corner | The hero takes one adjacent step in the correct direction; camera and route indicators stay continuous. |

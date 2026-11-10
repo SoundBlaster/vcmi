@@ -545,6 +545,54 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	for(const LobbyPeer * peer : {&host, &guest})
 		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), destination) << peer->failure;
 
+	GiveBonus flightBonus;
+	flightBonus.id = hero->id;
+	flightBonus.bonus = Bonus(BonusDuration::ONE_DAY, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID());
+	server.gh->giveHeroBonus(&flightBonus);
+	pumpUntil([&] {
+		return host.state->getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT)
+			&& guest.state->getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT);
+	});
+	ASSERT_TRUE(host.state->getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT));
+	ASSERT_TRUE(guest.state->getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT));
+	const int3 airborne(0, 35, 0);
+	MoveHero flight({hero->convertFromVisitablePos(airborne)}, EPathfindingLayer::AIR, hero->id, true);
+	flight.player = red;
+	flight.requestID = 20;
+	host.codec->sendPack(flight);
+	pumpUntil([&] {
+		return host.results.contains(20)
+			&& host.state->getHero(hero->id)->visitablePos() == airborne
+			&& guest.state->getHero(hero->id)->visitablePos() == airborne;
+	});
+	ASSERT_TRUE(host.results.contains(20)) << host.failure;
+	ASSERT_TRUE(host.results.at(20));
+	for(const LobbyPeer * peer : {&host, &guest})
+		ASSERT_EQ(peer->state->getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::AIR);
+	EndTurn prematureEnd;
+	prematureEnd.player = red;
+	prematureEnd.requestID = 21;
+	host.codec->sendPack(prematureEnd);
+	pumpUntil([&] { return host.results.contains(21); });
+	ASSERT_TRUE(host.results.contains(21)) << host.failure;
+	ASSERT_FALSE(host.results.at(21));
+	ASSERT_TRUE(server.gh->gameState().actingPlayers.contains(red));
+	ASSERT_TRUE(host.state->actingPlayers.contains(red));
+	ASSERT_TRUE(guest.state->actingPlayers.contains(red));
+	MoveHero land({hero->convertFromVisitablePos(destination)}, EPathfindingLayer::LAND, hero->id, false);
+	land.player = red;
+	land.requestID = 22;
+	host.codec->sendPack(land);
+	pumpUntil([&] {
+		return host.results.contains(22)
+			&& host.state->getHero(hero->id)->visitablePos() == destination
+			&& guest.state->getHero(hero->id)->visitablePos() == destination;
+	});
+	ASSERT_TRUE(host.results.contains(22)) << host.failure;
+	ASSERT_TRUE(host.results.at(22));
+	for(const LobbyPeer * peer : {&host, &guest})
+		ASSERT_EQ(peer->state->getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+
 	EndTurn endTurn;
 	endTurn.player = red;
 	endTurn.requestID = 12;
@@ -617,6 +665,20 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	{
 		EXPECT_EQ(peer->state->getHero(blueHero->id)->visitablePos(), blueDestination) << peer->failure;
 		EXPECT_EQ(visibility(*peer->state), visibility(server.gh->gameState()));
+	}
+	EndTurn finishBlue;
+	finishBlue.player = blue;
+	finishBlue.requestID = 23;
+	guest.codec->sendPack(finishBlue);
+	pumpUntil([&] { return guest.results.contains(23) && host.state->actingPlayers.contains(red) && guest.state->actingPlayers.contains(red); });
+	ASSERT_TRUE(guest.results.contains(23)) << guest.failure;
+	ASSERT_TRUE(guest.results.at(23));
+	EXPECT_FALSE(server.gh->gameState().getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT));
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		const auto * replicaHero = peer->state->getHero(hero->id);
+		EXPECT_FALSE(replicaHero->hasBonusOfType(BonusType::FLYING_MOVEMENT));
+		EXPECT_EQ(replicaHero->getPathfindingStartLayer(), EPathfindingLayer::LAND);
 	}
 }
 
@@ -2979,6 +3041,43 @@ TEST_F(HeroMovementTest, HeroOnFootCannotClaimSailingLayerAcrossSeam)
 	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->visitablePos(), destination);
+}
+
+TEST_F(HeroMovementTest, TransientMovementGuardChecksAllOwnedHeroes)
+{
+	const PlayerColor red(0), blue(1);
+	const int3 land(1, 5, 0), water(0, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(red).playerActive(blue)
+		.hero(int3(2, 5, 0), HeroTypeID(0), red)
+		.hero(int3(6, 6, 0), HeroTypeID(1), red)
+		.hero(int3(9, 8, 0), HeroTypeID(2), blue)
+		.terrain(water, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	auto * walker = findHeroAt(int3(2, 5, 0));
+	auto * otherHero = findHeroAt(int3(6, 6, 0));
+	ASSERT_NE(walker, nullptr);
+	ASSERT_NE(otherHero, nullptr);
+	ASSERT_EQ(walker->visitablePos(), land);
+	walker->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	walker->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), red);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(red));
+	ASSERT_TRUE(handler.moveHero(walker->id, walker->convertFromVisitablePos(water), EMovementMode::STANDARD, true, red, EPathfindingLayer::WATER));
+	EXPECT_TRUE(handler.hasHeroInTransientMovement(red));
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(blue));
+	map()->toroidal = false;
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(red));
+	map()->toroidal = true;
+	ASSERT_TRUE(handler.moveHero(walker->id, walker->convertFromVisitablePos(land), EMovementMode::STANDARD, false, red, EPathfindingLayer::LAND));
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(red));
+	otherHero->setConfirmedMovementLayer(EPathfindingLayer::AIR);
+	EXPECT_TRUE(handler.hasHeroInTransientMovement(red));
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(blue));
+	otherHero->setConfirmedMovementLayer(EPathfindingLayer::AUTO);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(red));
 }
 
 TEST_F(HeroMovementTest, HeroWithMovementBonusesUsesAirAndWaterLayersAcrossSeam)

@@ -174,7 +174,8 @@ void TurnTimerHandler::onPlayerMakingTurn(PlayerColor player, int waitTime)
 		if(timerCountDown(timer.baseTimer, si->turnTimerInfo.baseTimer, player, waitTime))
 			return;
 
-		if(endTurnAllowed[state->color] && !gameHandler.activities->topActivity(state->color)) //wait for replies to avoid pending activities
+		if(endTurnAllowed[state->color] && !gameHandler.activities->topActivity(state->color)
+			&& !gameHandler.hasHeroInTransientMovement(state->color)) // wait for activities and transient movement
 			gameHandler.turnOrder->onPlayerEndsTurn(state->color);
 	}
 }
