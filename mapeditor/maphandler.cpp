@@ -11,6 +11,7 @@
 //code is copied from vcmiclient/mapHandler.cpp with minimal changes
 #include "StdInc.h"
 #include "maphandler.h"
+#include "TerrainViewTopology.h"
 #include "graphics.h"
 #include "../lib/RoadHandler.h"
 #include "../lib/RiverHandler.h"
@@ -127,7 +128,8 @@ void MapHandler::drawTerrainTile(QPainter & painter, int x, int y, int z, QPoint
 void MapHandler::drawRoad(QPainter & painter, int x, int y, int z, QPointF offset)
 {
 	const auto & tinfo = map->getTile(int3(x, y, z));
-	auto * tinfoUpper = map->isInTheMap(int3(x, y - 1, z)) ? &map->getTile(int3(x, y - 1, z)) : nullptr;
+	const auto upper = TerrainViewTopology::roadSourceAbove(map->getTopology(), int3(x, y, z));
+	const auto * tinfoUpper = upper ? &map->getTile(*upper) : nullptr;
 
 	if(tinfoUpper && tinfoUpper->roadType)
 	{

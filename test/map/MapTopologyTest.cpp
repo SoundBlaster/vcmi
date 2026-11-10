@@ -11,6 +11,45 @@
 
 #include "../../lib/mapping/MapTopology.h"
 #include "../../client/adventureMap/MinimapPosition.h"
+#include "../../mapeditor/TerrainViewTopology.h"
+
+TEST(MapTopology, EditorRoadAndRedrawCrossToroidalSeams)
+{
+	const MapTopology wrapped(7, 5, 2, true);
+	const MapTopology bounded(7, 5, 2, false);
+	EXPECT_EQ(TerrainViewTopology::roadSourceAbove(wrapped, {3, 0, 1}), int3(3, 4, 1));
+	EXPECT_FALSE(TerrainViewTopology::roadSourceAbove(bounded, {3, 0, 1}));
+	EXPECT_EQ(TerrainViewTopology::roadSourceAbove(bounded, {3, 1, 1}), int3(3, 0, 1));
+	EXPECT_FALSE(TerrainViewTopology::roadSourceAbove(wrapped, {3, 0, 2}));
+	EXPECT_TRUE(TerrainViewTopology::wrappedRedrawAreas({}, 7, 5).empty());
+	for(const auto & selection : std::vector<std::vector<int3>>{
+		{{0, 0, 0}}, {{6, 4, 0}}, {{0, 2, 0}}, {{1, 1, 0}, {5, 3, 0}}})
+	{
+		int minX = selection.front().x, maxX = minX, minY = selection.front().y, maxY = minY;
+		for(const auto & tile : selection)
+		{
+			minX = std::min(minX, tile.x);
+			maxX = std::max(maxX, tile.x);
+			minY = std::min(minY, tile.y);
+			maxY = std::max(maxY, tile.y);
+		}
+		std::set<int3> expected;
+		for(int x = minX - 2; x < maxX + 2; ++x)
+			for(int y = minY - 2; y < maxY + 2; ++y)
+				expected.insert(*wrapped.canonicalize({x, y, 0}));
+		std::set<int3> actual;
+		int count = 0;
+		for(const auto & area : TerrainViewTopology::wrappedRedrawAreas(selection, 7, 5))
+			for(int x = area.x; x < area.x + area.width; ++x)
+				for(int y = area.y; y < area.y + area.height; ++y)
+				{
+					actual.insert({x, y, 0});
+					++count;
+				}
+		EXPECT_EQ(actual, expected);
+		EXPECT_EQ(count, actual.size());
+	}
+}
 
 TEST(MapTopology, ToroidalMinimapClicksAddressTheTileUnderThePixel)
 {

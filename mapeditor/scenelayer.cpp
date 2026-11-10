@@ -10,6 +10,7 @@
 
 #include "StdInc.h"
 #include "scenelayer.h"
+#include "TerrainViewTopology.h"
 #include "mainwindow.h"
 #include "../lib/mapping/CMapEditManager.h"
 #include "../lib/mapping/CMap.h"
@@ -153,6 +154,16 @@ void AbstractViewportLayer::redraw(const std::vector<int3> & tiles)
 
 void AbstractViewportLayer::redrawWithSurroundingTiles(const std::vector<int3> & tiles)
 {
+	if(tiles.empty())
+		return;
+	if(map->toroidal)
+	{
+		std::vector<QRectF> areas;
+		for(const auto & area : TerrainViewTopology::wrappedRedrawAreas(tiles, map->width, map->height))
+			areas.emplace_back(area.x * tileSize, area.y * tileSize, area.width * tileSize, area.height * tileSize);
+		redraw(areas);
+		return;
+	}
 	int maxX = 0;
 	int maxY = 0;
 	int minX = INT_MAX;
