@@ -26,7 +26,12 @@ and records no toroidal capability. The toroidal start guard requires both
 the tag and the necessary ordinary version. Bounded sessions continue to use
 the negotiated legacy layout. A local client accepts an untagged server below
 the toroidal version, but disconnects from an untagged server at or beyond
-that version because its layout is ambiguous. A previous upstream server's
+that version because its layout is ambiguous. The current client also rejects
+an older tagged experimental server whose version predates replicated movement
+layers, even for a bounded session: the greeting does not identify the map.
+The current server may negotiate such a client into a bounded lobby, but its
+toroidal start guard requires the replicated-layer version from every peer.
+A previous upstream server's
 existing `min(clientVersion, serverVersion)` greeting negotiation responds to
 the tagged value with its own untagged, lower ordinary version.
 

@@ -80,6 +80,7 @@ private:
 	std::set<SpellID> spells; //known spells (spell IDs)
 	ObjectInstanceID visitedTown; //set if hero is visiting town or in the town garrison
 	ObjectInstanceID boardedBoat; //set to CGBoat when sailing
+	EPathfindingLayer confirmedMovementLayer = EPathfindingLayer::AUTO;
 	/// Special terrain, such as Cursed Ground, whose bonuses hero receives. Not serialized - restored from hero position
 	BattleField specialTerrain = BattleField::NONE;
 
@@ -166,6 +167,9 @@ public:
 	CGBoat * getBoat();
 	const CGBoat * getBoat() const;
 	void setBoat(CGBoat * getBoat);
+	EPathfindingLayer getPathfindingStartLayer() const;
+	EPathfindingLayer getConfirmedMovementLayer() const { return confirmedMovementLayer; }
+	void setConfirmedMovementLayer(EPathfindingLayer layer) { confirmedMovementLayer = layer; }
 
 	/// Returns ID of existing war machine that will be replaced if hero were to purchase new war machine
 	/// If there is no replaced war machine (for example slot is empty), method will return empty ArtifactID
@@ -417,6 +421,15 @@ public:
 
 		if(h.hasFeature(Handler::Version::HOTA_HERO_LEVEL_OPTIONS))
 			h & cannotGainExperience;
+		if(h.hasFeature(Handler::Version::TOROIDAL_REPLICATED_MOVEMENT_LAYER))
+		{
+			h & confirmedMovementLayer;
+			if(!h.saving && confirmedMovementLayer != EPathfindingLayer::AUTO
+				&& (confirmedMovementLayer < EPathfindingLayer::LAND || confirmedMovementLayer >= EPathfindingLayer::NUM_LAYERS))
+				throw std::runtime_error("Invalid hero movement layer in saved game state");
+		}
+		else if(!h.saving)
+			confirmedMovementLayer = EPathfindingLayer::AUTO;
 
 		if(!h.saving && h.loadingGamestate)
 			attachCommanderToArmy();

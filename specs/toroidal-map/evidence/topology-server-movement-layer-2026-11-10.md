@@ -51,3 +51,8 @@ with graphical clients, all nonstandard relocations and bonus expiry,
 multiplayer continuity, and full legacy save gameplay remain unverified.
 The raw mismatched network-codec layout regression remains disabled. Older
 saves cannot recover information they never stored.
+
+The later [replicated-layer follow-up](topology-replicated-movement-layer-2026-11-10.md)
+changes the initial-layer behavior described in the previous paragraph and
+adds scoped local, TCP and save checks; its remaining limitations are listed
+there.

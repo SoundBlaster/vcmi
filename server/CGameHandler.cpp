@@ -1001,13 +1001,21 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			tmh.attackedFrom = guardPos;
 
 		tmh.result = result;
+		if(gameState().getMap().toroidal && tmh.start != tmh.end)
+		{
+			if(result == TryMoveHero::SUCCESS || result == TryMoveHero::EMBARK)
+				tmh.movementLayer = layer;
+			else if(result == TryMoveHero::DISEMBARK)
+				tmh.movementLayer = EPathfindingLayer::LAND;
+			else if(result == TryMoveHero::TELEPORTATION)
+				tmh.movementLayer = h->inBoat() ? h->getBoat()->layer : EPathfindingLayer::LAND;
+		}
 		sendAndApply(tmh);
 		if(gameState().getMap().toroidal && tmh.start != tmh.end
 			&& (result == TryMoveHero::SUCCESS || result == TryMoveHero::TELEPORTATION
 				|| result == TryMoveHero::EMBARK || result == TryMoveHero::DISEMBARK))
 		{
-			const auto resultingLayer = result == TryMoveHero::SUCCESS ? layer
-				: (h->inBoat() ? h->getBoat()->layer : EPathfindingLayer::LAND);
+			const auto resultingLayer = tmh.movementLayer;
 			if(resultingLayer >= EPathfindingLayer::LAND && resultingLayer < EPathfindingLayer::NUM_LAYERS)
 				heroMovementLayers[hid] = {h->visitablePos(), resultingLayer};
 			else
@@ -1968,7 +1976,8 @@ void CGameHandler::load(const StartInfo &info)
 	gs = std::make_shared<CGameState>();
 	randomizer = std::make_unique<GameRandomizer>(*gs);
 
-	if(CLoadFile::readVersion(saveFile) < ESerializationVersion::SAVE_CHUNKS)
+	const auto loadedVersion = CLoadFile::readVersion(saveFile);
+	if(loadedVersion < ESerializationVersion::SAVE_CHUNKS)
 	{
 		CLegacyLoadFile lf(saveFile, gs.get());
 		BinaryDeserializer & game = lf.skipToGameState();
@@ -1990,9 +1999,12 @@ void CGameHandler::load(const StartInfo &info)
 			throw std::runtime_error("Error: saved game '" + info.mapname + "' contains unexpected data after game state!");
 	}
 	logGlobal->info("Game has been successfully loaded!");
-
 	gs->preInit(LIBRARY);
 	gs->updateOnLoad(info);
+	if(loadedVersion < ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER)
+		for(const auto & [id, entry] : heroMovementLayers)
+			if(auto * hero = gs->getHero(id); hero && hero->visitablePos() == entry.first)
+				hero->setConfirmedMovementLayer(entry.second);
 	auto * startInfo = gs->getStartInfo();
 	if(startInfo->campState && startInfo->campState->getStartTime() == 0)
 		startInfo->campState->setStartTime(startInfo->startTime);

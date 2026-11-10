@@ -322,7 +322,10 @@ void GameStatePackVisitor::visitChangeObjPos(ChangeObjPos & pack)
 	gs.getMap().moveObject(pack.objid, pack.nPos + obj->getVisitableOffset());
 
 	if(auto * hero = dynamic_cast<CGHeroInstance *>(obj))
+	{
+		hero->setConfirmedMovementLayer(EPathfindingLayer::AUTO);
 		hero->updateSpecialTerrain(gs);
+	}
 }
 
 void GameStatePackVisitor::visitChangeObjectVisitors(ChangeObjectVisitors & pack)
@@ -591,6 +594,9 @@ void GameStatePackVisitor::visitTryMoveHero(TryMoveHero & pack)
 		logGlobal->error("Attempt ot move unavailable hero %d", pack.id.getNum());
 		return;
 	}
+	if(gs.getMap().toroidal && pack.movementLayer != EPathfindingLayer::AUTO
+		&& (pack.movementLayer < EPathfindingLayer::LAND || pack.movementLayer >= EPathfindingLayer::NUM_LAYERS))
+		throw std::runtime_error("Invalid confirmed hero movement layer in network packet");
 
 	const TerrainTile & fromTile = gs.getMap().getTile(h->convertToVisitablePos(pack.start));
 	const TerrainTile & destTile = gs.getMap().getTile(h->convertToVisitablePos(pack.end));
@@ -639,6 +645,8 @@ void GameStatePackVisitor::visitTryMoveHero(TryMoveHero & pack)
 			b->setAnchorPos(pack.end);
 		gs.getMap().showObject(h);
 		h->updateSpecialTerrain(gs);
+		if(gs.getMap().toroidal)
+			h->setConfirmedMovementLayer(pack.movementLayer);
 	}
 
 	auto & fogOfWarMap = gs.getPlayerTeam(h->getOwner())->fogOfWarMap;

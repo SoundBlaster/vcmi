@@ -82,13 +82,14 @@ enum class ESerializationVersion : int32_t
 	TOROIDAL_MAP, // map header stores the adventure map topology
 	TOROIDAL_UNINDEXED_OBJECTS, // shown objects with no indexed occupancy
 	TOROIDAL_MOVEMENT_SOURCE_LAYER, // server tracks each hero's last confirmed movement layer
+	TOROIDAL_REPLICATED_MOVEMENT_LAYER, // clients receive and persist the confirmed movement layer
 
 	RELEASE_170 = HOTA_MAP_STACK_COUNT,
 	RELEASE_174 = CUSTOM_GARRISON_TITLE,
 
 	MINIMAL = RELEASE_170,
 	MINIMAL_LOBBY = LOBBY_SCENARIO_LIST, // client and server of lobby reject each other below this version
-	CURRENT = TOROIDAL_MOVEMENT_SOURCE_LAYER,
+	CURRENT = TOROIDAL_REPLICATED_MOVEMENT_LAYER,
 };
 
 static_assert(ESerializationVersion::MINIMAL <= ESerializationVersion::CURRENT, "Invalid serialization version definition!");

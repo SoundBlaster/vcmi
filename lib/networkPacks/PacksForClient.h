@@ -732,6 +732,8 @@ struct DLL_LINKAGE TryMoveHero : public CPackForClient
 	FowTilesType fowRevealed;
 	/// If hero moves on guarded tile, this field will be set to visitable pos of attacked wandering monster
 	int3 attackedFrom = int3(-1);
+	/// Server-confirmed destination layer, AUTO when absent or movement failed.
+	EPathfindingLayer movementLayer = EPathfindingLayer::AUTO;
 
 	void visitTyped(ICPackVisitor & visitor) override;
 
@@ -749,6 +751,10 @@ struct DLL_LINKAGE TryMoveHero : public CPackForClient
 		h & movePoints;
 		h & fowRevealed;
 		h & attackedFrom;
+		if(h.hasFeature(Handler::Version::TOROIDAL_REPLICATED_MOVEMENT_LAYER))
+			h & movementLayer;
+		else if(!h.saving)
+			movementLayer = EPathfindingLayer::AUTO;
 
 		std::string fow;
 		for (const auto & tile : fowRevealed)

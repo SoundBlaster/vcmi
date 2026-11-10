@@ -309,6 +309,8 @@ if(TARGET vcmisdl3)
 endif()
 
 add_executable(vcmitest ${test_SRCS} ${test_HEADERS} ${mock_HEADERS})
+# Exercise the real client rollback visitor without linking the entire client.
+target_sources(vcmitest PRIVATE ${CMAKE_SOURCE_DIR}/client/netlag/PackRollbackGeneratorVisitor.cpp)
 # Tests link the constituent object libraries rather than the facade: that keeps
 # lib globals single-instance and lets classes needed only by tests stay
 # unexported, since static linking ignores visibility.

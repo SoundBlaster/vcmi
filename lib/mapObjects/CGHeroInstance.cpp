@@ -1490,6 +1490,14 @@ void CGHeroInstance::setBoat(CGBoat* newBoat)
 	}
 }
 
+EPathfindingLayer CGHeroInstance::getPathfindingStartLayer() const
+{
+	const auto * header = cb ? cb->tryGetMapHeader() : nullptr;
+	if(header && header->toroidal && confirmedMovementLayer != EPathfindingLayer::AUTO)
+		return confirmedMovementLayer;
+	return inBoat() ? getBoat()->layer : EPathfindingLayer::LAND;
+}
+
 void CGHeroInstance::restoreBonusSystem(CGameState & gs)
 {
 	CArmedInstance::restoreBonusSystem(gs);

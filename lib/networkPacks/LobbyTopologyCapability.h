@@ -54,7 +54,7 @@ inline bool isSafeServerGreeting(const Greeting & greeting)
 {
 	return greeting.version >= ESerializationVersion::MINIMAL_LOBBY
 		&& greeting.version <= ESerializationVersion::CURRENT
-		&& ((greeting.toroidal && greeting.version >= ESerializationVersion::TOROIDAL_MAP)
+		&& ((greeting.toroidal && greeting.version >= ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER)
 			|| (!greeting.toroidal && greeting.version < ESerializationVersion::TOROIDAL_MAP));
 }
 }

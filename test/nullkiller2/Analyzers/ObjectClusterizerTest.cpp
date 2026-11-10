@@ -10,7 +10,9 @@
 #include "StdInc.h"
 
 #include "AI/Nullkiller2/Analyzers/ObjectClusterizer.h"
+#include "AI/Nullkiller2/Pathfinding/Actors.h"
 #include "lib/mapping/MapTopology.h"
+#include "lib/mapObjects/CGHeroInstance.h"
 #include "lib/mapObjects/CGResource.h"
 #include "mock/TinyH3MBuilder.h"
 #include "nullkiller2/NullkillerTest.h"
@@ -73,6 +75,31 @@ TEST(Nullkiller2_Analyzers_ObjectClusterizer, dimensionDoorReachWrapsEdgesAndCor
 }
 
 class Nullkiller2_ObjectClusterCenter : public NullkillerTest {};
+
+TEST_F(Nullkiller2_ObjectClusterCenter, heroActorUsesConfirmedToroidalMovementLayer)
+{
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(PlayerColor(0)).hero({6, 5, 0}, HeroTypeID(0), PlayerColor(0));
+	startWithMap(std::move(builder));
+	auto * hero = findHeroByOwner(PlayerColor(0));
+	ASSERT_NE(hero, nullptr);
+	class ActorProbe final : public NK2AI::ChainActor
+	{
+	public:
+		explicit ActorProbe(const CGHeroInstance * hero) : ChainActor(hero, NK2AI::HeroRole::MAIN, 1) {}
+	};
+	map()->toroidal = true;
+	for(const auto layer : {EPathfindingLayer::AIR, EPathfindingLayer::WATER})
+	{
+		hero->setConfirmedMovementLayer(layer);
+		EXPECT_EQ(ActorProbe(hero).layer, layer);
+	}
+	map()->toroidal = false;
+	EXPECT_EQ(ActorProbe(hero).layer, EPathfindingLayer::LAND);
+	map()->toroidal = true;
+	hero->setConfirmedMovementLayer(EPathfindingLayer::AUTO);
+	EXPECT_EQ(ActorProbe(hero).layer, EPathfindingLayer::LAND);
+}
 
 TEST_F(Nullkiller2_ObjectClusterCenter, clusterCenterTreatsOppositeEdgesAsNearby)
 {

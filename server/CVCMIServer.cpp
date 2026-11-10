@@ -267,7 +267,7 @@ bool CVCMIServer::supportsMapTopology(const CMapHeader & header) const
 {
 	return !header.toroidal || std::ranges::all_of(activeConnections, [](const auto & connection)
 	{
-		return connection->supportsToroidalTopology() && connection->getSerializationVersion() >= ESerializationVersion::TOROIDAL_MAP;
+		return connection->supportsToroidalTopology() && connection->getSerializationVersion() >= ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
 	});
 }
 

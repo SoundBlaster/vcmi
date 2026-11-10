@@ -10,6 +10,7 @@
 #include "StdInc.h"
 
 #include "../../client/mapView/MapViewBattle.h"
+#include "../../client/netlag/PackRollbackGeneratorVisitor.h"
 
 #include "../mock/GameHandlerTestServer.h"
 #include "../mock/TinyMapGameTest.h"
@@ -764,7 +765,34 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 		ASSERT_TRUE(boost::filesystem::equivalent(*selectedPath, path));
 		handler.save(name, PlayerColor::NEUTRAL, 0);
 		ASSERT_TRUE(boost::filesystem::exists(path));
-		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::TOROIDAL_MOVEMENT_SOURCE_LAYER;
+		if(scenario == 1)
+		{
+			// The immediately preceding branch save stored the layer only in
+			// server state. Its normal load must populate the replicated hero.
+			const auto priorVersion = ESerializationVersion::TOROIDAL_MOVEMENT_SOURCE_LAYER;
+			const std::string priorName = name + "-prior";
+			const auto priorPath = directory / (priorName + ".vsgm1");
+			ASSERT_TRUE(loader->createResource(priorName + ".vsgm1"));
+			CMemorySerializer priorHeader, priorGame;
+			priorHeader.oser.version = priorVersion;
+			priorGame.oser.version = priorVersion;
+			gameState()->saveHeader(priorHeader.oser);
+			gameState()->saveGame(priorGame.oser);
+			priorGame.oser & handler;
+			CSaveFile priorSave(priorVersion);
+			priorSave.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*gameState()).toBytes());
+			priorSave.addChunk(SaveFileFormat::CHUNK_HEADER, priorHeader.extractBuffer());
+			priorSave.addChunk(SaveFileFormat::CHUNK_GAMESTATE, priorGame.extractBuffer());
+			priorSave.write(priorPath);
+			StartInfo priorInfo = *gameState()->getStartInfo();
+			priorInfo.mapname = priorName;
+			CGameHandler priorRestored(server, gameState());
+			ASSERT_NO_THROW(priorRestored.load(priorInfo));
+			const auto * priorHero = priorRestored.gs->getHero(airborneHeroID);
+			ASSERT_NE(priorHero, nullptr);
+			EXPECT_EQ(priorHero->getPathfindingStartLayer(), EPathfindingLayer::AIR);
+		}
+		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
 		EXPECT_EQ(CLoadFile::readVersion(path), expectedVersion);
 		std::ifstream file(path.c_str(), std::ios::binary);
 		std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
@@ -793,6 +821,7 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 			auto * hero = loadedState->getHero(airborneHeroID);
 			ASSERT_NE(hero, nullptr);
 			ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+			EXPECT_EQ(hero->getPathfindingStartLayer(), EPathfindingLayer::AIR);
 			ASSERT_TRUE(restored.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 			EXPECT_EQ(hero->visitablePos(), int3(35, 0, 0));
 		}
@@ -1730,6 +1759,7 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 	ASSERT_EQ(otherHero->visitablePos(), int3(0, 5, 0));
 	hero->setMovementPoints(3000);
 	otherHero->setMovementPoints(3000);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
 	const auto snapshot = gameState()->saveToMemory();
 
 	class Peer final : public INetworkClientListener
@@ -1875,6 +1905,46 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 		EXPECT_EQ(peer->state->getHero(otherHero->id)->movementPointsRemaining(), otherHero->movementPointsRemaining());
 		EXPECT_TRUE(peer->state->isVisibleFor(otherDestination, otherPlayer));
 	}
+	const int3 airborne(0, 35, 0);
+	MoveHero flight({hero->convertFromVisitablePos(airborne)}, EPathfindingLayer::AIR, hero->id, true);
+	flight.player = player;
+	flight.requestID = 5;
+	first.codec->sendPack(flight);
+	pumpUntil([&] {
+		return first.results.contains(5)
+			&& first.state->getHero(hero->id)->visitablePos() == airborne
+			&& second.state->getHero(hero->id)->visitablePos() == airborne;
+	});
+	ASSERT_TRUE(first.results.contains(5)) << first.failure;
+	ASSERT_TRUE(first.results.at(5));
+	ASSERT_EQ(hero->getPathfindingStartLayer(), EPathfindingLayer::AIR);
+	for(const Peer * peer : {&first, &second})
+	{
+		const auto * replicaHero = peer->state->getHero(hero->id);
+		ASSERT_EQ(replicaHero->getPathfindingStartLayer(), EPathfindingLayer::AIR);
+		CPathsInfo paths(peer->state->getMapSize(), replicaHero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *peer->state, replicaHero);
+		CPathfinder pathfinder(*peer->state, config);
+		pathfinder.calculatePaths();
+		const auto * node = paths.getNode(destination, EPathfindingLayer::LAND);
+		ASSERT_TRUE(node->reachable());
+		ASSERT_NE(node->theNodeBefore, nullptr);
+		EXPECT_EQ(node->theNodeBefore->coord, airborne);
+		EXPECT_EQ(node->theNodeBefore->layer, EPathfindingLayer::AIR);
+	}
+	MoveHero landing({hero->convertFromVisitablePos(destination)}, EPathfindingLayer::LAND, hero->id, false);
+	landing.player = player;
+	landing.requestID = 6;
+	first.codec->sendPack(landing);
+	pumpUntil([&] {
+		return first.results.contains(6)
+			&& first.state->getHero(hero->id)->visitablePos() == destination
+			&& second.state->getHero(hero->id)->visitablePos() == destination;
+	});
+	ASSERT_TRUE(first.results.contains(6)) << first.failure;
+	ASSERT_TRUE(first.results.at(6));
+	for(const Peer * peer : {&first, &second})
+		EXPECT_EQ(peer->state->getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::LAND);
 }
 
 TEST_F(HeroMovementTest, blockedToroidalStepIsRejected)
@@ -2778,6 +2848,32 @@ TEST_F(HeroMovementTest, PathfinderHonorsSourceObjectExitDirectionAcrossSeam)
 	hero->setMovementPoints(3000);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
 	ASSERT_EQ(hero->visitablePos(), origin);
+	CPathsInfo replanned(gameState()->getMapSize(), hero);
+	auto replanConfig = std::make_shared<SingleHeroPathfinderConfig>(replanned, *gameState(), hero);
+	CPathfinder replan(*gameState(), replanConfig);
+	replan.calculatePaths();
+	const auto * landing = replanned.getNode(destination, EPathfindingLayer::LAND);
+	ASSERT_TRUE(landing->reachable());
+	ASSERT_NE(landing->theNodeBefore, nullptr);
+	EXPECT_EQ(landing->theNodeBefore->coord, origin);
+	EXPECT_EQ(landing->theNodeBefore->layer, EPathfindingLayer::AIR);
+	TryMoveHero predicted;
+	predicted.id = hero->id;
+	predicted.start = hero->anchorPos();
+	predicted.end = hero->convertFromVisitablePos(destination);
+	predicted.result = TryMoveHero::SUCCESS;
+	predicted.movePoints = hero->movementPointsRemaining();
+	predicted.movementLayer = EPathfindingLayer::LAND;
+	PackRollbackGeneratorVisitor rollback(*gameState());
+	predicted.visit(rollback);
+	ASSERT_TRUE(rollback.canBeRolledBack());
+	auto rollbackPacks = rollback.acquireRollbackPacks();
+	ASSERT_FALSE(rollbackPacks.empty());
+	gameState()->apply(predicted);
+	ASSERT_EQ(hero->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+	gameState()->apply(*rollbackPacks.front());
+	ASSERT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->getPathfindingStartLayer(), EPathfindingLayer::AIR);
 	// Older server save layouts lack this state and remain readable.
 	CMemorySerializer oldArchive;
 	oldArchive.oser.version = ESerializationVersion::TOROIDAL_UNINDEXED_OBJECTS;

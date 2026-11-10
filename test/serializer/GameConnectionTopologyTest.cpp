@@ -13,6 +13,7 @@
 #include "../../lib/network/NetworkInterface.h"
 #include "../../lib/networkPacks/LobbyTopologyCapability.h"
 #include "../../lib/networkPacks/PacksForLobby.h"
+#include "../../lib/networkPacks/PacksForClient.h"
 #include "../../lib/serializer/ESerializationVersion.h"
 #include "../../lib/serializer/GameConnection.h"
 #include "../../server/CVCMIServer.h"
@@ -100,8 +101,37 @@ TEST(GameConnectionTopologyTest, PreviousTaggedToroidalPeerNegotiatesItsOwnVersi
 	const auto accepted = LobbyTopologyCapability::negotiateClient(LobbyTopologyCapability::encode(prior));
 	EXPECT_TRUE(accepted.toroidal);
 	EXPECT_EQ(accepted.version, prior);
-	EXPECT_TRUE(LobbyTopologyCapability::isSafeServerGreeting(accepted));
+	EXPECT_FALSE(LobbyTopologyCapability::isSafeServerGreeting(accepted));
 	EXPECT_TRUE(topologyAfterPacketRoundTrip(prior, prior));
+	auto transport = std::make_shared<PacketCapture>();
+	auto connection = std::make_shared<GameConnection>(transport);
+	connection->setSerializationVersion(prior);
+	connection->setToroidalTopologySupported(true);
+	CVCMIServer server(0, true);
+	server.activeConnections.push_back(connection);
+	CMapHeader map;
+	map.toroidal = true;
+	EXPECT_FALSE(server.supportsMapTopology(map));
+	map.toroidal = false;
+	EXPECT_TRUE(server.supportsMapTopology(map));
+}
+
+TEST(GameConnectionTopologyTest, MovementLayerIsVersionedInPackets)
+{
+	for(const auto version : {ESerializationVersion::TOROIDAL_MOVEMENT_SOURCE_LAYER, ESerializationVersion::CURRENT})
+	{
+		auto transport = std::make_shared<PacketCapture>();
+		GameConnection sender(transport), receiver(transport);
+		sender.setSerializationVersion(version);
+		receiver.setSerializationVersion(version);
+		TryMoveHero outgoing;
+		outgoing.movementLayer = EPathfindingLayer::AIR;
+		sender.sendPack(outgoing);
+		auto packet = receiver.retrievePack(transport->bytes);
+		const auto * movement = dynamic_cast<const TryMoveHero *>(packet.get());
+		ASSERT_NE(movement, nullptr);
+		EXPECT_EQ(movement->movementLayer, version == ESerializationVersion::CURRENT ? EPathfindingLayer::AIR : EPathfindingLayer::AUTO);
+	}
 }
 
 TEST(GameConnectionTopologyTest, CapabilityGreetingSurvivesLobbyPacketSerialization)

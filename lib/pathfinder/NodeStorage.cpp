@@ -137,7 +137,7 @@ void NodeStorage::resetTile(const int3 & tile, const EPathfindingLayer & layer, 
 
 std::vector<CGPathNode *> NodeStorage::getInitialNodes()
 {
-	auto * initialNode = getNode(out.hpos, out.hero->inBoat() ? out.hero->getBoat()->layer : EPathfindingLayer::LAND);
+	auto * initialNode = getNode(out.hpos, out.hero->getPathfindingStartLayer());
 
 	initialNode->turns = 0;
 	initialNode->moveRemains = out.hero->movementPointsRemaining();

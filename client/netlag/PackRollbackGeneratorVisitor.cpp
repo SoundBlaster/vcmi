@@ -100,6 +100,7 @@ void PackRollbackGeneratorVisitor::visitTryMoveHero(TryMoveHero & pack)
 
 	rollbackMove->id = pack.id;
 	rollbackMove->movePoints = movedHero->movementPointsRemaining();
+	rollbackMove->movementLayer = movedHero->getConfirmedMovementLayer();
 	rollbackMove->result = pack.result;
 	if(pack.result == TryMoveHero::EMBARK)
 		rollbackMove->result = TryMoveHero::DISEMBARK;
