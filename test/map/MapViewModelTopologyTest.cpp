@@ -56,3 +56,46 @@ TEST(MapViewModelTopologyTest, WrappedCameraPreservesPixelGeometryAcrossSeams)
 			}
 	}
 }
+
+TEST(MapViewModelTopologyTest, CachedBandsPlaceEveryVisibleTileExactlyOnce)
+{
+	constexpr int extent = 36;
+	for(const Point dimensions : {Point(384, 256), Point(1600, 1200)})
+	for(const int tileSize : {16, 32})
+	for(const bool nativeCache : {false, true})
+	for(const Point center : {Point(0, 0), Point(extent * tileSize - 1, 0),
+		Point(0, extent * tileSize - 1), Point(extent * tileSize - 1, extent * tileSize - 1)})
+	{
+		MapViewModel model;
+		model.setTileSize(Point(tileSize, tileSize));
+		model.setCacheAtNativeSize(nativeCache);
+		model.setViewDimensions(dimensions);
+		model.setViewCenter(center);
+		model.setLevel(1);
+		const Point cacheTileSize = model.getCacheTileSize();
+		const Rect visible = model.getTilesTotalRect();
+		std::set<std::pair<int, int>> visited;
+		int bands = 0;
+		model.forEachCachedBand([&](const Rect & cacheArea, const Point & target, const Point & size)
+		{
+			++bands;
+			ASSERT_EQ(cacheArea.w % cacheTileSize.x, 0);
+			ASSERT_EQ(cacheArea.h % cacheTileSize.y, 0);
+			const int columns = cacheArea.w / cacheTileSize.x;
+			const int rows = cacheArea.h / cacheTileSize.y;
+			EXPECT_EQ(size, Point(columns * tileSize, rows * tileSize));
+			for(int y = 0; y < rows; ++y)
+				for(int x = 0; x < columns; ++x)
+				{
+					const Point screen = target + Point(x * tileSize, y * tileSize);
+					const int3 tile = model.getTileAtPoint(screen + Point(tileSize / 2, tileSize / 2));
+					EXPECT_EQ(model.getTargetTileArea(tile).topLeft(), screen);
+					EXPECT_EQ(model.getCacheTileArea(tile).topLeft(), cacheArea.topLeft() + Point(x * cacheTileSize.x, y * cacheTileSize.y));
+					EXPECT_TRUE(visited.emplace(tile.x, tile.y).second);
+				}
+		});
+		EXPECT_GE(bands, 1);
+		EXPECT_LE(bands, 4);
+		EXPECT_EQ(visited.size(), static_cast<size_t>(visible.w * visible.h));
+	}
+}

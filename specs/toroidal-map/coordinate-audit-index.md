@@ -112,7 +112,7 @@ regenerating the index resets manually recorded statuses.
 | `client/mapView/MapRendererContextState.cpp` | 45, 48, 50, 51, 110, 158 | unreviewed |
 | `client/mapView/MapView.cpp` | 67, 130 | unreviewed |
 | `client/mapView/MapViewActions.cpp` | 58, 69, 86, 161 | unreviewed |
-| `client/mapView/MapViewCache.cpp` | 128, 158, 159, 238, 271, 272, 274, 282, 283, 284, 289, 293, 306, 307, 308, 309, 311, 312, 456, 458, 461, 481, 487, 492, 494, 502, 513 | unreviewed |
+| `client/mapView/MapViewCache.cpp` | 128, 158, 159, 238, 271, 272, 274, 282, 283, 284, 289, 293, 306, 307, 308, 309, 311, 312, 456, 458, 461, 481, 487, 492, 494, 502, 513 | partial: cache-band geometry extracted and tested at seams and multiple zooms; actual rendering and other candidates unreviewed |
 | `client/mapView/MapViewController.cpp` | 90, 91, 94, 95, 110, 136, 138 | unreviewed |
 | `client/mapView/MapViewModel.cpp` | 97, 98, 114, 138, 139, 142, 143, 153 | unreviewed |
 | `client/mapView/mapHandler.cpp` | 93, 95 | unreviewed |

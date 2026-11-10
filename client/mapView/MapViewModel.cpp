@@ -146,6 +146,43 @@ Rect MapViewModel::getCacheTileArea(const int3 & coordinates) const
 	return Rect(tileIndex * getCacheTileSize(), getCacheTileSize());
 }
 
+void MapViewModel::forEachCachedBand(const std::function<void(const Rect &, const Point &, const Point &)> & visit) const
+{
+	const Rect tilesRect = getTilesTotalRect();
+	const Point tileSize = getSingleTileSize();
+	const Point cacheTileSize = getCacheTileSize();
+	const int width = tilesRect.w;
+	const int height = tilesRect.h;
+	if(width <= 0 || height <= 0)
+		return;
+
+	const Point origin = getTargetTileArea(int3(tilesRect.x, tilesRect.y, getLevel())).topLeft();
+	const int firstSlotX = ((tilesRect.x % width) + width) % width;
+	const int firstSlotY = ((tilesRect.y % height) + height) % height;
+	// A circular cache has at most two contiguous bands along either axis.
+	const std::array<std::pair<int, int>, 2> columns = {{{firstSlotX, width - firstSlotX}, {0, firstSlotX}}};
+	const std::array<std::pair<int, int>, 2> rows = {{{firstSlotY, height - firstSlotY}, {0, firstSlotY}}};
+
+	int offsetX = 0;
+	for(const auto & column : columns)
+	{
+		int offsetY = 0;
+		for(const auto & row : rows)
+		{
+			if(column.second > 0 && row.second > 0)
+			{
+				const Rect cacheArea(column.first * cacheTileSize.x, row.first * cacheTileSize.y,
+					column.second * cacheTileSize.x, row.second * cacheTileSize.y);
+				const Point targetPosition = origin + Point(offsetX * tileSize.x, offsetY * tileSize.y);
+				const Point targetSize(column.second * tileSize.x, row.second * tileSize.y);
+				visit(cacheArea, targetPosition, targetSize);
+			}
+			offsetY += row.second;
+		}
+		offsetX += column.second;
+	}
+}
+
 Rect MapViewModel::getTargetTileArea(const int3 & coordinates) const
 {
 	Point topLeftOffset = getMapViewCenter() - getPixelsVisibleDimensions() / 2;

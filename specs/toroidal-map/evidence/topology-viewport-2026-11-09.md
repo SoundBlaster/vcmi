@@ -2,6 +2,18 @@
 
 ## Camera geometry check, 2026-11-10
 
+At source revision `6a442e2` plus the cache-layout change, the actual band
+enumeration used by software blitting and GPU presentation was moved to
+`MapViewModel` without changing its algorithm. The standalone test checks
+that each tile in the view is represented exactly once, with matching cache
+and screen positions, at all four normalized seam/corner camera positions,
+two viewport sizes, two zoom levels and both cache scaling modes. The larger
+viewport spans multiple map periods. `vcmiclient` and the standalone test
+target built; all 12 standalone tests passed (`cache-band-build.log` and
+`cache-band-test.log` on TB5). This verifies rectangle geometry only; actual
+texture contents, scaling artifacts and consecutive rendered frames remain
+unverified.
+
 At source revision `0adab6f` plus the new standalone test,
 `MapViewModelTopologyTest.WrappedCameraPreservesPixelGeometryAcrossSeams`
 passed for one-pixel horizontal, vertical and diagonal camera moves across

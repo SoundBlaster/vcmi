@@ -265,58 +265,7 @@ bool MapViewCache::isUpdatedThisFrame() const
 
 void MapViewCache::forEachCachedBand(const std::function<void(const Rect &, const Point &, const Point &)> & visit) const
 {
-	const Rect tilesRect = model->getTilesTotalRect();
-	const Point tileSize = model->getSingleTileSize();
-	const Point cacheTileSize = model->getCacheTileSize();
-	const int width = tilesRect.w;
-	const int height = tilesRect.h;
-
-	if(width <= 0 || height <= 0)
-		return;
-
-	// Screen position of the tile in the top left corner of the visible window, always within
-	// one tile of the origin since the view may be scrolled by a fraction of a tile.
-	const Point origin = model->getTargetTileArea(int3(tilesRect.x, tilesRect.y, model->getLevel())).topLeft();
-
-	// Position of that same tile inside the cache, which stores tiles wrapped around
-	// on both axes (tile x lives at slot x modulo width).
-	const int firstSlotX = ((tilesRect.x % width) + width) % width;
-	const int firstSlotY = ((tilesRect.y % height) + height) % height;
-
-	// Because of the wrapping the visible window is split into at most two bands per axis - so
-	// at most four rectangles, each contiguous both in the cache and on screen.
-	const std::array<std::pair<int, int>, 2> columns = {{ // {first slot, slot count}
-		{firstSlotX, width - firstSlotX},
-		{0, firstSlotX}
-	}};
-	const std::array<std::pair<int, int>, 2> rows = {{
-		{firstSlotY, height - firstSlotY},
-		{0, firstSlotY}
-	}};
-
-	int offsetX = 0;
-	for(const auto & column : columns)
-	{
-		int offsetY = 0;
-		for(const auto & row : rows)
-		{
-			if(column.second > 0 && row.second > 0)
-			{
-				Rect cacheArea(
-					column.first * cacheTileSize.x,
-					row.first * cacheTileSize.y,
-					column.second * cacheTileSize.x,
-					row.second * cacheTileSize.y);
-
-				Point targetPosition = origin + Point(offsetX * tileSize.x, offsetY * tileSize.y);
-				Point targetSize(column.second * tileSize.x, row.second * tileSize.y);
-
-				visit(cacheArea, targetPosition, targetSize);
-			}
-			offsetY += row.second;
-		}
-		offsetX += column.second;
-	}
+	model->forEachCachedBand(visit);
 }
 
 void MapViewCache::renderCachedTiles(Canvas & target)

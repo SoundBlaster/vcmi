@@ -10,6 +10,7 @@
 #pragma once
 
 #include "../../lib/Rect.h"
+#include <functional>
 
 class MapViewModel
 {
@@ -62,6 +63,9 @@ public:
 
 	/// returns area covered by specified tile in map cache
 	Rect getCacheTileArea(const int3 & coordinates) const;
+
+	/// enumerates cache regions and their target positions and sizes
+	void forEachCachedBand(const std::function<void(const Rect &, const Point &, const Point &)> & visit) const;
 
 	/// returns area covered by specified tile in target view
 	Rect getTargetTileArea(const int3 & coordinates) const;
