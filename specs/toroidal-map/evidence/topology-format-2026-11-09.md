@@ -1,5 +1,25 @@
 # Map topology format: build and test attempt
 
+On 2026-11-10 the format test at revision `8384c5d` showed that a version-3
+header with an unknown string or boolean `topology` was silently loaded as a
+bounded map. Both new assertions failed before the fix. The loader now
+rejects an explicit unrecognized or malformed topology; a missing field and
+an explicit `bounded` field retain bounded behavior, and `toroidal` still
+requires the version-4 format. The focused map-format and save-header tests
+passed, and client, server, editor and test targets built
+(`unknown-topology-before-test.log`, `unknown-topology-after-build.log`,
+`unknown-topology-after-test.log` on TB5).
+The full local suite passed 1,395 tests with three disabled
+(`full-suite-unknown-topology.log`).
+
+The lobby compatibility question is separate: `LobbyClientConnected` sends a
+numeric serialization version, not a toroidal capability identifier, and the
+server start guard checks that version. A future unrelated upstream version
+could reuse this branch's number. Existing packet framing rejects unread
+bytes, but neither that check nor this loader validation proves all such
+peers are safely distinguished. Explicit capability negotiation and upstream
+version allocation remain unresolved.
+
 On 2026-11-09 a versioned topology flag was added to the map header, JSON map
 header and binary serialization. A version-4 map header signals `toroidal`;
 legacy maps and older save formats default to bounded. The server checks a

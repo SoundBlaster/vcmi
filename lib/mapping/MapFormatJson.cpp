@@ -918,16 +918,20 @@ void CMapLoaderJson::readHeader(const bool complete)
 	}
 
 	fileVersionMinor = static_cast<int>(header["versionMinor"].Integer());
+	const bool hasTopology = header.Struct().contains("topology");
+	const JsonNode & topology = static_cast<const JsonNode &>(header)["topology"];
 	if(fileVersionMajor == VERSION_MAJOR_TOROIDAL)
 	{
-		if(!header["topology"].isString() || header["topology"].String() != "toroidal")
+		if(!topology.isString() || topology.String() != "toroidal")
 			throw std::runtime_error("Invalid or missing topology in map format version 4");
 		mapHeader->toroidal = true;
 	}
 	else
 	{
-		if(header["topology"].isString() && header["topology"].String() == "toroidal")
+		if(topology.isString() && topology.String() == "toroidal")
 			throw std::runtime_error("Toroidal topology requires map format version 4");
+		if(hasTopology && (!topology.isString() || topology.String() != "bounded"))
+			throw std::runtime_error("Unsupported or invalid map topology");
 		mapHeader->toroidal = false;
 	}
 

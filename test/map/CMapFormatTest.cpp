@@ -201,6 +201,12 @@ TEST(MapFormat, ToroidalTopologyRoundTripsAndRequiresNewFormat)
 
 	header["topology"].String() = "unknown";
 	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
+	header["versionMajor"].Float() = CMapFormatJson::VERSION_MAJOR;
+	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
+	header["topology"].Bool() = true;
+	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
+	header["topology"].String() = "bounded";
+	EXPECT_FALSE(loadOriginal(header, objects, surface, underground)->toroidal);
 }
 
 TEST(MapFormat, ToroidalHeaderRequiresAtLeastThreeTilesOnEachAxis)
