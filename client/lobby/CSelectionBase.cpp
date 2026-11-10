@@ -253,7 +253,13 @@ void InfoCard::changeSelection()
 
 	labelSaveDate->setText(mapInfo->date);
 	mapName->setText(mapInfo->getNameTranslated(&GAME->translator()));
-	mapDescription->setText(mapInfo->getDescriptionTranslated(&GAME->translator()));
+	auto description = mapInfo->getDescriptionTranslated(&GAME->translator());
+	if(mapInfo->mapHeader && mapInfo->mapHeader->toroidal)
+	{
+		const auto warning = LIBRARY->generaltexth->translate("vcmi.selectionTab.toroidalExperimental");
+		description = description.empty() ? warning : warning + "\n\n" + description;
+	}
+	mapDescription->setText(description);
 
 	mapDescription->label->scrollTextTo(0, false);
 	if(mapDescription->slider)

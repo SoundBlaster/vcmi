@@ -989,6 +989,7 @@
 	"vcmi.randomMapTab.widgets.templateLabel": "Шаблон",
 	"vcmi.selectionTab.campaignSets.help": "Несколько кампаний, объединенные набором",
 	"vcmi.selectionTab.campaignSets.hover": "Набор кампаний",
+	"vcmi.selectionTab.toroidalExperimental": "Экспериментальная замкнутая карта. Поддержка ИИ ещё не проверена.",
 	"vcmi.server.errors.campOrMapFile.unknownEntity": "Не удалось загрузить файл! Найден неизвестный объект \"%s\"! Возможно, файл несовместим с текущей версией модов!",
 	"vcmi.server.errors.disconnected": "{Сетевая ошибка}\n\nПодключение к игровому серверу потеряно!",
 	"vcmi.server.errors.existingProcess": "Запущен другой процесс сервера VCMI. Пожалуйста, завершите его перед запуском новой игры.",
