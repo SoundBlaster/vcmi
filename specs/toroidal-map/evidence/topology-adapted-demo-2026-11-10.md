@@ -188,3 +188,18 @@ removable-volume denial. These observations do not prove that permissions are
 the cause, nor do they verify the latest client visually. No system privacy
 setting was changed. Diagnostic dyld logs were retained in the isolated TB5
 runtime; the stalled processes were closed after inspection.
+
+A subsequent diagnostic launcher set `HOME` before executing the same client.
+With the logs in a temporary local directory and the test data still on TB5,
+the client log recorded initialization through the SDL3 backend. A sample
+then showed `CResourceHandler::initialize` waiting in `open` while constructing
+a recursive directory iterator. The first loaders in this function use the
+test save and configuration directories; the sample does not expose the
+actual path argument. No game window appeared. This shows progress beyond
+the earlier logging wait, but does not determine the cause of the new wait.
+
+After the later Dimension Door and Scuttle Boat tests were added, the full
+`vcmitest` run passed 1,415 tests on macOS arm64. One optional prototype-save
+test was skipped without its environment variable and four tests remained
+disabled; its separate earlier run is recorded in the save-marker evidence.
+The full-run log is `full-suite-post-spells.log` on TB5.
