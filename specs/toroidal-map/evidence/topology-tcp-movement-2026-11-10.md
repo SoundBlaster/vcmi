@@ -88,3 +88,22 @@ plus the test. Both peers are test listeners in the same process as the server,
 with packets over TCP loopback and directly configured lobby slots. The test
 does not establish packet confidentiality, graphical multiplayer behavior,
 remote-host behavior, other levels or all rejection reasons.
+
+## Mixed-capability lobby start
+
+The TCP lobby-start fixture now connects a third listener that offers the
+current numeric version without the experimental topology tag. The server
+negotiates the previous serialization version for that peer. When the host
+requests the toroidal VMAP, it receives the incompatible-version message;
+the server remains in the lobby without an initialized game and none of the
+three listeners has received a game state. The third listener then sends its
+normal disconnect packet. The same host successfully starts the toroidal
+game with the two tagged peers and the original movement assertions run.
+
+On macOS arm64, the test and nine enabled `GameConnectionTopologyTest` cases
+passed three consecutive repetitions with the TB5 build from `68bfaf7` plus
+this test change. The log is `tcp-mixed-capability-2026-11-10.log` in the
+TB5 runtime directory. The untagged listener is a current-code test double, not an
+old binary, and all three listeners and server run in one process over TCP
+loopback. This does not resolve the disabled raw conflicting-layout test,
+prove mixed-version graphical interoperability, or authenticate capabilities.

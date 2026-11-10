@@ -355,7 +355,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	class LobbyPeer final : public INetworkClientListener
 	{
 	public:
-		explicit LobbyPeer(std::string name) : name(std::move(name)) {}
+		explicit LobbyPeer(std::string name, bool offerTopology = true) : name(std::move(name)), offerTopology(offerTopology) {}
 		void onConnectionFailed(const std::string & error) override { failure = error; }
 		void onDisconnected(const std::shared_ptr<INetworkConnection> &, const std::string & error) override { failure = error; }
 		void onConnectionEstablished(const std::shared_ptr<INetworkConnection> & connection) override
@@ -366,7 +366,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 			greeting.uuid = name;
 			greeting.names = {name};
 			greeting.mode = EStartMode::NEW_GAME;
-			greeting.version = LobbyTopologyCapability::encode(ESerializationVersion::CURRENT);
+			greeting.version = offerTopology ? LobbyTopologyCapability::encode(ESerializationVersion::CURRENT) : ESerializationVersion::CURRENT;
 			codec->sendPack(greeting);
 		}
 		void onPacketReceived(const std::shared_ptr<INetworkConnection> &, const std::vector<std::byte> & bytes) override
@@ -375,9 +375,14 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 			if(const auto * greeting = dynamic_cast<const LobbyClientConnected *>(packet.get()); greeting && greeting->uuid == name)
 			{
 				const auto accepted = LobbyTopologyCapability::decode(greeting->version);
-				negotiated = accepted.toroidal && accepted.version == ESerializationVersion::CURRENT;
+				negotiated = true;
+				acceptedTopology = accepted.toroidal;
+				acceptedVersion = accepted.version;
+				clientId = greeting->clientId;
 				codec->setSerializationVersion(accepted.version);
 			}
+			if(const auto * message = dynamic_cast<const LobbyShowMessage *>(packet.get()))
+				messages.push_back(message->message.toString(LIBRARY->staticTexts()));
 			if(auto * start = dynamic_cast<LobbyStartGame *>(packet.get()); start && start->initializedGameState)
 			{
 				state = start->initializedGameState;
@@ -395,7 +400,12 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		}
 		std::string name;
 		std::string failure;
+		bool offerTopology;
 		bool negotiated = false;
+		bool acceptedTopology = false;
+		ESerializationVersion acceptedVersion = ESerializationVersion::NONE;
+		GameConnectionID clientId = GameConnectionID::INVALID;
+		std::vector<std::string> messages;
 		std::map<uint32_t, bool> results;
 		std::set<ObjectInstanceID> failedMoves;
 		std::shared_ptr<INetworkConnection> transport;
@@ -407,7 +417,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	const auto port = server.prepare(false, true);
 	ASSERT_NE(port, 0);
 	auto network = INetworkHandler::createHandler();
-	LobbyPeer host("lobby-host"), guest("lobby-guest");
+	LobbyPeer host("lobby-host"), guest("lobby-guest"), legacy("lobby-legacy", false);
 	const auto pumpUntil = [&](const auto & ready)
 	{
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
@@ -423,9 +433,13 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	network->connectToRemote(host, "127.0.0.1", port);
 	pumpUntil([&] { return host.negotiated; });
 	ASSERT_TRUE(host.negotiated) << host.failure;
+	ASSERT_TRUE(host.acceptedTopology);
+	ASSERT_EQ(host.acceptedVersion, ESerializationVersion::CURRENT);
 	network->connectToRemote(guest, "127.0.0.1", port);
 	pumpUntil([&] { return guest.negotiated; });
 	ASSERT_TRUE(guest.negotiated) << guest.failure;
+	ASSERT_TRUE(guest.acceptedTopology);
+	ASSERT_EQ(guest.acceptedVersion, ESerializationVersion::CURRENT);
 	ASSERT_EQ(server.activeConnections.size(), 2);
 
 	server.si->mapname = "MAPEDITOR/tcp-lobby";
@@ -450,7 +464,31 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	}
 	ASSERT_TRUE(server.hasPlayerAt(PlayerColor(0), server.activeConnections[0]->connectionID));
 	ASSERT_TRUE(server.hasPlayerAt(PlayerColor(1), server.activeConnections[1]->connectionID));
+	// The untagged peer offers the same ordinal but must be downgraded and
+	// prevent a toroidal game from starting through the actual lobby path.
+	network->connectToRemote(legacy, "127.0.0.1", port);
+	pumpUntil([&] { return legacy.negotiated || !legacy.failure.empty(); });
+	ASSERT_TRUE(legacy.negotiated) << legacy.failure;
+	EXPECT_FALSE(legacy.acceptedTopology);
+	EXPECT_EQ(legacy.acceptedVersion, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	ASSERT_EQ(server.activeConnections.size(), 3);
+	const auto messagesBefore = host.messages.size();
 	LobbyStartGame start;
+	host.codec->sendPack(start);
+	pumpUntil([&] { return host.messages.size() > messagesBefore; });
+	ASSERT_GT(host.messages.size(), messagesBefore) << host.failure;
+	EXPECT_EQ(host.messages.back(), MetaString::createFromTextID("vcmi.server.errors.incompatibleVersion").toString(LIBRARY->staticTexts()));
+	EXPECT_EQ(server.getState(), EServerState::LOBBY);
+	EXPECT_EQ(server.gh, nullptr);
+	EXPECT_FALSE(host.state);
+	EXPECT_FALSE(guest.state);
+	EXPECT_FALSE(legacy.state);
+	LobbyClientDisconnected disconnect;
+	disconnect.clientId = legacy.clientId;
+	legacy.codec->sendPack(disconnect);
+	pumpUntil([&] { return server.activeConnections.size() == 2; });
+	ASSERT_EQ(server.activeConnections.size(), 2);
+	ASSERT_EQ(server.getState(), EServerState::LOBBY);
 	host.codec->sendPack(start);
 	pumpUntil([&] { return host.state && guest.state; });
 	ASSERT_TRUE(host.state) << host.failure;
