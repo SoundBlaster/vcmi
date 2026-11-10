@@ -43,3 +43,31 @@ On the TB5 CMake build, `vcmitest --gtest_filter=` selected
 `HeroMovementTest.HeroCanEmbarkAndDisembarkAcrossToroidalCorner`.
 All four passed. The GUI and automated checks do not establish full support
 for every map, game mode or animation frame.
+
+## Current-build GUI follow-up
+
+A signed bundle containing the client, server and shared library rebuilt from
+clean VCMI source revision `afb8044` was launched on the same Mac. It loaded
+the same VMAP; its window title included `1.8.0.afb8044`. The bundled client
+and library SHA-256 values after dependency-path rewriting and signing were
+`3045aa03d55f5dd040cdfb7643d10acc94d332fce4eb4ecb159d897baec7d6b8` and
+`5061917785c77703f7956f89051f19a9727894af363aaa1896f6dad4948eb77e`.
+The bundle passed `codesign --verify --deep --strict`. The client and server
+build completed with duplicate-library and missing-search-path linker warnings.
+
+On the real game window, the hero embarked `(0,0)` → `(35,0)`, then on the
+next day sailed `(35,0)` → `(35,35)` → `(0,35)` → `(35,34)` → `(0,35)` →
+`(35,35)` → `(35,0)` and disembarked at `(0,0)`. Thus the selected-hero state
+and sampled GUI showed crossings in both directions on both axes and a diagonal
+crossing of the horizontal seam in each direction. Each cardinal move cost 100
+movement points and each diagonal move cost 141. The test also tried selecting
+`(0,35)` from `(35,0)` diagonally across both seams: a longer path was shown
+and no move executed by the directional shortcut. This fixture has land at
+`(0,0)`, adjacent to that diagonal; it is not evidence that a fully open-water
+corner crossing fails or succeeds in the GUI.
+
+The immutable local copy of observation records 0–26 is
+`/Volumes/TB5/Developer/Builds/GitHub/VCMI-8dd012bf29c2d973/runtime/boat-gui-afb8044-observations-0-26.jsonl`,
+SHA-256 `c3693b4e1794dd09d9176ea7c1b212284c3727598bc252a818f5b582314176ac`.
+The follow-up used still GUI observations, not a continuous recording, and does
+not independently establish frame pacing or the smoothness of diagonal movement.
