@@ -289,7 +289,7 @@ add_subdirectory_with_folder("3rdparty" googletest EXCLUDE_FROM_ALL)
 
 # Coordinate arithmetic does not require game assets or VCMI's global test
 # environment. Keep it runnable even when an H3 installation is unavailable.
-add_executable(vcmi-map-topology-test map/MapTopologyTest.cpp map/MapViewModelTopologyTest.cpp ${CMAKE_SOURCE_DIR}/client/mapView/MapViewModel.cpp ${CMAKE_SOURCE_DIR}/lib/Rect.cpp)
+add_executable(vcmi-map-topology-test map/MapTopologyTest.cpp map/MapViewModelTopologyTest.cpp ${CMAKE_SOURCE_DIR}/client/mapView/MapViewModel.cpp ${CMAKE_SOURCE_DIR}/client/mapView/MapViewMovement.cpp ${CMAKE_SOURCE_DIR}/lib/Rect.cpp)
 target_include_directories(vcmi-map-topology-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/client)
 target_link_libraries(vcmi-map-topology-test PRIVATE gtest_main gmock Boost::boost)
 if(TARGET TBB::tbb)

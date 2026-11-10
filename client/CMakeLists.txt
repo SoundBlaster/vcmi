@@ -75,6 +75,7 @@ set(vcmiclientcommon_SRCS
 	mapView/MapViewCache.cpp
 	mapView/MapViewController.cpp
 	mapView/MapViewModel.cpp
+	mapView/MapViewMovement.cpp
 	mapView/mapHandler.cpp
 	mapView/MapOverlayLogVisualizer.cpp
 
@@ -291,6 +292,7 @@ set(vcmiclientcommon_HEADERS
 	mapView/MapViewCache.h
 	mapView/MapViewController.h
 	mapView/MapViewModel.h
+	mapView/MapViewMovement.h
 	mapView/mapHandler.h
 	mapView/MapOverlayLogVisualizer.h
 

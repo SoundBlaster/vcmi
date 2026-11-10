@@ -2,6 +2,18 @@
 
 ## Camera geometry check, 2026-11-10
 
+At revision `406969f` plus the movement-offset extraction, the same sprite
+offset calculation used by the adventure renderer was checked for all eight
+seam directions, including all four corners. Five interpolation positions
+from start to finish stayed within one tile; a bounded-map check retained
+ordinary displacement. A model-level following-camera check independently
+reconstructed the normalized camera position and verified a stable sprite
+screen position at those samples. Both `vcmiclient` and the asset-independent
+test target built, and all 13 standalone tests passed
+(`movement-offset-build.log`, `movement-offset-test.log` on TB5). This is
+calculation evidence, not proof of real frame timing, camera-controller
+integration, actual image content or the boat animation.
+
 At source revision `6a442e2` plus the cache-layout change, the actual band
 enumeration used by software blitting and GPU presentation was moved to
 `MapViewModel` without changing its algorithm. The standalone test checks

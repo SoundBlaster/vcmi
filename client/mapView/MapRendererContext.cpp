@@ -12,6 +12,7 @@
 #include "MapRendererContext.h"
 
 #include "MapRendererContextState.h"
+#include "MapViewMovement.h"
 #include "mapHandler.h"
 
 #include "../Client.h"
@@ -497,26 +498,8 @@ Point MapRendererAdventureMovingContext::objectImageOffset(ObjectInstanceID obje
 {
 	if(target == objectID)
 	{
-		int3 offsetTilesFrom = tileFrom - coordinates;
-		int3 offsetTilesDest = tileDest - coordinates;
 		const auto * map = GAME->map().getMap();
-		if(map->toroidal)
-		{
-			const auto topology = map->getTopology();
-			const auto from = topology.canonicalize(tileFrom);
-			const auto dest = topology.canonicalize(tileDest);
-			const auto tile = topology.canonicalize(coordinates);
-			assert(from && dest && tile);
-			offsetTilesFrom = topology.displacement(*tile, *from);
-			offsetTilesDest = offsetTilesFrom + topology.displacement(*from, *dest);
-		}
-
-		Point offsetPixelsFrom = Point(offsetTilesFrom) * Point(32, 32);
-		Point offsetPixelsDest = Point(offsetTilesDest) * Point(32, 32);
-
-		Point result = vstd::lerp(offsetPixelsFrom, offsetPixelsDest, progress);
-
-		return result;
+		return movingObjectImageOffset(map->getTopology(), map->toroidal, tileFrom, tileDest, coordinates, progress);
 	}
 
 	return MapRendererAdventureContext::objectImageOffset(objectID, coordinates);

@@ -9,6 +9,7 @@
 #include "StdInc.h"
 
 #include "../../client/mapView/MapViewModel.h"
+#include "../../client/mapView/MapViewMovement.h"
 #include "../../lib/mapping/MapTopology.h"
 
 TEST(MapViewModelTopologyTest, WrappedCameraPreservesPixelGeometryAcrossSeams)
@@ -98,4 +99,43 @@ TEST(MapViewModelTopologyTest, CachedBandsPlaceEveryVisibleTileExactlyOnce)
 		EXPECT_LE(bands, 4);
 		EXPECT_EQ(visited.size(), static_cast<size_t>(visible.w * visible.h));
 	}
+}
+
+TEST(MapViewModelTopologyTest, MovingSpriteTakesOneStepAcrossEachSeam)
+{
+	constexpr int extent = 36;
+	constexpr int tileSize = 32;
+	const MapTopology wrapped(extent, extent, 2, true);
+	for(int dx = -1; dx <= 1; ++dx)
+	for(int dy = -1; dy <= 1; ++dy)
+	{
+		if(dx == 0 && dy == 0)
+			continue;
+		const int3 from(dx < 0 ? 0 : dx > 0 ? extent - 1 : 10,
+			dy < 0 ? 0 : dy > 0 ? extent - 1 : 10, 1);
+		const int3 dest = *wrapped.canonicalize(from + int3(dx, dy, 0));
+		for(int pixels = 0; pixels <= tileSize; pixels += 8)
+		{
+			const double progress = static_cast<double>(pixels) / tileSize;
+			const Point sourceOffset(dx * pixels, dy * pixels);
+			const Point destinationOffset(-dx * (tileSize - pixels), -dy * (tileSize - pixels));
+			EXPECT_EQ(movingObjectImageOffset(wrapped, true, from, dest, from, progress), sourceOffset);
+			EXPECT_EQ(movingObjectImageOffset(wrapped, true, from, dest, dest, progress), destinationOffset);
+			EXPECT_EQ(movingObjectImageOffset(wrapped, true, from, dest, from + int3(extent, -extent, 0), progress), sourceOffset);
+
+			MapViewModel view;
+			view.setTileSize(Point(tileSize, tileSize));
+			view.setViewDimensions(Point(800, 600));
+			view.setLevel(1);
+			const int period = extent * tileSize;
+			view.setViewCenter(Point(MapTopology::wrapCoordinate(from.x * tileSize + tileSize / 2 + dx * pixels, period),
+				MapTopology::wrapCoordinate(from.y * tileSize + tileSize / 2 + dy * pixels, period)));
+			const int3 centerTile = view.getTileAtPoint(Point(400, 300));
+			const Point screenPosition = view.getTargetTileArea(centerTile).topLeft()
+				+ movingObjectImageOffset(wrapped, true, from, dest, centerTile, progress);
+			EXPECT_EQ(screenPosition, Point(384, 284));
+		}
+	}
+	const MapTopology bounded(extent, extent, 2, false);
+	EXPECT_EQ(movingObjectImageOffset(bounded, false, int3(0, 0, 1), int3(35, 35, 1), int3(0, 0, 1), 0.5), Point(560, 560));
 }
