@@ -32,3 +32,10 @@ suite uses test listeners and in-process server/game-state objects, although
 their packets traverse real local TCP connections. It does not demonstrate
 a full multiplayer lobby, graphical clients, separate machines, packet
 confidentiality, or broader multiplayer behavior.
+
+A separate bounded-map regression invokes the ordinary server request
+handler with an owned hero. A rock tile returns `result=false` and leaves
+the hero in place; an adjacent legal tile returns `result=true` and moves
+the hero. This and the TCP scenario passed together on a build from
+`f85437a` plus the bounded-map test. This provides a topology-independent
+regression for the acknowledgement fix.

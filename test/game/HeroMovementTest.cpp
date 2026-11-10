@@ -942,6 +942,49 @@ TEST_F(HeroMovementTest, blockedToroidalStepIsRejectedRoE)
 	checkBlockedToroidalStep(EMapFormat::ROE);
 }
 
+TEST_F(HeroMovementTest, MovementAcknowledgementReportsRejectedAndAcceptedRequests)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.terrain(int3(11, 10, 0), TerrainId::ROCK);
+	startWithMap(std::move(builder));
+	ASSERT_FALSE(map()->toroidal);
+	gameState()->actingPlayers.insert(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(10, 10, 0));
+	hero->setMovementPoints(3000);
+
+	class Acknowledgements final : public GameHandlerTestServer
+	{
+	public:
+		using GameHandlerTestServer::GameHandlerTestServer;
+		void sendPack(CPackForClient & pack, GameConnectionID) override
+		{
+			if(const auto * applied = dynamic_cast<const PackageApplied *>(&pack))
+				results[applied->requestID] = applied->result;
+		}
+		std::map<uint32_t, bool> results;
+	} server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	MoveHero blocked({hero->convertFromVisitablePos(int3(11, 10, 0))}, EPathfindingLayer::LAND, hero->id, false);
+	blocked.player = player;
+	blocked.requestID = 1;
+	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, blocked);
+	ASSERT_TRUE(server.results.contains(1));
+	EXPECT_FALSE(server.results.at(1));
+	EXPECT_EQ(hero->visitablePos(), int3(10, 10, 0));
+
+	MoveHero allowed({hero->convertFromVisitablePos(int3(9, 10, 0))}, EPathfindingLayer::LAND, hero->id, false);
+	allowed.player = player;
+	allowed.requestID = 2;
+	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, allowed);
+	ASSERT_TRUE(server.results.contains(2));
+	EXPECT_TRUE(server.results.at(2));
+	EXPECT_EQ(hero->visitablePos(), int3(9, 10, 0));
+}
+
 TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)
 {
 	const PlayerColor player(0);
