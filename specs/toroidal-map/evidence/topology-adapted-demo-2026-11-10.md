@@ -28,6 +28,22 @@ test process was force-quit through Activity Monitor. This attempt neither
 verifies the current client visually nor proves that signing preserves or
 fails to preserve removable-volume authorization.
 
+The client already provides `--logLocation`. A development-signed diagnostic
+bundle with a small launcher passed that argument to the same `4255569`
+client, placing only its log in a temporary local directory; the bundle,
+profile and game resources remained on TB5. The bundle and nested client
+both satisfied the earlier development bundle's designated requirement.
+The client opened its log and identified itself as `1.8.0.4255569`, but did
+not display a window. Its last log entry was the scan of the isolated
+profile's `Saves` path, which resolves to TB5. A process sample showed a
+recursive directory iterator waiting in `open`; it did not identify the
+actual syscall path. Filtered TCC records showed an All Files preflight,
+not a removable-volume prompt or decision. Thus the result narrows the
+startup stall to a later filesystem operation but does not establish its
+cause or verify GUI behavior. The process was force-quit, the diagnostic log
+was copied to `development-log-probe-4255569.log` on TB5, and the temporary
+local log directory was removed.
+
 For comparison, the existing ad-hoc signed `VCMI Toroid Lab.app` had a
 designated requirement based on its code-directory hash. The earlier macOS
 log below recorded a mismatch between its saved requirement and the newly
