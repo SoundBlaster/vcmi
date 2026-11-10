@@ -19,3 +19,18 @@ The macOS arm64 editor and test targets built successfully; the linker
 reported existing duplicate-library and missing Conan search-path warnings.
 The coordinate helper is tested, but Qt painting, mouse movement and redraw
 in a live editor window have not been verified.
+
+## Attempted live check
+
+A test editor bundle with the current object-selection code was signed with a
+development identity and launched through Computer Use. No editor window
+appeared. Activity Monitor sampled the main thread in
+`CBasicLogConfigurator::configureDefault` while opening a log file. A second
+diagnostic build changed only the editor log filename to a separate file on
+the same volume; it likewise did not reach a window and its sample stopped at
+the same logging call. This weakens the hypothesis that both editors merely
+contended for the same filename; it does not establish the cause or prove a
+macOS privacy-permission failure. Both test processes were force-quit and the
+temporary source edit to the log filename was reverted. The pre-existing
+editor and its unsaved map were left open. No visual selection or preview
+result was obtained.
