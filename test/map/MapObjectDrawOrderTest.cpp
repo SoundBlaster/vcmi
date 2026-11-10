@@ -282,9 +282,7 @@ TEST_F(MapObjectDrawOrderTest, ChangingTopologyRebuildsShownButNotHiddenObjects)
 	EXPECT_EQ(map.getTile(int3(0, 0, 0)).blockingObjects, (std::vector<ObjectInstanceID>{overlapping->id, shown->id}));
 }
 
-// Tracked compatibility gap: occupancy alone cannot distinguish a fully
-// clipped shown object from a deliberately hidden object.
-TEST_F(MapObjectDrawOrderTest, DISABLED_ChangingTopologyRestoresClippedShownObjectsButNotHiddenObjects)
+TEST_F(MapObjectDrawOrderTest, ChangingTopologyRestoresClippedShownObjectsButNotHiddenObjects)
 {
 	map.width = 10;
 	map.height = 10;
@@ -295,19 +293,31 @@ TEST_F(MapObjectDrawOrderTest, DISABLED_ChangingTopologyRestoresClippedShownObje
 				map.getTile(int3(x, y, z)).terrainType = ETerrainId::GRASS;
 
 	auto shown = std::make_shared<CGObjectInstance>(nullptr);
-	shown->id = ObjectInstanceID(0);
+	shown->id = ObjectInstanceID(1);
 	shown->pos = int3(0, 5, 0);
 	shown->appearance = makeTemplate(R"([ "A0" ])", 0);
 	auto hidden = std::make_shared<CGObjectInstance>(nullptr);
-	hidden->id = ObjectInstanceID(1);
+	hidden->id = ObjectInstanceID(0);
 	hidden->pos = int3(0, 6, 0);
 	hidden->appearance = makeTemplate(R"([ "A0" ])", 0);
-	map.objects = {shown, hidden};
+	map.objects = {hidden, shown};
 	map.showObject(shown.get());
+	map.reindexObjects();
+	ASSERT_EQ(shown->id, ObjectInstanceID(0));
+	ASSERT_EQ(hidden->id, ObjectInstanceID(1));
 
 	map.setToroidalAndRebuild(true);
 	EXPECT_TRUE(vstd::contains(map.getTile(int3(9, 5, 0)).visitableObjects, shown->id));
 	EXPECT_TRUE(vstd::contains(map.getTile(int3(9, 5, 0)).blockingObjects, shown->id));
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 6, 0)).visitableObjects, hidden->id));
+
+	// Returning to bounded topology clips the shown object again. Explicitly
+	// hiding it there must keep it hidden on the next topology change.
+	map.setToroidalAndRebuild(false);
+	map.hideObject(shown.get());
+	map.setToroidalAndRebuild(true);
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 5, 0)).visitableObjects, shown->id));
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 5, 0)).blockingObjects, shown->id));
 	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 6, 0)).visitableObjects, hidden->id));
 }
 

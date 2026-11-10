@@ -328,6 +328,8 @@ private:
 
 	/// holes are neither visitable nor blocking, so tiles do not know about them
 	std::unordered_set<int3> holePositions;
+	/// Shown objects whose blocking and visitable cells are all outside the map; not serialized.
+	std::unordered_set<const CGObjectInstance *> unindexedShownObjects;
 
 public:
 	template <typename Handler>
@@ -362,6 +364,7 @@ public:
 		if(!h.saving)
 		{
 			holePositions.clear();
+			unindexedShownObjects.clear();
 			for(const auto & object : objects)
 			{
 				if(object && object->ID == Obj::HOLE)

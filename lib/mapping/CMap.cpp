@@ -312,10 +312,9 @@ void CMap::setToroidalAndRebuild(bool enabled, TopologyRebuildObjects objectScop
 				tile.blockingObjects.clear();
 				tile.visitableObjects.clear();
 			}
-	if(objectScope == TopologyRebuildObjects::AllMapObjects)
-		for(const auto & object : objects)
-			if(object)
-				shownObjects.insert(object->id);
+	for(const auto & object : objects)
+		if(object && (objectScope == TopologyRebuildObjects::AllMapObjects || unindexedShownObjects.contains(object.get())))
+			shownObjects.insert(object->id);
 	toroidal = enabled;
 	for(const auto & id : shownObjects)
 		showObject(objects.at(id).get());
@@ -337,6 +336,7 @@ void CMap::setToroidalAndRebuild(bool enabled, TopologyRebuildObjects objectScop
 
 void CMap::hideObject(CGObjectInstance * obj)
 {
+	unindexedShownObjects.erase(obj);
 	if(obj->ID == Obj::HOLE)
 		holePositions.erase(obj->anchorPos());
 
@@ -363,6 +363,8 @@ void CMap::showObject(CGObjectInstance * obj)
 	if(obj->ID == Obj::HOLE)
 		holePositions.insert(obj->anchorPos());
 
+	bool hasOccupancy = false;
+	bool indexed = false;
 	const int zVal = obj->anchorPos().z;
 	for(int fx = 0; fx < obj->getWidth(); ++fx)
 	{
@@ -371,11 +373,15 @@ void CMap::showObject(CGObjectInstance * obj)
 		{
 			const int yVal = obj->anchorPos().y - fy;
 			const int3 footprint(xVal, yVal, zVal);
+			const bool visitable = obj->visitableAt(footprint);
+			const bool blocking = obj->blockingAt(footprint);
+			hasOccupancy |= visitable || blocking;
 			const auto tile = getTopology().canonicalize(footprint);
 			if(tile)
 			{
 				TerrainTile & curt = getTile(*tile);
-				if(obj->visitableAt(footprint))
+				indexed |= visitable || blocking;
+				if(visitable)
 				{
 					const bool duplicate = vstd::contains(curt.visitableObjects, obj->id);
 					assert(!duplicate || (toroidal && (obj->getWidth() > width || obj->getHeight() > height)));
@@ -383,7 +389,7 @@ void CMap::showObject(CGObjectInstance * obj)
 						curt.visitableObjects.push_back(obj->id);
 				}
 
-				if(obj->blockingAt(footprint))
+				if(blocking)
 				{
 					const bool duplicate = vstd::contains(curt.blockingObjects, obj->id);
 					assert(!duplicate || (toroidal && (obj->getWidth() > width || obj->getHeight() > height)));
@@ -393,6 +399,10 @@ void CMap::showObject(CGObjectInstance * obj)
 			}
 		}
 	}
+	if(hasOccupancy && !indexed)
+		unindexedShownObjects.insert(obj);
+	else
+		unindexedShownObjects.erase(obj);
 }
 
 
