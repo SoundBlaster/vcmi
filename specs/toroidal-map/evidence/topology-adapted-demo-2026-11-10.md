@@ -221,3 +221,29 @@ the message now uses the stored path. Five filesystem/resource-path tests
 passed after the fix (`filesystem-path-before-test.log` and
 `filesystem-path-final-test.log` on TB5). This diagnostics fix does not resolve
 the stalled directory open.
+
+## Current client GUI check
+
+On macOS arm64, a freshly rebuilt client stamped `4aa0566` was launched from
+the signed diagnostic bundle. For this run its isolated temporary profile
+used local copies of the game archives and music, omitting `VIDEO.VID`, and
+a copy of the previously authored 36×36 Toroid Seam Laboratory map. The build
+and original data remained on TB5. This configuration reached the main menu;
+it does not establish why the earlier TB5 directory open stalled or verify a
+launch with game data read directly from TB5.
+
+Computer Use keyboard input and screenshots showed the experimental/AI
+warning in the scenario list and the loaded map. From the starting corner,
+the first northwest step collected 1,000 gold, changing the displayed total
+from 20,000 to 21,000. A second northwest step placed the minimap marker in
+the opposite corner; subsequent east and south steps moved it across the
+horizontal and vertical seams back to the starting corner. A GUI save was
+created, loaded from the normal save list with 21,000 gold still displayed,
+and another northwest step placed the marker in the opposite corner.
+
+These observations establish the listed before/after states for this map and
+build. They do not establish uninterrupted intermediate animation, scrolling
+smoothness, other terrain, AI behavior or general legacy-map compatibility.
+The test save was copied to `runtime/gui-save-4aa0566` on TB5; the temporary
+local copies of the game archives, music and map were removed after the
+client exited, and the profile's prior TB5 links were restored.
