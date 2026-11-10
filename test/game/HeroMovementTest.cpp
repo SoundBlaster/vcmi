@@ -1281,6 +1281,46 @@ TEST_F(HeroMovementTest, removingCornerGuardRefreshesWrappedGuardCache)
 		EXPECT_EQ(gameState()->guardingCreaturePosition(tile), int3(-1, -1, -1));
 }
 
+TEST_F(HeroMovementTest, grailCanBeDugAfterCrossingToroidalCorner)
+{
+	const PlayerColor player(0);
+	const int3 destination(35, 35, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 0, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	map()->grailPos = destination;
+
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	hero->setMovementPoints(hero->movementPointsLimit());
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_EQ(hero->visitablePos(), destination);
+	hero->setMovementPoints(hero->movementPointsLimit());
+	ASSERT_EQ(hero->diggingStatus(), EDiggingStatus::CAN_DIG);
+	ASSERT_TRUE(handler.dig(hero));
+	EXPECT_TRUE(hero->hasArt(ArtifactID::GRAIL));
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+	EXPECT_TRUE(map()->isHoleAt(destination));
+	const auto snapshot = gameState()->saveToMemory();
+	auto restored = std::make_shared<CGameState>();
+	restored->preInit(LIBRARY);
+	restored->loadFromMemory(snapshot);
+	ASSERT_TRUE(restored->getMap().toroidal);
+	EXPECT_TRUE(restored->getMap().isHoleAt(destination));
+	const auto * restoredHero = restored->getHero(hero->id);
+	ASSERT_NE(restoredHero, nullptr);
+	EXPECT_EQ(restoredHero->visitablePos(), destination);
+	EXPECT_TRUE(restoredHero->hasArt(ArtifactID::GRAIL));
+	EXPECT_EQ(restoredHero->movementPointsRemaining(), 0);
+	hero->setMovementPoints(hero->movementPointsLimit());
+	EXPECT_EQ(hero->diggingStatus(), EDiggingStatus::TILE_OCCUPIED);
+	EXPECT_FALSE(handler.dig(hero));
+}
+
 TEST_F(HeroMovementTest, visionsRangeUsesToroidalDistance)
 {
 	const PlayerColor player(0);
