@@ -7,6 +7,12 @@ corners. Both tests passed with Complete data (`seam-direction-build.log`
 and `seam-direction-test.log` on TB5). This checks game state, not rendered
 animation frames.
 
+The same RoE and SoD tests were extended with all eight diagonal steps that
+cross exactly one seam. Both passed: each destination was an immediate
+pathfinder neighbor, and the server applied the expected direction and the
+same movement cost as an interior diagonal. These cases use the fixture's
+terrain and do not verify rendered animation or every passability rule.
+
 On 2026-11-10, an SoD synthetic map had cobblestone on both sides of a
 horizontal seam. `HeroMovementTest.RoadMovementCostAppliesAcrossToroidalSeam`
 checked that the pathfinder selects the direct step `(0,5,0) -> (35,5,0)`
