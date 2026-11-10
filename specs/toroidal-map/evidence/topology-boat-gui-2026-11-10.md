@@ -71,3 +71,30 @@ The immutable local copy of observation records 0–26 is
 SHA-256 `c3693b4e1794dd09d9176ea7c1b212284c3727598bc252a818f5b582314176ac`.
 The follow-up used still GUI observations, not a continuous recording, and does
 not independently establish frame pacing or the smoothness of diagonal movement.
+
+## Open-water diagonal corner follow-up
+
+`MapFormat.ToroidalOpenWaterCornerFixtureRoundTrips` generates and reloads a
+36×36 toroidal VMAP with water at all four corners, a red hero at `(30,30)`
+and a boat at `(31,30)`. The test verifies every intended water tile and the
+boat after the round trip; optional output refuses to overwrite a file. The
+fixture used below has SHA-256
+`2524eccd4396bc76d8d8d8f3509b15ad01c50249bb8128d41c7cb92444911e79`.
+
+The signed client, server and shared library were built from revision
+`3478269`; only the fixture test was uncommitted. On the real game window,
+the hero embarked `(30,30)` → `(31,30)`. On day two it sailed via `(32,31)`,
+`(33,32)`, `(34,33)`, `(35,34)` to `(35,35)`, then crossed both seams
+diagonally `(35,35)` → `(0,0)` → `(35,35)`, crossed east to `(0,35)`, and
+sailed diagonally `(0,35)` → `(35,0)` → `(0,35)`. Selected-hero observations
+show each diagonal consumed 141 movement points and the eastward step 100.
+The final GUI still displayed the boat. These observations establish the
+transitions for this boat and fixture; they do not verify other shoreline
+configurations, boats, AI, or continuous animation.
+
+The local player-state records 0–36 were copied to
+`/Volumes/TB5/Developer/Builds/GitHub/VCMI-8dd012bf29c2d973/runtime/boat-corners-3478269-observations-0-36.jsonl`,
+SHA-256 `9b3e8179b88ec5598214dfaf4ef11b9e492428e1b26bc020504fe791baad1092`.
+A simultaneous screen-recording attempt produced no saved movie; the Mac's
+internal disk was nearly full during the attempt. No causal diagnosis or
+claim about movement smoothness follows from these still observations.
