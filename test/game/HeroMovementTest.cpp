@@ -3177,6 +3177,36 @@ TEST_F(HeroMovementTest, HeroCapturesMineAcrossToroidalSeam)
 	EXPECT_EQ(hero->visitablePos(), minePosition);
 }
 
+TEST_F(HeroMovementTest, HeroCanRevisitMineOnTheSameToroidalTile)
+{
+	const PlayerColor player(0);
+	const int3 minePosition(10, 35, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 0, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	auto object = handler.createNewObject(minePosition, Obj::MINE, MapObjectSubID(0));
+	auto * mine = dynamic_cast<CGMine *>(object.get());
+	ASSERT_NE(mine, nullptr);
+	mine->setOwner(PlayerColor::NEUTRAL);
+	handler.newObject(object, player);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(minePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_EQ(hero->visitablePos(), minePosition);
+	ASSERT_EQ(mine->getOwner(), player);
+	const auto remaining = hero->movementPointsRemaining();
+	mine->setOwner(PlayerColor::NEUTRAL);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->anchorPos(), EMovementMode::STANDARD, false, player, EPathfindingLayer::AUTO));
+	EXPECT_EQ(mine->getOwner(), player);
+	EXPECT_EQ(hero->visitablePos(), minePosition);
+	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+}
+
 TEST_F(HeroMovementTest, MonsterGuardAcrossSeamStartsBattle)
 {
 	const PlayerColor player(0);

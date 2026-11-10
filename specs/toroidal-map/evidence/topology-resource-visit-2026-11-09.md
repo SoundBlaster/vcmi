@@ -148,3 +148,16 @@ exception. The complete local suite passed 1,382 tests with three disabled
 were built from `d34da7f` plus the refactor (`shared-layer-rules-build.log`).
 This run includes bounded-map tests but is not a complete bounded regression
 or multiplayer validation.
+
+## Same-tile revisit after a seam crossing
+
+`HeroMovementTest.HeroCanRevisitMineOnTheSameToroidalTile` has a hero capture
+a mine across the north–south seam, then changes the mine to neutral in the
+fixture and sends the same-position `AUTO` movement request used to revisit
+an object. The mine returns to the player and the hero keeps the same tile
+and movement points. This distinguishes a real second visit from a successful
+request that does nothing. The new test and the existing seam mine-capture
+test passed from the separate TB5 build based on `6498ce3` plus this test.
+
+This is one server-side object and a synthetic ownership change. It does not
+verify GUI shortcut input, other visitable objects or multiplayer.
