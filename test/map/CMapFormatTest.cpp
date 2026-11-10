@@ -13,8 +13,11 @@
 #include "../../lib/filesystem/Filesystem.h"
 
 #include "../../lib/callback/EditorCallback.h"
+#include "../../lib/callback/GameRandomizer.h"
 #include "../../lib/CRandomGenerator.h"
 #include "../../lib/GameLibrary.h"
+#include "../../lib/mapObjectConstructors/AObjectTypeHandler.h"
+#include "../../lib/mapObjectConstructors/CObjectClassesHandler.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/CMap.h"
 #include "../../lib/mapping/CMapEditManager.h"
@@ -684,6 +687,81 @@ TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
 	EXPECT_EQ(reopened->getTile(int3(35, 1, 0)).visitableObjects.size(), 1u);
 	EXPECT_EQ(reopened->getTile(int3(1, 35, 0)).visitableObjects.size(), 1u);
 	if(const char * outputPath = std::getenv("VCMI_TOROID_DEMO_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream file(outputPath, std::ios::binary);
+		ASSERT_TRUE(file);
+		file.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+		file.close();
+		ASSERT_TRUE(file);
+	}
+}
+
+TEST(MapFormat, ToroidalBoatDemonstrationFixtureRoundTrips)
+{
+	const PlayerColor red(0), blue(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).name("Toroid Boat Laboratory")
+		.description("Experimental seam-crossing boat and shore fixture.")
+		.playerActive(red).playerActive(blue)
+		.playerMainTown(red, int3(8, 8, 0), false)
+		.playerMainTown(blue, int3(27, 27, 0), false)
+		.town(int3(8, 8, 0), FactionID(0), red)
+		.town(int3(27, 27, 0), FactionID(0), blue)
+		.hero(int3(1, 0, 0), HeroTypeID(0), red)
+		.hero(int3(19, 18, 0), HeroTypeID(1), blue);
+	const auto bytes = builder.build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("ToroidBoatLaboratory", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+
+	CRandomGenerator random(12345);
+	std::vector<int3> water;
+	for(int x : {32, 33, 34, 35, 0, 1, 2, 3, 4})
+		for(int y : {32, 33, 34, 35, 0, 1, 2, 3, 4})
+			if(x >= 32 || y >= 32)
+				water.emplace_back(x, y, 0);
+	auto * editor = map->getEditManager();
+	editor->getTerrainSelection().setSelection(water);
+	editor->drawTerrain(ETerrainId::WATER, 0, &random);
+
+	const int3 boatPosition(35, 0, 0);
+	auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::BOAT, BoatId::CASTLE);
+	const auto templates = factory->getTemplates(ETerrainId::WATER);
+	ASSERT_FALSE(templates.empty());
+	auto boat = factory->create(&callback, templates.front());
+	GameRandomizer objectRandomizer(callback);
+	objectRandomizer.setSeed(12345);
+	factory->configureObject(boat.get(), objectRandomizer);
+	boat->setAnchorPos(boatPosition + boat->getVisitableOffset());
+	map->generateUniqueInstanceName(boat.get());
+	map->addNewObject(boat);
+	ASSERT_EQ(boat->visitablePos(), boatPosition);
+
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&output);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	ASSERT_TRUE(reopened->toroidal);
+	EXPECT_FALSE(reopened->getTile(int3(0, 0, 0)).isWater());
+	for(const auto & position : water)
+		EXPECT_TRUE(reopened->getTile(position).isWater()) << position.toString();
+	const auto & objects = reopened->getTile(boatPosition).visitableObjects;
+	ASSERT_FALSE(objects.empty());
+	EXPECT_EQ(reopened->getObject(objects.back())->ID, Obj::BOAT);
+	ASSERT_FALSE(testing::Test::HasFailure());
+	if(const char * outputPath = std::getenv("VCMI_TOROID_BOAT_OUTPUT"))
 	{
 		ASSERT_FALSE(boost::filesystem::exists(outputPath));
 		std::ofstream file(outputPath, std::ios::binary);
