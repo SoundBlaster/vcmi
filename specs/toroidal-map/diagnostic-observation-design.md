@@ -81,6 +81,27 @@ revocation and reconciliation with the server's rules. Exact ASP semantics,
 SDK integration and the agent interface remain deferred until the actual ASP
 specification and SDK are reviewed; this note does not define those semantics.
 
+## Possible Screener integration
+
+The user suggested Screener for visual inspection. The connected Screener MCP
+server can list recorded sessions, read their timeline, return a contact sheet
+and retrieve a frame; it does not start a recording or control the game. Its
+fixture timeline and a fixture frame were retrieved successfully on this Mac.
+No VCMI session was present in that catalog.
+
+The local Screener source also contains a macOS ScreenCaptureKit window-still
+source taking an explicit window ID and expected process ID, and a custom-frame
+API. A separate producer could associate selected game observation changes
+with image captures and semantic markers in a Screener trace. Capture time is
+not the same as the time a change was observed, and correlating the two needs
+an explicit timestamp and latency contract. The window source requires existing
+screen-capture authorization and captures stills; it has not been tested on
+VCMI's SDL window. The connected MCP's configured catalog must also include the
+produced trace. None of these observations establishes that a released SDK
+version has the local source's APIs, that screen capture will work on this
+machine, or that sparse stills can prove smooth scrolling. The user's existing
+video remains separate evidence of the recorded presentation.
+
 ## Evidence and limits
 
 Version 2 emits an initial snapshot, then only when player state, level,
