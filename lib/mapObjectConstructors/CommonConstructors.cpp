@@ -24,6 +24,8 @@
 #include "../mapObjects/MiscObjects.h"
 #include "../mapObjects/ObjectTemplate.h"
 #include "../mapping/TerrainTile.h"
+#include "../mapping/CMapHeader.h"
+#include "../mapping/MapTopology.h"
 #include "../modding/LibraryLoadContext.h"
 #include "../modding/IdentifierStorage.h"
 #include "../texts/TextIdentifier.h"
@@ -230,7 +232,11 @@ void CTownInstanceConstructor::initializeObject(CGTownInstance * obj) const
 
 void CTownInstanceConstructor::randomizeObject(CGTownInstance * object, IGameRandomizer & gameRandomizer) const
 {
-	auto templ = getOverride(object->cb->getTile(object->pos)->getTerrainID(), object);
+	auto terrainPos = object->anchorPos();
+	const auto * map = object->cb->tryGetMapHeader();
+	if(map && map->toroidal)
+		terrainPos = map->getTopology().canonicalize(terrainPos).value_or(terrainPos);
+	auto templ = getOverride(object->cb->getTile(terrainPos)->getTerrainID(), object);
 	if(templ)
 		object->appearance = templ;
 }

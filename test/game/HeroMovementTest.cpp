@@ -30,6 +30,7 @@
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
+#include "../../lib/mapObjectConstructors/AObjectTypeHandler.h"
 #include "../../lib/mapping/TerrainTile.h"
 #include "../../lib/mapping/MapTopology.h"
 #include "../../lib/mapping/CMapService.h"
@@ -2685,6 +2686,33 @@ TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 	EXPECT_EQ(restored->getMap().getObject(heroID)->visitablePos(), destination);
 	EXPECT_TRUE(restored->isVisibleFor(destination, player));
 	EXPECT_FALSE(restored->isVisibleFor(hiddenTile, player));
+}
+
+TEST_F(HeroMovementTest, TownAppearanceUsesWrappedAnchorTerrain)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(player)
+		.town(int3(10, 10, 0), FactionID::CASTLE, player)
+		.hero(int3(15, 15, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	auto * town = findFirst<CGTownInstance>();
+	ASSERT_NE(town, nullptr);
+	GameRandomizer randomizer(*gameState());
+	const auto originalAnchor = town->anchorPos();
+	ASSERT_NO_THROW(town->getObjectHandler()->configureObject(town, randomizer));
+	const auto originalAppearance = town->appearance;
+	map()->setToroidalAndRebuild(true);
+	for(const auto & offset : {int3(map()->width, 0, 0), int3(0, -map()->height, 0),
+		int3(map()->width, -map()->height, 0), int3(-2 * map()->width, 2 * map()->height, 0)})
+	{
+		map()->moveObject(town->id, originalAnchor + offset);
+		ASSERT_NO_THROW(town->getObjectHandler()->configureObject(town, randomizer)) << offset.toString();
+		EXPECT_EQ(town->appearance, originalAppearance);
+	}
+	map()->setToroidalAndRebuild(false);
+	EXPECT_ANY_THROW(town->getObjectHandler()->configureObject(town, randomizer));
 }
 
 /// Two towns that share an entrance tile, as found on some SoD maps. The pathfinder only considers the top town.
