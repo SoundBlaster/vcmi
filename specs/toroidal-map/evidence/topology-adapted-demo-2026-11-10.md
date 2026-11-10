@@ -403,3 +403,17 @@ appearance of roads, rivers, fog, other terrain or artwork spanning a seam.
 The client was closed without saving; the temporary game-data copies were
 removed and the previous test-profile settings, key bindings and TB5 data
 links were restored.
+
+## Border-scroll attempt on the signed client
+
+The signed `4255569` client was launched again with the existing TB5 access
+grant and loaded the isolated laboratory save. A Computer Use click at the
+left edge of the screen, held for one second, produced no visible camera or
+minimap viewport movement in the sampled screenshots. A route marker changed,
+so this action does not establish that the game received an ordinary mouse
+motion to the intended position. The session was closed without saving.
+
+The schema defaults `adventure.borderScroll` to true on desktop, but the
+effective setting and input/focus state during this attempt were not measured.
+The result therefore neither verifies border scrolling nor isolates a game
+defect; the existing keyboard-scroll observations remain separate.
