@@ -44,6 +44,16 @@ cause or verify GUI behavior. The process was force-quit, the diagnostic log
 was copied to `development-log-probe-4255569.log` on TB5, and the temporary
 local log directory was removed.
 
+After the user reported granting access, the same signed diagnostic bundle
+was launched again. Its local log again reached the isolated `Saves` scan.
+This time the macOS TCC log recorded a new non-preflight
+`kTCCServiceSystemPolicyRemovableVolumes` request attributed to
+`local.vcmi.toroid.development`, followed by `AUTHREQ_PROMPTING`. At the time
+of inspection there was no response in the filtered log, and the process was
+still running. System Settings showed older Lab and Test permissions enabled,
+but did not show an entry for this new development bundle. The observation
+does not establish whether or where the prompt was visible on screen.
+
 For comparison, the existing ad-hoc signed `VCMI Toroid Lab.app` had a
 designated requirement based on its code-directory hash. The earlier macOS
 log below recorded a mismatch between its saved requirement and the newly
