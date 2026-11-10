@@ -81,13 +81,14 @@ enum class ESerializationVersion : int32_t
 	CAMPAIGN_ENEMY_HERO_CARRIED_OVER, // campaign scenario may carry over a hero that the player does not own
 	TOROIDAL_MAP, // map header stores the adventure map topology
 	TOROIDAL_UNINDEXED_OBJECTS, // shown objects with no indexed occupancy
+	TOROIDAL_MOVEMENT_SOURCE_LAYER, // server tracks each hero's last confirmed movement layer
 
 	RELEASE_170 = HOTA_MAP_STACK_COUNT,
 	RELEASE_174 = CUSTOM_GARRISON_TITLE,
 
 	MINIMAL = RELEASE_170,
 	MINIMAL_LOBBY = LOBBY_SCENARIO_LIST, // client and server of lobby reject each other below this version
-	CURRENT = TOROIDAL_UNINDEXED_OBJECTS,
+	CURRENT = TOROIDAL_MOVEMENT_SOURCE_LAYER,
 };
 
 static_assert(ESerializationVersion::MINIMAL <= ESerializationVersion::CURRENT, "Invalid serialization version definition!");

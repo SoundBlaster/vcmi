@@ -713,6 +713,31 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 		const bool toroidal = scenario == 1;
 		map()->setToroidalAndRebuild(toroidal);
 		ObjectInstanceID shownID, hiddenID;
+		ObjectInstanceID airborneHeroID;
+		if(scenario == 1)
+		{
+			auto * hero = findHeroByOwner(player);
+			ASSERT_NE(hero, nullptr);
+			auto resources = findAll<CGResource>();
+			ASSERT_FALSE(resources.empty());
+			auto * resource = resources.front();
+			map()->moveObject(hero->id, hero->convertFromVisitablePos(int3(1, 0, 0)));
+			map()->hideObject(resource);
+			const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A" ] })";
+			JsonNode definition(text.data(), text.size(), "SavedAirborneSource");
+			auto appearance = std::make_shared<ObjectTemplate>();
+			appearance->id = resource->ID;
+			appearance->subid = resource->subID;
+			InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+			appearance->readJson(definition, resolver, false);
+			resource->appearance = appearance;
+			resource->pos = int3(0, 0, 0);
+			map()->showObject(resource);
+			hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+			hero->setMovementPoints(3000);
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+			airborneHeroID = hero->id;
+		}
 		if(scenario == 2)
 		{
 			std::vector<CGObjectInstance *> resources;
@@ -739,7 +764,7 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 		ASSERT_TRUE(boost::filesystem::equivalent(*selectedPath, path));
 		handler.save(name, PlayerColor::NEUTRAL, 0);
 		ASSERT_TRUE(boost::filesystem::exists(path));
-		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::TOROIDAL_UNINDEXED_OBJECTS;
+		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::TOROIDAL_MOVEMENT_SOURCE_LAYER;
 		EXPECT_EQ(CLoadFile::readVersion(path), expectedVersion);
 		std::ifstream file(path.c_str(), std::ios::binary);
 		std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
@@ -759,6 +784,18 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 		auto game = loaded.openChunk(SaveFileFormat::CHUNK_GAMESTATE, loadedState.get());
 		loadedState->loadGame(game->iser);
 		EXPECT_EQ(loadedState->getMap().toroidal, toroidal);
+		if(scenario == 1)
+		{
+			GameHandlerTestServer restoredServer(loadedState, player);
+			CGameHandler restored(restoredServer, loadedState);
+			game->iser & restored;
+			ASSERT_TRUE(game->isFullyRead());
+			auto * hero = loadedState->getHero(airborneHeroID);
+			ASSERT_NE(hero, nullptr);
+			ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+			ASSERT_TRUE(restored.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+			EXPECT_EQ(hero->visitablePos(), int3(35, 0, 0));
+		}
 		if(scenario == 2)
 		{
 			auto & restoredMap = loadedState->getMap();
@@ -2734,11 +2771,42 @@ TEST_F(HeroMovementTest, PathfinderHonorsSourceObjectExitDirectionAcrossSeam)
 
 	// A hero that has actually flown over that object can continue in the air.
 	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	ASSERT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_EQ(hero->visitablePos(), origin);
 	map()->moveObject(hero->id, hero->convertFromVisitablePos(int3(1, 5, 0)));
 	hero->setMovementPoints(3000);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
 	ASSERT_EQ(hero->visitablePos(), origin);
-	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	// Older server save layouts lack this state and remain readable.
+	CMemorySerializer oldArchive;
+	oldArchive.oser.version = ESerializationVersion::TOROIDAL_UNINDEXED_OBJECTS;
+	oldArchive.iser.version = ESerializationVersion::TOROIDAL_UNINDEXED_OBJECTS;
+	oldArchive.oser & handler;
+	GameHandlerTestServer oldServer(gameState(), player);
+	CGameHandler oldRestored(oldServer, gameState());
+	oldArchive.iser.cb = gameState().get();
+	oldArchive.iser & oldRestored;
+	ASSERT_TRUE(oldArchive.isFullyRead());
+	// Save the server portion while airborne, then resume with a new handler.
+	CMemorySerializer archive;
+	archive.oser & handler;
+	GameHandlerTestServer restoredServer(gameState(), player);
+	CGameHandler restored(restoredServer, gameState());
+	archive.iser.cb = gameState().get();
+	archive.iser & restored;
+	ASSERT_TRUE(archive.isFullyRead());
+	const int3 blocked(35, 4, 0);
+	map()->getTile(blocked).terrainType = TerrainId::ROCK;
+	EXPECT_FALSE(restored.moveHero(hero->id, hero->convertFromVisitablePos(blocked), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_EQ(hero->visitablePos(), origin);
+	ASSERT_TRUE(restored.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	// Landing returns the hero to LAND; Flight alone must not preserve AIR.
+	map()->hideObject(hero);
+	map()->moveObject(object->id, destination);
+	map()->showObject(hero);
+	EXPECT_FALSE(restored.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
 	EXPECT_EQ(hero->visitablePos(), destination);
 }
 

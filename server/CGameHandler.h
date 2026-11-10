@@ -59,6 +59,10 @@ class MapEventDispatcher;
 class CGameHandler : public Environment, public IGameEventCallback
 {
 	IGameServer & server;
+	// Only server-confirmed movement determines the source layer. The position
+	// prevents a later unrelated relocation from reusing stale layer state.
+	std::map<ObjectInstanceID, std::pair<int3, EPathfindingLayer>> heroMovementLayers;
+	bool legacyMovementLayerUnknown = false;
 
 public:
 	std::unique_ptr<HeroPoolProcessor> heroPool;
@@ -285,6 +289,20 @@ public:
 		h & *turnTimerHandler;
 
 		h & *statistics;
+		if(h.hasFeature(Handler::Version::TOROIDAL_MOVEMENT_SOURCE_LAYER))
+		{
+			h & legacyMovementLayerUnknown;
+			h & heroMovementLayers;
+			if(!h.saving)
+				for(const auto & [id, entry] : heroMovementLayers)
+					if(!id.hasValue() || entry.second < EPathfindingLayer::LAND || entry.second >= EPathfindingLayer::NUM_LAYERS)
+						throw std::runtime_error("Invalid hero movement layer in saved server state");
+		}
+		else if(!h.saving)
+		{
+			legacyMovementLayerUnknown = true;
+			heroMovementLayers.clear();
+		}
 	}
 
 	/// applies replay recording options of this game to the log kept inside the gamestate

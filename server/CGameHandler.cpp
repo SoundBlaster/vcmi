@@ -752,6 +752,7 @@ bool CGameHandler::removeObject(const CGObjectInstance * obj, const PlayerColor 
 	RemoveObject ro;
 	ro.objectID = obj->id;
 	ro.initiator = initiator;
+	heroMovementLayers.erase(obj->id);
 	sendAndApply(ro);
 
 	checkVictoryLossConditionsForAll(); //e.g. if monster escaped (removing objs after battle is done directly by endBattle, not this function)
@@ -939,12 +940,20 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			&& !pathfinderHelper->canMoveBetween(source, hmpos))
 			return complainRet("Cannot approach the destination from this direction!");
 
-		// The server does not track the source layer. A sailing boat remains
-		// on SAIL, and Water Walk alone cannot make an on-foot hero on land
-		// start on WATER; these cases obey source-object exit directions.
+		// Only a confirmed prior move can put an on-foot hero into AIR or WATER.
+		// Old saves lack that information; keep the previous fallback
+		// until an actual move establishes the layer for this hero.
 		const bool inSailingBoat = h->inBoat() && h->getBoat()->layer == EPathfindingLayer::SAIL;
-		if(gameState().getMap().toroidal && (inSailingBoat || (!canFly
-			&& (!canWalkOnSea || (!h->inBoat() && gameState().getMap().getTile(source).isLand()))))
+		auto sourceLayer = EPathfindingLayer(EPathfindingLayer::AUTO);
+		const auto previousLayer = heroMovementLayers.find(hid);
+		if(previousLayer != heroMovementLayers.end() && previousLayer->second.first == source)
+			sourceLayer = previousLayer->second.second;
+		else if(previousLayer == heroMovementLayers.end() && !legacyMovementLayerUnknown)
+			sourceLayer = h->inBoat() ? h->getBoat()->layer : EPathfindingLayer::LAND;
+		const bool legacyGround = gameState().getMap().toroidal && sourceLayer == EPathfindingLayer::AUTO && !canFly
+			&& (!canWalkOnSea || (!h->inBoat() && gameState().getMap().getTile(source).isLand()));
+		if(gameState().getMap().toroidal
+			&& (inSailingBoat || sourceLayer == EPathfindingLayer::LAND || sourceLayer == EPathfindingLayer::SAIL || legacyGround)
 			&& !pathfinderHelper->canMoveBetween(hmpos, source))
 			return complainRet("Cannot leave the source from this direction!");
 
@@ -993,6 +1002,17 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 
 		tmh.result = result;
 		sendAndApply(tmh);
+		if(gameState().getMap().toroidal && tmh.start != tmh.end
+			&& (result == TryMoveHero::SUCCESS || result == TryMoveHero::TELEPORTATION
+				|| result == TryMoveHero::EMBARK || result == TryMoveHero::DISEMBARK))
+		{
+			const auto resultingLayer = result == TryMoveHero::SUCCESS ? layer
+				: (h->inBoat() ? h->getBoat()->layer : EPathfindingLayer::LAND);
+			if(resultingLayer >= EPathfindingLayer::LAND && resultingLayer < EPathfindingLayer::NUM_LAYERS)
+				heroMovementLayers[hid] = {h->visitablePos(), resultingLayer};
+			else
+				heroMovementLayers.erase(hid);
+		}
 
 		if (visitDest == VISIT_DEST && tmh.start == tmh.end)
 		{ // Hero should be always able to visit any object he is staying on even if there are guards around
@@ -1537,6 +1557,7 @@ void CGameHandler::giveHero(ObjectInstanceID id, PlayerColor player, ObjectInsta
 
 void CGameHandler::changeObjPos(ObjectInstanceID objid, int3 newPos, const PlayerColor & initiator)
 {
+	heroMovementLayers.erase(objid);
 	ChangeObjPos cop;
 	cop.objid = objid;
 	cop.nPos = newPos;
