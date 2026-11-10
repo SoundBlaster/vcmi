@@ -11,6 +11,7 @@
 
 #include "../gui/CIntObject.h"
 #include "AdventureMapShortcuts.h"
+#include "MapScrollAccumulator.h"
 
 #include "../../lib/int3.h"
 
@@ -56,6 +57,9 @@ private:
 
 	/// if true, then scrolling was blocked via ctrl and should not restart until player move cursor outside scrolling area
 	bool scrollingWasBlocked;
+
+	MapScrollAccumulator keyboardScrollAccumulator;
+	MapScrollAccumulator borderScrollAccumulator;
 
 	/// map scrolling shortcuts that are currently held by player
 	std::set<EShortcut> heldScrollShortcuts;

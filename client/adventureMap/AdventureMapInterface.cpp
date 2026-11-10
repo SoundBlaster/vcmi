@@ -241,10 +241,13 @@ void AdventureMapInterface::handleKeyboardScrollingUpdate(uint32_t timePassed)
 		scrollDirection.y += 1;
 
 	if (scrollDirection == Point(0,0) || !shortcuts->optionMapScrollingActive())
+	{
+		keyboardScrollAccumulator.reset();
 		return;
+	}
 
-	int32_t scrollSpeedPixels = settings["adventure"]["scrollSpeedPixels"].Float();
-	int32_t scrollDistance = scrollSpeedPixels * timePassed / 1000;
+	const auto scrollDistance = keyboardScrollAccumulator.advance(scrollDirection.x, scrollDirection.y,
+		settings["adventure"]["scrollSpeedPixels"].Float(), timePassed);
 
 	widget->getMapView()->onMapScrolled(scrollDirection * scrollDistance);
 }
@@ -253,9 +256,6 @@ void AdventureMapInterface::handleMapScrollingUpdate(uint32_t timePassed)
 {
 	/// Width of window border, in pixels, that triggers map scrolling
 	static constexpr int32_t borderScrollWidth = 15;
-
-	int32_t scrollSpeedPixels = settings["adventure"]["scrollSpeedPixels"].Float();
-	int32_t scrollDistance = scrollSpeedPixels * timePassed / 1000;
 
 	Point cursorPosition = ENGINE->getCursorPosition();
 	Point scrollDirection;
@@ -272,29 +272,37 @@ void AdventureMapInterface::handleMapScrollingUpdate(uint32_t timePassed)
 	if (cursorPosition.y > ENGINE->screenDimensions().y - borderScrollWidth)
 		scrollDirection.y = +1;
 
-	Point scrollDelta = scrollDirection * scrollDistance;
-
-	bool cursorInScrollArea = scrollDelta != Point(0,0);
+	bool cursorInScrollArea = scrollDirection != Point(0,0);
 	bool scrollingActive = cursorInScrollArea && shortcuts->optionMapScrollingActive() && !scrollingWasBlocked;
 	bool scrollingBlocked = ENGINE->isKeyboardCtrlDown() || !settings["adventure"]["borderScroll"].Bool() || !ENGINE->screenHandler().hasFocus();
 
 	if (!scrollingWasActive && scrollingBlocked)
 	{
 		scrollingWasBlocked = true;
+		borderScrollAccumulator.reset();
 		return;
 	}
 
 	if (!cursorInScrollArea && scrollingWasBlocked)
 	{
 		scrollingWasBlocked = false;
+		borderScrollAccumulator.reset();
 		return;
 	}
 
 	if (scrollingActive)
-		widget->getMapView()->onMapScrolled(scrollDelta);
+	{
+		const auto distance = borderScrollAccumulator.advance(scrollDirection.x, scrollDirection.y,
+			settings["adventure"]["scrollSpeedPixels"].Float(), timePassed);
+		widget->getMapView()->onMapScrolled(scrollDirection * distance);
+	}
+	else
+		borderScrollAccumulator.reset();
 
 	if (!scrollingActive && !scrollingWasActive)
 		return;
+
+	const Point scrollDelta = scrollingActive ? scrollDirection : Point(0, 0);
 
 	if(scrollDelta.x > 0)
 	{

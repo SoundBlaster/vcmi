@@ -9,6 +9,27 @@
 #include "StdInc.h"
 
 #include "../../client/mapView/MapViewModel.h"
+#include "../../client/adventureMap/MapScrollAccumulator.h"
+
+TEST(MapScrollAccumulatorTest, SlowScrollingAccumulatesSubpixelUpdates)
+{
+	MapScrollAccumulator scroll;
+	int moved = 0;
+	for (int frame = 0; frame < 200; ++frame)
+		moved += scroll.advance(-1, 0, 100.0, 5);
+	EXPECT_EQ(moved, 100);
+}
+
+TEST(MapScrollAccumulatorTest, DirectionChangesAndResetDiscardOldRemainder)
+{
+	MapScrollAccumulator scroll;
+	EXPECT_EQ(scroll.advance(-1, 0, 100.0, 5), 0);
+	EXPECT_EQ(scroll.advance(0, -1, 100.0, 5), 0);
+	EXPECT_EQ(scroll.advance(0, -1, 100.0, 5), 1);
+	EXPECT_EQ(scroll.advance(0, -1, 100.0, 5), 0);
+	scroll.reset();
+	EXPECT_EQ(scroll.advance(0, -1, 100.0, 5), 0);
+}
 #include "../../client/mapView/MapViewMovement.h"
 #include "../../lib/mapping/MapTopology.h"
 

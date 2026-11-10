@@ -287,3 +287,15 @@ recorded, so the runtime cause was not independently instrumented. The
 comparison also does not establish behavior on ordinary bounded maps. The
 client exited, temporary game-data copies were removed, and test-profile
 settings, key bindings and TB5 data links were restored.
+
+After the fractional-scroll correction, the rebuilt client stamped `67fc6fa`
+(the source tree also contained the uncommitted correction) was run with
+the same isolated save, temporary bindings and 100 pixels/second setting.
+One-second X and F7 holds visibly shifted the hero, ore and terrain right and
+down respectively, and moved the minimap viewport. This demonstrates
+keyboard scrolling through both seams at the reduced speed on the laboratory
+map; screenshots do not measure frame pacing, and border scrolling was not
+exercised in this GUI run. The focused map topology test executable passed
+16 tests, including fractional accumulation and reset on direction changes.
+The temporary resources were removed after exit and the prior test-profile
+settings and links were restored.
