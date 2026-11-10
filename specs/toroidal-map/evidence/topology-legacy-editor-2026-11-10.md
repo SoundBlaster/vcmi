@@ -123,8 +123,10 @@ observations of the surface only, with no hero movement, gameplay completion,
 or per-object render comparison. The session was closed without saving and
 temporary resource copies were removed; the profile links were restored.
 
-The test checks membership rather than visitable-object ordering; it does not
-establish that all overlapping objects remain accessible or that an arbitrary
-legacy map is balanced, traversable or artistically seamless when converted.
+The test also compares the ordered visitable-object lists before and after the
+round trip; it does not assert the presence of a particular interactive
+overlap. It does not establish that all overlapping objects remain accessible
+or that an arbitrary legacy map is balanced, traversable or artistically
+seamless when converted.
 Neither source map nor game resources are included in the repository. The
 test skips when no external H3M path is supplied.

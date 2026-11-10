@@ -406,6 +406,13 @@ TEST(MapFormat, ConvertsExternalLegacyMapWithWrappedFootprints)
 			result.insert(source.getObject(id)->instanceName);
 		return result;
 	};
+	const auto orderedNames = [](const CMap & source, const std::vector<ObjectInstanceID> & ids)
+	{
+		std::vector<std::string> result;
+		for(const auto & id : ids)
+			result.push_back(source.getObject(id)->instanceName);
+		return result;
+	};
 	for(int z = 0; z < map->levels(); ++z)
 		for(int x = 0; x < map->width; ++x)
 			for(int y = 0; y < map->height; ++y)
@@ -414,7 +421,7 @@ TEST(MapFormat, ConvertsExternalLegacyMapWithWrappedFootprints)
 				const auto & before = map->getTile(pos);
 				const auto & after = reopened->getTile(pos);
 				EXPECT_EQ(names(*map, before.blockingObjects), names(*reopened, after.blockingObjects)) << pos.toString();
-				EXPECT_EQ(names(*map, before.visitableObjects), names(*reopened, after.visitableObjects)) << pos.toString();
+				EXPECT_EQ(orderedNames(*map, before.visitableObjects), orderedNames(*reopened, after.visitableObjects)) << pos.toString();
 			}
 	ASSERT_FALSE(::testing::Test::HasFailure());
 	if(const char * outputPath = std::getenv("VCMI_TOROID_LEGACY_OUTPUT"))
