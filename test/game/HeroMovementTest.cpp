@@ -19,6 +19,7 @@
 #include "../../lib/battle/BattleInfo.h"
 #include "../../lib/campaign/CampaignState.h"
 #include "../../lib/callback/EditorCallback.h"
+#include "../../lib/callback/CCallback.h"
 #include "../../lib/callback/GameRandomizer.h"
 #include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/filesystem/CMemoryBuffer.h"
@@ -1113,6 +1114,114 @@ TEST_F(HeroMovementTest, pathfinderAndServerCrossToroidalSeams)
 TEST_F(HeroMovementTest, pathfinderAndServerCrossToroidalSeamsRoE)
 {
 	checkToroidalSeamMovement(EMapFormat::ROE);
+}
+
+TEST_F(HeroMovementTest, WrappedPathfindingDoesNotRevealHiddenTerrain)
+{
+	const PlayerColor player(0);
+	const int3 hidden(35, 10, 0), goal(34, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 10, 0));
+	hero->setMovementPoints(3000);
+	auto callback = makeCallback(player);
+	const auto pathsFor = [&]()
+	{
+		auto paths = std::make_unique<CPathsInfo>(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(*paths, *callback, hero);
+		callback->calculatePaths(config);
+		return paths;
+	};
+	map()->getTile(hidden).terrainType = TerrainId::ROCK;
+	const auto hiddenRock = pathsFor();
+	ASSERT_FALSE(hiddenRock->getNode(hidden, EPathfindingLayer::LAND)->reachable());
+	ASSERT_TRUE(hiddenRock->getNode(goal, EPathfindingLayer::LAND)->reachable());
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(hidden), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(0, 10, 0));
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	map()->getTile(hidden).terrainType = TerrainId::GRASS;
+	const auto hiddenGrass = pathsFor();
+	for(int x = 0; x < map()->width; ++x)
+		for(int y = 0; y < map()->height; ++y)
+		{
+			const int3 tile(x, y, 0);
+			const auto * rockNode = hiddenRock->getNode(tile, EPathfindingLayer::LAND);
+			const auto * grassNode = hiddenGrass->getNode(tile, EPathfindingLayer::LAND);
+			EXPECT_EQ(rockNode->reachable(), grassNode->reachable()) << tile.toString();
+			EXPECT_EQ(rockNode->accessible, grassNode->accessible) << tile.toString();
+			if(rockNode->reachable() && grassNode->reachable())
+			{
+				EXPECT_EQ(rockNode->turns, grassNode->turns) << tile.toString();
+				EXPECT_EQ(rockNode->moveRemains, grassNode->moveRemains) << tile.toString();
+			}
+		}
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 1;
+	const auto visibleGrass = pathsFor();
+	EXPECT_TRUE(visibleGrass->getNode(hidden, EPathfindingLayer::LAND)->reachable());
+	EXPECT_GT(visibleGrass->getNode(goal, EPathfindingLayer::LAND)->moveRemains,
+		hiddenGrass->getNode(goal, EPathfindingLayer::LAND)->moveRemains);
+}
+
+TEST_F(HeroMovementTest, WrappedSailingDoesNotRevealHiddenCoast)
+{
+	const PlayerColor player(0);
+	const int3 source(0, 0, 0), destination(35, 35, 0), hidden(35, 0, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(2, 0, 0), HeroTypeID(0), player)
+		.terrain(source, TerrainId::WATER).terrain(destination, TerrainId::WATER)
+		.terrain(hidden, TerrainId::WATER).terrain(int3(0, 35, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(source, BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(source), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	hero->setMovementPoints(3000);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	auto callback = makeCallback(player);
+	const auto pathsFor = [&]()
+	{
+		auto paths = std::make_unique<CPathsInfo>(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(*paths, *callback, hero);
+		callback->calculatePaths(config);
+		return paths;
+	};
+	const auto hiddenWater = pathsFor();
+	const auto * waterNode = hiddenWater->getNode(destination, EPathfindingLayer::SAIL);
+	ASSERT_TRUE(waterNode->reachable());
+	map()->getTile(hidden).terrainType = TerrainId::GRASS;
+	const auto hiddenLand = pathsFor();
+	const auto * landNode = hiddenLand->getNode(destination, EPathfindingLayer::SAIL);
+	ASSERT_TRUE(landNode->reachable());
+	EXPECT_EQ(waterNode->turns, landNode->turns);
+	EXPECT_EQ(waterNode->moveRemains, landNode->moveRemains);
+
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 1;
+	const auto visibleLand = pathsFor();
+	map()->getTile(hidden).terrainType = TerrainId::WATER;
+	const auto visibleWater = pathsFor();
+	ASSERT_TRUE(visibleLand->getNode(destination, EPathfindingLayer::SAIL)->reachable());
+	ASSERT_TRUE(visibleWater->getNode(destination, EPathfindingLayer::SAIL)->reachable());
+	EXPECT_GT(visibleWater->getNode(destination, EPathfindingLayer::SAIL)->moveRemains,
+		visibleLand->getNode(destination, EPathfindingLayer::SAIL)->moveRemains);
+
+	// The server checks actual terrain, even when route planning lacks knowledge.
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	EXPECT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), destination);
 }
 
 TEST_F(HeroMovementTest, sightRangeWrapsWithoutRevealingDistantTiles)

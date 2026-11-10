@@ -116,7 +116,8 @@ public:
 		const TerrainTile & srcTile,
 		const int3 & srcCoord,
 		NeighbourTilesVector & vec,
-		const bool limitCoastSailing) const;
+		const bool limitCoastSailing,
+		const bool requireKnownTiles) const;
 
 	int getMovementCost(
 		const int3 & src,

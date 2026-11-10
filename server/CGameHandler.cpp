@@ -945,7 +945,7 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		if(gameState().getMap().toroidal && h->inBoat() && h->getBoat()->layer == EPathfindingLayer::SAIL && layer == EPathfindingLayer::SAIL && t.isWater())
 		{
 			NeighbourTilesVector neighbours;
-			pathfinderHelper->getNeighbours(gameState().getMap().getTile(source), source, neighbours, true);
+			pathfinderHelper->getNeighbours(gameState().getMap().getTile(source), source, neighbours, true, false);
 			if(!vstd::contains(neighbours, hmpos))
 				return complainRet("Cannot sail diagonally across land!");
 		}

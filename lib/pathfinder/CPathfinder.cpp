@@ -62,7 +62,8 @@ void CPathfinderHelper::calculateNeighbourTiles(NeighbourTilesVector & result, c
 		*source.tile,
 		source.node->coord,
 		result,
-		source.node->layer == EPathfindingLayer::SAIL);
+		source.node->layer == EPathfindingLayer::SAIL,
+		true);
 
 	if(source.isNodeObjectVisitable())
 	{
@@ -590,10 +591,18 @@ void CPathfinderHelper::getNeighbours(
 	const TerrainTile & sourceTile,
 	const int3 & srcCoord,
 	NeighbourTilesVector & vec,
-	const bool limitCoastSailing) const
+	const bool limitCoastSailing,
+	const bool requireKnownTiles) const
 {
 	const TerrainType * sourceTerrain = sourceTile.getTerrain();
-	const auto topology = gameInfo.getMapHeader()->getTopology();
+	const auto * mapHeader = gameInfo.getMapHeader();
+	const auto topology = mapHeader->getTopology();
+	const bool checkVisibility = requireKnownTiles && mapHeader->toroidal;
+	const auto * team = checkVisibility ? gameInfo.getPlayerTeam(hero->tempOwner) : nullptr;
+	const auto isKnown = [&](const int3 & tile)
+	{
+		return !checkVisibility || (team && team->fogOfWarMap[tile]);
+	};
 
 	static constexpr std::array dirs = {
 		int3(-1, +1, +0),	int3(0, +1, +0),	int3(+1, +1, +0),
@@ -604,7 +613,7 @@ void CPathfinderHelper::getNeighbours(
 	for(const auto & dir : dirs)
 	{
 		const auto destCoord = topology.canonicalize(srcCoord + dir);
-		if(!destCoord)
+		if(!destCoord || !isKnown(*destCoord))
 			continue;
 
 		const TerrainTile * destTile = gameInfo.getTile(*destCoord);
@@ -618,6 +627,8 @@ void CPathfinderHelper::getNeighbours(
 			const auto horizontalNeighbour = topology.canonicalize(srcCoord + int3{dir.x, 0, 0});
 			const auto verticalNeighbour = topology.canonicalize(srcCoord + int3{0, dir.y, 0});
 			assert(horizontalNeighbour && verticalNeighbour);
+			if(!isKnown(*horizontalNeighbour) || !isKnown(*verticalNeighbour))
+				continue;
 			if(gameInfo.getTile(*horizontalNeighbour)->isLand() || gameInfo.getTile(*verticalNeighbour)->isLand())
 				continue;
 		}
