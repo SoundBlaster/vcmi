@@ -247,3 +247,23 @@ smoothness, other terrain, AI behavior or general legacy-map compatibility.
 The test save was copied to `runtime/gui-save-4aa0566` on TB5; the temporary
 local copies of the game archives, music and map were removed after the
 client exited, and the profile's prior TB5 links were restored.
+
+## Sampled movement frames
+
+The same `4aa0566` diagnostic client was launched again with local copies of
+the game data and the saved laboratory game. To make intermediate states
+observable, `adventure.heroMoveTime` in the isolated test profile was set to
+5,000 ms per step (the ordinary default is 150 ms). Computer Use then sent
+keypad 7, 6 and 2 in separate steps, recording four screenshots during the
+northwest corner crossing and three during each of the east and south seam
+crossings. At the sampled instants the hero remained visible near the viewport
+center while the nearby ore, wood and castle shifted in the expected relative
+direction. The minimap marker moved to the corresponding opposite corner.
+
+This is visual evidence of intermediate positions on this map, including a
+real animated hero and the following camera. The screenshots are sparse,
+the speed is deliberately nonstandard, and the scene has plain grass and fog:
+they do not prove every intervening frame, normal-speed smoothness, independent
+manual scrolling, seam-spanning static artwork or boat presentation. The
+test client exited, the previous test-profile settings were restored, and its
+temporary local data copies were removed.
