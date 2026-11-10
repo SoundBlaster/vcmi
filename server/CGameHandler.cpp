@@ -1881,10 +1881,13 @@ void CGameHandler::save(const std::string & filename, PlayerColor playerToNotify
 		if(!CResourceHandler::get("local")->createResource(savefname))
 			throw std::runtime_error("Failed to create save file " + savefname);
 
+		const auto serializationVersion = SaveFileFormat::versionForTopology(gameState().getMap().toroidal);
 		CMemorySerializer header;
+		header.oser.version = serializationVersion;
 		gameState().saveHeader(header.oser);
 
 		CMemorySerializer game;
+		game.oser.version = serializationVersion;
 		gameState().saveGame(game.oser);
 		logGlobal->info("Saving server state");
 		game.oser & *this;
@@ -1895,7 +1898,7 @@ void CGameHandler::save(const std::string & filename, PlayerColor playerToNotify
 		entry.originalFileURI = savePath.getOriginalName();
 		entry.metadata = SaveMetadata::create(gameState());
 
-		CSaveFile save;
+		CSaveFile save(serializationVersion);
 		save.addChunk(SaveFileFormat::CHUNK_METADATA, entry.metadata.toBytes());
 		save.addChunk(SaveFileFormat::CHUNK_HEADER, header.extractBuffer());
 		save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, game.extractBuffer());

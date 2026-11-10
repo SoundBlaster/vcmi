@@ -31,7 +31,9 @@ existing `min(clientVersion, serverVersion)` greeting negotiation responds to
 the tagged value with its own untagged, lower ordinary version.
 
 This is not authentication: a modified peer can claim the tag without
-implementing the behavior. It also does not resolve collisions in saved-game
-or VMAP version allocations, or prove interoperability with arbitrary future
-forks. Packet-level tests, actual server start-guard tests and real multi-peer
-sessions are separate evidence requirements.
+implementing the behavior. The separate [save marker](save-format-design.md)
+protects newly written branch saves but leaves untagged prototype saves
+ambiguous; VMAP version allocation also remains unresolved. This does not
+prove interoperability with arbitrary future forks. Packet-level tests,
+server preparation tests and real multi-peer sessions are separate evidence
+requirements.

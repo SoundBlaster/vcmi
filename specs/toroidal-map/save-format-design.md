@@ -1,6 +1,6 @@
 # Experimental save format marker
 
-Status: design for the local branch; this is not an upstream allocation.
+Status: implemented in the local branch; this is not an upstream allocation.
 
 The branch-local `TOROIDAL_MAP` serialization ordinal can collide with a
 future upstream ordinal that describes a different binary layout. Previously
@@ -23,8 +23,7 @@ cannot be guaranteed safe against a future collision. No existing save is
 rewritten or deleted. Before upstream release, this mechanism and the VMAP
 major-version allocation require coordination with maintainers.
 
-Verification needs to cover both actual server save paths and raw headers:
-tagged toroidal save/load, bounded serialization at the preceding version,
-continued loading of an untagged branch-era save, rejection of unknown tagged
-versions, and metadata access for a newer version. These checks do not prove
-that unrelated forks or future upstream versions will recognize the marker.
+The verification and its limits are recorded in
+[save marker evidence](evidence/topology-save-marker-2026-11-10.md). These
+checks do not prove that unrelated forks or future upstream versions will
+recognize the marker.

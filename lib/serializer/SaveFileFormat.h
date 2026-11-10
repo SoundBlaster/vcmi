@@ -49,6 +49,25 @@ inline constexpr std::array CHUNK_ORDER = {CHUNK_METADATA, CHUNK_HEADER, CHUNK_G
 constexpr size_t FILE_HEADER_SIZE = 8;
 constexpr size_t CHUNK_HEADER_SIZE = 12;
 
+// Branch-local discriminator, not an upstream version allocation.
+constexpr uint32_t TOROIDAL_VERSION_TAG = 0x54520000u;
+constexpr uint32_t VERSION_TAG_MASK = 0xffff0000u;
+constexpr uint32_t VERSION_VALUE_MASK = 0x0000ffffu;
+static_assert(static_cast<uint32_t>(ESerializationVersion::CURRENT) <= VERSION_VALUE_MASK);
+static_assert(ESerializationVersion::CURRENT == ESerializationVersion::TOROIDAL_MAP,
+	"Reassess bounded-save compatibility when adding serialization features");
+
+constexpr ESerializationVersion versionForTopology(bool toroidal)
+{
+	return toroidal ? ESerializationVersion::CURRENT : ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
+}
+
+constexpr uint32_t encodeVersion(ESerializationVersion version)
+{
+	const auto value = static_cast<uint32_t>(version);
+	return version >= ESerializationVersion::TOROIDAL_MAP ? TOROIDAL_VERSION_TAG | value : value;
+}
+
 /// Limit for size of uncompressed chunk, to reject corrupted size before allocating memory for it
 constexpr uint32_t MAX_CHUNK_SIZE = 1024 * 1024 * 1024;
 

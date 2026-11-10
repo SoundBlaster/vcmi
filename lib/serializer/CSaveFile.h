@@ -18,7 +18,7 @@ class DLL_LINKAGE CSaveFile final
 	size_t chunksWritten = 0;
 
 public:
-	CSaveFile();
+	explicit CSaveFile(ESerializationVersion version = ESerializationVersion::CURRENT);
 
 	/// Compresses data and appends it as the next chunk. Chunks must be added in SaveFileFormat::CHUNK_ORDER
 	void addChunk(const SaveFileFormat::ChunkID & id, const std::vector<std::byte> & data);

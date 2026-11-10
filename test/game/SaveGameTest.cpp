@@ -25,7 +25,7 @@ class SaveGameTest : public GameStateTest
 {
 protected:
 	boost::filesystem::path directory;
-	void checkSavedGameIsRestored(bool toroidal);
+	void checkSavedGameIsRestored(bool toroidal, bool untaggedPrototype = false);
 
 	void SetUp() override
 	{
@@ -41,7 +41,7 @@ protected:
 	}
 };
 
-void SaveGameTest::checkSavedGameIsRestored(bool toroidal)
+void SaveGameTest::checkSavedGameIsRestored(bool toroidal, bool untaggedPrototype)
 {
 	startTestGame();
 	map->toroidal = toroidal;
@@ -52,19 +52,32 @@ void SaveGameTest::checkSavedGameIsRestored(bool toroidal)
 	const auto saveFile = directory / "test.vsgm1";
 
 	{
+		const auto version = SaveFileFormat::versionForTopology(toroidal);
 		CMemorySerializer header;
+		header.oser.version = version;
 		gameState->saveHeader(header.oser);
 		CMemorySerializer game;
+		game.oser.version = version;
 		gameState->saveGame(game.oser);
 
-		CSaveFile save;
+		CSaveFile save(version);
 		save.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*gameState).toBytes());
 		save.addChunk(SaveFileFormat::CHUNK_HEADER, header.extractBuffer());
 		save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, game.extractBuffer());
 		save.write(saveFile);
 	}
+	if(untaggedPrototype)
+	{
+		std::vector<std::byte> version;
+		SaveFileFormat::writeUInt32(version, static_cast<uint32_t>(ESerializationVersion::TOROIDAL_MAP));
+		std::fstream file(saveFile.c_str(), std::ios::in | std::ios::out | std::ios::binary);
+		file.seekp(SaveFileFormat::FILE_MAGIC.size());
+		file.write(reinterpret_cast<const char *>(version.data()), version.size());
+		ASSERT_TRUE(file.good());
+	}
 
 	CLoadFile loader(saveFile);
+	EXPECT_EQ(CLoadFile::readVersion(saveFile), SaveFileFormat::versionForTopology(toroidal));
 	JsonValidator validator;
 
 	const JsonNode metadata = SaveMetadata::parse(loader.readChunk(SaveFileFormat::CHUNK_METADATA), "test", validator);
@@ -103,6 +116,11 @@ TEST_F(SaveGameTest, savedGameIsRestored)
 TEST_F(SaveGameTest, savedToroidalGameIsRestored)
 {
 	checkSavedGameIsRestored(true);
+}
+
+TEST_F(SaveGameTest, untaggedPrototypeToroidalSaveIsRestored)
+{
+	checkSavedGameIsRestored(true, true);
 }
 
 TEST_F(SaveGameTest, mapTopologyIsVersionedInSavedHeader)

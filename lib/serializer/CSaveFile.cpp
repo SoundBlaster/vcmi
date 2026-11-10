@@ -14,13 +14,15 @@
 
 #include <zlib.h>
 
-CSaveFile::CSaveFile()
+CSaveFile::CSaveFile(ESerializationVersion version)
 {
+	if(version < ESerializationVersion::SAVE_CHUNKS || version > ESerializationVersion::CURRENT)
+		throw std::logic_error("Unsupported serialization version for a new saved game");
 	saveData.reserve(128 * 1024);
 
 	for(char symbol : SaveFileFormat::FILE_MAGIC)
 		saveData.push_back(static_cast<std::byte>(symbol));
-	SaveFileFormat::writeUInt32(saveData, static_cast<uint32_t>(ESerializationVersion::CURRENT));
+	SaveFileFormat::writeUInt32(saveData, SaveFileFormat::encodeVersion(version));
 }
 
 void CSaveFile::addChunk(const SaveFileFormat::ChunkID & id, const std::vector<std::byte> & data)

@@ -59,6 +59,14 @@ protected:
 		std::ofstream stream(saveFile.c_str(), std::ios::binary | std::ios::trunc);
 		stream.write(content.data(), content.size());
 	}
+
+	void setRawVersion(uint32_t version) const
+	{
+		auto content = readSaveFile();
+		for(size_t i = 0; i < sizeof(version); ++i)
+			content[SaveFileFormat::FILE_MAGIC.size() + i] = static_cast<char>((version >> (8 * i)) & 0xff);
+		writeSaveFile(content);
+	}
 };
 
 TEST_F(SaveFileTest, chunksAreRestored)
@@ -70,6 +78,45 @@ TEST_F(SaveFileTest, chunksAreRestored)
 	EXPECT_EQ(loader.readChunk(SaveFileFormat::CHUNK_GAMESTATE), gameState);
 	EXPECT_EQ(loader.readChunk(SaveFileFormat::CHUNK_METADATA), metadata);
 	EXPECT_EQ(loader.readChunk(SaveFileFormat::CHUNK_HEADER), header);
+}
+
+TEST_F(SaveFileTest, toroidalVersionHasAnExplicitOnDiskMarker)
+{
+	const auto content = readSaveFile();
+	const auto rawVersion = SaveFileFormat::readUInt32(reinterpret_cast<const std::byte *>(content.data()) + SaveFileFormat::FILE_MAGIC.size());
+	EXPECT_EQ(rawVersion & 0xffff0000u, 0x54520000u);
+	EXPECT_GT(rawVersion, static_cast<uint32_t>(ESerializationVersion::CURRENT));
+	EXPECT_EQ(CLoadFile::readVersion(saveFile), ESerializationVersion::CURRENT);
+}
+
+TEST_F(SaveFileTest, boundedSaveUsesPreviousUnmarkedVersion)
+{
+	const auto previous = ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
+	CSaveFile save(previous);
+	save.addChunk(SaveFileFormat::CHUNK_METADATA, metadata);
+	save.addChunk(SaveFileFormat::CHUNK_HEADER, header);
+	save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, gameState);
+	save.write(saveFile);
+	const auto content = readSaveFile();
+	const auto rawVersion = SaveFileFormat::readUInt32(reinterpret_cast<const std::byte *>(content.data()) + SaveFileFormat::FILE_MAGIC.size());
+	EXPECT_EQ(rawVersion, static_cast<uint32_t>(previous));
+	EXPECT_EQ(CLoadFile::readVersion(saveFile), previous);
+	CLoadFile loader(saveFile);
+	EXPECT_EQ(loader.readChunk(SaveFileFormat::CHUNK_GAMESTATE), gameState);
+}
+
+TEST_F(SaveFileTest, taggedVersionBelowTopologyIsRejected)
+{
+	setRawVersion(SaveFileFormat::TOROIDAL_VERSION_TAG | static_cast<uint32_t>(ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER));
+	EXPECT_THROW(CLoadFile::readVersion(saveFile), std::runtime_error);
+	EXPECT_THROW(CLoadFile::readMetadata(saveFile), std::runtime_error);
+}
+
+TEST_F(SaveFileTest, newerTaggedSaveOnlyAllowsMetadata)
+{
+	setRawVersion(SaveFileFormat::TOROIDAL_VERSION_TAG | (static_cast<uint32_t>(ESerializationVersion::CURRENT) + 1));
+	EXPECT_THROW(CLoadFile loader(saveFile), SaveTooNewException);
+	EXPECT_EQ(CLoadFile::readMetadata(saveFile), metadata);
 }
 
 TEST_F(SaveFileTest, truncatedFileIsRejected)
@@ -103,23 +150,18 @@ TEST_F(SaveFileTest, corruptedChunkIsRejected)
 
 TEST_F(SaveFileTest, unsupportedVersionsAreReported)
 {
-	auto content = readSaveFile();
-
-	content[4] = 1;
-	content[5] = 0;
-	writeSaveFile(content);
+	setRawVersion(1);
 	EXPECT_THROW(CLoadFile::readVersion(saveFile), SaveTooOldException);
 
-	content[6] = 1;
-	writeSaveFile(content);
+	setRawVersion(static_cast<uint32_t>(ESerializationVersion::CURRENT) + 1);
 	EXPECT_THROW(CLoadFile::readVersion(saveFile), SaveTooNewException);
 	EXPECT_THROW(CLoadFile loader(saveFile), SaveTooNewException);
 }
 
 TEST_F(SaveFileTest, metadataOfNewerSaveIsReadable)
 {
+	setRawVersion(static_cast<uint32_t>(ESerializationVersion::CURRENT) + 1);
 	auto content = readSaveFile();
-	content[6] = 1;
 	// newer versions may change all chunks after metadata
 	content.resize(content.size() + 100);
 	writeSaveFile(content);

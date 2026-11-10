@@ -38,7 +38,14 @@ ESerializationVersion CLoadFile::readVersion(const boost::filesystem::path & fna
 		if(std::to_integer<char>(header[i]) != SaveFileFormat::FILE_MAGIC[i])
 			throw std::runtime_error("Error: '" + fileNameUtf8 + "' is not a VCMI file!");
 
-	const auto version = static_cast<ESerializationVersion>(SaveFileFormat::readUInt32(header.data() + SaveFileFormat::FILE_MAGIC.size()));
+	auto rawVersion = SaveFileFormat::readUInt32(header.data() + SaveFileFormat::FILE_MAGIC.size());
+	if((rawVersion & SaveFileFormat::VERSION_TAG_MASK) == SaveFileFormat::TOROIDAL_VERSION_TAG)
+	{
+		rawVersion &= SaveFileFormat::VERSION_VALUE_MASK;
+		if(rawVersion < static_cast<uint32_t>(ESerializationVersion::TOROIDAL_MAP))
+			throw std::runtime_error("Error: invalid toroidal save version in '" + fileNameUtf8 + "'!");
+	}
+	const auto version = static_cast<ESerializationVersion>(rawVersion);
 
 	if(version < ESerializationVersion::MINIMAL)
 		throw SaveTooOldException("Error: too old file format detected in '" + fileNameUtf8 + "'!");

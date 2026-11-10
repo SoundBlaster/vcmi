@@ -22,6 +22,7 @@
 #include "../../lib/filesystem/CMemoryBuffer.h"
 #include "../../lib/filesystem/CFilesystemLoader.h"
 #include "../../lib/filesystem/Filesystem.h"
+#include "../../lib/filesystem/AdapterLoaders.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGResource.h"
@@ -173,6 +174,81 @@ TEST_F(ToroidalDemoGameTest, HeroCrossesCornerAndBothEdges)
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 35, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->visitablePos(), int3(0, 0, 0));
+}
+
+TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersion)
+{
+	const PlayerColor player(0);
+	startWithMap(makeToroidalDemoMap());
+	const auto directory = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-server-save-%%%%-%%%%");
+	boost::filesystem::create_directories(directory / "Saves");
+	boost::filesystem::create_directories(directory / "config");
+	{
+		std::ofstream config((directory / "config/serverSettings.json").c_str());
+		config << "{}";
+	}
+	auto * local = dynamic_cast<CFilesystemList *>(CResourceHandler::get("local"));
+	ASSERT_NE(local, nullptr);
+	auto loader = std::make_shared<CFilesystemLoader>("", directory, 4);
+	local->addLoader(loader, true);
+	struct TemporaryFilesystem
+	{
+		CFilesystemList * local;
+		ISimpleResourceLoader * loader;
+		boost::filesystem::path directory;
+		~TemporaryFilesystem()
+		{
+			local->removeLoader(loader);
+			boost::filesystem::remove_all(directory);
+		}
+	} temporary{local, loader.get(), directory};
+	const auto configPath = CResourceHandler::get()->getResourceName(JsonPath::builtin("config/serverSettings.json"));
+	ASSERT_TRUE(configPath.has_value());
+	ASSERT_TRUE(boost::filesystem::equivalent(*configPath, directory / "config/serverSettings.json"));
+
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	for(const bool toroidal : {false, true})
+	{
+		map()->toroidal = toroidal;
+		const std::string name = "Saves/" + directory.filename().string() + (toroidal ? "-toroidal" : "-bounded");
+		const auto path = directory / (name + ".vsgm1");
+		ASSERT_TRUE(loader->createResource(name + ".vsgm1"));
+		ASSERT_TRUE(local->createResource(name + ".vsgm1"));
+		const auto localPath = local->getResourceName(ResourcePath(name, EResType::SAVEGAME));
+		ASSERT_TRUE(localPath.has_value());
+		ASSERT_TRUE(boost::filesystem::equivalent(*localPath, path));
+		const auto selectedPath = CResourceHandler::get()->getResourceName(ResourcePath(name, EResType::SAVEGAME));
+		ASSERT_TRUE(selectedPath.has_value());
+		ASSERT_TRUE(boost::filesystem::equivalent(*selectedPath, path));
+		handler.save(name, PlayerColor::NEUTRAL, 0);
+		ASSERT_TRUE(boost::filesystem::exists(path));
+		const auto expectedVersion = SaveFileFormat::versionForTopology(toroidal);
+		EXPECT_EQ(CLoadFile::readVersion(path), expectedVersion);
+		std::ifstream file(path.c_str(), std::ios::binary);
+		std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
+		file.read(reinterpret_cast<char *>(fileHeader.data()), fileHeader.size());
+		ASSERT_TRUE(file.good());
+		EXPECT_EQ(SaveFileFormat::readUInt32(fileHeader.data() + SaveFileFormat::FILE_MAGIC.size()), SaveFileFormat::encodeVersion(expectedVersion));
+		CLoadFile loaded(path);
+		CMapHeader loadedHeader;
+		StartInfo loadedStart;
+		auto header = loaded.openChunk(SaveFileFormat::CHUNK_HEADER, nullptr);
+		header->iser & loadedHeader;
+		header->iser & loadedStart;
+		EXPECT_TRUE(header->isFullyRead());
+		EXPECT_EQ(loadedHeader.toroidal, toroidal);
+		auto loadedState = std::make_shared<CGameState>();
+		loadedState->preInit(LIBRARY);
+		auto game = loaded.openChunk(SaveFileFormat::CHUNK_GAMESTATE, loadedState.get());
+		loadedState->loadGame(game->iser);
+		EXPECT_EQ(loadedState->getMap().toroidal, toroidal);
+		StartInfo loadInfo = *gameState()->getStartInfo();
+		loadInfo.mapname = name;
+		CGameHandler reloaded(server, gameState());
+		ASSERT_NO_THROW(reloaded.load(loadInfo));
+		EXPECT_EQ(reloaded.gameInfo().getMapHeader()->toroidal, toroidal);
+	}
 }
 
 TEST(ToroidalDemoVmapTest, SavedMapStartsAndSupportsCornerVisit)
