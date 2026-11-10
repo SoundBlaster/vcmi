@@ -12,8 +12,17 @@ image on a 96×96 period, plus one partially visible smaller image. The
 standalone topology suite passed 14 tests and `vcmiclient` built on macOS
 arm64 (`wrapped-sprite-fragments-final-build.log` and
 `wrapped-sprite-fragments-final-test.log` on TB5). These checks establish
-fragment geometry; actual SDL compositing, game frames and performance have
-not been measured.
+fragment geometry; game frames and performance have not been measured.
+
+A later SDL3 software test drew a synthetic 96×96 image through VCMI's
+`Canvas` and `SDLImageShared` into a 32×32 surface using the same fragment
+enumeration. The resulting RGBA values matched the expected periodic image
+for every pixel at five movement samples across all four corners. The separate
+CTest target `WrappedSpriteSdl` passed on macOS arm64
+(`wrapped-sprite-sdl-build.log` and `wrapped-sprite-sdl-test.log` on TB5).
+It uses a minimal `IImage` adapter at scale 1; it does not exercise the full
+map renderer, actual game sprites, alpha/color effects, the GPU backend or
+live animation.
 
 At revision `406969f` plus the movement-offset extraction, the same sprite
 offset calculation used by the adventure renderer was checked for all eight

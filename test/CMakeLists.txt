@@ -301,6 +301,13 @@ if(TARGET luajit::luajit)
 endif()
 add_test(NAME MapTopologyStandalone COMMAND vcmi-map-topology-test)
 
+if(TARGET vcmisdl3)
+	add_executable(vcmi-wrapped-sprite-sdl-test map/WrappedSpriteSdlTest.cpp ${CMAKE_SOURCE_DIR}/client/mapView/MapViewMovement.cpp)
+	target_include_directories(vcmi-wrapped-sprite-sdl-test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/client)
+	target_link_libraries(vcmi-wrapped-sprite-sdl-test PRIVATE gtest_main gmock vcmisdl3)
+	add_test(NAME WrappedSpriteSdl COMMAND vcmi-wrapped-sprite-sdl-test)
+endif()
+
 add_executable(vcmitest ${test_SRCS} ${test_HEADERS} ${mock_HEADERS})
 # Tests link the constituent object libraries rather than the facade: that keeps
 # lib globals single-instance and lets classes needed only by tests stay
