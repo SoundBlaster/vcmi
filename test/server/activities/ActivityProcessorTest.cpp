@@ -2612,6 +2612,7 @@ class SubterraneanGateTopologyTest : public TinyMapGameTest
 {
 protected:
 	const Services * gameServices() override { return LIBRARY; }
+	void checkWhirlpoolTravel(TQuantity creatureCount, bool blockAllExits = false);
 };
 }
 
@@ -2796,6 +2797,101 @@ TEST_F(SubterraneanGateTopologyTest, whirlpoolListsPassableExitTilesAcrossSeam)
 	const auto boundedExits = CGWhirlpool::getPassableExitTiles(*gameState(), {whirlpool->id});
 	ASSERT_EQ(boundedExits.size(), 1u);
 	EXPECT_EQ(boundedExits.front().second, int3(0, 5, 0));
+}
+
+void SubterraneanGateTopologyTest::checkWhirlpoolTravel(TQuantity creatureCount, bool blockAllExits)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 5, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, creatureCount}})
+		.terrain(int3(11, 5, 0), TerrainId::WATER)
+		.terrain(int3(12, 5, 0), TerrainId::WATER)
+		.terrain(int3(0, 5, 0), TerrainId::WATER)
+		.terrain(int3(35, 5, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+
+	GameRandomizer randomizer(*gameState());
+	const auto addWhirlpool = [&](const int3 & pos, const std::string & name, const std::string & mask)
+	{
+		const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ ")" + mask + R"(" ] })";
+		JsonNode definition(text.data(), text.size(), "SeamWhirlpoolTravelTest");
+		auto appearance = std::make_shared<ObjectTemplate>();
+		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+		appearance->readJson(definition, resolver, false);
+		auto whirlpool = std::make_shared<CGWhirlpool>(gameState().get());
+		whirlpool->ID = Obj::WHIRLPOOL;
+		whirlpool->subID = MapObjectSubID(0);
+		whirlpool->pos = pos;
+		whirlpool->instanceName = name;
+		whirlpool->appearance = appearance;
+		static_cast<CGObjectInstance *>(whirlpool.get())->initObj(randomizer);
+		map()->addNewObject(whirlpool);
+		whirlpool->assignTeleportChannel();
+		return whirlpool;
+	};
+	const auto entrance = addWhirlpool(int3(12, 5, 0), "whirlpool_entrance", "A");
+	const auto exit = addWhirlpool(int3(0, 5, 0), "whirlpool_exit", "AA");
+	ASSERT_EQ(entrance->channel, exit->channel);
+
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(10, 5, 0));
+	ASSERT_EQ(hero->stacksCount(), 1u);
+	ASSERT_EQ(hero->Slots().begin()->second->getCount(), creatureCount);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(int3(11, 5, 0), BoatId::CASTLE, player);
+	handler.createBoat(int3(0, 5, 0), BoatId::CASTLE, player);
+	if(blockAllExits)
+		handler.createBoat(int3(35, 5, 0), BoatId::CASTLE, player);
+	const auto exits = CGWhirlpool::getPassableExitTiles(*gameState(), {exit->id});
+	if(blockAllExits)
+		ASSERT_TRUE(exits.empty());
+	else
+	{
+		ASSERT_EQ(exits.size(), 1u);
+		EXPECT_EQ(exits.front(), std::make_pair(exit->id, int3(35, 5, 0)));
+	}
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(11, 5, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	const auto boatID = hero->getBoat()->id;
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(12, 5, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_EQ(hero->visitablePos(), int3(12, 5, 0));
+	EXPECT_EQ(hero->Slots().begin()->second->getCount(), creatureCount == 1 ? 1 : creatureCount / 2);
+	auto dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	const auto movement = hero->movementPointsRemaining();
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	const int3 expectedPosition = blockAllExits ? int3(12, 5, 0) : int3(35, 5, 0);
+	EXPECT_EQ(hero->visitablePos(), expectedPosition);
+	ASSERT_TRUE(hero->inBoat());
+	ASSERT_NE(hero->getBoat(), nullptr);
+	EXPECT_EQ(hero->getBoat()->id, boatID);
+	EXPECT_EQ(hero->getBoat()->visitablePos(), expectedPosition);
+	EXPECT_EQ(map()->getTile(expectedPosition).topVisitableObj(), hero->id);
+	if(!blockAllExits)
+		EXPECT_NE(map()->getTile(int3(12, 5, 0)).topVisitableObj(), hero->id);
+	EXPECT_EQ(hero->movementPointsRemaining(), movement);
+}
+
+TEST_F(SubterraneanGateTopologyTest, protectedBoatUsesUnoccupiedWhirlpoolExitAcrossSeam)
+{
+	checkWhirlpoolTravel(1);
+}
+
+TEST_F(SubterraneanGateTopologyTest, unprotectedBoatUsesUnoccupiedWhirlpoolExitAcrossSeam)
+{
+	checkWhirlpoolTravel(10);
+}
+
+TEST_F(SubterraneanGateTopologyTest, protectedBoatStaysWhenAllWhirlpoolExitsAreOccupied)
+{
+	checkWhirlpoolTravel(1, true);
 }
 
 TEST_F(SummonBoatTopologyTest, choosesNearestBoatAccordingToMapTopology)

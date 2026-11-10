@@ -49,7 +49,28 @@ and client, editor, and test targets built (`seam-teleport-whirlpool-build.log`)
 The complete local suite passed 1,361 tests from 222 suites, with three
 disabled (`full-suite-seam-teleports.log`).
 
-These fixtures use in-memory synthetic objects and bypass the static-object
-save restriction. Actual whirlpool travel, multiple-choice monolith dialogs,
-original artwork, multiplayer and GUI rendering remain unverified. This does
-not yet make the real legacy map's seam-crossing gate safe to author or save.
+Those fixtures used in-memory synthetic objects and bypassed the static-object
+save restriction that applied at the time. That run did not verify actual
+whirlpool travel, multiple-choice monolith dialogs, original artwork,
+multiplayer or GUI rendering. Later work supports some seam-crossing static
+objects; see the implementation matrix for its current limits.
+
+## Boat travel through a seam-spanning whirlpool
+
+Additional server-side tests build a protected single-creature hero and
+an unprotected ten-creature hero, respectively. Each hero boards a boat,
+sails into a whirlpool and arrives at the other whirlpool's `(35,5,0)`
+visitable tile, whose raw coordinate lies across the seam. A second boat
+occupies the other exit tile, so the selectable or random exit must be the
+unoccupied one. After the teleport the tests verify the same boat and hero
+occupy the destination, the entrance no longer contains the hero, and the
+teleport does not consume additional movement points. The protected army
+remains intact; the unprotected stack loses five of ten creatures. A third
+case occupies both exits: the protected hero and boat stay on the entrance
+tile with no further movement cost.
+
+All seven tests in `SubterraneanGateTopologyTest` passed on macOS arm64 using
+the TB5 build from `f97bf21` plus these tests. These are synthetic whirlpools
+and in-process server activities. Original artwork, the GUI dialog, multiple available random exits and
+multiplayer remain
+unverified.
