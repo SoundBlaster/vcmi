@@ -10,6 +10,7 @@
 
 #include "../../client/mapView/MapViewModel.h"
 #include "../../client/mapView/MapViewOverlay.h"
+#include "../../client/mapView/MapViewObservation.h"
 #include "../../client/adventureMap/MapScrollAccumulator.h"
 
 TEST(MapScrollAccumulatorTest, SlowScrollingAccumulatesSubpixelUpdates)
@@ -33,6 +34,34 @@ TEST(MapScrollAccumulatorTest, DirectionChangesAndResetDiscardOldRemainder)
 }
 #include "../../client/mapView/MapViewMovement.h"
 #include "../../lib/mapping/MapTopology.h"
+
+TEST(MapViewModelTopologyTest, ObservationDistinguishesVisibleCopiesAndHonorsFogAndBudget)
+{
+	MapViewModel model;
+	model.setTileSize(Point(10, 10));
+	model.setViewDimensions(Point(40, 40));
+	model.setViewCenter(Point(0, 0));
+	model.setLevel(0);
+	const MapTopology torus(3, 3, 1, true);
+	std::vector<std::pair<int3, int3>> observations;
+	const auto visible = [](const int3 & tile) { return tile != int3(-1, -1, 0); };
+	const auto visit = [&](const int3 & displayed, const int3 & canonical, const Rect & area)
+	{
+		observations.emplace_back(displayed, canonical);
+		EXPECT_EQ(area.topLeft(), model.getTargetTileArea(displayed).topLeft());
+	};
+	EXPECT_TRUE(forEachObservedMapTile(model, torus, 16, visible, visit));
+	EXPECT_EQ(observations.size(), 15u);
+	EXPECT_EQ(std::count(observations.begin(), observations.end(), std::make_pair(int3(-2, -2, 0), int3(1, 1, 0))), 1);
+	EXPECT_EQ(std::count(observations.begin(), observations.end(), std::make_pair(int3(1, 1, 0), int3(1, 1, 0))), 1);
+	EXPECT_EQ(std::count_if(observations.begin(), observations.end(), [](const auto & pair) { return pair.first == int3(-1, -1, 0); }), 0);
+	observations.clear();
+	EXPECT_FALSE(forEachObservedMapTile(model, torus, 2, visible, visit));
+	EXPECT_EQ(observations.size(), 2u);
+	observations.clear();
+	EXPECT_TRUE(forEachObservedMapTile(model, MapTopology(3, 3, 1, false), 16, visible, visit));
+	EXPECT_EQ(observations.size(), 4u);
+}
 
 TEST(MapViewModelTopologyTest, RepeatedCopiesUseTheSameOverlayTileAndLabelParity)
 {

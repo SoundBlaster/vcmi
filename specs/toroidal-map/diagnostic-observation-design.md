@@ -17,6 +17,19 @@ game identity. The trace is produced only when explicitly enabled and written
 to a caller-selected local path with a finite frame budget. Normal play does
 not create a trace or scan the viewport.
 
+Prototype: set `VCMI_MAP_OBSERVATION_PATH` to a writable local file before
+launch. The client appends JSON Lines for at most 1,800 `MapView::show` calls
+per process; failure to open the file leaves observation disabled. Each line
+contains a session identifier, sequence, monotonic timestamp, level, map and
+viewport geometry, camera center and candidate object copies. Each candidate
+contains the object ID, displayed tile, canonical tile, screen-space tile
+rectangle and native image offset. A candidate is a renderer input, not a
+guarantee that pixels were visible or that the object was clickable. At most
+4,096 viewport tiles and 512 candidates are examined/emitted per record;
+`complete: false` marks truncation. An explicit path enables local writes;
+the game appends, never truncates an existing trace. No environment variable
+means no file and no viewport scan.
+
 Use the active renderer context and its visibility check; do not enumerate the
 authoritative map or reveal fog-hidden entities. A diagnostic view must be no
 more privileged than the view being recorded. Record geometry and identifiers,
@@ -43,8 +56,10 @@ experimental until a real client session and focused tests verify it.
 
 ## Planned steps
 
-1. Add a bounded, opt-in adventure-map trace and unit tests for its output and
-   canonical copy mapping, including hidden tiles and bounded maps.
+1. Prototype the bounded, opt-in adventure-map trace and unit-test canonical
+   copy mapping, hidden tiles, bounded maps and the viewport budget. The
+   20-test standalone topology suite passed on macOS arm64; the client target
+   built. End-to-end output and real-client fog behavior remain to verify.
 2. Exercise it in a signed local client on the seam laboratory map and compare
    consecutive camera/object positions with independent screenshots.
 3. Extend GUI observation incrementally, starting with window/widget geometry;

@@ -16,6 +16,7 @@
 #include "MapViewCache.h"
 #include "MapViewController.h"
 #include "MapViewModel.h"
+#include "MapViewObservation.h"
 #include "mapHandler.h"
 
 #include "../CPlayerInterface.h"
@@ -37,10 +38,90 @@
 #include "../../lib/texts/MetaString.h"
 #include "../../lib/texts/TextOperations.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
+#include "../../lib/mapping/CMapHeader.h"
 
 #include "MapOverlayLogVisualizer.h"
 
 #include <vstd/DateUtils.h>
+#include <cstdlib>
+#include <fstream>
+
+namespace
+{
+// Disabled unless explicitly requested. Appending avoids overwriting an
+// existing file, and the fixed budgets bound work and output per process.
+void observeMapView(const MapViewModel & model, const Rect & viewport, const IMapRendererContext & context)
+{
+	struct Trace
+	{
+		std::ofstream file;
+		std::size_t remaining = 1800;
+		std::size_t sequence = 0;
+		const int64_t session = std::chrono::duration_cast<std::chrono::nanoseconds>(
+			std::chrono::steady_clock::now().time_since_epoch()).count();
+		Trace()
+		{
+			if(const char * path = std::getenv("VCMI_MAP_OBSERVATION_PATH"); path && *path)
+				file.open(path, std::ios::out | std::ios::app);
+		}
+	};
+	static Trace trace;
+	if(!trace.file || trace.remaining == 0)
+		return;
+	--trace.remaining;
+	const auto * callback = GAME->interface()->cb.get();
+	const auto * header = callback->getMapHeader();
+	const auto topology = header->getTopology();
+	const auto center = model.getMapViewCenter();
+	const auto tileSize = model.getSingleTileSize();
+	const auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+		std::chrono::steady_clock::now().time_since_epoch()).count();
+	std::ostringstream out;
+	out << "{\"version\":1,\"session\":" << trace.session << ",\"sequence\":" << trace.sequence++
+		<< ",\"monotonic_ns\":" << timestamp << ",\"level\":" << model.getLevel()
+		<< ",\"map_size\":[" << header->width << ',' << header->height << ']'
+		<< ",\"toroidal\":" << (header->toroidal ? "true" : "false")
+		<< ",\"center\":[" << center.x << ',' << center.y << ']'
+		<< ",\"tile_size\":[" << tileSize.x << ',' << tileSize.y << ']'
+		<< ",\"viewport\":[" << viewport.x << ',' << viewport.y << ',' << viewport.w << ',' << viewport.h << ']'
+		<< ",\"candidates\":[";
+	bool first = true;
+	bool candidatesComplete = true;
+	std::size_t candidateCount = 0;
+	const bool tilesComplete = forEachObservedMapTile(model, topology, 4096,
+		[&](const int3 & displayed)
+		{
+			const auto canonical = topology.canonicalize(displayed);
+			return canonical && context.isVisible(displayed) && callback->isVisible(*canonical);
+		},
+		[&](const int3 & displayed, const int3 & canonical, const Rect & area)
+		{
+			for(const auto & id : context.getObjects(displayed))
+			{
+				if(!callback->tryGetObj(id))
+					continue;
+				if(candidateCount == 512)
+				{
+					candidatesComplete = false;
+					break;
+				}
+				++candidateCount;
+				if(!first)
+					out << ',';
+				first = false;
+				const Point offset = context.objectImageOffset(id, displayed);
+				out << "{\"id\":" << id.getNum() << ",\"displayed\":[" << displayed.x << ',' << displayed.y
+					<< "],\"canonical\":[" << canonical.x << ',' << canonical.y
+					<< "],\"tile_rect\":[" << viewport.x + area.x << ',' << viewport.y + area.y << ',' << area.w << ',' << area.h
+					<< "],\"image_offset\":[" << offset.x << ',' << offset.y << "]}";
+			}
+		});
+	out << "],\"complete\":" << (tilesComplete && candidatesComplete ? "true" : "false") << "}\n";
+	trace.file << out.str();
+	if(trace.sequence % 60 == 0 || trace.remaining == 0)
+		trace.file.flush();
+}
+}
 
 BasicMapView::~BasicMapView() = default;
 
@@ -160,6 +241,7 @@ void MapView::show(Canvas & to)
 {
 	actions->setContext(controller->getContext());
 	BasicMapView::show(to);
+	observeMapView(*model, pos, *controller->getContext());
 }
 
 MapView::MapView(const Point & offset, const Point & dimensions)
