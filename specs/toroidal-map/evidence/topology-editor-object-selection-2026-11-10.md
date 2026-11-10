@@ -34,3 +34,12 @@ macOS privacy-permission failure. Both test processes were force-quit and the
 temporary source edit to the log filename was reverted. The pre-existing
 editor and its unsaved map were left open. No visual selection or preview
 result was obtained.
+
+A further diagnostic build sent the editor log to `/dev/null`, rather than
+opening a file on TB5. It passed logging but still did not show a window; the
+Activity Monitor sample found the main thread in
+`initializeBaseFilesystem` / `CResourceHandler::initialize`. This indicates
+that avoiding the log-file open alone is insufficient. The sample does not
+identify the filesystem operation or establish why it stalled. The probe was
+force-quit, the temporary source edit was reverted, and the ordinary editor
+target was rebuilt from the restored source.
