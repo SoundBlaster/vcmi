@@ -23,12 +23,22 @@ per process; failure to open the file leaves observation disabled. Each line
 contains a session identifier, sequence, monotonic timestamp, level, map and
 viewport geometry, camera center and candidate object copies. Each candidate
 contains the object ID, displayed tile, canonical tile, screen-space tile
-rectangle and native image offset. A candidate is a renderer input, not a
+rectangle in logical GUI coordinates and native image offset. A candidate is a renderer input, not a
 guarantee that pixels were visible or that the object was clickable. At most
 4,096 viewport tiles and 512 candidates are examined/emitted per record;
 `complete: false` marks truncation. An explicit path enables local writes;
 the game appends, never truncates an existing trace. No environment variable
 means no file and no viewport scan.
+
+The subsequent prototype revision also includes the top window's widget tree
+in each map-show record when that window derives from `CIntObject`. Nodes have
+per-record indices and parent indices, logical rectangles, active/disabled
+flags, and a coarse `button` or `widget` kind. Traversal is capped at 256 nodes
+and depth 32; `gui_complete: false` marks a truncated tree. The absence of a
+compatible top window is reported by `gui_available: false`. These values
+describe in-memory objects at that instant, not occlusion, painted pixels,
+stable control IDs, semantic names, or guaranteed ability to click. The trace
+does not yet capture GUI-only frames when the adventure map is not shown.
 
 Use the active renderer context and its visibility check; do not enumerate the
 authoritative map or reveal fog-hidden entities. A diagnostic view must be no
@@ -36,8 +46,7 @@ more privileged than the view being recorded. Record geometry and identifiers,
 not names, chat or save contents. The first slice does not create a network
 endpoint or accept actions. File-access errors must not crash the game.
 
-Later slices can expose a structured GUI tree and selected semantic roles and
-actions. `WindowHandler` keeps the window stack, while `CIntObject` has child
+Later slices can expose stable semantic roles and actions. `WindowHandler` keeps the window stack, while `CIntObject` has child
 links, rectangles and disabled state, but that alone does not prove occlusion,
 actionability, semantic names or what was actually painted. Those fields need
 explicit contracts and focused checks before consumers rely on them.
@@ -63,6 +72,7 @@ experimental until a real client session and focused tests verify it.
 2. A signed client session produced 1,800 records including both seam
    crossings and an independent screenshot; see [the observation record](evidence/map-observation-client-2026-11-10.md).
    Further synchronized visual comparison and broader fog cases remain open.
-3. Extend GUI observation incrementally, starting with window/widget geometry;
-   define stable semantics and actionable roles only where the game supplies
-   them. Consider a future protocol adapter separately.
+3. Prototype window/widget geometry. The standalone topology suite checks the
+   bounded tree walk and parent indices; client output still requires a real
+   session check. Define stable semantics and actionable roles only where the
+   game supplies them. Consider a future protocol adapter separately.

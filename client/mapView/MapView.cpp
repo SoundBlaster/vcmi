@@ -25,6 +25,8 @@
 #include "../adventureMap/AdventureMapInterface.h"
 #include "../GameEngine.h"
 #include "../GameInstance.h"
+#include "../gui/WindowHandler.h"
+#include "../widgets/Buttons.h"
 #include "render/CAnimation.h"
 #include "render/Canvas.h"
 #include "render/Colors.h"
@@ -116,7 +118,23 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 					<< "],\"image_offset\":[" << offset.x << ',' << offset.y << "]}";
 			}
 		});
-	out << "],\"complete\":" << (tilesComplete && candidatesComplete ? "true" : "false") << "}\n";
+	out << "],\"complete\":" << (tilesComplete && candidatesComplete ? "true" : "false");
+	const auto window = ENGINE->windows().topWindow<CIntObject>();
+	out << ",\"gui_available\":" << (window ? "true" : "false") << ",\"gui\":[";
+	bool firstWidget = true;
+	const bool guiComplete = forEachObservedWidget(window.get(), 256, 32,
+		[&](const CIntObject & widget, int index, int parent)
+		{
+			if(!firstWidget)
+				out << ',';
+			firstWidget = false;
+			out << "{\"index\":" << index << ",\"parent\":" << parent
+				<< ",\"kind\":\"" << (dynamic_cast<const ButtonBase *>(&widget) ? "button" : "widget")
+				<< "\",\"rect\":[" << widget.pos.x << ',' << widget.pos.y << ',' << widget.pos.w << ',' << widget.pos.h
+				<< "],\"active\":" << (widget.isActive() ? "true" : "false")
+				<< ",\"disabled\":" << (widget.isDisabled() ? "true" : "false") << '}';
+		});
+	out << "],\"gui_complete\":" << (guiComplete ? "true" : "false") << "}\n";
 	trace.file << out.str();
 	if(trace.sequence % 60 == 0 || trace.remaining == 0)
 		trace.file.flush();

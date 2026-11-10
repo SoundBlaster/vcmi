@@ -63,6 +63,22 @@ TEST(MapViewModelTopologyTest, ObservationDistinguishesVisibleCopiesAndHonorsFog
 	EXPECT_EQ(observations.size(), 4u);
 }
 
+TEST(MapViewModelTopologyTest, ObservationWidgetTraversalKeepsParentsAndReportsLimits)
+{
+	struct Widget { std::vector<Widget *> children; };
+	Widget leaf, sibling, child{{&leaf}}, root{{&child, &sibling}};
+	std::vector<std::pair<int, int>> nodes;
+	const auto visit = [&](const Widget &, int index, int parent) { nodes.emplace_back(index, parent); };
+	EXPECT_TRUE(forEachObservedWidget(&root, 4, 2, visit));
+	EXPECT_EQ(nodes, (std::vector<std::pair<int, int>>{{0, -1}, {1, 0}, {2, 1}, {3, 0}}));
+	nodes.clear();
+	EXPECT_FALSE(forEachObservedWidget(&root, 2, 2, visit));
+	EXPECT_EQ(nodes.size(), 2u);
+	nodes.clear();
+	EXPECT_FALSE(forEachObservedWidget(&root, 4, 1, visit));
+	EXPECT_EQ(nodes, (std::vector<std::pair<int, int>>{{0, -1}, {1, 0}, {2, 0}}));
+}
+
 TEST(MapViewModelTopologyTest, RepeatedCopiesUseTheSameOverlayTileAndLabelParity)
 {
 	const MapTopology torus(5, 7, 2, true);

@@ -33,3 +33,35 @@ bool forEachObservedMapTile(const MapViewModel & model, const MapTopology & topo
 		}
 	return true;
 }
+
+/// Walk a widget tree without exposing text or assuming that nodes are
+/// rendered, unobscured or actionable. Parent indices belong to this record.
+template<typename Node, typename Visit>
+bool forEachObservedWidget(const Node * root, std::size_t maxNodes, std::size_t maxDepth, Visit visit)
+{
+	std::size_t count = 0;
+	bool complete = true;
+	const auto walk = [&](const auto & self, const Node * node, int parent, std::size_t depth) -> void
+	{
+		if(!node)
+			return;
+		if(count == maxNodes || depth > maxDepth)
+		{
+			complete = false;
+			return;
+		}
+		const int index = static_cast<int>(count++);
+		visit(*node, index, parent);
+		for(const auto * child : node->children)
+		{
+			if(count == maxNodes && child)
+			{
+				complete = false;
+				break;
+			}
+			self(self, child, index, depth + 1);
+		}
+	};
+	walk(walk, root, -1, 0);
+	return complete;
+}
