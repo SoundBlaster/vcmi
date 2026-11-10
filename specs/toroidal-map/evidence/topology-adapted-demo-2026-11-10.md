@@ -267,3 +267,23 @@ they do not prove every intervening frame, normal-speed smoothness, independent
 manual scrolling, seam-spanning static artwork or boat presentation. The
 test client exited, the previous test-profile settings were restored, and its
 temporary local data copies were removed.
+
+
+## Independent camera scrolling
+
+The `4aa0566` diagnostic client loaded the same saved laboratory map with
+the hero at the starting corner. At the default 800 pixels/second, temporary
+key bindings X and F7 scrolled west and north respectively: before/after
+screenshots showed the stationary hero and nearby terrain shifting, while
+the minimap viewport moved across the corresponding map edges. Ctrl+Right
+also moved the view with the default binding. These are endpoint observations,
+not a measurement of every frame or of visual smoothness.
+
+At the deliberately reduced setting of 100 pixels/second, holding the same
+X binding for three seconds produced no visible shift in that scene. The
+per-update integer division in `AdventureMapInterface` can discard every
+subpixel displacement at short update intervals, but no frame timings were
+recorded, so the runtime cause was not independently instrumented. The
+comparison also does not establish behavior on ordinary bounded maps. The
+client exited, temporary game-data copies were removed, and test-profile
+settings, key bindings and TB5 data links were restored.
