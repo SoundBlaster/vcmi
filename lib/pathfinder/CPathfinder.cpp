@@ -365,12 +365,16 @@ bool CPathfinder::isLayerTransitionPossible() const
 	case ELayer::AIR:
 		if(destLayer == ELayer::LAND || destLayer == ELayer::AVIATE)
 			return true;
+		if(destLayer == ELayer::WATER)
+			return !config->getOrCreatePathfinderHelper(source, gameInfo)->hero->inBoat();
 
 		break;
 
 	case ELayer::WATER:
 		if(destLayer == ELayer::LAND)
 			return true;
+		if(destLayer == ELayer::AIR && (!config->options.lightweightFlyingMode || source.isInitialPosition))
+			return !config->getOrCreatePathfinderHelper(source, gameInfo)->hero->inBoat();
 
 		break;
 	}

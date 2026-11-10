@@ -476,6 +476,12 @@ void LayerTransitionRule::process(
 		break;
 
 	case EPathfindingLayer::WATER:
+		if(destination.node->layer == EPathfindingLayer::AIR)
+		{
+			if(destination.node->accessible != EPathAccessibility::FLYABLE)
+				destination.blocked = true;
+			break;
+		}
 		if(destination.node->accessible != EPathAccessibility::ACCESSIBLE && destination.node->accessible != EPathAccessibility::VISITABLE)
 		{
 			/// Hero that walking on water can transit to accessible and visitable tiles

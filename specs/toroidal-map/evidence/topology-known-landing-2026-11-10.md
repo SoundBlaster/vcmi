@@ -11,11 +11,11 @@ on that basis. If the hero already lacks a known route, this check does not
 prevent exploration. The earlier rejection of a step that spends all points
 on AIR or WATER remains in effect.
 
-The check is intentionally incomplete. It does not apply to boats, a hero
-with both Flight and Water Walk, or every legacy unknown-layer situation.
-The pathfinder does not represent all AIR/WATER switches accepted by the
-server; `HeroCanSwitchFromWaterWalkToFlightToReachShore` exercises one such
-route. The prospective search cannot predict all object-leave effects,
+The check is intentionally incomplete. It does not apply to boats or every
+legacy unknown-layer situation. It initially skipped heroes with both Flight
+and Water Walk; the later [layer-switch change](topology-transient-switches-2026-11-10.md)
+models the tested on-foot transitions and removes that exclusion. The
+prospective search cannot predict all object-leave effects,
 newly revealed cells or concurrent world changes. A previously stranded hero
 can still be unable to end the turn, including when a turn timer expires.
 G12 remains pending; this is not a general recovery guarantee.

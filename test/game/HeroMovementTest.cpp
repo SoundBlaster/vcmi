@@ -644,6 +644,42 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(server.gh->gameState().actingPlayers.contains(red));
 	ASSERT_TRUE(host.state->actingPlayers.contains(red));
 	ASSERT_TRUE(guest.state->actingPlayers.contains(red));
+	GiveBonus waterWalkBonus;
+	waterWalkBonus.id = hero->id;
+	waterWalkBonus.bonus = Bonus(BonusDuration::ONE_DAY, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID());
+	server.gh->giveHeroBonus(&waterWalkBonus);
+	pumpUntil([&] {
+		return host.state->getHero(hero->id)->hasBonusOfType(BonusType::WATER_WALKING)
+			&& guest.state->getHero(hero->id)->hasBonusOfType(BonusType::WATER_WALKING);
+	});
+	const int3 walking(0, 34, 0);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		const auto * replicaHero = peer->state->getHero(hero->id);
+		ASSERT_TRUE(replicaHero->hasBonusOfType(BonusType::WATER_WALKING));
+		CPathsInfo replicaPaths(peer->state->getMapSize(), replicaHero);
+		auto replicaConfig = std::make_shared<SingleHeroPathfinderConfig>(replicaPaths, *peer->state, replicaHero);
+		CPathfinder replicaSearch(*peer->state, replicaConfig);
+		replicaSearch.calculatePaths();
+		const auto * waterNode = replicaPaths.getNode(walking, EPathfindingLayer::WATER);
+		ASSERT_TRUE(waterNode->reachable());
+		ASSERT_NE(waterNode->theNodeBefore, nullptr);
+		EXPECT_EQ(waterNode->theNodeBefore->coord, airborne);
+		EXPECT_EQ(waterNode->theNodeBefore->layer, EPathfindingLayer::AIR);
+	}
+	MoveHero waterStep({hero->convertFromVisitablePos(walking)}, EPathfindingLayer::WATER, hero->id, true);
+	waterStep.player = red;
+	waterStep.requestID = 25;
+	host.codec->sendPack(waterStep);
+	pumpUntil([&] {
+		return host.results.contains(25)
+			&& host.state->getHero(hero->id)->visitablePos() == walking
+			&& guest.state->getHero(hero->id)->visitablePos() == walking;
+	});
+	ASSERT_TRUE(host.results.contains(25)) << host.failure;
+	ASSERT_TRUE(host.results.at(25));
+	for(const LobbyPeer * peer : {&host, &guest})
+		EXPECT_EQ(peer->state->getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::WATER);
 	MoveHero land({hero->convertFromVisitablePos(destination)}, EPathfindingLayer::LAND, hero->id, false);
 	land.player = red;
 	land.requestID = 22;
@@ -739,10 +775,12 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(guest.results.contains(23)) << guest.failure;
 	ASSERT_TRUE(guest.results.at(23));
 	EXPECT_FALSE(server.gh->gameState().getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT));
+	EXPECT_FALSE(server.gh->gameState().getHero(hero->id)->hasBonusOfType(BonusType::WATER_WALKING));
 	for(const LobbyPeer * peer : {&host, &guest})
 	{
 		const auto * replicaHero = peer->state->getHero(hero->id);
 		EXPECT_FALSE(replicaHero->hasBonusOfType(BonusType::FLYING_MOVEMENT));
+		EXPECT_FALSE(replicaHero->hasBonusOfType(BonusType::WATER_WALKING));
 		EXPECT_EQ(replicaHero->getPathfindingStartLayer(), EPathfindingLayer::LAND);
 	}
 }
@@ -3297,15 +3335,15 @@ TEST_F(HeroMovementTest, HeroCanSwitchFromWaterWalkToFlightToReachShore)
 {
 	const PlayerColor player(0);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
-	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player);
-	for(int x = 32; x <= 35; ++x)
+	builder.size(36, false).playerActive(player).hero(int3(4, 5, 0), HeroTypeID(0), player);
+	for(const int x : {35, 0, 1, 2})
 		for(int y = 2; y <= 8; ++y)
 			builder.terrain(int3(x, y, 0), TerrainId::WATER);
-	builder.resource(int3(32, 5, 0), GameResID::GOLD, 1000);
+	builder.resource(int3(35, 5, 0), GameResID::GOLD, 1000);
 	startWithMap(std::move(builder));
 	map()->toroidal = true;
 	revealMap(player);
-	ASSERT_TRUE(map()->getTile(int3(32, 5, 0)).blocked());
+	ASSERT_TRUE(map()->getTile(int3(35, 5, 0)).blocked());
 	auto * hero = findHeroByOwner(player);
 	ASSERT_NE(hero, nullptr);
 	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
@@ -3313,12 +3351,138 @@ TEST_F(HeroMovementTest, HeroCanSwitchFromWaterWalkToFlightToReachShore)
 	hero->setMovementPoints(500);
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
-	for(const int x : {35, 34, 33})
+	for(const int x : {2, 1, 0})
 		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(x, 5, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
 	ASSERT_EQ(hero->movementPointsRemaining(), 200);
-	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(32, 5, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
-	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(31, 5, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * landing = paths.getNode(int3(34, 5, 0), EPathfindingLayer::LAND);
+	ASSERT_TRUE(landing->reachable());
+	ASSERT_EQ(landing->turns, 0);
+	ASSERT_NE(landing->theNodeBefore, nullptr);
+	EXPECT_EQ(landing->theNodeBefore->coord, int3(35, 5, 0));
+	EXPECT_EQ(landing->theNodeBefore->layer, EPathfindingLayer::AIR);
+	ASSERT_NE(landing->theNodeBefore->theNodeBefore, nullptr);
+	EXPECT_EQ(landing->theNodeBefore->theNodeBefore->layer, EPathfindingLayer::WATER);
+	CPathsInfo noFlightPaths(gameState()->getMapSize(), hero);
+	auto noFlightConfig = std::make_shared<SingleHeroPathfinderConfig>(noFlightPaths, *gameState(), hero);
+	noFlightConfig->options.useFlying = false;
+	CPathfinder noFlightPathfinder(*gameState(), noFlightConfig);
+	noFlightPathfinder.calculatePaths();
+	EXPECT_NE(noFlightPaths.getNode(int3(34, 5, 0), EPathfindingLayer::LAND)->turns, 0);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(35, 5, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(34, 5, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+}
+
+TEST_F(HeroMovementTest, HeroCanSwitchFromFlightToWaterWalkAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 first(0, 5, 0), second(35, 5, 0), landing(35, 4, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(2, 5, 0), HeroTypeID(0), player).terrain(first, TerrainId::WATER).terrain(second, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(first), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * waterNode = paths.getNode(second, EPathfindingLayer::WATER);
+	ASSERT_TRUE(waterNode->reachable());
+	ASSERT_EQ(waterNode->turns, 0);
+	ASSERT_NE(waterNode->theNodeBefore, nullptr);
+	EXPECT_EQ(waterNode->theNodeBefore->coord, first);
+	EXPECT_EQ(waterNode->theNodeBefore->layer, EPathfindingLayer::AIR);
+	CPathsInfo noWaterPaths(gameState()->getMapSize(), hero);
+	auto noWaterConfig = std::make_shared<SingleHeroPathfinderConfig>(noWaterPaths, *gameState(), hero);
+	noWaterConfig->options.useWaterWalking = false;
+	CPathfinder noWaterPathfinder(*gameState(), noWaterConfig);
+	noWaterPathfinder.calculatePaths();
+	EXPECT_FALSE(noWaterPaths.getNode(second, EPathfindingLayer::WATER)->reachable());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(second), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(landing), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+}
+
+TEST_F(HeroMovementTest, CombinedFlightAndWaterWalkPreserveKnownLanding)
+{
+	const PlayerColor player(0);
+	const int3 land(0, 5, 0), first(35, 5, 0), second(34, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player);
+	for(int x = 33; x <= 35; ++x)
+		for(int y = 4; y <= 6; ++y)
+			builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(first), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	ASSERT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(second), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	EXPECT_EQ(hero->visitablePos(), first);
+	EXPECT_EQ(hero->movementPointsRemaining(), 200);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(land), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+}
+
+TEST_F(HeroMovementTest, PathfinderSwitchesTransientLayersAcrossEdgesAndCorners)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	const std::vector<std::pair<int3, int3>> crossings = {
+		{{0, 18, 0}, {35, 18, 0}}, {{35, 18, 0}, {0, 18, 0}},
+		{{18, 0, 0}, {18, 35, 0}}, {{18, 35, 0}, {18, 0, 0}},
+		{{0, 0, 0}, {35, 35, 0}}, {{35, 35, 0}, {0, 0, 0}},
+		{{35, 0, 0}, {0, 35, 0}}, {{0, 35, 0}, {35, 0, 0}}
+	};
+	for(const auto & [source, destination] : crossings)
+	{
+		map()->getTile(source).terrainType = TerrainId::WATER;
+		map()->getTile(destination).terrainType = TerrainId::WATER;
+		map()->moveObject(hero->id, hero->convertFromVisitablePos(source));
+		for(const auto sourceLayer : {EPathfindingLayer::AIR, EPathfindingLayer::WATER})
+		{
+			hero->setConfirmedMovementLayer(sourceLayer);
+			hero->setMovementPoints(3000);
+			CPathsInfo paths(gameState()->getMapSize(), hero);
+			auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+			CPathfinder pathfinder(*gameState(), config);
+			pathfinder.calculatePaths();
+			const EPathfindingLayer destinationLayer = sourceLayer == EPathfindingLayer::AIR ? EPathfindingLayer::WATER : EPathfindingLayer::AIR;
+			const auto * node = paths.getNode(destination, destinationLayer);
+			SCOPED_TRACE(source.toString() + " to " + destination.toString() + " layer " + std::to_string(sourceLayer));
+			ASSERT_TRUE(node->reachable());
+			ASSERT_EQ(node->turns, 0);
+			ASSERT_NE(node->theNodeBefore, nullptr);
+			EXPECT_EQ(node->theNodeBefore->coord, source);
+			EXPECT_EQ(node->theNodeBefore->layer, sourceLayer);
+		}
+	}
 }
 
 TEST_F(HeroMovementTest, UnknownShoreDoesNotChangeTransientMoveAcceptance)

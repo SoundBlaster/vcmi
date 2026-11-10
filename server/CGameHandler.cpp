@@ -1068,9 +1068,6 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		return complainRet("Cannot exhaust movement points while flying or walking on water!");
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
 		&& dst != h->pos && !h->inBoat() && !canEmbarkLayer
-		// The regular pathfinder does not model all AIR/WATER switches that
-		// the server accepts when both abilities are active.
-		&& !(canFly && canWalkOnSea)
 		&& (layer == EPathfindingLayer::AIR || layer == EPathfindingLayer::WATER))
 	{
 		const auto sourceLayer = h->getConfirmedMovementLayer();
