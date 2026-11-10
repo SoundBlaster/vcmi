@@ -26,7 +26,7 @@ contains the object ID, displayed tile, canonical tile, screen-space tile
 rectangle in logical GUI coordinates and native image offset. A candidate is
 a renderer input, not a
 guarantee that pixels were visible or that the object was clickable. At most
-4,096 viewport tiles and 512 candidates are examined/emitted per record;
+20,000 viewport tiles and 512 candidates are examined/emitted per record;
 `complete: false` marks truncation. An explicit path enables local writes;
 the game appends, never truncates an existing trace. No environment variable
 means no file and no viewport scan.
@@ -34,10 +34,11 @@ means no file and no viewport scan.
 The subsequent prototype revision can include the top window's widget tree
 when that window derives from `CIntObject`. Nodes have per-record indices and
 parent indices, logical rectangles, active/disabled flags, and a coarse
-`button` or `widget` kind. The client checks the tree at most every 200 ms or
-when the top window changes and stores the last tree in emitted snapshots.
+`button` or `widget` kind. The client inspects map state at most every 100 ms,
+and checks the tree at most every 200 ms or when it observes a top-window
+change; it stores the last tree in emitted snapshots.
 `gui_observed_ns` gives its own monotonic observation time; a brief change
-between checks may be missed. Traversal is capped at 4,096 nodes and depth
+between checks may be missed, as may brief map changes. Traversal is capped at 4,096 nodes and depth
 32; `gui_complete: false` marks a truncated tree. The absence of a
 compatible top window is reported by `gui_available: false`. These values
 describe in-memory objects at their observation time, not occlusion, painted pixels,
@@ -88,6 +89,7 @@ experimental until a real client session and focused tests verify it.
    version truncated every tree and wrote 53 MB in one session. The
    [change-driven revision](evidence/observation-on-change-client-2026-11-10.md)
    produced 24 snapshots in a separate client session; its world-view object
-   enumeration hit the explicit limit.
+   enumeration hit the former 4,096-tile limit. The larger limit and the
+   bounded inspection frequency still require a new client-session check.
    Define stable semantics and actionable roles only where the
    game supplies them. Consider a future protocol adapter separately.

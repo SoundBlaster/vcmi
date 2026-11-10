@@ -92,6 +92,16 @@ TEST(MapViewModelTopologyTest, ObservationEmitsOnlyForChangesAndCameraSettling)
 	EXPECT_FALSE(gate.shouldRecord("state-b", Point(2, 0)));
 }
 
+TEST(MapViewModelTopologyTest, ObservationLimitsInspectionFrequency)
+{
+	MapObservationSampler sampler;
+	const auto start = std::chrono::steady_clock::time_point{};
+	EXPECT_TRUE(sampler.shouldInspect(start));
+	EXPECT_FALSE(sampler.shouldInspect(start + std::chrono::milliseconds(99)));
+	EXPECT_TRUE(sampler.shouldInspect(start + std::chrono::milliseconds(100)));
+	EXPECT_FALSE(sampler.shouldInspect(start + std::chrono::milliseconds(101)));
+}
+
 TEST(MapViewModelTopologyTest, RepeatedCopiesUseTheSameOverlayTileAndLabelParity)
 {
 	const MapTopology torus(5, 7, 2, true);

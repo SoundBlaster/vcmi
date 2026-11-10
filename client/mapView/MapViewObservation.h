@@ -8,7 +8,23 @@
 #include "MapViewModel.h"
 #include "../../lib/mapping/MapTopology.h"
 #include <cstddef>
+#include <chrono>
 #include <string>
+
+class MapObservationSampler
+{
+	std::chrono::steady_clock::time_point last{};
+	bool initialized = false;
+public:
+	bool shouldInspect(std::chrono::steady_clock::time_point now)
+	{
+		if(initialized && now - last < std::chrono::milliseconds(100))
+			return false;
+		initialized = true;
+		last = now;
+		return true;
+	}
+};
 
 /// Emit a snapshot for a changed observable state or when a moving camera
 /// stops, so its exact final pixel position is not left stale.

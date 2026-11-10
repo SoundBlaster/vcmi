@@ -60,6 +60,7 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 		std::size_t remaining = 1800;
 		std::size_t sequence = 0;
 		std::size_t showCount = 0;
+		MapObservationSampler sampler;
 		MapObservationGate gate;
 		const CIntObject * previousWindow = nullptr;
 		std::chrono::steady_clock::time_point lastGuiScan{};
@@ -76,6 +77,9 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 	if(!trace.file || trace.remaining == 0)
 		return;
 	const std::size_t showCount = trace.showCount++;
+	const auto now = std::chrono::steady_clock::now();
+	if(!trace.sampler.shouldInspect(now))
+		return;
 	const auto * callback = GAME->interface()->cb.get();
 	const auto * header = callback->getMapHeader();
 	const auto topology = header->getTopology();
@@ -97,7 +101,7 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 	bool first = true;
 	bool candidatesComplete = true;
 	std::size_t candidateCount = 0;
-	const bool tilesComplete = forEachObservedMapTile(model, topology, 4096,
+	const bool tilesComplete = forEachObservedMapTile(model, topology, 20000,
 		[&](const int3 & displayed)
 		{
 			const auto canonical = topology.canonicalize(displayed);
@@ -129,7 +133,6 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 	out << "],\"complete\":" << (tilesComplete && candidatesComplete ? "true" : "false");
 	key << ':' << tilesComplete << ':' << candidatesComplete;
 	const auto window = ENGINE->windows().topWindow<CIntObject>();
-	const auto now = std::chrono::steady_clock::now();
 	if(trace.guiData.empty() || trace.previousWindow != window.get() || now - trace.lastGuiScan >= std::chrono::milliseconds(200))
 	{
 		trace.previousWindow = window.get();
