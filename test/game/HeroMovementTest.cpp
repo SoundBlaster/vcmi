@@ -326,7 +326,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	} temporary{directory};
 
 	const PlayerColor red(0), blue(1);
-	auto source = TinyH3M::TinyH3MBuilder(EMapFormat::SOD)
+	auto mapBuilder = TinyH3M::TinyH3MBuilder(EMapFormat::SOD)
 		.size(36, false).name("Toroid TCP Lobby")
 		.playerActive(red).playerActive(blue)
 		.playerMainTown(red, int3(8, 8, 0), false)
@@ -336,7 +336,11 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		.hero(int3(1, 0, 0), HeroTypeID(0), red)
 		.hero(int3(1, 5, 0), HeroTypeID(1), blue)
 		.terrain(int3(35, 4, 0), TerrainId::ROCK)
-		.resource(int3(35, 35, 0), GameResID::GOLD, 10).build();
+		.resource(int3(35, 35, 0), GameResID::GOLD, 10);
+	for(int x = 0; x <= 2; ++x)
+		for(int y = 33; y <= 35; ++y)
+			mapBuilder.terrain(int3(x, y, 0), TerrainId::WATER);
+	auto source = mapBuilder.build();
 	CMemoryBuffer bytes;
 	bytes.write(source.data(), static_cast<si64>(source.size()));
 	bytes.seek(0);
@@ -385,6 +389,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 			}
 			if(const auto * message = dynamic_cast<const LobbyShowMessage *>(packet.get()))
 				messages.push_back(message->message.toString(LIBRARY->staticTexts()));
+			if(const auto * message = dynamic_cast<const SystemMessage *>(packet.get()))
+				systemMessages.push_back(message->text.toString(LIBRARY->staticTexts()));
 			if(auto * start = dynamic_cast<LobbyStartGame *>(packet.get()); start && start->initializedGameState)
 			{
 				state = start->initializedGameState;
@@ -408,6 +414,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		ESerializationVersion acceptedVersion = ESerializationVersion::NONE;
 		GameConnectionID clientId = GameConnectionID::INVALID;
 		std::vector<std::string> messages;
+		std::vector<std::string> systemMessages;
 		std::map<uint32_t, bool> results;
 		std::set<ObjectInstanceID> failedMoves;
 		std::shared_ptr<INetworkConnection> transport;
@@ -555,6 +562,24 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	});
 	ASSERT_TRUE(host.state->getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT));
 	ASSERT_TRUE(guest.state->getHero(hero->id)->hasBonusOfType(BonusType::FLYING_MOVEMENT));
+	FowTilesType knownWater;
+	for(int x = 0; x <= 2; ++x)
+		for(int y = 33; y <= 35; ++y)
+			knownWater.insert(int3(x, y, 0));
+	server.gh->changeFogOfWar(knownWater, red, ETileVisibility::REVEALED);
+	server.gh->setMovePoints(hero->id, 350);
+	pumpUntil([&] {
+		return host.state->getHero(hero->id)->movementPointsRemaining() == 350
+			&& guest.state->getHero(hero->id)->movementPointsRemaining() == 350
+			&& std::all_of(knownWater.begin(), knownWater.end(), [&](const int3 & tile) {
+				return host.state->isVisibleFor(tile, red) && guest.state->isVisibleFor(tile, red);
+			});
+	});
+	ASSERT_EQ(host.state->getHero(hero->id)->movementPointsRemaining(), 350);
+	ASSERT_EQ(guest.state->getHero(hero->id)->movementPointsRemaining(), 350);
+	ASSERT_TRUE(std::all_of(knownWater.begin(), knownWater.end(), [&](const int3 & tile) {
+		return host.state->isVisibleFor(tile, red) && guest.state->isVisibleFor(tile, red);
+	}));
 	const int3 airborne(0, 35, 0);
 	MoveHero flight({hero->convertFromVisitablePos(airborne)}, EPathfindingLayer::AIR, hero->id, true);
 	flight.player = red;
@@ -569,6 +594,46 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(host.results.at(20));
 	for(const LobbyPeer * peer : {&host, &guest})
 		ASSERT_EQ(peer->state->getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::AIR);
+	const auto pointsBeforeRejectedFlight = server.gh->gameState().getHero(hero->id)->movementPointsRemaining();
+	ASSERT_EQ(pointsBeforeRejectedFlight, 250);
+	CPathfinderHelper movementCost(server.gh->gameState(), hero, PathfinderOptions(server.gh->gameInfo()));
+	const auto unsafeCost = movementCost.getMovementCost(airborne, int3(1, 34, 0), EPathfindingLayer::AIR, pointsBeforeRejectedFlight);
+	ASSERT_GT(unsafeCost, 0);
+	ASSERT_LT(unsafeCost, pointsBeforeRejectedFlight);
+	const auto redVisibility = [&](const CGameState & state)
+	{
+		std::vector<bool> result;
+		for(int x = 0; x < 36; ++x)
+			for(int y = 0; y < 36; ++y)
+				result.push_back(state.isVisibleFor(int3(x, y, 0), red));
+		return result;
+	};
+	const auto redFogBeforeRejection = redVisibility(server.gh->gameState());
+	ASSERT_EQ(redVisibility(*host.state), redFogBeforeRejection);
+	ASSERT_EQ(redVisibility(*guest.state), redFogBeforeRejection);
+	MoveHero unsafeFlight({hero->convertFromVisitablePos(int3(1, 34, 0))}, EPathfindingLayer::AIR, hero->id, true);
+	unsafeFlight.player = red;
+	unsafeFlight.requestID = 24;
+	host.codec->sendPack(unsafeFlight);
+	pumpUntil([&] { return host.results.contains(24) && host.failedMoves.contains(hero->id) && guest.failedMoves.contains(hero->id); });
+	ASSERT_TRUE(host.results.contains(24)) << host.failure;
+	ASSERT_TRUE(host.failedMoves.contains(hero->id));
+	ASSERT_TRUE(guest.failedMoves.contains(hero->id));
+	EXPECT_FALSE(host.results.at(24));
+#ifndef ENABLE_GOLDMASTER
+	EXPECT_TRUE(std::any_of(host.systemMessages.begin(), host.systemMessages.end(), [](const std::string & message) {
+		return message.find("Cannot leave the known landing area") != std::string::npos;
+	}));
+#endif
+	EXPECT_EQ(server.gh->gameState().getHero(hero->id)->visitablePos(), airborne);
+	EXPECT_EQ(server.gh->gameState().getHero(hero->id)->movementPointsRemaining(), pointsBeforeRejectedFlight);
+	EXPECT_EQ(redVisibility(server.gh->gameState()), redFogBeforeRejection);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), airborne);
+		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), pointsBeforeRejectedFlight);
+		EXPECT_EQ(redVisibility(*peer->state), redFogBeforeRejection);
+	}
 	EndTurn prematureEnd;
 	prematureEnd.player = red;
 	prematureEnd.requestID = 21;

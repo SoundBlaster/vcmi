@@ -26,8 +26,17 @@ second step and a successful return. `ToroidalWaterWalkMayUseLastPointsToReachKn
 covers a legal route forward. `UnknownShoreDoesNotChangeTransientMoveAcceptance`
 compares acceptance when a hidden tile changes terrain, and
 `AlreadyStrandedWaterWalkerCanContinueExploring` covers an already unsafe
-state after the map changes. These are local synthetic server tests; the new
-rejection has not been exercised by a remote peer or through the GUI.
+state after the map changes. These are local synthetic server tests.
+
+`ToroidalDemoVmapTest.TcpLobbyStartsToroidalGameForTwoPeers` also exercises the
+known-landing rejection over a real TCP loopback lobby and two connected test
+peers. The hero flies across the seam, then requests a diagonal AIR step that
+costs less than its remaining movement but loses the known landing route. The
+server sends a failed movement and negative acknowledgement; its hero and both
+replicas retain the same position, movement points and red-player fog. In this non-Goldmaster
+build, the host also receives the specific known-landing diagnostic. The
+extended test passed three consecutive runs. This does not prove behavior
+over a remote network or in the graphical client.
 
 The ordinary pathfinder had also discarded a legal last-point transition
 from AIR or WATER to LAND, despite the server accepting it. The common
@@ -42,4 +51,6 @@ The optional prototype save, VMAP and Complete legacy map were supplied.
 returns on a revealed 252 × 252 surface map in 36–37 ms in two targeted test
 runs, including fixture setup. This is not a multiplayer load benchmark or a
 worst-case performance bound. The full log is
-`full-suite-known-landing-2026-11-10.log` in the TB5 runtime directory.
+`full-suite-known-landing-tcp-2026-11-10.log` in the TB5 runtime directory;
+that run includes the extended TCP test before the additional fog assertions;
+the final TCP test with those assertions passed three targeted runs.
