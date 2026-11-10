@@ -19,6 +19,7 @@ class CGHeroInstance;
 class CGObjectInstance;
 class CGameState;
 class CPathfinderHelper;
+class PathfinderMapView;
 struct TerrainTile;
 
 template<typename N>
@@ -255,7 +256,7 @@ struct PathNodeInfo
 
 	PathNodeInfo();
 
-	virtual void setNode(const IGameInfoCallback & gameInfo, CGPathNode * n);
+	virtual void setNode(const IGameInfoCallback & gameInfo, CGPathNode * n, const PathfinderMapView * mapView = nullptr);
 
 	void updateInfo(CPathfinderHelper * hlp, const IGameInfoCallback & gameInfo);
 
@@ -273,7 +274,7 @@ struct CDestinationNodeInfo : public PathNodeInfo
 
 	CDestinationNodeInfo();
 
-	void setNode(const IGameInfoCallback & gameInfo, CGPathNode * n) override;
+	void setNode(const IGameInfoCallback & gameInfo, CGPathNode * n, const PathfinderMapView * mapView = nullptr) override;
 
 	virtual bool isBetterWay() const;
 };

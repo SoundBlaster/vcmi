@@ -3132,6 +3132,122 @@ TEST_F(HeroMovementTest, ToroidalWaterWalkCanStillBeStrandedWithPointsRemaining)
 	EXPECT_EQ(hero->movementPointsRemaining(), 100);
 }
 
+TEST_F(HeroMovementTest, ProposedWaterWalkStartMatchesActualStateAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 land(0, 5, 0), water(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player);
+	for(int x = 33; x <= 35; ++x)
+		for(int y = 4; y <= 6; ++y)
+			builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), land);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	CPathsInfo proposed(gameState()->getMapSize(), hero);
+	EXPECT_THROW((SingleHeroPathfinderConfig(proposed, *gameState(), hero, PathfinderStart{water, EPathfindingLayer::LAND, 200})), std::invalid_argument);
+	EXPECT_THROW((SingleHeroPathfinderConfig(proposed, *gameState(), hero, PathfinderStart{water, EPathfindingLayer::WATER, -1})), std::invalid_argument);
+	auto proposedConfig = std::make_shared<SingleHeroPathfinderConfig>(proposed, *gameState(), hero, PathfinderStart{water, EPathfindingLayer::WATER, 200});
+	proposedConfig->options.turnLimit = 0;
+	CPathfinder proposedSearch(*gameState(), proposedConfig);
+	proposedSearch.calculatePaths();
+	ASSERT_EQ(proposed.getNode(water, EPathfindingLayer::WATER)->moveRemains, 200);
+	ASSERT_EQ(hero->visitablePos(), land);
+	ASSERT_EQ(hero->movementPointsRemaining(), 300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	ASSERT_EQ(hero->movementPointsRemaining(), 200);
+	CPathsInfo actual(gameState()->getMapSize(), hero);
+	auto actualConfig = std::make_shared<SingleHeroPathfinderConfig>(actual, *gameState(), hero);
+	actualConfig->options.turnLimit = 0;
+	CPathfinder actualSearch(*gameState(), actualConfig);
+	actualSearch.calculatePaths();
+	ASSERT_EQ(actual.getNode(water, EPathfindingLayer::WATER)->moveRemains, 200);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			for(const auto layer : {EPathfindingLayer::LAND, EPathfindingLayer::WATER})
+			{
+				const int3 tile(x, y, 0);
+				const auto * expected = actual.getNode(tile, layer);
+				const auto * predicted = proposed.getNode(tile, layer);
+				SCOPED_TRACE(tile.toString() + " layer " + std::to_string(layer)
+					+ " accessibility " + std::to_string(static_cast<int>(predicted->accessible)) + "/" + std::to_string(static_cast<int>(expected->accessible))
+					+ " predecessor " + (expected->theNodeBefore ? expected->theNodeBefore->coord.toString() : "none"));
+				EXPECT_EQ(predicted->turns == 0, expected->turns == 0);
+				if(predicted->turns == 0 && expected->turns == 0)
+					EXPECT_EQ(predicted->moveRemains, expected->moveRemains);
+			}
+}
+
+TEST_F(HeroMovementTest, ProposedFlightStartKeepsUnderlyingObjectAndMatchesActualState)
+{
+	const PlayerColor player(0);
+	const int3 land(0, 5, 0), water(35, 5, 0), hidden(34, 4, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player).terrain(water, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), land);
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+-+", "+++"], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "ProspectiveFlightObject");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto object = std::make_shared<CGObjectInstance>(gameState().get());
+	object->pos = land;
+	object->instanceName = "prospective_flight_object";
+	object->appearance = appearance;
+	map()->hideObject(hero);
+	map()->addNewObject(object);
+	map()->showObject(hero);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	const auto originalObjects = map()->getTile(land).visitableObjects;
+	CPathsInfo proposed(gameState()->getMapSize(), hero);
+	auto proposedConfig = std::make_shared<SingleHeroPathfinderConfig>(proposed, *gameState(), hero, PathfinderStart{water, EPathfindingLayer::AIR, 200});
+	proposedConfig->options.turnLimit = 0;
+	const auto * viewTile = proposedConfig->options.mapView->getTile(land);
+	EXPECT_TRUE(vstd::contains(viewTile->visitableObjects, object->id));
+	EXPECT_FALSE(vstd::contains(viewTile->visitableObjects, hero->id));
+	CPathfinder proposedSearch(*gameState(), proposedConfig);
+	proposedSearch.calculatePaths();
+	EXPECT_EQ(map()->getTile(land).visitableObjects, originalObjects);
+	EXPECT_FALSE(proposed.getNode(hidden, EPathfindingLayer::AIR)->reachable());
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_EQ(hero->movementPointsRemaining(), 200);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	CPathsInfo actual(gameState()->getMapSize(), hero);
+	auto actualConfig = std::make_shared<SingleHeroPathfinderConfig>(actual, *gameState(), hero);
+	actualConfig->options.turnLimit = 0;
+	CPathfinder actualSearch(*gameState(), actualConfig);
+	actualSearch.calculatePaths();
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			for(const auto layer : {EPathfindingLayer::LAND, EPathfindingLayer::AIR})
+			{
+				const int3 tile(x, y, 0);
+				const auto * expected = actual.getNode(tile, layer);
+				const auto * predicted = proposed.getNode(tile, layer);
+				SCOPED_TRACE(tile.toString() + " layer " + std::to_string(layer));
+				EXPECT_EQ(predicted->turns == 0, expected->turns == 0);
+				if(predicted->turns == 0 && expected->turns == 0)
+					EXPECT_EQ(predicted->moveRemains, expected->moveRemains);
+			}
+}
+
 TEST_F(HeroMovementTest, TransientMovementGuardChecksAllOwnedHeroes)
 {
 	const PlayerColor red(0), blue(1);

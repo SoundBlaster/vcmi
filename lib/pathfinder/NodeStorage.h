@@ -13,6 +13,8 @@
 #include "CGPathNode.h"
 
 struct TeamState;
+struct PathfinderStart;
+class PathfinderMapView;
 
 class NodeStorage : public INodeStorage
 {
@@ -23,6 +25,9 @@ private:
 	PlayerColor player;
 	bool useFlying = false;
 	bool useWaterWalking = false;
+	std::optional<EPathfindingLayer> initialLayer;
+	std::optional<int> initialMovementPoints;
+	const PathfinderMapView * mapView = nullptr;
 
 	inline
 	void resetTile(const int3 & tile, const EPathfindingLayer & layer, EPathAccessibility accessibility);
@@ -32,6 +37,7 @@ private:
 
 public:
 	NodeStorage(CPathsInfo & pathsInfo, const CGHeroInstance * hero);
+	NodeStorage(CPathsInfo & pathsInfo, const CGHeroInstance * hero, const PathfinderStart & start);
 
 	void initialize(const PathfinderOptions & options, const IGameInfoCallback & gameInfo) override;
 	virtual ~NodeStorage() = default;

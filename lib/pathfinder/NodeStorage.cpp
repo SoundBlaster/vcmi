@@ -27,13 +27,14 @@ void NodeStorage::initialize(const PathfinderOptions & options, const IGameInfoC
 	playerTeam = gameInfo.getPlayerTeam(player);
 	useFlying = options.useFlying;
 	useWaterWalking = options.useWaterWalking;
+	mapView = options.mapView.get();
 }
 
 EPathAccessibility NodeStorage::evaluateAccessibility(
 	const int3 & coord,
 	const EPathfindingLayer & layer) const
 {
-	const TerrainTile * tile = gameInfo->getTile(coord);
+	const TerrainTile * tile = mapView ? mapView->getTile(coord) : gameInfo->getTile(coord);
 	if(!PathfinderUtil::layerMatchesTerrain(layer, *tile)
 		|| (layer == ELayer::AIR && !useFlying)
 		|| (layer == ELayer::WATER && !useWaterWalking))
@@ -128,6 +129,13 @@ NodeStorage::NodeStorage(CPathsInfo & pathsInfo, const CGHeroInstance * hero)
 	out.hpos = hero->visitablePos();
 }
 
+NodeStorage::NodeStorage(CPathsInfo & pathsInfo, const CGHeroInstance * hero, const PathfinderStart & start)
+	: out(pathsInfo), initialLayer(start.layer), initialMovementPoints(start.movementPoints)
+{
+	out.hero = hero;
+	out.hpos = start.position;
+}
+
 void NodeStorage::resetTile(const int3 & tile, const EPathfindingLayer & layer, EPathAccessibility accessibility)
 {
 	auto * node = out.getNodeForWrite(tile, layer);
@@ -137,10 +145,10 @@ void NodeStorage::resetTile(const int3 & tile, const EPathfindingLayer & layer, 
 
 std::vector<CGPathNode *> NodeStorage::getInitialNodes()
 {
-	auto * initialNode = getNode(out.hpos, out.hero->getPathfindingStartLayer());
+	auto * initialNode = getNode(out.hpos, initialLayer.value_or(out.hero->getPathfindingStartLayer()));
 
 	initialNode->turns = 0;
-	initialNode->moveRemains = out.hero->movementPointsRemaining();
+	initialNode->moveRemains = initialMovementPoints.value_or(out.hero->movementPointsRemaining());
 	initialNode->setCost(0.0);
 
 	if(!initialNode->coord.isValid())

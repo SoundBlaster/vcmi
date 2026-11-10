@@ -9,6 +9,9 @@
  */
 #pragma once
 
+#include "../constants/EntityIdentifiers.h"
+#include "../int3.h"
+
 class INodeStorage;
 class IPathfindingRule;
 class CPathfinderHelper;
@@ -17,9 +20,31 @@ class CGHeroInstance;
 class IGameInfoCallback;
 struct PathNodeInfo;
 struct CPathsInfo;
+struct TerrainTile;
+
+/// Read-only tile overlay used while searching from a prospective hero position.
+class DLL_LINKAGE PathfinderMapView
+{
+	struct Impl;
+	std::unique_ptr<Impl> impl;
+public:
+	PathfinderMapView(const IGameInfoCallback & gameInfo, const CGHeroInstance * hero);
+	~PathfinderMapView();
+	const TerrainTile * getTile(const int3 & position) const;
+};
+
+/// A prospective on-foot AIR or WATER position on the hero's current level.
+/// The map view retains current player knowledge; it does not reveal new tiles.
+struct PathfinderStart
+{
+	int3 position;
+	EPathfindingLayer layer;
+	int movementPoints;
+};
 
 struct DLL_LINKAGE PathfinderOptions
 {
+	std::shared_ptr<const PathfinderMapView> mapView;
 	bool useFlying;
 	bool useWaterWalking;
 	bool ignoreGuards;
@@ -113,6 +138,7 @@ private:
 
 public:
 	SingleHeroPathfinderConfig(CPathsInfo & out, const IGameInfoCallback & gs, const CGHeroInstance * hero);
+	SingleHeroPathfinderConfig(CPathsInfo & out, const IGameInfoCallback & gs, const CGHeroInstance * hero, const PathfinderStart & start);
 	virtual ~SingleHeroPathfinderConfig();
 
 	CPathfinderHelper * getOrCreatePathfinderHelper(const PathNodeInfo & source, const IGameInfoCallback & gameInfo) override;

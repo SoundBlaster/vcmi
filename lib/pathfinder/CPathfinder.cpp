@@ -21,6 +21,7 @@
 #include "../TerrainHandler.h"
 #include "../RoadHandler.h"
 #include "../callback/IGameInfoCallback.h"
+#include "../gameState/CGameState.h"
 #include "../mapObjects/CGHeroInstance.h"
 #include "../mapObjects/CGTownInstance.h"
 #include "../mapObjects/MiscObjects.h"
@@ -118,7 +119,7 @@ void CPathfinder::calculatePaths()
 			throw std::runtime_error("Wrong checksum");
 		}
 
-		source.setNode(gameInfo, initialNode);
+		source.setNode(gameInfo, initialNode, config->options.mapView.get());
 		auto * hlp = config->getOrCreatePathfinderHelper(source, gameInfo);
 		if(hlp->isHeroPatrolLocked())
 			continue;
@@ -133,7 +134,7 @@ void CPathfinder::calculatePaths()
 		counter++;
 		auto * node = topAndPop();
 
-		source.setNode(gameInfo, node);
+		source.setNode(gameInfo, node, config->options.mapView.get());
 		source.node->locked = true;
 
 		int movement = source.node->moveRemains;
@@ -152,7 +153,7 @@ void CPathfinder::calculatePaths()
 				continue;
 		}
 
-		source.isInitialPosition = source.nodeHero == hlp->hero;
+		source.isInitialPosition = config->options.mapView ? source.node->theNodeBefore == nullptr : source.nodeHero == hlp->hero;
 		source.updateInfo(hlp, gameInfo);
 
 		//add accessible neighbouring nodes to the queue
@@ -168,7 +169,7 @@ void CPathfinder::calculatePaths()
 				if(neighbour->locked)
 					continue;
 
-				destination.setNode(gameInfo, neighbour);
+				destination.setNode(gameInfo, neighbour, config->options.mapView.get());
 				hlp = config->getOrCreatePathfinderHelper(destination, gameInfo);
 
 				if(!hlp->isPatrolMovementAllowed(neighbour->coord))
@@ -219,7 +220,7 @@ void CPathfinder::calculatePaths()
 			if(teleportNode->accessible == EPathAccessibility::BLOCKED)
 				continue;
 
-			destination.setNode(gameInfo, teleportNode);
+			destination.setNode(gameInfo, teleportNode, config->options.mapView.get());
 			destination.turn = turn;
 			destination.movementLeft = movement;
 			destination.cost = cost;
@@ -423,6 +424,8 @@ void CPathfinder::initializeGraph()
 
 bool CPathfinderHelper::canMoveBetween(const int3 & a, const int3 & b) const
 {
+	if(options.mapView)
+		return gameInfo.gameState().getMap().checkForVisitableDir(a, options.mapView->getTile(b), b);
 	return gameInfo.checkForVisitableDir(a, b);
 }
 

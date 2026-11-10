@@ -17,6 +17,36 @@
 #include "../IGameSettings.h"
 #include "../GameLibrary.h"
 #include "../callback/IGameInfoCallback.h"
+#include "../mapObjects/CGHeroInstance.h"
+#include "../mapping/TerrainTile.h"
+
+struct PathfinderMapView::Impl
+{
+	const IGameInfoCallback & gameInfo;
+	ObjectInstanceID hero;
+	mutable std::map<int3, TerrainTile> tiles;
+};
+
+PathfinderMapView::PathfinderMapView(const IGameInfoCallback & gameInfo, const CGHeroInstance * hero)
+	: impl(std::make_unique<Impl>(gameInfo, hero->id))
+{
+}
+
+PathfinderMapView::~PathfinderMapView() = default;
+
+const TerrainTile * PathfinderMapView::getTile(const int3 & position) const
+{
+	const auto found = impl->tiles.find(position);
+	if(found != impl->tiles.end())
+		return &found->second;
+	const auto * tile = impl->gameInfo.getTile(position);
+	if(!vstd::contains(tile->visitableObjects, impl->hero) && !vstd::contains(tile->blockingObjects, impl->hero))
+		return tile;
+	auto it = impl->tiles.emplace(position, *tile).first;
+	vstd::erase_if(it->second.visitableObjects, [&](ObjectInstanceID id) { return id == impl->hero; });
+	vstd::erase_if(it->second.blockingObjects, [&](ObjectInstanceID id) { return id == impl->hero; });
+	return &it->second;
+}
 
 PathfinderOptions::PathfinderOptions(const IGameInfoCallback & cb)
 	: useFlying(true)
@@ -63,6 +93,17 @@ SingleHeroPathfinderConfig::SingleHeroPathfinderConfig(CPathsInfo & out, const I
 	: PathfinderConfig(std::make_shared<NodeStorage>(out, hero), gs, buildRuleSet())
 	, hero(hero)
 {
+}
+
+SingleHeroPathfinderConfig::SingleHeroPathfinderConfig(CPathsInfo & out, const IGameInfoCallback & gs, const CGHeroInstance * hero, const PathfinderStart & start)
+	: PathfinderConfig(std::make_shared<NodeStorage>(out, hero, start), gs, buildRuleSet())
+	, hero(hero)
+{
+	if(hero->inBoat() || !gs.isInTheMap(start.position) || start.position.z != hero->visitablePos().z
+		|| (start.layer != EPathfindingLayer::AIR && start.layer != EPathfindingLayer::WATER)
+		|| start.movementPoints < 0)
+		throw std::invalid_argument("Invalid prospective on-foot transient pathfinder start");
+	options.mapView = std::make_shared<PathfinderMapView>(gs, hero);
 }
 
 CPathfinderHelper * SingleHeroPathfinderConfig::getOrCreatePathfinderHelper(const PathNodeInfo & source, const IGameInfoCallback & gameInfo)

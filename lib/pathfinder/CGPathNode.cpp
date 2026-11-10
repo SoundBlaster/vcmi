@@ -11,6 +11,7 @@
 #include "CGPathNode.h"
 
 #include "CPathfinder.h"
+#include "PathfinderOptions.h"
 
 #include "../callback/IGameInfoCallback.h"
 #include "../mapObjects/CGHeroInstance.h"
@@ -131,7 +132,7 @@ PathNodeInfo::PathNodeInfo()
 {
 }
 
-void PathNodeInfo::setNode(const IGameInfoCallback & gameInfo, CGPathNode * n)
+void PathNodeInfo::setNode(const IGameInfoCallback & gameInfo, CGPathNode * n, const PathfinderMapView * mapView)
 {
 	node = n;
 	guarded = false;
@@ -141,7 +142,7 @@ void PathNodeInfo::setNode(const IGameInfoCallback & gameInfo, CGPathNode * n)
 		assert(node->coord.isValid());
 
 		coord = node->coord;
-		tile = gameInfo.getTile(coord);
+		tile = mapView ? mapView->getTile(coord) : gameInfo.getTile(coord);
 		nodeObject = nullptr;
 		nodeHero = nullptr;
 
@@ -195,9 +196,9 @@ CDestinationNodeInfo::CDestinationNodeInfo():
 {
 }
 
-void CDestinationNodeInfo::setNode(const IGameInfoCallback & gameInfo, CGPathNode * n)
+void CDestinationNodeInfo::setNode(const IGameInfoCallback & gameInfo, CGPathNode * n, const PathfinderMapView * mapView)
 {
-	PathNodeInfo::setNode(gameInfo, n);
+	PathNodeInfo::setNode(gameInfo, n, mapView);
 
 	blocked = false;
 	action = EPathNodeAction::UNKNOWN;
