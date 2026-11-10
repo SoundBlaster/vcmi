@@ -333,6 +333,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		.town(int3(27, 27, 0), FactionID(0), blue)
 		.hero(int3(1, 0, 0), HeroTypeID(0), red)
 		.hero(int3(1, 5, 0), HeroTypeID(1), blue)
+		.terrain(int3(35, 4, 0), TerrainId::ROCK)
 		.resource(int3(35, 35, 0), GameResID::GOLD, 10).build();
 	CMemoryBuffer bytes;
 	bytes.write(source.data(), static_cast<si64>(source.size()));
@@ -388,12 +389,15 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 				state->apply(*gamePack);
 				if(const auto * applied = dynamic_cast<const PackageApplied *>(gamePack))
 					results[applied->requestID] = applied->result;
+				if(const auto * movement = dynamic_cast<const TryMoveHero *>(gamePack); movement && movement->result == TryMoveHero::FAILED)
+					failedMoves.insert(movement->id);
 			}
 		}
 		std::string name;
 		std::string failure;
 		bool negotiated = false;
 		std::map<uint32_t, bool> results;
+		std::set<ObjectInstanceID> failedMoves;
 		std::shared_ptr<INetworkConnection> transport;
 		std::unique_ptr<GameConnection> codec;
 		std::shared_ptr<CGameState> state;
@@ -515,6 +519,47 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_EQ(blueHeroes.size(), 1);
 	const auto * blueHero = blueHeroes.front();
 	ASSERT_EQ(blueHero->visitablePos(), int3(0, 5, 0));
+	const auto blueMovementBefore = blueHero->movementPointsRemaining();
+	const auto visibility = [&](const CGameState & state)
+	{
+		std::vector<bool> result;
+		for(const PlayerColor player : {red, blue})
+			for(int x = 0; x < 36; ++x)
+				for(int y = 0; y < 36; ++y)
+					result.push_back(state.isVisibleFor(int3(x, y, 0), player));
+		return result;
+	};
+	const auto serverFog = visibility(server.gh->gameState());
+	const auto hostFog = visibility(*host.state);
+	const auto guestFog = visibility(*guest.state);
+	ASSERT_EQ(hostFog, serverFog);
+	ASSERT_EQ(guestFog, serverFog);
+	const int3 blockedDestination(35, 4, 0);
+	ASSERT_FALSE(server.gh->gameState().getMap().getTile(blockedDestination).getTerrain()->isPassable());
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_EQ(peer->state->getHero(blueHero->id)->visitablePos(), int3(0, 5, 0));
+		ASSERT_EQ(peer->state->getHero(blueHero->id)->movementPointsRemaining(), blueMovementBefore);
+	}
+	MoveHero blockedMove({blueHero->convertFromVisitablePos(blockedDestination)}, EPathfindingLayer::LAND, blueHero->id, false);
+	blockedMove.player = blue;
+	blockedMove.requestID = 14;
+	guest.codec->sendPack(blockedMove);
+	pumpUntil([&] { return guest.results.contains(14) && host.failedMoves.contains(blueHero->id) && guest.failedMoves.contains(blueHero->id); });
+	ASSERT_TRUE(guest.results.contains(14)) << guest.failure;
+	ASSERT_TRUE(host.failedMoves.contains(blueHero->id)) << host.failure;
+	ASSERT_TRUE(guest.failedMoves.contains(blueHero->id)) << guest.failure;
+	EXPECT_FALSE(guest.results.at(14));
+	EXPECT_EQ(visibility(server.gh->gameState()), serverFog);
+	EXPECT_EQ(visibility(*host.state), hostFog);
+	EXPECT_EQ(visibility(*guest.state), guestFog);
+	EXPECT_EQ(server.gh->gameState().getHero(blueHero->id)->visitablePos(), int3(0, 5, 0));
+	EXPECT_EQ(server.gh->gameState().getHero(blueHero->id)->movementPointsRemaining(), blueMovementBefore);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		EXPECT_EQ(peer->state->getHero(blueHero->id)->visitablePos(), int3(0, 5, 0)) << peer->failure;
+		EXPECT_EQ(peer->state->getHero(blueHero->id)->movementPointsRemaining(), blueMovementBefore);
+	}
 	const int3 blueDestination(35, 5, 0);
 	MoveHero guestMove({blueHero->convertFromVisitablePos(blueDestination)}, EPathfindingLayer::LAND, blueHero->id, false);
 	guestMove.player = blue;
@@ -529,7 +574,10 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	EXPECT_TRUE(guest.results.at(13));
 	EXPECT_EQ(server.gh->gameState().getHero(blueHero->id)->visitablePos(), blueDestination);
 	for(const LobbyPeer * peer : {&host, &guest})
+	{
 		EXPECT_EQ(peer->state->getHero(blueHero->id)->visitablePos(), blueDestination) << peer->failure;
+		EXPECT_EQ(visibility(*peer->state), visibility(server.gh->gameState()));
+	}
 }
 
 TEST(ToroidalDemoVmapTest, DecodesExternalUntaggedPrototypeSave)

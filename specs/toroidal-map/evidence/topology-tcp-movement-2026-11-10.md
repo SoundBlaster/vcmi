@@ -71,3 +71,20 @@ sample showed its only thread waiting in `dyld` while opening a file, before
 the test executable entered `main`. This is not evidence that the TCP test
 itself hung; the path and cause of the `open` wait remain unknown. The current
 TCP movement test passed independently as described above.
+
+## Rejected seam move after normal lobby start
+
+The TCP lobby-start test now places impassable rock at `(35,4,0)`. During
+the blue player's turn, its listener requests a diagonal step there from
+`(0,5,0)`, across the horizontal seam. The server returns a negative
+`PackageApplied` result and both listeners receive a failed `TryMoveHero`.
+The test checks the authoritative state and both replicas retain the hero's
+position and movement points. It compares every surface tile's fog state
+for both teams before and after the rejected move, confirms the three states
+agree, then executes the legal westward step and compares fog again.
+
+The expanded test passed three consecutive repetitions on macOS arm64 with the TB5 build from `ce3eb14`
+plus the test. Both peers are test listeners in the same process as the server,
+with packets over TCP loopback and directly configured lobby slots. The test
+does not establish packet confidentiality, graphical multiplayer behavior,
+remote-host behavior, other levels or all rejection reasons.
