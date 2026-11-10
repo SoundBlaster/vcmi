@@ -9,6 +9,8 @@
  */
 #include "StdInc.h"
 
+#include "../../client/mapView/MapViewBattle.h"
+
 #include "../mock/GameHandlerTestServer.h"
 #include "../mock/TinyMapGameTest.h"
 #include "../mock/ToroidalDemoMap.h"
@@ -3225,6 +3227,40 @@ TEST_F(HeroMovementTest, MonsterGuardAcrossCornerStartsBattle)
 	const auto * battle = gameState()->getBattle(player);
 	ASSERT_NE(battle, nullptr);
 	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+}
+
+TEST_F(HeroMovementTest, WrappedMonsterBattleUsesTheCanonicalVisitablePosition)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.monster(int3(35, 35, 0), CreatureID(27), 100);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	const auto guardID = map()->getTile(int3(35, 35, 0)).topVisitableObj();
+	map()->moveObject(guardID, int3(-1, -1, 0));
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	auto * guard = dynamic_cast<const CArmedInstance *>(map()->getObject(guardID));
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(guard, nullptr);
+	ASSERT_EQ(guard->anchorPos(), int3(-1, -1, 0));
+	ASSERT_EQ(guard->visitablePos(), int3(35, 35, 0));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	const auto * battle = gameState()->getBattle(player);
+	ASSERT_NE(battle, nullptr);
+	ASSERT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+	ASSERT_EQ(battle->getLocation(), guard->visitablePos());
+	EXPECT_TRUE(battleMatchesMonsterPosition(*guard, battle->getLocation(), true));
+	EXPECT_FALSE(battleMatchesMonsterPosition(*guard, int3(35, 34, 0), true));
+	EXPECT_FALSE(battleMatchesMonsterPosition(*guard, int3(35, 35, 1), true));
+	EXPECT_FALSE(battleMatchesMonsterPosition(*guard, battle->getLocation(), false));
+	EXPECT_TRUE(battleMatchesMonsterPosition(*guard, guard->anchorPos(), false));
 }
 
 TEST_F(HeroMovementTest, HiddenMonsterGuardAcrossCornerStillStartsBattle)

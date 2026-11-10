@@ -12,6 +12,7 @@
 #include "MapRendererContext.h"
 
 #include "MapRendererContextState.h"
+#include "MapViewBattle.h"
 #include "MapViewMovement.h"
 #include "mapHandler.h"
 
@@ -159,7 +160,7 @@ int MapRendererBaseContext::attackedMonsterDirection(const CGObjectInstance * wa
 
 	for(const auto & battle : GAME->interface()->cb->getActiveBattles())
 	{
-		if(wanderingMonster->pos != battle.second->getBattle()->getLocation())
+		if(!battleMatchesMonsterPosition(*wanderingMonster, battle.second->getBattle()->getLocation(), GAME->map().getMap()->toroidal))
 			continue;
 
 		// hero is gone once the battle is being torn down, while the map is still drawn
