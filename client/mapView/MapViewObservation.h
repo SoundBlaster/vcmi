@@ -7,6 +7,29 @@
 
 #include "MapViewModel.h"
 #include "../../lib/mapping/MapTopology.h"
+#include <cstddef>
+#include <string>
+
+/// Emit a snapshot for a changed observable state or when a moving camera
+/// stops, so its exact final pixel position is not left stale.
+class MapObservationGate
+{
+	bool initialized = false;
+	bool wasMoving = false;
+	Point lastCenter;
+	std::string lastKey;
+public:
+	bool shouldRecord(const std::string & key, const Point & center)
+	{
+		const bool moving = initialized && center != lastCenter;
+		const bool record = !initialized || key != lastKey || (wasMoving && !moving);
+		initialized = true;
+		wasMoving = moving;
+		lastCenter = center;
+		lastKey = key;
+		return record;
+	}
+};
 
 /// Visits visible displayed tile copies within a fixed work budget. The
 /// caller provides visibility from the active renderer context, not the map.

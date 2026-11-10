@@ -79,6 +79,19 @@ TEST(MapViewModelTopologyTest, ObservationWidgetTraversalKeepsParentsAndReportsL
 	EXPECT_EQ(nodes, (std::vector<std::pair<int, int>>{{0, -1}, {1, 0}, {2, 0}}));
 }
 
+TEST(MapViewModelTopologyTest, ObservationEmitsOnlyForChangesAndCameraSettling)
+{
+	MapObservationGate gate;
+	EXPECT_TRUE(gate.shouldRecord("state-a", Point(0, 0)));
+	EXPECT_FALSE(gate.shouldRecord("state-a", Point(0, 0)));
+	EXPECT_FALSE(gate.shouldRecord("state-a", Point(1, 0)));
+	EXPECT_FALSE(gate.shouldRecord("state-a", Point(2, 0)));
+	EXPECT_TRUE(gate.shouldRecord("state-a", Point(2, 0)));
+	EXPECT_FALSE(gate.shouldRecord("state-a", Point(2, 0)));
+	EXPECT_TRUE(gate.shouldRecord("state-b", Point(2, 0)));
+	EXPECT_FALSE(gate.shouldRecord("state-b", Point(2, 0)));
+}
+
 TEST(MapViewModelTopologyTest, RepeatedCopiesUseTheSameOverlayTileAndLabelParity)
 {
 	const MapTopology torus(5, 7, 2, true);

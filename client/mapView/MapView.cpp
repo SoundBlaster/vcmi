@@ -59,6 +59,11 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 		std::ofstream file;
 		std::size_t remaining = 1800;
 		std::size_t sequence = 0;
+		std::size_t showCount = 0;
+		MapObservationGate gate;
+		const CIntObject * previousWindow = nullptr;
+		std::chrono::steady_clock::time_point lastGuiScan{};
+		std::string guiData;
 		const int64_t session = std::chrono::duration_cast<std::chrono::nanoseconds>(
 			std::chrono::steady_clock::now().time_since_epoch()).count();
 		Trace()
@@ -70,17 +75,19 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 	static Trace trace;
 	if(!trace.file || trace.remaining == 0)
 		return;
-	--trace.remaining;
+	const std::size_t showCount = trace.showCount++;
 	const auto * callback = GAME->interface()->cb.get();
 	const auto * header = callback->getMapHeader();
 	const auto topology = header->getTopology();
 	const auto center = model.getMapViewCenter();
 	const auto tileSize = model.getSingleTileSize();
-	const auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-		std::chrono::steady_clock::now().time_since_epoch()).count();
 	std::ostringstream out;
-	out << "{\"version\":1,\"session\":" << trace.session << ",\"sequence\":" << trace.sequence++
-		<< ",\"monotonic_ns\":" << timestamp << ",\"level\":" << model.getLevel()
+	std::ostringstream key;
+	key << model.getLevel() << ':' << header->width << ':' << header->height << ':' << header->toroidal
+		<< ':' << tileSize.x << ':' << tileSize.y << ':' << viewport.x << ':' << viewport.y << ':' << viewport.w << ':' << viewport.h
+		<< ':' << static_cast<int>(std::floor(static_cast<double>(center.x) / tileSize.x))
+		<< ':' << static_cast<int>(std::floor(static_cast<double>(center.y) / tileSize.y));
+	out << ",\"level\":" << model.getLevel()
 		<< ",\"map_size\":[" << header->width << ',' << header->height << ']'
 		<< ",\"toroidal\":" << (header->toroidal ? "true" : "false")
 		<< ",\"center\":[" << center.x << ',' << center.y << ']'
@@ -108,6 +115,7 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 					break;
 				}
 				++candidateCount;
+				key << ':' << id.getNum() << ',' << displayed.x << ',' << displayed.y << ',' << canonical.x << ',' << canonical.y;
 				if(!first)
 					out << ',';
 				first = false;
@@ -119,25 +127,41 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 			}
 		});
 	out << "],\"complete\":" << (tilesComplete && candidatesComplete ? "true" : "false");
+	key << ':' << tilesComplete << ':' << candidatesComplete;
 	const auto window = ENGINE->windows().topWindow<CIntObject>();
-	out << ",\"gui_available\":" << (window ? "true" : "false") << ",\"gui\":[";
-	bool firstWidget = true;
-	const bool guiComplete = forEachObservedWidget(window.get(), 256, 32,
-		[&](const CIntObject & widget, int index, int parent)
-		{
-			if(!firstWidget)
-				out << ',';
-			firstWidget = false;
-			out << "{\"index\":" << index << ",\"parent\":" << parent
-				<< ",\"kind\":\"" << (dynamic_cast<const ButtonBase *>(&widget) ? "button" : "widget")
-				<< "\",\"rect\":[" << widget.pos.x << ',' << widget.pos.y << ',' << widget.pos.w << ',' << widget.pos.h
-				<< "],\"active\":" << (widget.isActive() ? "true" : "false")
-				<< ",\"disabled\":" << (widget.isDisabled() ? "true" : "false") << '}';
-		});
-	out << "],\"gui_complete\":" << (guiComplete ? "true" : "false") << "}\n";
-	trace.file << out.str();
-	if(trace.sequence % 60 == 0 || trace.remaining == 0)
-		trace.file.flush();
+	const auto now = std::chrono::steady_clock::now();
+	if(trace.guiData.empty() || trace.previousWindow != window.get() || now - trace.lastGuiScan >= std::chrono::milliseconds(200))
+	{
+		trace.previousWindow = window.get();
+		trace.lastGuiScan = now;
+		std::ostringstream gui;
+		gui << ",\"gui_available\":" << (window ? "true" : "false") << ",\"gui\":[";
+		bool firstWidget = true;
+		const bool guiComplete = forEachObservedWidget(window.get(), 4096, 32,
+			[&](const CIntObject & widget, int index, int parent)
+			{
+				if(!firstWidget)
+					gui << ',';
+				firstWidget = false;
+				gui << "{\"index\":" << index << ",\"parent\":" << parent
+					<< ",\"kind\":\"" << (dynamic_cast<const ButtonBase *>(&widget) ? "button" : "widget")
+					<< "\",\"rect\":[" << widget.pos.x << ',' << widget.pos.y << ',' << widget.pos.w << ',' << widget.pos.h
+					<< "],\"active\":" << (widget.isActive() ? "true" : "false")
+					<< ",\"disabled\":" << (widget.isDisabled() ? "true" : "false") << '}';
+			});
+		gui << "],\"gui_complete\":" << (guiComplete ? "true" : "false");
+		trace.guiData = gui.str();
+	}
+	key << trace.guiData;
+	if(!trace.gate.shouldRecord(key.str(), center))
+		return;
+	--trace.remaining;
+	const auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+	const auto guiTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(trace.lastGuiScan.time_since_epoch()).count();
+	trace.file << "{\"version\":2,\"session\":" << trace.session << ",\"sequence\":" << trace.sequence++
+		<< ",\"show_count\":" << showCount << ",\"monotonic_ns\":" << timestamp << ",\"gui_observed_ns\":" << guiTimestamp
+		<< out.str() << trace.guiData << "}\n";
+	trace.file.flush();
 }
 }
 
