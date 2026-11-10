@@ -1527,6 +1527,31 @@ TEST_F(HeroMovementTest, ObjectTileQueriesFindFootprintAcrossToroidalCorner)
 	EXPECT_TRUE(object.coveringAt(across));
 }
 
+TEST_F(HeroMovementTest, VisitablePositionWrapsCornerWithoutChangingLevel)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A0", "00" ] })";
+	JsonNode definition(text.data(), text.size(), "VisitableCornerTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	CGObjectInstance object(gameState().get());
+	object.appearance = appearance;
+	object.pos = int3(0, 0, 1);
+	EXPECT_EQ(object.visitablePos(), int3(-1, -1, 1));
+	map()->toroidal = true;
+	EXPECT_EQ(object.visitablePos(), int3(35, 35, 1));
+	EXPECT_EQ(object.anchorPos(), int3(0, 0, 1));
+	object.pos.z = -1;
+	EXPECT_EQ(object.visitablePos(), int3(-1, -1, -1));
+	object.pos.z = 1;
+	object.cb = nullptr;
+	EXPECT_EQ(object.visitablePos(), int3(-1, -1, 1));
+}
+
 TEST_F(HeroMovementTest, SeamSpanningBlockerPreventsMovementOnBothSides)
 {
 	const PlayerColor player(0);
@@ -1637,7 +1662,15 @@ TEST_F(HeroMovementTest, CollectsResourceWithVisitableTileAcrossSeam)
 	resource->appearance = appearance;
 	map()->showObject(resource);
 	const int3 destination(35, 10, 0);
-	ASSERT_EQ(resource->visitablePos(), int3(-1, 10, 0));
+	ASSERT_EQ(resource->visitablePos(), destination);
+	map()->toroidal = false;
+	EXPECT_EQ(resource->visitablePos(), int3(-1, 10, 0));
+	map()->toroidal = true;
+	EditorCallback unboundEditor(nullptr);
+	auto * originalCallback = resource->cb;
+	resource->cb = &unboundEditor;
+	EXPECT_NO_THROW(EXPECT_EQ(resource->visitablePos(), int3(-1, 10, 0)));
+	resource->cb = originalCallback;
 	ASSERT_EQ(map()->getTile(destination).topVisitableObj(), resource->id);
 	const auto id = resource->id;
 	const auto gold = gameState()->players.at(player).resources[GameResID::GOLD];

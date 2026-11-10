@@ -38,11 +38,37 @@ resource onto a synthetic footprint whose raw visitable coordinate is
 `(-1,10,0)` and whose canonical tile is `(35,10,0)`. The game-state occupancy
 identifies the resource at the canonical tile, and a server movement into it
 collects and removes the resource. The broader related run passed 36 tests
-(`seam-visitable-related-tests.log`). `visitablePos()` itself still returns the
-raw coordinate in this case; a global change would need to account for object
-construction before the editor has attached a map. The single resource check
-does not prove that other consumers handle this raw value, and the authored
-static-object restriction remains in force.
+(`seam-visitable-related-tests.log`). At that revision `visitablePos()` still
+returned the raw coordinate; the later correction is described below. The
+single resource check does not prove that other consumers handle such objects,
+and the authored static-object restriction remains in force.
+
+## Canonical visitable positions
+
+On 2026-11-10, `CGObjectInstance::visitablePos()` was changed to resolve an
+object's visitable cell through its attached toroidal map topology. The stored
+anchor and footprint coordinates remain raw; bounded maps and objects without
+an attached map keep the earlier result. An invalid level also remains raw.
+This changes an accessor shared by many subsystems and does not by itself
+validate every use of a position or every placement made before attachment.
+
+Before the correction, a synthetic town at anchor `(0,10,0)` with its
+visitable footprint at raw `(-1,10,0)` failed the new Town Portal test's
+position assertion. With the correction, the server spell handler reaches
+the town at canonical `(35,10,0)` and assigns the hero as its visitor. Other
+focused tests cover corner wrapping on the underground level, a detached
+object and editor callback, invalid level, resource pickup, two-way gate,
+one-way monolith and whirlpool. Seven focused tests passed after the final
+test addition. The synthetic town and objects bypass the existing authoring
+restriction; they do not prove a real map can be saved or visually rendered.
+
+The macOS arm64 Release test, client and editor targets built from `47faf46`
+plus the accessor change. The complete suite then passed 1,425 tests with two
+optional external-prototype tests skipped and four tests disabled. This run
+preceded the final corner-only test addition, which passed in the focused run.
+The build retained duplicate-library and absent Conan search-path warnings;
+the suite emitted mock-callback warnings, including calls to the newly queried
+map-header accessor. No GUI test was performed for this change.
 
 The later unbound-callback check exposed a regression in the new footprint
 lookup: `EditorCallback` throws if asked for a map header before a map is

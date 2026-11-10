@@ -2696,7 +2696,7 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGateWithVisitableTileAcrossSeam)
 	};
 	const auto entrance = addGate(int3(10, 5, 0), "entrance", "A");
 	const auto exit = addGate(int3(0, 5, 1), "seam_exit", "A0");
-	ASSERT_EQ(exit->visitablePos(), int3(-1, 5, 1));
+	ASSERT_EQ(exit->visitablePos(), int3(35, 5, 1));
 	ASSERT_EQ(map()->getTile(int3(35, 5, 1)).topVisitableObj(), exit->id);
 	CGSubterraneanGate::postInit(gameState().get());
 	ASSERT_EQ(entrance->channel, exit->channel);
@@ -2750,7 +2750,7 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesOneWayMonolithWithExitAcrossSeam)
 	};
 	const auto entrance = addMonolith(Obj::MONOLITH_ONE_WAY_ENTRANCE, int3(10, 5, 0), "entrance", "A");
 	const auto exit = addMonolith(Obj::MONOLITH_ONE_WAY_EXIT, int3(0, 5, 0), "seam_exit", "A0");
-	ASSERT_EQ(exit->visitablePos(), int3(-1, 5, 0));
+	ASSERT_EQ(exit->visitablePos(), int3(35, 5, 0));
 	ASSERT_EQ(map()->getTile(int3(35, 5, 0)).topVisitableObj(), exit->id);
 	ASSERT_EQ(entrance->channel, exit->channel);
 	auto * hero = findHeroByOwner(player);
@@ -2951,6 +2951,44 @@ TEST_F(TownPortalTest, unskilledTownPortalChoosesNearestTownAcrossToroidalSeam)
 	map()->toroidal = true;
 	gameHandler.castSpell(hero, SpellID(SpellID::decode("core:townPortal")), int3(-1, -1, -1));
 	EXPECT_EQ(hero->visitablePos(), (*across)->visitablePos());
+}
+
+TEST_F(TownPortalTest, reachesTownWhoseVisitableTileWrapsAcrossSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(player)
+		.hero(int3(3, 10, 0), HeroTypeID(0), player)
+		.heroSpells({SpellID(SpellID::decode("core:townPortal"))})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID(ArtifactID::SPELLBOOK)}})
+		.heroPrimary(0, 0, 20, 20)
+		.town(int3(10, 10, 0), FactionID(0), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	auto * hero = findHeroByOwner(player);
+	const auto towns = findAll<CGTownInstance>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(towns.size(), 1u);
+	auto * town = towns.front();
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ "A0" ] })";
+	JsonNode definition(text.data(), text.size(), "SeamTownPortalTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	map()->hideObject(town);
+	town->pos = int3(0, 10, 0);
+	town->appearance = appearance;
+	map()->showObject(town);
+	const int3 destination(35, 10, 0);
+	ASSERT_EQ(town->visitablePos(), destination);
+	ASSERT_EQ(map()->getTile(destination).topVisitableObj(), town->id);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.castSpell(hero, SpellID(SpellID::decode("core:townPortal")), int3(-1, -1, -1));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_EQ(town->getVisitingHero(), hero);
 }
 
 TEST_F(TownPortalTest, unskilledTownPortalChoosesCrossLevelTownAcrossToroidalSeam)

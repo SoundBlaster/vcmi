@@ -418,7 +418,13 @@ void CGObjectInstance::onHeroVisit(IGameEventCallback & gameEvents, const CGHero
 int3 CGObjectInstance::visitablePos() const
 {
 	// getVisitableOffset reports a non-visitable object
-	return pos - getVisitableOffset();
+	const auto position = pos - getVisitableOffset();
+	// Objects are also queried while being constructed, before a map is attached.
+	// Keep their raw coordinates then and preserve invalid level sentinels.
+	const auto * header = cb ? cb->tryGetMapHeader() : nullptr;
+	if(header && header->toroidal)
+		return header->getTopology().canonicalize(position).value_or(position);
+	return position;
 }
 
 bool CGObjectInstance::isVisitable() const
