@@ -14,6 +14,20 @@ each bundle satisfied the other's designated requirement. This checks code
 identity across two different bundle seals, not a source rebuild or retention
 of a macOS privacy authorization. Neither copy was launched in this check.
 
+A later `4255569` client and shared library were copied into a separate
+development-signed bundle, with its dependencies adjusted to bundled
+libraries. It passed strict signature verification and satisfied the prior
+development bundle's designated requirement in both directions. Computer Use
+launched the app, but no game window appeared. A process sample showed the
+current client and `libvcmi.dylib` loaded and its main thread waiting in
+`open` while configuring the default log. The sample does not expose the
+file path, though the default log directory resolves through the isolated
+TB5 profile. Filtered TCC logs recorded developer-tool and All Files
+preflights, but no removable-volume prompt or decision for this launch. The
+test process was force-quit through Activity Monitor. This attempt neither
+verifies the current client visually nor proves that signing preserves or
+fails to preserve removable-volume authorization.
+
 For comparison, the existing ad-hoc signed `VCMI Toroid Lab.app` had a
 designated requirement based on its code-directory hash. The earlier macOS
 log below recorded a mismatch between its saved requirement and the newly

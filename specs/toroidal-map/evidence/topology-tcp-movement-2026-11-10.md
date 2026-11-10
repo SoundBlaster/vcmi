@@ -57,3 +57,17 @@ across the horizontal seam. Both replicas matched the server after each
 step. The final test passed five consecutive runs on macOS arm64, built from
 `8d71f38` plus the test. The real graphical clients, lobby UI, mixed-version
 start, remote hosts and network confidentiality are outside this check.
+
+## Recheck after pathfinding changes
+
+After commit `4255569`, the TCP movement, TCP lobby-start and capability
+negotiation tests each passed three consecutive times on macOS arm64. The log
+is `tcp-current-4255569.log` on TB5. These remain in-process fixtures using
+loopback TCP and test listeners; they are not graphical multiplayer sessions.
+
+An older orphaned `vcmitest` process with the TCP movement filter had remained
+running for hours and was excluded from the previous full-suite run. A macOS
+sample showed its only thread waiting in `dyld` while opening a file, before
+the test executable entered `main`. This is not evidence that the TCP test
+itself hung; the path and cause of the `open` wait remain unknown. The current
+TCP movement test passed independently as described above.
