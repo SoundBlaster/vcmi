@@ -61,6 +61,14 @@ response. The strict-signature correction alone therefore did not produce a
 working launch. The file being opened and the cause of the wait remain
 unknown; no visual behavior from this new client has been established.
 
+As a separate diagnostic, the same strict-verified 33 MB bundle was copied
+temporarily to the internal disk and launched there; the linked build
+libraries and the isolated game data remained on TB5. This process also
+stalled in `dyld` during an `open` before displaying a window. The sample did
+not reveal the path being opened, so it cannot establish which volume caused
+the wait. The process was stopped and the temporary internal copy removed;
+the TB5 bundle and its earlier backup remain.
+
 ## Initial fixture and GUI observations
 
 `test/mock/ToroidalDemoMap.h` defines a deliberately sparse 36×36 grass map
