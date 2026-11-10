@@ -579,7 +579,11 @@ const CGObjectInstance * CMap::getHeroAtTownEntrance(const CGTownInstance & town
 
 const CGObjectInstance * CMap::getObjectiveObjectFrom(const int3 & pos, Obj type)
 {
-	for(const auto & objID : getTile(pos).visitableObjects)
+	const auto topology = getTopology();
+	const auto tile = topology.canonicalize(pos);
+	if(!tile)
+		return nullptr;
+	for(const auto & objID : getTile(*tile).visitableObjects)
 	{
 		const auto * object = getObject(objID);
 		if (object->ID == type)
@@ -588,7 +592,7 @@ const CGObjectInstance * CMap::getObjectiveObjectFrom(const int3 & pos, Obj type
 
 	for(const auto & object : objects)
 	{
-		if(object && object->ID == type && object->anchorPos() == pos)
+		if(object && object->ID == type && topology.canonicalize(object->anchorPos()) == tile)
 			return object.get();
 	}
 
@@ -620,7 +624,7 @@ void CMap::checkForObjectives()
 					break;
 
 				case EventCondition::HAVE_BUILDING:
-					if (isInTheMap(cond.position))
+					if (getTopology().canonicalize(cond.position))
 					{
 						if(const auto * object = getObjectiveObjectFrom(cond.position, Obj::TOWN))
 							cond.objectID = object->id;
@@ -634,7 +638,7 @@ void CMap::checkForObjectives()
 						cond.condition = EventCondition::CONTROL_CURRENT;
 					[[fallthrough]];
 				case EventCondition::CONTROL_CURRENT:
-					if(isInTheMap(cond.position))
+					if(getTopology().canonicalize(cond.position))
 					{
 						const auto & type = cond.objectType.as<MapObjectID>();
 						if(const auto * object = getObjectiveObjectFrom(cond.position, type))
@@ -665,7 +669,7 @@ void CMap::checkForObjectives()
 					if(cond.objectType.as<MapObjectID>() == Obj::HERO_PLACEHOLDER)
 						break;
 
-					if(isInTheMap(cond.position))
+					if(getTopology().canonicalize(cond.position))
 					{
 						if(const auto * object = getObjectiveObjectFrom(cond.position, cond.objectType.as<MapObjectID>()))
 							cond.objectID = object->id;

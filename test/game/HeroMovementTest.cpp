@@ -2937,6 +2937,56 @@ TEST_F(HeroMovementTest, EditorMoveTracksOnlyStillSelectedMainTown)
 	EXPECT_EQ(map()->players[0].posOfMainTown, other);
 }
 
+TEST_F(HeroMovementTest, ObjectiveResolvesTownAnchorAcrossToroidalSeams)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.town(int3(10, 10, 0), FactionID::CASTLE, player)
+		.hero(int3(20, 20, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	auto * town = findFirst<CGTownInstance>();
+	ASSERT_NE(town, nullptr);
+	map()->setToroidalAndRebuild(true);
+	map()->moveObject(town->id, int3(-1, -1, 0));
+	const auto resolve = [&](EventCondition::EWinLoseType type, const int3 & position)
+	{
+		EventCondition condition(type);
+		if(type == EventCondition::HAVE_BUILDING)
+			condition.objectType = BuildingID(0);
+		else if(type == EventCondition::TRANSPORT)
+			condition.objectType = ArtifactID(0);
+		else
+			condition.objectType = MapObjectID(Obj::TOWN);
+		condition.position = position;
+		TriggeredEvent event;
+		event.identifier = "wrapped_town_objective";
+		event.effect.type = EventEffect::DEFEAT;
+		event.trigger = EventExpression(EventExpression::Variant(condition));
+		map()->triggeredEvents.clear();
+		map()->triggeredEvents.push_back(event);
+		map()->checkForObjectives();
+		ObjectInstanceID resolved = ObjectInstanceID::NONE;
+		map()->triggeredEvents.back().trigger.test([&](const EventCondition & current)
+		{
+			resolved = current.objectID;
+			return true;
+		});
+		return resolved;
+	};
+	for(const auto type : {EventCondition::CONTROL, EventCondition::CONTROL_CURRENT,
+		EventCondition::DESTROY, EventCondition::HAVE_BUILDING, EventCondition::TRANSPORT})
+	{
+		EXPECT_EQ(resolve(type, town->anchorPos()), town->id) << type;
+		EXPECT_EQ(resolve(type, int3(35, 35, 0)), town->id) << type;
+		EXPECT_EQ(resolve(type, town->visitablePos()), town->id) << type;
+		EXPECT_EQ(resolve(type, int3(-1, -1, -1)), ObjectInstanceID::NONE) << type;
+		EXPECT_EQ(resolve(type, int3(35, 35, 1)), ObjectInstanceID::NONE) << type;
+	}
+	map()->toroidal = false;
+	EXPECT_EQ(resolve(EventCondition::CONTROL_CURRENT, town->anchorPos()), ObjectInstanceID::NONE);
+}
+
 /// Two towns that share an entrance tile, as found on some SoD maps. The pathfinder only considers the top town.
 TEST_F(HeroMovementTest, sharedEntranceInteractsOnlyWithTopTown)
 {
