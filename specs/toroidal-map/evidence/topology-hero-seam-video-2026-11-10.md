@@ -30,7 +30,22 @@ SHA-256 `c9c5606950d27a8bf5587114f501adb5bb9a21399fc39715477c3d6df06ca043`.
 The contact sheets and appended observation file are beside it. An earlier
 15-second trial finished before movement and is not evidence for animation.
 
-This verifies only the inspected samples for one hero, terrain, camera mode,
-zoom and local client. The four directions cross one axis at a time; diagonal
-corner animation, other artwork, boats, full-frame-by-frame inspection, visual
-latency and current builds after `c2457bd` remain unverified.
+## Simultaneous corner crossing
+
+A separate 25.008-second screen recording of the same client and game captured
+one southwest diagonal move using the End key. The source observation records
+sequences 69–71: hero `(0,35,0) → (35,0,0)`, 141 movement points spent, and
+camera center `(1149,3) → (1136,16)`. Both axes therefore crossed their map
+period in one move. A 25 fps resampled contact sheet around the transition
+shows intermediate images with the hero and nearby resources still present;
+no obvious jump was observed in this cropped sample. An attempted reverse
+action used an unsupported Computer Use key name and was not performed.
+
+The second movie is `runtime/hero-corner-c2457bd-2026-11-10.mov` in the same
+TB5 build root, 3600×2338, 1,438 frames, approximately 57.5 fps average;
+SHA-256 `2bc054164662ecaaae4f344d410f8405f6b8b86e51cc08595ceb90bc0009aa1d`.
+
+These checks cover only the inspected samples for one hero, terrain, camera
+mode, zoom and local client. Other diagonal directions, other artwork, boats,
+full-frame-by-frame inspection, visual latency and current builds after
+`c2457bd` remain unverified.
