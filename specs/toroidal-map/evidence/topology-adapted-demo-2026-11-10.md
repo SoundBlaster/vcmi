@@ -42,6 +42,25 @@ setting was changed. This is the setting currently displayed by macOS; it does
 not resolve the earlier logged code-requirement mismatch or establish why the
 new processes stalled before opening their game windows.
 
+The stale client was stopped before preparing the current build because its
+old executable referenced the former `CSaveFile` constructor while the build
+directory contained the new library. A backup of that bundle was retained on
+TB5. The updated lab bundle copies the build's client, server and editor, and
+keeps `Mods`, `config` and `scripts` under `Contents/Resources/Data` with
+relative links inside the bundle. The old bundle failed strict code-signature
+verification because its links pointed outside the bundle; the new ad-hoc
+signed bundle passed `codesign --verify --deep --strict`. The client executable
+SHA-256 was `c8be9ffa72138be00ce963d7026230d33b2c86c22bb1abe8eefedd2d00a75a68`;
+the linked build library SHA-256 was
+`fd65024087b8f56fe2b8116e932e09e18f6700b02c26d870373958f955455bbb`.
+
+Launching that bundle through Computer Use timed out without a game window.
+A new process remained in `dyld` opening a dependency; the targeted TCC log
+showed an All Files preflight for it but no removable-volume request or
+response. The strict-signature correction alone therefore did not produce a
+working launch. The file being opened and the cause of the wait remain
+unknown; no visual behavior from this new client has been established.
+
 ## Initial fixture and GUI observations
 
 `test/mock/ToroidalDemoMap.h` defines a deliberately sparse 36×36 grass map
