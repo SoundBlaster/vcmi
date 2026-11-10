@@ -1,5 +1,20 @@
 # Boat movement across a seam
 
+On 2026-11-10 a toroidal SoD fixture at revision `81bc7ab` demonstrated that
+the server let a hero in a normal sailing boat use an `AIR` step directly
+across a seam when the hero had Flying, although the pathfinder does not
+allow a direct `SAIL` to `AIR` transition. The regression failed before the
+fix. Standard toroidal movement now also rejects a direct `SAIL` to `WATER`
+transition while the hero remains in that boat. The test checks both layers
+against the pathfinder and confirms that sailing the same step remains legal
+with matching movement cost. The corner embark/disembark, corner sailing and
+aviation-vehicle embark tests also passed (`sail-flight-before-test.log`,
+`sail-flight-after-build.log`, `sail-flight-after-test.log` on TB5). The
+`WATER` case was added after the initial failing run, so that run demonstrates
+the `AIR` discrepancy only. Other vehicles and multiplayer remain unverified.
+The full local suite passed 1,392 tests, with three disabled
+(`full-suite-sail-flight.log`).
+
 On 2026-11-10 an in-memory SoD fixture placed Favorable Winds at `(0,0,0)`
 before game initialization, with its footprint crossing both seams. At source
 revision `e966ad1`, the toroidal test failed for all three opposite-edge and

@@ -862,6 +862,10 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			|| (layer == EPathfindingLayer::AVIATE && !canEmbarkLayer && (!h->inBoat() || h->getBoat()->layer != EPathfindingLayer::AVIATE))))
 		return complainRet("Hero cannot use the requested movement layer!");
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
+		&& h->inBoat() && h->getBoat()->layer == EPathfindingLayer::SAIL
+		&& (layer == EPathfindingLayer::AIR || layer == EPathfindingLayer::WATER))
+		return complainRet("Cannot leave a sailing boat on this movement layer!");
+	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
 		&& !PathfinderUtil::layerMatchesTerrain(layer, t))
 		return complainRet("Movement layer does not match the destination terrain!");
 	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD

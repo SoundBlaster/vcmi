@@ -1343,6 +1343,57 @@ TEST_F(HeroMovementTest, HeroCanEmbarkAviationVehicleAcrossToroidalSeam)
 	EXPECT_EQ(hero->visitablePos(), destination);
 }
 
+TEST_F(HeroMovementTest, SailingBoatCannotSwitchDirectlyToFlyingAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 source(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(2, 5, 0), HeroTypeID(0), player)
+		.terrain(source, TerrainId::WATER).terrain(destination, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(source, BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(source), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * air = paths.getNode(destination, EPathfindingLayer::AIR);
+	if(air->reachable() && air->theNodeBefore)
+		EXPECT_FALSE(air->theNodeBefore->coord == source && air->theNodeBefore->layer == EPathfindingLayer::SAIL);
+	const auto * water = paths.getNode(destination, EPathfindingLayer::WATER);
+	if(water->reachable() && water->theNodeBefore)
+		EXPECT_FALSE(water->theNodeBefore->coord == source && water->theNodeBefore->layer == EPathfindingLayer::SAIL);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	EXPECT_EQ(hero->visitablePos(), source);
+	EXPECT_TRUE(hero->inBoat());
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	EXPECT_EQ(hero->visitablePos(), source);
+	EXPECT_TRUE(hero->inBoat());
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	const auto * sail = paths.getNode(destination, EPathfindingLayer::SAIL);
+	ASSERT_TRUE(sail->reachable());
+	ASSERT_NE(sail->theNodeBefore, nullptr);
+	ASSERT_EQ(sail->theNodeBefore->coord, source);
+	const int remaining = sail->moveRemains;
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_TRUE(hero->inBoat());
+	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+}
+
 TEST_F(HeroMovementTest, AviationVehicleCannotEnterVisitableObjectAcrossSeam)
 {
 	const PlayerColor player(0);
