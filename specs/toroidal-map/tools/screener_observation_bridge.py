@@ -100,17 +100,21 @@ class MCPClient:
         return self.call("tools/call", {"name": name, "arguments": arguments})
 
     def close(self):
-        self.process.stdin.close()
         try:
-            self.process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.process.terminate()
+            self.process.stdin.close()
+        except BrokenPipeError:
+            pass
+        finally:
             try:
                 self.process.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.process.wait()
-        self.process.stdout.close()
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+                    self.process.wait()
+            self.process.stdout.close()
 
 
 def main():
@@ -162,6 +166,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (OSError, ValueError, KeyError, RuntimeError, TimeoutError) as error:
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError, TimeoutError) as error:
         print("Screener bridge: {}".format(error), file=sys.stderr)
         sys.exit(1)
