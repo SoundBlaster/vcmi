@@ -5328,6 +5328,11 @@ Guard: %3</source>
     <name>Validator</name>
     <message>
         <location filename="../validator.cpp"/>
+        <source>The visit order at %1 cannot be preserved when this toroidal map is saved.</source>
+        <translation>Порядок посещения объектов в точке %1 не может быть сохранён на тороидальной карте.</translation>
+    </message>
+    <message>
+        <location filename="../validator.cpp"/>
         <source>Object %1 is larger than the toroidal map. Reduce its footprint before saving.</source>
         <translation>Объект %1 больше тороидальной карты. Уменьшите его размер перед сохранением.</translation>
     </message>

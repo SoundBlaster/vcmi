@@ -110,8 +110,9 @@ establishes the intended arithmetic only; it is not runtime evidence.
    now allows seam-crossing footprints that fit within one map period. A
    synthetic round trip and a resource interaction pass; one real town sprite
    was visually inspected. The editor warns when static visitable objects
-   overlap across a seam, but visual ordering and target selection need a
-   reviewed policy. Footprints larger than the map period remain rejected.
+   overlap across a seam; unstable visit order is rejected at save time.
+   Visual ordering and target selection still need a reviewed policy.
+   Footprints larger than the map period remain rejected.
    Hero and boat movement across seams remains a separate requirement.
 2. **Minimum map dimensions:** the initial file-format implementation requires
    width and height of at least 3. Extents of 1 or 2 make distinct directions

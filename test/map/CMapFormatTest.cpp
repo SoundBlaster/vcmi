@@ -564,6 +564,81 @@ TEST(MapFormat, ToroidalWrappedFootprintsSurviveVmapRoundTrip)
 	EXPECT_THROW(loadOriginal(header, objects, surface, underground), std::runtime_error);
 }
 
+TEST(MapFormat, ToroidalInteractiveOverlapRejectsUnstableVisitOrder)
+{
+	auto bytes = TinyH3M::TinyH3MBuilder(EMapFormat::SOD)
+		.size(36, false).playerActive(PlayerColor(0))
+		.resource(int3(15, 15, 0), GameResID::GOLD, 10)
+		.resource(int3(16, 15, 0), GameResID::WOOD, 5).build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("WrappedInteractiveOrder", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	std::vector<CGObjectInstance *> resources;
+	for(const auto & object : map->objects)
+		if(object && object->ID == Obj::RESOURCE)
+			resources.push_back(object.get());
+	ASSERT_EQ(resources.size(), 2u);
+	const auto makeAppearance = [](const std::string & mask)
+	{
+		const auto text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": )" + mask + " }";
+		JsonNode definition(text.data(), text.size(), "WrappedInteractiveOrder");
+		auto result = std::make_shared<ObjectTemplate>();
+		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+		result->readJson(definition, resolver, false);
+		return result;
+	};
+	map->hideObject(resources[0]);
+	resources[0]->pos = int3(35, 10, 0);
+	resources[0]->appearance = makeAppearance(R"([ "A" ])");
+	map->showObject(resources[0]);
+	map->hideObject(resources[1]);
+	resources[1]->pos = int3(35, 10, 0);
+	resources[1]->appearance = makeAppearance(R"([ "A" ])");
+	map->showObject(resources[1]);
+	map->hideObject(resources[0]);
+	map->showObject(resources[0]);
+	CMemoryBuffer boundedArchive;
+	{
+		CMapSaverJson saver(&boundedArchive);
+		EXPECT_NO_THROW(saver.saveMap(map));
+	}
+	map->hideObject(resources[1]);
+	resources[1]->pos = int3(0, 10, 0);
+	resources[1]->appearance = makeAppearance(R"([ "A0" ])");
+	map->showObject(resources[1]);
+	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+	const int3 overlap(35, 10, 0);
+	ASSERT_EQ(map->getTile(overlap).visitableObjects.size(), 2u);
+	ASSERT_EQ(map->getTile(overlap).topVisitableObj(), resources[1]->id);
+	const auto topName = resources[1]->instanceName;
+	CMemoryBuffer archive;
+	{
+		CMapSaverJson saver(&archive);
+		saver.saveMap(map);
+	}
+	archive.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&archive);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	const auto & tile = reopened->getTile(overlap);
+	ASSERT_EQ(tile.visitableObjects.size(), 2u);
+	const auto * selected = reopened->getObject(tile.topVisitableObj());
+	ASSERT_NE(selected, nullptr);
+	EXPECT_EQ(selected->instanceName, topName);
+
+	map->hideObject(resources[0]);
+	map->showObject(resources[0]);
+	ASSERT_EQ(map->getTile(overlap).topVisitableObj(), resources[0]->id);
+	CMemoryBuffer unstableArchive;
+	CMapSaverJson unstableSaver(&unstableArchive);
+	EXPECT_THROW(unstableSaver.saveMap(map), std::runtime_error);
+}
+
 TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
 {
 	auto bytes = makeToroidalDemoMap().build();

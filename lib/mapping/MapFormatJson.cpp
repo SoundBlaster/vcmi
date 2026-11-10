@@ -17,6 +17,7 @@
 #include "../json/JsonWriter.h"
 #include "CMap.h"
 #include "MapFormat.h"
+#include "TerrainTile.h"
 #include "../GameLibrary.h"
 #include "../RiverHandler.h"
 #include "../RoadHandler.h"
@@ -49,6 +50,23 @@ static void validateToroidalFootprintSizes(const CMap & map)
 		if(object && object->ID != Obj::HERO && object->ID != Obj::BOAT
 			&& (object->getWidth() > map.width || object->getHeight() > map.height))
 			throw std::runtime_error("Toroidal map object footprint exceeds the map period: " + object->instanceName);
+}
+
+static void validateToroidalVisitOrder(const CMap & map)
+{
+	if(!map.toroidal)
+		return;
+	for(int z = 0; z < map.levels(); ++z)
+		for(int x = 0; x < map.width; ++x)
+			for(int y = 0; y < map.height; ++y)
+			{
+				const int3 position(x, y, z);
+				const auto & objects = map.getTile(position).visitableObjects;
+				// VMAP reconstructs tile lists in map object order. A different
+				// order could select another object after the map is reopened.
+				if(!std::is_sorted(objects.begin(), objects.end()))
+					throw std::runtime_error("Toroidal map has a visit order that VMAP cannot preserve at " + position.toString());
+			}
 }
 
 class MapObjectResolver: public IInstanceResolver
@@ -1417,6 +1435,7 @@ void CMapSaverJson::addToArchive(const JsonNode & data, const std::string & file
 void CMapSaverJson::saveMap(const std::unique_ptr<CMap>& map)
 {
 	validateToroidalFootprintSizes(*map);
+	validateToroidalVisitOrder(*map);
 	this->map = map.get();
 	this->mapHeader = this->map;
 	writeHeader();

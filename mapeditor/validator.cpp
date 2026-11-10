@@ -238,6 +238,9 @@ std::set<Validator::Issue> Validator::validate(const CMap * map)
 						const auto & visitable = map->getTile(pos).visitableObjects;
 						if(visitable.size() < 2)
 							continue;
+						if(!std::is_sorted(visitable.begin(), visitable.end()))
+							issues.emplace(tr("The visit order at %1 cannot be preserved when this toroidal map is saved.")
+								.arg(QString::fromStdString(pos.toString())), true);
 						int staticCount = 0;
 						bool crossesSeam = false;
 						for(const auto & id : visitable)

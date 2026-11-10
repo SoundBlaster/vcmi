@@ -50,8 +50,10 @@ The server's `objectVisitedBy` selects the last visitable object, excluding a
 hero on top. Drawing order, movement passability and interaction selection
 are distinct mechanisms: their agreement on newly overlapping interactive
 objects must be investigated and tested. The editor now warns about multiple
-static visitable objects sharing a tile when one crosses a seam. This warning
-does not resolve selection or establish a general interactive-layer policy.
+static visitable objects sharing a tile when one crosses a seam. The VMAP
+writer rejects a toroidal map when a tile's visitable-object order differs
+from the order its reader would reconstruct; the editor marks that case as
+critical. These diagnostics do not establish a general interactive-layer policy.
 
 The pilot rejects static footprints wider or taller than the map period, since
 their repeated image slices are not supported. The wrapped-footprint work does
