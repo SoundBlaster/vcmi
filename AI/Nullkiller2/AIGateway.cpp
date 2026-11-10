@@ -1257,7 +1257,7 @@ HeroMovementResult AIGateway::moveHeroToTile(const int3 dst, const HeroPtr & her
 		{
 			// Mirror server-side check: interaction with objects of players that were not met yet
 			// is not allowed while simultaneous turns are active. Abort instead of sending doomed request
-			if(const TerrainTile * tile = cc->tryGetTile(heroPtr->convertFromVisitablePos(dst)))
+			if(const TerrainTile * tile = cc->tryGetTile(dst))
 			{
 				for(const auto & objectID : tile->visitableObjects)
 				{

@@ -16,6 +16,7 @@
 #include "AI/Nullkiller2/Pathfinding/Actions/TownPortalAction.h"
 #include "AI/Nullkiller2/Pathfinding/Actions/DimensionDoorAction.h"
 #include "lib/mapObjects/CGTownInstance.h"
+#include "lib/mapObjects/CGResource.h"
 #include "lib/mapping/TerrainTile.h"
 
 namespace NK2AI
@@ -46,6 +47,32 @@ protected:
 		ASSERT_NE(hero, nullptr);
 		hero->setMovementPoints(2000);
 
+		client = std::make_unique<ScriptedMovementClient>(gameState());
+		callback = makeCallback(PLAYER, client.get());
+		gateway = makeGateway(callback);
+		client->notify(*gateway);
+	}
+
+	void startBlockedObjectGame(const int3 & origin, const int3 & destination, bool toroidal)
+	{
+		const PlayerColor enemy(1);
+		TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+		builder.size(36, false).playerActive(PLAYER).playerActive(enemy)
+			.hero(origin + int3(1, 0, 0), HeroTypeID(0), PLAYER)
+			.heroGarrison({{CreatureID::ARCHER, 1}})
+			.resource(destination, GameResID::GOLD, 10);
+		startWithMap(std::move(builder));
+		map()->toroidal = toroidal;
+		revealMap(PLAYER);
+		hero = findHeroByOwner(PLAYER);
+		auto * resource = findFirst<CGResource>();
+		ASSERT_NE(hero, nullptr);
+		ASSERT_NE(resource, nullptr);
+		ASSERT_EQ(hero->visitablePos(), origin);
+		ASSERT_EQ(resource->visitablePos(), destination);
+		resource->tempOwner = enemy;
+		gameState()->blockedContacts.insert({PLAYER, enemy});
+		hero->setMovementPoints(2000);
 		client = std::make_unique<ScriptedMovementClient>(gameState());
 		callback = makeCallback(PLAYER, client.get());
 		gateway = makeGateway(callback);
@@ -187,6 +214,40 @@ TEST_F(Nullkiller2_AIGateway, choosesDirectRouteAcrossToroidalSeam)
 		EXPECT_TRUE(client->requested(destination));
 		EXPECT_EQ(hero->visitablePos(), destination);
 	}
+}
+
+TEST_F(Nullkiller2_AIGateway, DoesNotRequestBlockedEnemyInteractionAcrossSeam)
+{
+	const int3 origin(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	startBlockedObjectGame(origin, destination, true);
+	ASSERT_NE(hero, nullptr);
+	EXPECT_THROW(moveHeroTo(destination), NK2AI::cannotFulfillGoalException);
+	EXPECT_EQ(client->movementRequests, 0);
+	EXPECT_EQ(hero->visitablePos(), origin);
+}
+
+TEST_F(Nullkiller2_AIGateway, DoesNotRequestBlockedEnemyInteractionOnBoundedMap)
+{
+	const int3 origin(4, 5, 0);
+	const int3 destination(5, 5, 0);
+	startBlockedObjectGame(origin, destination, false);
+	ASSERT_NE(hero, nullptr);
+	EXPECT_THROW(moveHeroTo(destination), NK2AI::cannotFulfillGoalException);
+	EXPECT_EQ(client->movementRequests, 0);
+	EXPECT_EQ(hero->visitablePos(), origin);
+}
+
+TEST_F(Nullkiller2_AIGateway, RequestsEnemyInteractionWhenContactIsAllowed)
+{
+	const int3 origin(0, 5, 0);
+	const int3 destination(35, 5, 0);
+	startBlockedObjectGame(origin, destination, true);
+	ASSERT_NE(hero, nullptr);
+	gameState()->blockedContacts.clear();
+	EXPECT_EQ(moveHeroTo(destination), NK2AI::HeroMovementResult::COMPLETE);
+	EXPECT_EQ(client->movementRequests, 1);
+	EXPECT_TRUE(client->requested(destination));
 }
 
 TEST_F(Nullkiller2_AIGateway, plansUnskilledTownPortalToNearestTownAcrossSeam)
