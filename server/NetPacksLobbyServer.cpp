@@ -31,6 +31,7 @@
 #include "../lib/mapping/CMap.h"
 #include "../lib/mapping/CMapInfo.h"
 #include "../lib/mapping/CMapHeader.h"
+#include "../lib/networkPacks/LobbyTopologyCapability.h"
 #include "../lib/serializer/GameConnection.h"
 
 /// Returns true if canonical path points to an entry inside directory, and not to directory itself
@@ -164,18 +165,19 @@ void ClientPermissionsCheckerNetPackVisitor::visitLobbyClientConnected(LobbyClie
 
 void ApplyOnServerNetPackVisitor::visitLobbyClientConnected(LobbyClientConnected & pack)
 {
-	if(pack.version < ESerializationVersion::MINIMAL_LOBBY)
+	const auto negotiated = LobbyTopologyCapability::negotiateClient(pack.version);
+	if(negotiated.version < ESerializationVersion::MINIMAL_LOBBY)
 	{
 		// client of an older version can not read packs of the current lobby protocol
-		logNetwork->error("Rejecting client with incompatible serialization version %d", static_cast<int>(pack.version));
+		logNetwork->error("Rejecting client with incompatible serialization version %d", static_cast<int>(negotiated.version));
 		connection->getConnection()->close();
 		vstd::erase(srv.activeConnections, connection);
 		result = false;
 		return;
 	}
 
-	auto compatibleVersion = std::min(pack.version, ESerializationVersion::CURRENT);
-	connection->setSerializationVersion(compatibleVersion);
+	connection->setSerializationVersion(negotiated.version);
+	connection->setToroidalTopologySupported(negotiated.toroidal);
 
 	srv.clientConnected(connection, pack.names, pack.uuid, pack.mode);
 
@@ -183,7 +185,7 @@ void ApplyOnServerNetPackVisitor::visitLobbyClientConnected(LobbyClientConnected
 	pack.clientId = connection->connectionID;
 	pack.mode = srv.si->mode;
 	pack.hostClientId = srv.hostClientId;
-	pack.version = compatibleVersion;
+	pack.version = negotiated.toroidal ? LobbyTopologyCapability::encode(negotiated.version) : negotiated.version;
 
 	result = true;
 }

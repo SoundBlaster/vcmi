@@ -712,6 +712,7 @@ set(lib_MAIN_HEADERS
 	networkPacks/PacksForClient.h
 	networkPacks/PacksForClientBattle.h
 	networkPacks/PacksForLobby.h
+	networkPacks/LobbyTopologyCapability.h
 	networkPacks/PacksForServer.h
 	networkPacks/SetRewardableConfiguration.h
 	networkPacks/SetScriptVariable.h

@@ -16,9 +16,8 @@ The lobby compatibility question is separate: `LobbyClientConnected` sends a
 numeric serialization version, not a toroidal capability identifier, and the
 server start guard checks that version. A future unrelated upstream version
 could reuse this branch's number. Existing packet framing rejects unread
-bytes, but neither that check nor this loader validation proves all such
-peers are safely distinguished. Explicit capability negotiation and upstream
-version allocation remain unresolved.
+bytes, but neither that check nor this loader validation proved all such
+peers safely distinguished at that revision.
 
 An in-memory `GameConnection` test subsequently serialized the real
 `LobbyUpdateMapInfo` packet. With both codecs set to the current version the
@@ -35,6 +34,28 @@ intentionally failing `lobby-packet-conflict-test.log`.
 The normal full suite passed 1,397 tests with four disabled
 (`full-suite-lobby-packet.log`); the fourth disabled test is this newly
 recorded unresolved safety regression.
+
+The local branch now implements the experimental tagged greeting described
+in [network capability design](../network-capability-design.md). A tagged
+peer is negotiated at the normal serialization version; an untagged peer
+with the same ordinal is capped to the previous layout and excluded by the
+server's toroidal start guard. An untagged server at or beyond the branch's
+toroidal ordinal is rejected by the local client as ambiguous; this also
+restricts bounded games against such unverified future servers. Earlier
+untagged versions remain eligible for bounded sessions. The tag is not an
+upstream allocation or authentication, and map/save version collisions
+remain unresolved.
+
+The current `GameConnection` tests round-trip the tagged greeting, invoke
+the real server greeting visitor and topology guard with two tagged and two
+untagged simulated connections, and check legacy and ambiguous greetings.
+Six focused tests passed; the client, server and test targets built. The full
+suite passed 1,401 tests with four disabled (`lobby-capability-final-build.log`,
+`lobby-capability-final-test.log`, `full-suite-lobby-capability-final.log` on
+TB5). These are in-process packet and server-method tests, not a real TCP or
+old-binary multiplayer session. The raw-codec mismatch regression remains
+disabled as defense in depth: bypassing the handshake can still misinterpret
+the packet.
 
 On 2026-11-09 a versioned topology flag was added to the map header, JSON map
 header and binary serialization. A version-4 map header signals `toroidal`;

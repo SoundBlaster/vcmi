@@ -1,6 +1,7 @@
 # Experimental lobby capability design
 
-Status: proposed for the local branch; not an upstream protocol allocation.
+Status: implemented experimentally in the local branch; not an upstream
+protocol allocation. Real mixed-version multiplayer remains unverified.
 
 The existing lobby greeting contains one numeric serialization version. Its
 ordinal cannot establish that another build implements toroidal maps: an

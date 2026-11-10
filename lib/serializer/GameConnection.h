@@ -35,6 +35,7 @@ class DLL_LINKAGE GameConnection final : boost::noncopyable
 	std::unique_ptr<BinarySerializer> serializer;
 
 	std::mutex writeMutex;
+	bool toroidalTopologySupported = false;
 
 public:
 	bool isMyConnection(const std::shared_ptr<INetworkConnection> & otherConnection) const;
@@ -53,4 +54,6 @@ public:
 	void setCallback(IGameInfoCallback & cb);
 	void setSerializationVersion(ESerializationVersion version);
 	ESerializationVersion getSerializationVersion() const;
+	bool supportsToroidalTopology() const { return toroidalTopologySupported; }
+	void setToroidalTopologySupported(bool supported) { toroidalTopologySupported = supported; }
 };

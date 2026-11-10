@@ -16,6 +16,7 @@
 #include "../lib/StartInfo.h"
 
 class CMapInfo;
+class CMapHeader;
 
 struct CPackForLobby;
 
@@ -100,6 +101,7 @@ public:
 	void run();
 
 	bool wasStartedByClient() const;
+	bool supportsMapTopology(const CMapHeader & header) const;
 	bool prepareToStartGame();
 	void prepareToRestart();
 	void startGameImmediately();

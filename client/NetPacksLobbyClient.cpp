@@ -41,6 +41,7 @@
 #include "../lib/CConfigHandler.h"
 #include "../lib/GameLibrary.h"
 #include "../lib/campaign/CampaignState.h"
+#include "../lib/networkPacks/LobbyTopologyCapability.h"
 #include "../lib/serializer/GameConnection.h"
 #include "../lib/texts/CGeneralTextHandler.h"
 
@@ -70,11 +71,13 @@ void ApplyOnLobbyHandlerNetPackVisitor::visitLobbyClientConnected(LobbyClientCon
 	// Check if it's LobbyClientConnected for our client
 	if(isLocalClient)
 	{
-		handler.logicConnection->setSerializationVersion(pack.version);
+		const auto greeting = LobbyTopologyCapability::decode(pack.version);
+		handler.logicConnection->setSerializationVersion(greeting.version);
+		handler.logicConnection->setToroidalTopologySupported(greeting.toroidal);
 		handler.logicConnection->connectionID = pack.clientId;
 
-		// server of an older version does not reject clients of newer versions
-		if(pack.version < ESerializationVersion::MINIMAL_LOBBY)
+		// An untagged server at the toroidal ordinal has an ambiguous wire layout.
+		if(!LobbyTopologyCapability::isSafeServerGreeting(greeting))
 		{
 			handler.showServerError(LIBRARY->generaltexth->translate("vcmi.server.errors.incompatibleVersion"));
 			handler.sendClientDisconnecting();

@@ -263,6 +263,14 @@ void CVCMIServer::prepareToRestart()
 	gh = nullptr;
 }
 
+bool CVCMIServer::supportsMapTopology(const CMapHeader & header) const
+{
+	return !header.toroidal || std::ranges::all_of(activeConnections, [](const auto & connection)
+	{
+		return connection->supportsToroidalTopology() && connection->getSerializationVersion() >= ESerializationVersion::TOROIDAL_MAP;
+	});
+}
+
 bool CVCMIServer::prepareToStartGame()
 {
 	Load::ProgressAccumulator progressTracking;
@@ -357,10 +365,7 @@ bool CVCMIServer::prepareToStartGame()
 	if (!started)
 		return false;
 
-	if(newGH->gameInfo().getMapHeader()->toroidal && std::ranges::any_of(activeConnections, [](const auto & connection)
-	{
-		return connection->getSerializationVersion() < ESerializationVersion::TOROIDAL_MAP;
-	}))
+	if(!supportsMapTopology(*newGH->gameInfo().getMapHeader()))
 	{
 		logNetwork->error("Cannot start toroidal map with an incompatible client");
 		announceMessage(MetaString::createFromTextID("vcmi.server.errors.incompatibleVersion"));

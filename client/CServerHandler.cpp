@@ -62,6 +62,7 @@
 #include "../lib/mapObjects/CGTownInstance.h"
 #include "../lib/mapObjects/MiscObjects.h"
 #include "../lib/modding/ModIncompatibility.h"
+#include "../lib/networkPacks/LobbyTopologyCapability.h"
 #include "../lib/rmg/CMapGenOptions.h"
 #include "../lib/serializer/GameConnection.h"
 #include "../lib/UnlockGuard.h"
@@ -430,6 +431,7 @@ void CServerHandler::sendClientConnecting() const
 	lcc.uuid = uuid;
 	lcc.names = localPlayerNames;
 	lcc.mode = si->mode;
+	lcc.version = LobbyTopologyCapability::encode(ESerializationVersion::CURRENT);
 	sendLobbyPack(lcc);
 }
 
