@@ -838,8 +838,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), landed->visitablePos());
 		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), landed->movementPointsRemaining());
 	}
-	// Exercise the in-place landing packet over the same real connections.
-	// Establish the AIR state synthetically; the landing itself is server-driven.
+	// Exercise manual end turn and the in-place landing packet over TCP.
+	// Establish the AIR state synthetically; landing is server-driven.
 	TryMoveHero stageAir;
 	stageAir.id = hero->id;
 	stageAir.start = landed->anchorPos();
@@ -856,11 +856,18 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_EQ(guest.state->getHero(hero->id)->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
 	const auto landingPosition = landed->visitablePos();
 	const auto landingPoints = landed->movementPointsRemaining();
-	ASSERT_TRUE(server.gh->tryAutoLandTransientHero(red));
+	EndTurn finishRedOnLand;
+	finishRedOnLand.player = red;
+	finishRedOnLand.requestID = 27;
+	host.codec->sendPack(finishRedOnLand);
 	pumpUntil([&] {
-		return host.state->getHero(hero->id)->getConfirmedMovementLayer() == EPathfindingLayer::LAND
+		return host.results.contains(27) && host.state->actingPlayers.contains(blue)
+			&& guest.state->actingPlayers.contains(blue)
+			&& host.state->getHero(hero->id)->getConfirmedMovementLayer() == EPathfindingLayer::LAND
 			&& guest.state->getHero(hero->id)->getConfirmedMovementLayer() == EPathfindingLayer::LAND;
 	});
+	ASSERT_TRUE(host.results.contains(27)) << host.failure;
+	ASSERT_TRUE(host.results.at(27));
 	for(const LobbyPeer * peer : {&host, &guest})
 	{
 		const auto * replica = peer->state->getHero(hero->id);
@@ -868,8 +875,6 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(replica->visitablePos(), landingPosition);
 		EXPECT_EQ(replica->movementPointsRemaining(), landingPoints);
 	}
-	server.gh->turnTimerHandler->update(1);
-	pumpUntil([&] { return host.state->actingPlayers.contains(blue) && guest.state->actingPlayers.contains(blue); });
 	ASSERT_TRUE(server.gh->gameState().actingPlayers.contains(blue));
 	ASSERT_TRUE(host.state->actingPlayers.contains(blue));
 	ASSERT_TRUE(guest.state->actingPlayers.contains(blue));
@@ -3661,6 +3666,40 @@ TEST_F(HeroMovementTest, ToroidalTransientLandingSearchWorksOn252Map)
 		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
 		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(land), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	}
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
+TEST_F(HeroMovementTest, InPlaceLandingChecksAllHeroesBeforeChangingAny)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(16, 15, 0), HeroTypeID(1), player);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * first = findHeroAt(int3(1, 5, 0));
+	auto * second = findHeroAt(int3(16, 15, 0));
+	ASSERT_NE(first, nullptr);
+	ASSERT_NE(second, nullptr);
+	first->setConfirmedMovementLayer(EPathfindingLayer::AIR);
+	second->setConfirmedMovementLayer(EPathfindingLayer::AIR);
+	const auto firstPosition = first->visitablePos();
+	const auto secondPosition = second->visitablePos();
+	const int3 hiddenNeighbor(16, 15, 0);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hiddenNeighbor] = 0;
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_EQ(first->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	EXPECT_EQ(second->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hiddenNeighbor] = 1;
+	ASSERT_TRUE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_EQ(first->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(second->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(first->visitablePos(), firstPosition);
+	EXPECT_EQ(second->visitablePos(), secondPosition);
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 

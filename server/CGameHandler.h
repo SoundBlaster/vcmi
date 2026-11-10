@@ -269,6 +269,7 @@ public:
 
 	void onPlayerTurnEnded(PlayerColor which);
 	bool hasHeroInTransientMovement(PlayerColor player) const;
+	bool tryLandTransientHeroesInPlace(PlayerColor player);
 	bool tryAutoLandTransientHero(PlayerColor player);
 	void onNewTurn();
 	void addStatistics(StatisticDataSet &stat) const;
@@ -348,6 +349,7 @@ public:
 
 	friend class CVCMIServer;
 private:
+	void landTransientHeroInPlace(const CGHeroInstance * hero);
 	void getVictoryLossMessage(PlayerColor player, const EVictoryLossCheckResult & victoryLossCheckResult, InfoWindow & out) const;
 	/// Returns army of the object, throws if the object does not exist or has no army
 	const CArmedInstance * getArmyOrThrow(ObjectInstanceID id, const std::string & context);

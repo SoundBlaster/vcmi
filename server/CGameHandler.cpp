@@ -116,6 +116,31 @@ namespace
 enum class KnownLanding { FOUND, NONE, UNKNOWN };
 using LandingStep = std::pair<int3, EPathfindingLayer>;
 
+bool canLandTransientHeroInPlace(const CGameState & gameState, const CGHeroInstance * hero)
+{
+	if(hero->inBoat() || hero->getConfirmedMovementLayer() != EPathfindingLayer::AIR)
+		return false;
+	const auto position = hero->visitablePos();
+	const auto & tile = gameState.getMap().getTile(position);
+	const auto * team = gameState.getPlayerTeam(hero->getOwner());
+	if(!team || !tile.isLand() || !tile.getTerrain()->isPassable()
+		|| tile.objectVisitedBy(hero->id).hasValue()
+		|| gameState.guardingCreaturePosition(position).isValid())
+		return false;
+	if(!std::all_of(tile.blockingObjects.begin(), tile.blockingObjects.end(),
+		[hero](const auto & id) { return id == hero->id; }))
+		return false;
+	const auto topology = gameState.getMap().getTopology();
+	for(int dx = -1; dx <= 1; ++dx)
+		for(int dy = -1; dy <= 1; ++dy)
+		{
+			const auto neighbor = topology.canonicalize(position + int3(dx, dy, 0));
+			if(!neighbor || !team->fogOfWarMap[*neighbor])
+				return false;
+		}
+	return true;
+}
+
 // Only consider routes whose tiles and guard neighborhoods are already known
 // to the player. Unknown terrain cannot become a server-side information leak.
 KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHeroInstance * hero, const std::optional<PathfinderStart> & start, std::vector<LandingStep> * plainRoute = nullptr)
@@ -689,6 +714,42 @@ bool CGameHandler::hasHeroInTransientMovement(PlayerColor player) const
 	return false;
 }
 
+void CGameHandler::landTransientHeroInPlace(const CGHeroInstance * hero)
+{
+	const auto position = hero->visitablePos();
+	TryMoveHero landing;
+	landing.id = hero->id;
+	landing.start = hero->pos;
+	landing.end = hero->pos;
+	landing.result = TryMoveHero::SUCCESS;
+	landing.movePoints = hero->movementPointsRemaining();
+	landing.movementLayer = EPathfindingLayer::LAND;
+	sendAndApply(landing);
+	heroMovementLayers[hero->id] = {position, EPathfindingLayer::LAND};
+}
+
+bool CGameHandler::tryLandTransientHeroesInPlace(PlayerColor player)
+{
+	if(!gameState().getMap().toroidal)
+		return false;
+	const auto * state = gameState().getPlayerState(player);
+	if(!state)
+		return false;
+	std::vector<const CGHeroInstance *> landingHeroes;
+	for(const auto * hero : state->getHeroes())
+	{
+		const auto layer = hero->getConfirmedMovementLayer();
+		if(layer != EPathfindingLayer::AIR && layer != EPathfindingLayer::WATER)
+			continue;
+		if(!canLandTransientHeroInPlace(gameState(), hero))
+			return false;
+		landingHeroes.push_back(hero);
+	}
+	for(const auto * hero : landingHeroes)
+		landTransientHeroInPlace(hero);
+	return !landingHeroes.empty();
+}
+
 bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
 {
 	if(!gameState().getMap().toroidal)
@@ -703,37 +764,9 @@ bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
 			continue;
 		// A flying hero can already be above a legal stopping tile. A route
 		// search cannot express landing without moving to another tile.
-		const auto position = hero->visitablePos();
-		const auto & tile = gameState().getMap().getTile(position);
-		const auto * team = gameState().getPlayerTeam(player);
-		bool knownNeighborhood = team != nullptr;
-		const auto topology = gameState().getMap().getTopology();
-		for(int dx = -1; dx <= 1 && knownNeighborhood; ++dx)
-			for(int dy = -1; dy <= 1; ++dy)
-			{
-				const auto neighbor = topology.canonicalize(position + int3(dx, dy, 0));
-				if(!neighbor || !team->fogOfWarMap[*neighbor])
-				{
-					knownNeighborhood = false;
-					break;
-				}
-			}
-		const bool onlyHeroBlocks = std::all_of(tile.blockingObjects.begin(), tile.blockingObjects.end(),
-			[hero](const auto & id) { return id == hero->id; });
-		if(layer == EPathfindingLayer::AIR && knownNeighborhood && tile.isLand()
-			&& tile.getTerrain()->isPassable() && onlyHeroBlocks
-			&& !tile.objectVisitedBy(hero->id).hasValue()
-			&& !gameState().guardingCreaturePosition(position).isValid())
+		if(canLandTransientHeroInPlace(gameState(), hero))
 		{
-			TryMoveHero landing;
-			landing.id = hero->id;
-			landing.start = hero->pos;
-			landing.end = hero->pos;
-			landing.result = TryMoveHero::SUCCESS;
-			landing.movePoints = hero->movementPointsRemaining();
-			landing.movementLayer = EPathfindingLayer::LAND;
-			sendAndApply(landing);
-			heroMovementLayers[hero->id] = {position, EPathfindingLayer::LAND};
+			landTransientHeroInPlace(hero);
 			return true;
 		}
 		std::vector<LandingStep> route;
