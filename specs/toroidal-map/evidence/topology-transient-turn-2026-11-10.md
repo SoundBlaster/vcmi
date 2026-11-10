@@ -39,6 +39,11 @@ some points but lack a legal route to LAND or SAIL, and older saves may already
 contain stranded heroes. Preventing or recovering from those cases, including
 when the turn timer expires, is still required before considering G12 complete.
 The safeguard does not search hidden map cells or report their contents.
+`HeroMovementTest.ToroidalWaterWalkCanStillBeStrandedWithPointsRemaining`
+is an explicit characterization of this unresolved defect: after two WATER
+steps across the seam the hero has 100 points, all eight adjacent WATER moves
+are rejected by the safeguard, and the turn guard remains active. Replace
+this characterization with a success assertion when recovery is implemented.
 The client, server and tests built successfully with the safeguard on macOS
 arm64. The full suite passed 1,473 tests from 226 suites without skips; four
 remain disabled. The prototype save and VMAP and the Complete legacy map
