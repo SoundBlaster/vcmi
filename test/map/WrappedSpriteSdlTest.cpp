@@ -11,6 +11,9 @@
 #include "../../client/mapView/MapViewMovement.h"
 #include "../../lib/mapping/MapTopology.h"
 #include "render/CanvasImage.h"
+#include "render/GpuResources.h"
+
+#include <SDL3/SDL.h>
 
 class SoftwareSpriteImage : public CanvasImage
 {
@@ -21,6 +24,11 @@ public:
 	{
 		assert(scalingFactor == 1);
 		sprite->draw(target, nullptr, position, source, ColorRGBA(255, 255, 255, 255), 255, EImageBlitMode::OPAQUE);
+	}
+	bool drawTexture(SDL_Renderer * renderer, const Point & position, const Rect * source, int scalingFactor) const override
+	{
+		assert(scalingFactor == 1);
+		return sprite->drawTexture(renderer, nullptr, position, source, ColorRGBA(255, 255, 255, 255), 255, EImageBlitMode::OPAQUE, ImageFlip{});
 	}
 private:
 	std::shared_ptr<ISharedImage> sprite;
@@ -68,4 +76,59 @@ TEST(WrappedSpriteSdl, CompositesPeriodicFragmentsOnSoftwareCanvas)
 				EXPECT_EQ(pixels[index + 3], 255);
 			}
 	}
+}
+
+TEST(WrappedSpriteSdl, CompositesPeriodicFragmentsThroughTexturePath)
+{
+	SDL_Surface * screen = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_RGBA32);
+	ASSERT_NE(screen, nullptr);
+	SDL_Renderer * renderer = SDL_CreateSoftwareRenderer(screen);
+	if(!renderer)
+	{
+		SDL_DestroySurface(screen);
+		GTEST_SKIP() << "SDL software renderer unavailable";
+	}
+	GpuResources::get().setRenderer(renderer);
+	struct RendererCleanup
+	{
+		SDL_Surface * screen;
+		~RendererCleanup()
+		{
+			GpuResources::get().destroyRenderer();
+			SDL_DestroySurface(screen);
+		}
+	} cleanup{screen};
+	using Texture = std::unique_ptr<SDL_Texture, decltype(&SDL_DestroyTexture)>;
+	Texture target(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, 32, 32), SDL_DestroyTexture);
+	ASSERT_NE(target, nullptr);
+	auto image = std::make_shared<SoftwareSpriteImage>();
+	{
+		auto canvas = image->getCanvas();
+		for(int y = 0; y < 96; ++y)
+			for(int x = 0; x < 96; ++x)
+				canvas.drawPoint(Point(x, y), ColorRGBA(x, y, 90, 255));
+	}
+	image->prepare();
+	{
+		auto canvas = Canvas::createFromRenderTarget(target.get(), Point(32, 32), CanvasScalingPolicy::IGNORE);
+		forEachWrappedImageFragment(Point(-16, -16), image->dimensions(), Point(96, 96), [&](const Point & position, const Rect & source)
+		{
+			canvas.draw(image, position, source);
+		});
+	}
+	using Surface = std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)>;
+	Surface pixels(SDL_RenderReadPixels(renderer, nullptr), SDL_DestroySurface);
+	ASSERT_NE(pixels, nullptr);
+	std::vector<uint8_t> rgba(32 * 32 * 4);
+	ASSERT_TRUE(SDL_ConvertPixels(32, 32, pixels->format, pixels->pixels, pixels->pitch, SDL_PIXELFORMAT_RGBA32, rgba.data(), 32 * 4));
+	for(int y = 0; y < 32; ++y)
+		for(int x = 0; x < 32; ++x)
+		{
+			const auto index = static_cast<size_t>((y * 32 + x) * 4);
+			EXPECT_EQ(rgba[index], (80 + x) % 96);
+			EXPECT_EQ(rgba[index + 1], (80 + y) % 96);
+			EXPECT_EQ(rgba[index + 2], 90);
+			EXPECT_EQ(rgba[index + 3], 255);
+		}
+	SDL_SetRenderTarget(renderer, nullptr);
 }

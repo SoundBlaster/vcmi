@@ -24,6 +24,13 @@ It uses a minimal `IImage` adapter at scale 1; it does not exercise the full
 map renderer, actual game sprites, alpha/color effects, the GPU backend or
 live animation.
 
+A second test subsequently sent the same fragments through `Canvas`'s
+texture path and `SDLImageShared::drawTexture`, then read back every pixel
+from an SDL software renderer. It passed for the midpoint of one diagonal
+crossing (`wrapped-sprite-texture-build.log` and
+`wrapped-sprite-texture-test.log` on TB5). This exercises the texture API
+with a software renderer, not a hardware GPU or a running game.
+
 At revision `406969f` plus the movement-offset extraction, the same sprite
 offset calculation used by the adventure renderer was checked for all eight
 seam directions, including all four corners. Five interpolation positions
