@@ -1284,6 +1284,52 @@ TEST_F(HeroMovementTest, WrappedPathfindingDoesNotRevealHiddenGuard)
 		}
 }
 
+TEST_F(HeroMovementTest, WrappedPlayerGuardQueriesDoNotRevealHiddenGuards)
+{
+	const PlayerColor player(0);
+	const int3 hiddenGuard(35, 10, 0), visibleGuard(35, 11, 0), target(0, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(3, 10, 0), HeroTypeID(0), player)
+		.monster(hiddenGuard, CreatureID(0), 10).monster(visibleGuard, CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto & fog = gameState()->getPlayerTeam(player)->fogOfWarMap;
+	fog[hiddenGuard] = 0;
+	fog[visibleGuard] = 0;
+	auto callback = makeCallback(player);
+	CCallback unrestricted(gameState(), std::nullopt, nullptr);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(target), hiddenGuard);
+	EXPECT_TRUE(callback->getGuardingCreatures(target).empty());
+	EXPECT_EQ(callback->guardingCreaturePosition(target), int3(-1, -1, -1));
+	EXPECT_EQ(callback->getGuardingCreaturePosition(target), int3(-1, -1, -1));
+	EXPECT_EQ(unrestricted.guardingCreaturePosition(target), hiddenGuard);
+	EXPECT_EQ(unrestricted.getGuardingCreaturePosition(target), hiddenGuard);
+	EXPECT_FALSE(unrestricted.getGuardingCreatures(target).empty());
+
+	fog[visibleGuard] = 1;
+	const auto guards = callback->getGuardingCreatures(target);
+	ASSERT_EQ(guards.size(), 1u);
+	EXPECT_EQ(guards.front()->visitablePos(), visibleGuard);
+	EXPECT_EQ(callback->guardingCreaturePosition(target), visibleGuard);
+	EXPECT_EQ(callback->getGuardingCreaturePosition(target), visibleGuard);
+	EXPECT_EQ(gameState()->guardingCreaturePosition(target), hiddenGuard);
+
+	fog[target] = 0;
+	EXPECT_EQ(callback->getGuardingCreaturePosition(target), int3(-1, -1, -1));
+
+	// The pre-existing bounded-map callback behavior remains unchanged.
+	map()->setToroidalAndRebuild(false);
+	const int3 boundedTarget(34, 10, 0);
+	fog[hiddenGuard] = 0;
+	ASSERT_TRUE(fog[boundedTarget]);
+	const auto actualGuard = gameState()->guardingCreaturePosition(boundedTarget);
+	ASSERT_EQ(actualGuard, hiddenGuard);
+	EXPECT_EQ(callback->guardingCreaturePosition(boundedTarget), actualGuard);
+	EXPECT_EQ(callback->getGuardingCreaturePosition(boundedTarget), actualGuard);
+	EXPECT_FALSE(callback->getGuardingCreatures(boundedTarget).empty());
+}
+
 TEST_F(HeroMovementTest, WrappedPathfindingRecognizesVisibleGuardBesideHiddenGuard)
 {
 	const PlayerColor player(0);

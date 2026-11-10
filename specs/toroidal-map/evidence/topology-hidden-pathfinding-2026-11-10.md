@@ -53,3 +53,29 @@ run after the pathfinding change passed 1,446 tests, skipped three external
 input tests, and reported five disabled tests; it excluded the still-hung TCP
 case. Its log is `full-suite-hidden-guards.log` on TB5. The added server-battle
 test subsequently passed in a focused run together with four guard tests.
+
+## Player guard callbacks
+
+`WrappedPlayerGuardQueriesDoNotRevealHiddenGuards` reproduced a separate
+player-callback leak: a visible tile next to two hidden monsters across the
+seam returned their objects and a hidden guard position through three callback
+methods. These APIs are used outside the ordinary pathfinder, including by
+Nullkiller2. The test also covers a visible second guard when the cached first
+guard is hidden.
+
+On toroidal maps, a player callback now returns only visible guards and uses
+the first visible one when the cached guard is hidden. The position query
+returns an invalid position for an unseen tile. Unrestricted callbacks and
+authoritative game state retain the actual guard, and the test checks that
+bounded-map callbacks retain their previous behavior. The existing server
+test still starts a battle against a hidden guard across a corner. This is
+not a complete audit of AI, other `Unchecked` methods, spell cursors, or
+network confidentiality.
+
+The client, server, editor and test targets built on macOS arm64; linker
+warnings about duplicate libraries and missing Conan search paths remain.
+Eleven focused guard tests passed. The complete enabled suite passed 1,449
+tests, skipped three optional external-input tests and reported five disabled
+tests; no TCP case was excluded. Logs are `hidden-callback-before-test.log`,
+`hidden-callback-final-tests.log` and `full-suite-hidden-callback.log` in the
+TB5 build root. These are synthetic tests, not a graphical AI playthrough.

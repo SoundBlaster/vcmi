@@ -237,6 +237,11 @@ bool CGameInfoCallback::getTownInfo(const CGObjectInstance * town, InfoAboutTown
 int3 CGameInfoCallback::guardingCreaturePosition (int3 pos) const
 {
 	THROW_IF(!isVisible(pos), "Tile is not visible!");
+	if(gameState().getMap().toroidal && getPlayerID().has_value())
+	{
+		const auto guards = getGuardingCreatures(pos);
+		return guards.empty() ? int3(-1, -1, -1) : guards.front()->visitablePos();
+	}
 	return gameState().getMap().guardingCreaturePositions[pos];
 }
 
@@ -246,6 +251,8 @@ std::vector<const CGObjectInstance*> CGameInfoCallback::getGuardingCreatures (in
 	std::vector<const CGObjectInstance*> ret;
 	for(auto * cr : gameState().guardingCreatures(pos))
 	{
+		if(gameState().getMap().toroidal && getPlayerID().has_value() && !isVisible(cr->visitablePos()))
+			continue;
 		ret.push_back(cr);
 	}
 	return ret;

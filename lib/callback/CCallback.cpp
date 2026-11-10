@@ -392,6 +392,8 @@ int3 CCallback::getGuardingCreaturePosition(int3 tile)
 {
 	if (!gameState().getMap().isInTheMap(tile))
 		return int3(-1,-1,-1);
+	if(gameState().getMap().toroidal && getPlayerID().has_value())
+		return isVisible(tile) ? guardingCreaturePosition(tile) : int3(-1, -1, -1);
 
 	return gameState().getMap().guardingCreaturePositions[tile];
 }
