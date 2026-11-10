@@ -18,6 +18,7 @@
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapping/CMap.h"
 #include "../../lib/mapping/CMapEditManager.h"
+#include "../../lib/mapping/CMapService.h"
 #include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/mapping/TerrainTile.h"
@@ -342,6 +343,89 @@ TEST(MapFormat, LegacyH3MCanBeOptedIntoToroidalVmap)
 	EXPECT_EQ(reopened->getHeroesOnMap().size(), legacy->getHeroesOnMap().size());
 	EXPECT_EQ(reopened->getAllTowns().size(), legacy->getAllTowns().size());
 	EXPECT_EQ(reopened->getTile(int3(8, 8, 0)).terrainType, TerrainId::WATER);
+}
+
+TEST(MapFormat, ConvertsExternalLegacyMapWithWrappedFootprints)
+{
+	const char * path = std::getenv("VCMI_TOROID_LEGACY_H3M");
+	if(!path || !*path)
+		GTEST_SKIP() << "Set VCMI_TOROID_LEGACY_H3M to a legacy map";
+	std::ifstream file(path, std::ios::binary);
+	ASSERT_TRUE(file.is_open());
+	const std::vector<ui8> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	EditorCallback callback(nullptr);
+	CMapService service;
+	auto map = service.loadMap(bytes.data(), static_cast<int>(bytes.size()), "ExternalLegacyMap", "core", "ASCII", &callback);
+	ASSERT_NE(map, nullptr);
+	callback.setMap(map.get());
+	ASSERT_FALSE(map->toroidal);
+	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+	size_t crossing = 0;
+	for(const auto & object : map->objects)
+		if(object && map->hasStaticFootprintAcrossToroidalSeam(*object))
+			++crossing;
+	ASSERT_GT(crossing, 0u);
+	CMemoryBuffer archive;
+	{
+		CMapSaverJson saver(&archive);
+		ASSERT_NO_THROW(saver.saveMap(map));
+	}
+	archive.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&archive);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	ASSERT_TRUE(reopened->toroidal);
+	ASSERT_EQ(reopened->width, map->width);
+	ASSERT_EQ(reopened->height, map->height);
+	ASSERT_EQ(reopened->levels(), map->levels());
+	ASSERT_EQ(reopened->instanceNames.size(), map->instanceNames.size());
+	for(const auto & [name, object] : map->instanceNames)
+	{
+		const auto found = reopened->instanceNames.find(name);
+		ASSERT_NE(found, reopened->instanceNames.end()) << name;
+		const auto * copy = found->second.get();
+		ASSERT_EQ(copy->ID, object->ID) << name;
+		ASSERT_EQ(copy->anchorPos(), object->anchorPos()) << name;
+		ASSERT_EQ(copy->getWidth(), object->getWidth()) << name;
+		ASSERT_EQ(copy->getHeight(), object->getHeight()) << name;
+		for(int x = 0; x < object->getWidth(); ++x)
+			for(int y = 0; y < object->getHeight(); ++y)
+			{
+				const auto pos = object->anchorPos() - int3(x, y, 0);
+				EXPECT_EQ(copy->coveringAt(pos), object->coveringAt(pos)) << name << " " << pos.toString();
+				EXPECT_EQ(copy->blockingAt(pos), object->blockingAt(pos)) << name << " " << pos.toString();
+				EXPECT_EQ(copy->visitableAt(pos), object->visitableAt(pos)) << name << " " << pos.toString();
+			}
+	}
+	const auto names = [](const CMap & source, const std::vector<ObjectInstanceID> & ids)
+	{
+		std::multiset<std::string> result;
+		for(const auto & id : ids)
+			result.insert(source.getObject(id)->instanceName);
+		return result;
+	};
+	for(int z = 0; z < map->levels(); ++z)
+		for(int x = 0; x < map->width; ++x)
+			for(int y = 0; y < map->height; ++y)
+			{
+				const int3 pos(x, y, z);
+				const auto & before = map->getTile(pos);
+				const auto & after = reopened->getTile(pos);
+				EXPECT_EQ(names(*map, before.blockingObjects), names(*reopened, after.blockingObjects)) << pos.toString();
+				EXPECT_EQ(names(*map, before.visitableObjects), names(*reopened, after.visitableObjects)) << pos.toString();
+			}
+	ASSERT_FALSE(::testing::Test::HasFailure());
+	if(const char * outputPath = std::getenv("VCMI_TOROID_LEGACY_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream output(outputPath, std::ios::binary);
+		ASSERT_TRUE(output);
+		output.write(reinterpret_cast<const char *>(archive.getBuffer().data()), archive.getSize());
+		output.close();
+		ASSERT_TRUE(output);
+	}
 }
 
 TEST(MapFormat, ToroidalWrappedFootprintsSurviveVmapRoundTrip)

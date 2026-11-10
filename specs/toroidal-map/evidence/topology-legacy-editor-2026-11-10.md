@@ -93,3 +93,38 @@ the editor UI. The static-footprint load/save restriction remains in force.
 The full local suite passed 1,427 tests, skipped two optional prototype-input
 tests and reported five disabled tests (`full-suite-authoring-rebuild.log` on
 TB5). SpecPM validation reported no errors or warnings.
+
+## Two real H3M round trips and demo launch
+
+The later `MapFormat.ConvertsExternalLegacyMapWithWrappedFootprints` test
+loads a caller-supplied H3M, explicitly enables the torus with the editor's
+all-objects rebuild, saves VMAP and reopens it. It checks that at least one
+static footprint crosses a seam, compares instance names, object types,
+anchors, dimensions and visible/blocking/visitable mask cells, and compares
+the sets of blocking and visitable object names for every tile on every level.
+It passes with both of these separate two-level maps:
+
+- Demo `h3demo.h3m`, SHA-256
+  `3536cc09a8c3a7dc4602913ba58e63e2aa0f72da21df76ae55e6bed2edbd794e`:
+  this is the file rejected in the earlier editor check above.
+- Complete `Dead and Buried.h3m`, SHA-256
+  `cc23096e678a2e3bd9cf62445d7bba1828924222969b6ca5828d4805886fc162`:
+  a different file with the same map name.
+
+The generated demo VMAP's SHA-256 is
+`65fc7c17a561273af9ae1b2b833d7b37a5ed7af37c195120f3702b9952e94b5d`.
+The same diagnostic client and library identified in the
+[wrapped-footprint record](topology-wrapped-footprint-vmap-2026-11-10.md)
+started that VMAP using temporary local copies of the Complete archives.
+Computer Use showed the scenario start message and the game map. After
+revealing the map, westward then northward camera scrolling produced views
+whose minimap viewport spanned both map edges. These were discrete visual
+observations of the surface only, with no hero movement, gameplay completion,
+or per-object render comparison. The session was closed without saving and
+temporary resource copies were removed; the profile links were restored.
+
+The test checks membership rather than visitable-object ordering; it does not
+establish that all overlapping objects remain accessible or that an arbitrary
+legacy map is balanced, traversable or artistically seamless when converted.
+Neither source map nor game resources are included in the repository. The
+test skips when no external H3M path is supplied.
