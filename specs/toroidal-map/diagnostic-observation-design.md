@@ -95,11 +95,9 @@ API. A separate producer could associate selected game observation changes
 with image captures and semantic markers in a Screener trace. Capture time is
 not the same as the time a change was observed, and correlating the two needs
 an explicit timestamp and latency contract. The window source requires existing
-screen-capture authorization and captures stills; it has not been tested on
-VCMI's SDL window. The connected MCP's configured catalog must also include the
+screen-capture authorization and captures stills. The connected MCP's configured catalog must also include the
 produced trace. None of these observations establishes that a released SDK
-version has the local source's APIs, that screen capture will work on this
-machine, or that sparse stills can prove smooth scrolling. The user's existing
+version has the local source's APIs or that sparse stills can prove smooth scrolling. The user's existing
 video remains separate evidence of the recorded presentation.
 
 The local experimental bridge
@@ -131,8 +129,10 @@ was rejected. A later run used the real experimental MCP executable, a real
 Screener Fixture window and a synthetic observation: it produced one visual
 keyframe and a closed timeline, and the image showed the fixture. The first
 direct fixture-capture attempt crashed until the CLI initialized AppKit. These
-checks do not establish capture of a real game window or cross-process timestamp
-synchronization. The corresponding Screener work is on the separate
+checks do not establish cross-process timestamp synchronization. A subsequent
+[real VCMI window capture](evidence/screener-vcmi-window-2026-11-10.md)
+recorded seven event-driven frames and a closed timeline; it required the game
+window to be discoverable in the current space. The corresponding Screener work is on the separate
 `codex/mcp-window-recording` branch.
 
 ## Evidence and limits
