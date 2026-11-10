@@ -59,3 +59,21 @@ obstacles at the opposite edge; leaving them clipped yields different seam
 behavior. This observation does not decide which transformation an author
 wants, prove the resulting layout is playable, or establish which subset of
 these objects can safely be enabled. The restriction is still in force.
+
+## Fully clipped occupancy during topology conversion
+
+On 2026-11-10 a synthetic map test placed an object with mask `A0` at
+`(0, 5, 0)`: its only blocking and visitable cell is at `(-1, 5, 0)` and is
+clipped in bounded mode. A second object with the same mask was deliberately
+left hidden. After switching topology, the shown object's expected canonical
+tile `(9, 5, 0)` had neither its blocking nor its visitable entry; the hidden
+object remained absent. The existing shown/hidden rebuild test passed in the
+same run. The new regression is temporarily disabled until the map can retain
+the distinction between an explicitly hidden object and an object whose entire
+occupancy was clipped; it was run enabled to establish the failure.
+
+The current rebuild discovers shown objects from the existing tile occupancy
+index, which cannot distinguish these two cases when no indexed cells remain.
+This is one reason the static-footprint save/load restriction must not yet be
+lifted. The test is synthetic and does not establish how many objects in the
+demo H3M are affected. It does not test rendering or map serialization.

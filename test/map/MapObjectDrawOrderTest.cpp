@@ -246,6 +246,35 @@ TEST_F(MapObjectDrawOrderTest, ChangingTopologyRebuildsShownButNotHiddenObjects)
 	EXPECT_EQ(map.getTile(int3(0, 0, 0)).blockingObjects, (std::vector<ObjectInstanceID>{overlapping->id, shown->id}));
 }
 
+// Tracked compatibility gap: occupancy alone cannot distinguish a fully
+// clipped shown object from a deliberately hidden object.
+TEST_F(MapObjectDrawOrderTest, DISABLED_ChangingTopologyRestoresClippedShownObjectsButNotHiddenObjects)
+{
+	map.width = 10;
+	map.height = 10;
+	map.initTerrain();
+	for(int z = 0; z < map.levels(); ++z)
+		for(int x = 0; x < map.width; ++x)
+			for(int y = 0; y < map.height; ++y)
+				map.getTile(int3(x, y, z)).terrainType = ETerrainId::GRASS;
+
+	auto shown = std::make_shared<CGObjectInstance>(nullptr);
+	shown->id = ObjectInstanceID(0);
+	shown->pos = int3(0, 5, 0);
+	shown->appearance = makeTemplate(R"([ "A0" ])", 0);
+	auto hidden = std::make_shared<CGObjectInstance>(nullptr);
+	hidden->id = ObjectInstanceID(1);
+	hidden->pos = int3(0, 6, 0);
+	hidden->appearance = makeTemplate(R"([ "A0" ])", 0);
+	map.objects = {shown, hidden};
+	map.showObject(shown.get());
+
+	map.setToroidalAndRebuild(true);
+	EXPECT_TRUE(vstd::contains(map.getTile(int3(9, 5, 0)).visitableObjects, shown->id));
+	EXPECT_TRUE(vstd::contains(map.getTile(int3(9, 5, 0)).blockingObjects, shown->id));
+	EXPECT_FALSE(vstd::contains(map.getTile(int3(9, 6, 0)).visitableObjects, hidden->id));
+}
+
 TEST_F(MapObjectDrawOrderTest, WrappedInteractiveOverlapCanHaveDifferentVisualAndVisitOrder)
 {
 	map.width = 10;
