@@ -203,3 +203,21 @@ After the later Dimension Door and Scuttle Boat tests were added, the full
 test was skipped without its environment variable and four tests remained
 disabled; its separate earlier run is recorded in the save-marker evidence.
 The full-run log is `full-suite-post-spells.log` on TB5.
+
+The next diagnostic used an isolated temporary profile with copied settings,
+an empty saves directory and links to the game data on TB5. It progressed
+beyond the save/config loaders, then stopped in `CResourceHandler::createInitial`
+while opening a directory. A trace added before each filesystem scan identified
+the last requested path as the profile's `Data` link, which resolves to the
+isolated `complete-data/Data` directory on TB5. The last launch used a client
+stamped `309a6f0` and the traced library, and did not reach a game window.
+The system log recorded an All Files preflight and response, but no observed
+removable-volume denial; the operating-system cause remains unconfirmed.
+The launch log is retained as `runtime/vcmi-diagnostic-traced-data.log` on TB5.
+
+While adding the trace, the loader's error message was found to use a moved-from
+path argument. A symlink-loop test reproduced the missing path in the message;
+the message now uses the stored path. Five filesystem/resource-path tests
+passed after the fix (`filesystem-path-before-test.log` and
+`filesystem-path-final-test.log` on TB5). This diagnostics fix does not resolve
+the stalled directory open.
