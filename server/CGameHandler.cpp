@@ -477,7 +477,7 @@ void CGameHandler::handleReceivedPack(GameConnectionID connection, CPackForServe
 			complain((boost::format("Got false in applying %s... that request must have been fishy!")
 				% typeid(pack).name()).str());
 
-		sendPackageResponse(true);
+		sendPackageResponse(result);
 	}
 }
 

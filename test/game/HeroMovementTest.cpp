@@ -38,6 +38,8 @@
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/modding/IdentifierResolver.h"
 #include "../../lib/networkPacks/PacksForClient.h"
+#include "../../lib/networkPacks/PacksForServer.h"
+#include "../../lib/networkPacks/LobbyTopologyCapability.h"
 #include "../../lib/network/NetworkInterface.h"
 #include "../../lib/spells/CSpellHandler.h"
 #include "../../lib/spells/Problem.h"
@@ -758,6 +760,176 @@ TEST_F(HeroMovementTest, CornerMovementRevealsOnlyTheMovingTeamAndLevel)
 					EXPECT_FALSE(replica->isVisibleFor(tile, otherPlayer)) << tile.toString();
 				}
 			}
+}
+
+TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
+{
+	const PlayerColor player(0);
+	const PlayerColor otherPlayer(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).playerActive(otherPlayer)
+		.hero(int3(1, 0, 0), HeroTypeID(0), player)
+		.hero(int3(1, 5, 0), HeroTypeID(1), otherPlayer)
+		.terrain(int3(34, 35, 0), TerrainId::ROCK);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	setMapVisibility(player, false);
+	setMapVisibility(otherPlayer, false);
+	gameState()->actingPlayers.insert(player);
+	gameState()->actingPlayers.insert(otherPlayer);
+	auto * hero = findHeroByOwner(player);
+	auto * otherHero = findHeroByOwner(otherPlayer);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(otherHero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	ASSERT_EQ(otherHero->visitablePos(), int3(0, 5, 0));
+	hero->setMovementPoints(3000);
+	otherHero->setMovementPoints(3000);
+	const auto snapshot = gameState()->saveToMemory();
+
+	class Peer final : public INetworkClientListener
+	{
+	public:
+		explicit Peer(std::string name) : name(std::move(name)) {}
+		void onConnectionFailed(const std::string & error) override { failure = error; }
+		void onDisconnected(const std::shared_ptr<INetworkConnection> &, const std::string & error) override { failure = error; }
+		void onConnectionEstablished(const std::shared_ptr<INetworkConnection> & connection) override
+		{
+			transport = connection;
+			codec = std::make_unique<GameConnection>(transport);
+			LobbyClientConnected greeting;
+			greeting.uuid = name;
+			greeting.names = {name};
+			greeting.mode = EStartMode::NEW_GAME;
+			greeting.version = LobbyTopologyCapability::encode(ESerializationVersion::CURRENT);
+			codec->sendPack(greeting);
+		}
+		void onPacketReceived(const std::shared_ptr<INetworkConnection> &, const std::vector<std::byte> & bytes) override
+		{
+			auto packet = codec->retrievePack(bytes);
+			if(const auto * greeting = dynamic_cast<const LobbyClientConnected *>(packet.get()); greeting && greeting->uuid == name)
+			{
+				const auto accepted = LobbyTopologyCapability::decode(greeting->version);
+				negotiated = accepted.toroidal && accepted.version == ESerializationVersion::CURRENT;
+				codec->setSerializationVersion(accepted.version);
+			}
+			if(auto * movement = dynamic_cast<TryMoveHero *>(packet.get()); movement && state)
+			{
+				state->apply(*movement);
+				++movements;
+			}
+			if(const auto * applied = dynamic_cast<const PackageApplied *>(packet.get()))
+				results[applied->requestID] = applied->result;
+		}
+		std::string name;
+		std::string failure;
+		bool negotiated = false;
+		int movements = 0;
+		std::map<uint32_t, bool> results;
+		std::shared_ptr<INetworkConnection> transport;
+		std::unique_ptr<GameConnection> codec;
+		std::shared_ptr<CGameState> state;
+	};
+
+	CVCMIServer server(0, true);
+	const auto port = server.prepare(false, true);
+	ASSERT_NE(port, 0);
+	auto network = INetworkHandler::createHandler();
+	Peer first("movement-peer"), second("other-peer");
+	const auto pumpUntil = [&](const auto & ready)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		while(!ready() && first.failure.empty() && second.failure.empty() && std::chrono::steady_clock::now() < deadline)
+		{
+			network->getContext().restart();
+			network->getContext().poll();
+			server.getNetworkHandler().getContext().restart();
+			server.getNetworkHandler().getContext().poll();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+	};
+	network->connectToRemote(first, "127.0.0.1", port);
+	pumpUntil([&] { return first.negotiated; });
+	ASSERT_TRUE(first.negotiated) << first.failure;
+	network->connectToRemote(second, "127.0.0.1", port);
+	pumpUntil([&] { return second.negotiated; });
+	ASSERT_TRUE(second.negotiated) << second.failure;
+	ASSERT_EQ(server.activeConnections.size(), 2);
+	ASSERT_TRUE(server.supportsMapTopology(*gameState()->getMapHeader()));
+
+	for(const auto & [id, client] : server.playerNames)
+	{
+		if(client.name == first.name)
+			server.si->playerInfos[player].connectedPlayerIDs.insert(id);
+		if(client.name == second.name)
+			server.si->playerInfos[otherPlayer].connectedPlayerIDs.insert(id);
+	}
+	ASSERT_TRUE(server.hasPlayerAt(player, server.activeConnections[0]->connectionID));
+	ASSERT_FALSE(server.hasPlayerAt(player, server.activeConnections[1]->connectionID));
+	server.gh = std::make_shared<CGameHandler>(server, gameState());
+	for(auto & connection : server.activeConnections)
+		connection->setCallback(*gameState());
+	for(Peer * peer : {&first, &second})
+	{
+		peer->state = std::make_shared<CGameState>();
+		peer->state->preInit(LIBRARY);
+		peer->state->loadFromMemory(snapshot);
+		peer->codec->setCallback(*peer->state);
+	}
+	server.setState(EServerState::GAMEPLAY);
+	const int3 destination(35, 35, 0);
+	MoveHero request({hero->convertFromVisitablePos(destination)}, EPathfindingLayer::LAND, hero->id, false);
+	request.player = player;
+	request.requestID = 1;
+	second.codec->sendPack(request);
+	pumpUntil([&] { return second.results.contains(1); });
+	ASSERT_TRUE(second.results.contains(1)) << second.failure;
+	EXPECT_FALSE(second.results.at(1));
+	EXPECT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	request.requestID = 2;
+	first.codec->sendPack(request);
+	pumpUntil([&] { return first.results.contains(2) && first.movements && second.movements; });
+	ASSERT_TRUE(first.results.contains(2)) << first.failure;
+	EXPECT_TRUE(first.results.at(2));
+	ASSERT_EQ(hero->visitablePos(), destination);
+	for(const Peer * peer : {&first, &second})
+	{
+		EXPECT_EQ(peer->movements, 1) << peer->failure;
+		EXPECT_TRUE(peer->state->getMap().toroidal);
+		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), destination);
+		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), hero->movementPointsRemaining());
+		EXPECT_TRUE(peer->state->isVisibleFor(destination, player));
+		EXPECT_FALSE(peer->state->isVisibleFor(destination, otherPlayer));
+	}
+	MoveHero blocked({hero->convertFromVisitablePos(int3(34, 35, 0))}, EPathfindingLayer::LAND, hero->id, false);
+	blocked.player = player;
+	blocked.requestID = 3;
+	first.codec->sendPack(blocked);
+	pumpUntil([&] { return first.results.contains(3); });
+	ASSERT_TRUE(first.results.contains(3)) << first.failure;
+	EXPECT_FALSE(first.results.at(3));
+	EXPECT_EQ(hero->visitablePos(), destination);
+
+	const int3 otherDestination(35, 5, 0);
+	MoveHero otherRequest({otherHero->convertFromVisitablePos(otherDestination)}, EPathfindingLayer::LAND, otherHero->id, false);
+	otherRequest.player = otherPlayer;
+	otherRequest.requestID = 4;
+	second.codec->sendPack(otherRequest);
+	pumpUntil([&] {
+		return second.results.contains(4)
+			&& first.state->getHero(otherHero->id)->visitablePos() == otherDestination
+			&& second.state->getHero(otherHero->id)->visitablePos() == otherDestination;
+	});
+	ASSERT_TRUE(second.results.contains(4)) << second.failure;
+	EXPECT_TRUE(second.results.at(4));
+	ASSERT_EQ(otherHero->visitablePos(), otherDestination);
+	for(const Peer * peer : {&first, &second})
+	{
+		EXPECT_GE(peer->movements, 2) << peer->failure;
+		EXPECT_EQ(peer->state->getHero(otherHero->id)->visitablePos(), otherDestination);
+		EXPECT_EQ(peer->state->getHero(otherHero->id)->movementPointsRemaining(), otherHero->movementPointsRemaining());
+		EXPECT_TRUE(peer->state->isVisibleFor(otherDestination, otherPlayer));
+	}
 }
 
 TEST_F(HeroMovementTest, blockedToroidalStepIsRejected)
