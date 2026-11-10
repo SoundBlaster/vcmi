@@ -153,6 +153,8 @@ private:
 	CGObjectInstance * obj;
 	int3 initialPos;
 	int3 targetPos;
+	std::vector<size_t> mainTownPlayers;
+	void updateMainTownPositions(const int3 & from, const int3 & to);
 };
 
 /// The CRemoveObjectOperation class removes object from the map

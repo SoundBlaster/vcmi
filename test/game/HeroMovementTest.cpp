@@ -36,6 +36,7 @@
 #include "../../lib/mapping/MapTopology.h"
 #include "../../lib/mapping/CMapService.h"
 #include "../../lib/mapping/CMapInfo.h"
+#include "../../lib/mapping/CMapEditManager.h"
 #include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/modding/IdentifierResolver.h"
@@ -127,11 +128,19 @@ TEST(ToroidalDemoVmapTest, StartingHeroUsesMainTownOutsideMap)
 			if(auto * candidate = dynamic_cast<CGTownInstance *>(object.get()))
 				town = candidate;
 		ASSERT_NE(town, nullptr);
-		map->moveObject(town->id, rawAnchor);
-		map->players[0].hasMainTown = true;
-		map->players[0].generateHeroAtMainTown = true;
-		map->players[0].posOfMainTown = rawAnchor;
+		ASSERT_TRUE(map->players[0].hasMainTown);
+		ASSERT_TRUE(map->players[0].generateHeroAtMainTown);
+		ASSERT_EQ(map->players[0].posOfMainTown, town->anchorPos());
+		const auto originalAnchor = town->anchorPos();
 		map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+		map->getEditManager()->moveObject(town, rawAnchor);
+		ASSERT_EQ(map->players[0].posOfMainTown, rawAnchor);
+		map->getEditManager()->getUndoManager().undo();
+		ASSERT_EQ(town->anchorPos(), originalAnchor);
+		ASSERT_EQ(map->players[0].posOfMainTown, originalAnchor);
+		map->getEditManager()->getUndoManager().redo();
+		ASSERT_EQ(town->anchorPos(), rawAnchor);
+		ASSERT_EQ(map->players[0].posOfMainTown, rawAnchor);
 		const int3 entrance = town->visitablePos();
 		ASSERT_TRUE(map->isInTheMap(entrance));
 		if(existingHero)
@@ -2898,6 +2907,34 @@ TEST_F(HeroMovementTest, TownAppearanceUsesWrappedAnchorTerrain)
 	}
 	map()->setToroidalAndRebuild(false);
 	EXPECT_ANY_THROW(town->getObjectHandler()->configureObject(town, randomizer));
+}
+
+TEST_F(HeroMovementTest, EditorMoveTracksOnlyStillSelectedMainTown)
+{
+	const PlayerColor player(0);
+	const int3 original(10, 10, 0), destination(12, 12, 0), other(20, 20, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.town(original, FactionID::CASTLE, player)
+		.town(other, FactionID::CASTLE, player)
+		.playerMainTown(player, original, false)
+		.hero(int3(25, 25, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	auto * town = expectAt<CGTownInstance>(original);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(town, nullptr);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(map()->players[0].posOfMainTown, original);
+	auto * editor = map()->getEditManager();
+	editor->moveObject(hero, hero->anchorPos() + int3(1, 0, 0));
+	EXPECT_EQ(map()->players[0].posOfMainTown, original);
+	editor->getUndoManager().undo();
+	editor->moveObject(town, destination);
+	EXPECT_EQ(map()->players[0].posOfMainTown, destination);
+	map()->players[0].posOfMainTown = other;
+	editor->getUndoManager().undo();
+	EXPECT_EQ(town->anchorPos(), original);
+	EXPECT_EQ(map()->players[0].posOfMainTown, other);
 }
 
 /// Two towns that share an entrance tile, as found on some SoD maps. The pathfinder only considers the top town.

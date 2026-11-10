@@ -15,6 +15,7 @@
 #include "../TerrainHandler.h"
 #include "../MapLayerHandler.h"
 #include "../mapObjects/CGObjectInstance.h"
+#include "../mapObjects/CGTownInstance.h"
 #include "CMap.h"
 #include "MapTopology.h"
 #include "MapEditUtils.h"
@@ -650,16 +651,32 @@ CMoveObjectOperation::CMoveObjectOperation(CMap* map, CGObjectInstance * obj, co
 	initialPos(obj->anchorPos()),
 	targetPos(targetPosition)
 {
+	if(dynamic_cast<const CGTownInstance *>(obj))
+		for(size_t i = 0; i < map->players.size(); ++i)
+			if(map->players[i].hasMainTown && map->players[i].posOfMainTown == initialPos)
+				mainTownPlayers.push_back(i);
+}
+
+void CMoveObjectOperation::updateMainTownPositions(const int3 & from, const int3 & to)
+{
+	for(const auto player : mainTownPlayers)
+	{
+		auto & info = map->players.at(player);
+		if(info.hasMainTown && info.posOfMainTown == from)
+			info.posOfMainTown = to;
+	}
 }
 
 void CMoveObjectOperation::execute()
 {
 	map->moveObject(obj->id, targetPos);
+	updateMainTownPositions(initialPos, targetPos);
 }
 
 void CMoveObjectOperation::undo()
 {
 	map->moveObject(obj->id, initialPos);
+	updateMainTownPositions(targetPos, initialPos);
 }
 
 void CMoveObjectOperation::redo()
