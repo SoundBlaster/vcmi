@@ -9,6 +9,7 @@
 #include "../../../server/activities/VisitActivities.h"
 #include "../../../server/activities/ActivityProcessor.h"
 #include "../../../server/TurnTimerHandler.h"
+#include "../../../server/ServerSpellCastEnvironment.h"
 #include "CGameHandler.h"
 
 #include "mock/GameHandlerTestServer.h"
@@ -37,6 +38,7 @@
 #include "lib/mapping/CMapEvent.h"
 #include "lib/GameLibrary.h"
 #include "lib/CSkillHandler.h"
+#include "lib/spells/adventure/ReinforcementsEffect.h"
 
 namespace
 {
@@ -2950,6 +2952,57 @@ TEST_F(TownPortalTest, unskilledTownPortalChoosesCrossLevelTownAcrossToroidalSea
 	map()->toroidal = true;
 	handler.castSpell(hero, SpellID(SpellID::decode("core:townPortal")), int3(-1, -1, -1));
 	EXPECT_EQ(hero->visitablePos(), (*underground)->visitablePos());
+}
+
+TEST_F(TownPortalTest, reinforcementsChoosesNearestTownAcrossToroidalSeam)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(player)
+		.hero(int3(1, 10, 0), HeroTypeID(0), player)
+		.town(int3(9, 10, 0), FactionID(0), player)
+		.town(int3(35, 10, 0), FactionID(0), player);
+	startWithMap(std::move(builder));
+	const auto towns = findAll<CGTownInstance>();
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(towns.size(), 2u);
+	const auto interior = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().x == 9; });
+	const auto across = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().x == 35; });
+	ASSERT_NE(interior, towns.end());
+	ASSERT_NE(across, towns.end());
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	class RecordingEnvironment final : public ServerSpellCastEnvironment
+	{
+	public:
+		using ServerSpellCastEnvironment::ServerSpellCastEnvironment;
+		void showGarrisonDialog(ObjectInstanceID army, ObjectInstanceID caster, const MetaString &) override
+		{
+			source = army;
+			visitor = caster;
+		}
+		std::optional<ObjectInstanceID> source;
+		std::optional<ObjectInstanceID> visitor;
+	} environment(&handler);
+	JsonNode config;
+	config["allowTownSelection"].Bool() = false;
+	const auto * spell = SpellID(SpellID::decode("core:townPortal")).toSpell();
+	ASSERT_NE(spell, nullptr);
+	ReinforcementsEffect concreteEffect(spell, config);
+	const IAdventureSpellEffect & effect = concreteEffect;
+	const AdventureSpellCastParameters parameters{hero, int3(-1, -1, -1)};
+	EXPECT_EQ(effect.applyAdventureEffects(&environment, parameters), ESpellCastResult::OK);
+	ASSERT_TRUE(environment.source.has_value());
+	EXPECT_EQ(*environment.source, (*interior)->getUpperArmy()->id);
+	EXPECT_EQ(environment.visitor, hero->id);
+	environment.source.reset();
+	map()->toroidal = true;
+	EXPECT_EQ(effect.applyAdventureEffects(&environment, parameters), ESpellCastResult::OK);
+	ASSERT_TRUE(environment.source.has_value());
+	EXPECT_EQ(*environment.source, (*across)->getUpperArmy()->id);
+	EXPECT_EQ(environment.visitor, hero->id);
 }
 
 TEST_F(TownPortalTest, castingPausesToAskWhichTownAndFinishesAtTheChosenOne)

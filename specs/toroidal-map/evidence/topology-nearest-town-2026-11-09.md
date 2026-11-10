@@ -22,6 +22,14 @@ surface town; with wrapping, it selects and reaches the underground town.
 cross-level choice through the server spell handler, not Reinforcements or
 the game UI.
 
+A further synthetic scenario calls the actual Reinforcements effect with
+town selection disabled and records the garrison dialog requested through a
+server spell environment. The bounded map selects the interior town; the
+toroidal map selects the town across the horizontal seam. The caster ID is
+preserved in both cases. `TownPortalTest.*` passed five tests on macOS arm64.
+This exercises the effect directly, not a configured mod spell's full cast,
+unit transfer, cross-level selection, or the game UI.
+
 Source baseline `cd847d3` with local changes:
 
 ```text
