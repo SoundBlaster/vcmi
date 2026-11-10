@@ -701,6 +701,41 @@ bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
 		const auto layer = hero->getConfirmedMovementLayer();
 		if(hero->inBoat() || (layer != EPathfindingLayer::AIR && layer != EPathfindingLayer::WATER))
 			continue;
+		// A flying hero can already be above a legal stopping tile. A route
+		// search cannot express landing without moving to another tile.
+		const auto position = hero->visitablePos();
+		const auto & tile = gameState().getMap().getTile(position);
+		const auto * team = gameState().getPlayerTeam(player);
+		bool knownNeighborhood = team != nullptr;
+		const auto topology = gameState().getMap().getTopology();
+		for(int dx = -1; dx <= 1 && knownNeighborhood; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				const auto neighbor = topology.canonicalize(position + int3(dx, dy, 0));
+				if(!neighbor || !team->fogOfWarMap[*neighbor])
+				{
+					knownNeighborhood = false;
+					break;
+				}
+			}
+		const bool onlyHeroBlocks = std::all_of(tile.blockingObjects.begin(), tile.blockingObjects.end(),
+			[hero](const auto & id) { return id == hero->id; });
+		if(layer == EPathfindingLayer::AIR && knownNeighborhood && tile.isLand()
+			&& tile.getTerrain()->isPassable() && onlyHeroBlocks
+			&& !tile.objectVisitedBy(hero->id).hasValue()
+			&& !gameState().guardingCreaturePosition(position).isValid())
+		{
+			TryMoveHero landing;
+			landing.id = hero->id;
+			landing.start = hero->pos;
+			landing.end = hero->pos;
+			landing.result = TryMoveHero::SUCCESS;
+			landing.movePoints = hero->movementPointsRemaining();
+			landing.movementLayer = EPathfindingLayer::LAND;
+			sendAndApply(landing);
+			heroMovementLayers[hero->id] = {position, EPathfindingLayer::LAND};
+			return true;
+		}
 		std::vector<LandingStep> route;
 		if(findKnownTransientLanding(gameState(), hero, std::nullopt, &route) != KnownLanding::FOUND || route.empty())
 			continue;

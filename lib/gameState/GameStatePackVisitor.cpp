@@ -648,6 +648,12 @@ void GameStatePackVisitor::visitTryMoveHero(TryMoveHero & pack)
 		if(gs.getMap().toroidal)
 			h->setConfirmedMovementLayer(pack.movementLayer);
 	}
+	else if(gs.getMap().toroidal && pack.start == pack.end && pack.result == TryMoveHero::SUCCESS
+		&& pack.movementLayer != EPathfindingLayer::AUTO)
+	{
+		// Explicit in-place layer changes must reach every replicated state.
+		h->setConfirmedMovementLayer(pack.movementLayer);
+	}
 
 	auto & fogOfWarMap = gs.getPlayerTeam(h->getOwner())->fogOfWarMap;
 	for(const int3 & t : pack.fowRevealed)
