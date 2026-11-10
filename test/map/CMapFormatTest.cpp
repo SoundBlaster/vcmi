@@ -253,6 +253,54 @@ TEST(MapFormat, ToroidalHeaderRequiresAtLeastThreeTilesOnEachAxis)
 	EXPECT_THROW(loadHeader(header), std::runtime_error);
 }
 
+TEST(MapFormat, ReadsAndRewritesExternalUntaggedPrototypeVmap)
+{
+	const char * path = std::getenv("VCMI_TOROID_PROTOTYPE_VMAP");
+	if(!path || !*path)
+		GTEST_SKIP() << "Set VCMI_TOROID_PROTOTYPE_VMAP to a branch-era map";
+	std::ifstream file(path, std::ios::binary);
+	ASSERT_TRUE(file.is_open());
+	const std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	CMemoryBuffer input;
+	input.write(reinterpret_cast<const ui8 *>(bytes.data()), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	{
+		std::shared_ptr<CIOApi> io(new CProxyROIOApi(&input));
+		CZipLoader archive("", "_", io);
+		const JsonNode header = getFromArchive(archive, CMapFormatJson::HEADER_FILE_NAME);
+		ASSERT_EQ(header["versionMajor"].Integer(), CMapFormatJson::VERSION_MAJOR_TOROIDAL);
+		ASSERT_EQ(header["topology"].String(), "toroidal");
+	}
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderJson loader(&input);
+	auto map = loader.loadMap(&callback);
+	ASSERT_NE(map, nullptr);
+	callback.setMap(map.get());
+	ASSERT_TRUE(map->toroidal);
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	{
+		std::shared_ptr<CIOApi> io(new CProxyROIOApi(&output));
+		CZipLoader archive("", "_", io);
+		const JsonNode header = getFromArchive(archive, CMapFormatJson::HEADER_FILE_NAME);
+		ASSERT_EQ(header["versionMajor"].Integer(), CMapFormatJson::VERSION_MAJOR_TOROIDAL_TAGGED);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reopenedLoader(&output);
+	auto reopened = reopenedLoader.loadMap(&reopenedCallback);
+	ASSERT_NE(reopened, nullptr);
+	ASSERT_TRUE(reopened->toroidal);
+	EXPECT_EQ(reopened->width, map->width);
+	EXPECT_EQ(reopened->height, map->height);
+	EXPECT_EQ(reopened->objects.size(), map->objects.size());
+}
+
 TEST(MapFormat, LegacyH3MCanBeOptedIntoToroidalVmap)
 {
 	const PlayerColor player(0);

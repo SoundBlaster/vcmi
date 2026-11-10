@@ -23,8 +23,14 @@ test and retained four disabled tests (`full-suite-vmap-marker.log` on TB5).
 
 The original version-3 source rejects a larger major version, but no old
 binary was run. Existing untagged version-4 prototypes are still ambiguous,
-and this marker is not allocated by upstream. The focused tests load a
-synthetic version-4 header, not the previously authored on-disk demo map.
+and this marker is not allocated by upstream. A later optional test read the
+previously authored `toroid-seam-laboratory.vmap` from the isolated TB5
+runtime, confirmed its untagged version 4, serialized it with the new marker
+in memory and reopened it with the same dimensions and object count. It did
+not start gameplay or compare every object property. The source file's SHA-256
+remained `3fbc0a2cbbdfa22068e7e6a099a7b51e803d39b5fc0d0b3fd95155cc6eeb232d`
+before and after the test. Set `VCMI_TOROID_PROTOTYPE_VMAP` to repeat this
+optional test; `vmap-prototype-test.log` records this run on TB5.
 
 On 2026-11-10 the format test at revision `8384c5d` showed that a version-3
 header with an unknown string or boolean `topology` was silently loaded as a
