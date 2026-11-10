@@ -12,6 +12,8 @@
 #include "../mapObjects/CGObjectInstance.h"
 #include "../mapping/TerrainTile.h"
 #include "../mapping/MapTilesStorage.h"
+#include "../mapping/CMapHeader.h"
+#include "../mapping/MapTopology.h"
 #include "../callback/IGameInfoCallback.h"
 #include "CGPathNode.h"
 
@@ -19,6 +21,28 @@ namespace PathfinderUtil
 {
 	using FoW = MapTilesStorage<uint8_t>;
 	using ELayer = EPathfindingLayer;
+
+	inline std::vector<int3> knownGuardians(const int3 & pos, const FoW & fow, const IGameInfoCallback & gameInfo)
+	{
+		std::vector<int3> result;
+		const auto topology = gameInfo.getMapHeader()->getTopology();
+		for(const auto * guard : gameInfo.getGuardingCreatures(pos))
+		{
+			const auto guardPos = topology.canonicalize(guard->visitablePos());
+			if(guardPos && fow[*guardPos])
+				result.push_back(*guardPos);
+		}
+		return result;
+	}
+
+	inline int3 knownGuardingCreaturePosition(const int3 & pos, const FoW & fow, const IGameInfoCallback & gameInfo)
+	{
+		const auto guardPos = gameInfo.guardingCreaturePosition(pos);
+		if(!gameInfo.getMapHeader()->toroidal || !guardPos.isValid() || fow[guardPos])
+			return guardPos;
+		const auto guards = knownGuardians(pos, fow, gameInfo);
+		return guards.empty() ? int3(-1, -1, -1) : guards.front();
+	}
 
 	inline bool layerMatchesTerrain(const ELayer & layer, const TerrainTile & tile)
 	{
@@ -78,7 +102,7 @@ namespace PathfinderUtil
 			{
 				return EPathAccessibility::BLOCKED;
 			}
-			else if(gameInfo.guardingCreaturePosition(pos).isValid())
+			else if(knownGuardingCreaturePosition(pos, fow, gameInfo).isValid())
 			{
 				// Monster close by; blocked visit for battle
 				return EPathAccessibility::GUARDED;

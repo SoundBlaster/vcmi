@@ -27,3 +27,29 @@ tests, skipped three external-input cases, and reported five disabled tests.
 It excluded `HeroMovementTest.TcpPeersReceiveAuthoritativeCornerMovement`
 because an earlier instance remained hung; this run does not verify that
 network case. Its log is `full-suite-pathfinding-fog.log` on TB5.
+
+## Hidden guards
+
+A later synthetic test placed a hidden monster across a seam from a visible
+tile. With the monster present, the player's route previously exposed both
+`GUARDED` accessibility and a battle action; removing it changed those values.
+On toroidal maps, pathfinding now considers only guards whose visitable tiles
+are known to that player's team. It checks all guards when the cached first
+guard is hidden, so a second, visible guard remains effective. Bounded maps
+continue to use the existing guard queries. The actual server battle logic is
+unchanged.
+
+The test compares accessibility, reachability, actions and movement values
+across the map with a hidden guard and with that guard removed, and checks that
+revealing it restores the guarded action. A separate test covers a visible
+guard alongside the hidden cached guard. A server test places the corner
+guard under fog and verifies that entering its guarded tile starts battle with
+that guard. These are synthetic single-player state checks, not a claim about
+normal sight evolution, all guard interactions, AI behavior, a GUI, or network
+confidentiality.
+
+The client, server, editor, and test targets built on macOS arm64. The wider
+run after the pathfinding change passed 1,446 tests, skipped three external
+input tests, and reported five disabled tests; it excluded the still-hung TCP
+case. Its log is `full-suite-hidden-guards.log` on TB5. The added server-battle
+test subsequently passed in a focused run together with four guard tests.

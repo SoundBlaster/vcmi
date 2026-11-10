@@ -54,7 +54,7 @@ private:
 	bool isLayerTransitionPossible() const;
 	EPathNodeAction getTeleportDestAction() const;
 
-	bool isDestinationGuardian() const;
+	bool isDestinationGuardian(const CPathfinderHelper * helper) const;
 
 	void initializeGraph();
 
@@ -138,5 +138,6 @@ public:
 	bool passOneTurnLimitCheck(const PathNodeInfo & source) const;
 
 	int getGuardiansCount(int3 tile) const;
+	int3 getKnownGuardingCreaturePosition(int3 tile) const;
 	bool isTileBlockedByHole(const int3 & tile) const;
 };

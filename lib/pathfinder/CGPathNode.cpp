@@ -165,7 +165,7 @@ void PathNodeInfo::setNode(const IGameInfoCallback & gameInfo, CGPathNode * n)
 
 void PathNodeInfo::updateInfo(CPathfinderHelper * hlp, const IGameInfoCallback & gameInfo)
 {
-	if(gameInfo.guardingCreaturePosition(node->coord).isValid() && !isInitialPosition)
+	if(hlp->getKnownGuardingCreaturePosition(node->coord).isValid() && !isInitialPosition)
 	{
 		guarded = true;
 	}

@@ -13,6 +13,7 @@
 #include "INodeStorage.h"
 #include "PathfinderOptions.h"
 #include "PathfindingRules.h"
+#include "PathfinderUtil.h"
 #include "TurnInfo.h"
 
 #include "../IGameSettings.h"
@@ -181,7 +182,7 @@ void CPathfinder::calculatePaths()
 				destination.movementLeft = movement;
 				destination.cost = cost;
 				destination.updateInfo(hlp, gameInfo);
-				destination.isGuardianTile = destination.guarded && isDestinationGuardian();
+				destination.isGuardianTile = destination.guarded && isDestinationGuardian(hlp);
 
 				for(const auto & rule : config->rules)
 				{
@@ -391,9 +392,9 @@ EPathNodeAction CPathfinder::getTeleportDestAction() const
 	return action;
 }
 
-bool CPathfinder::isDestinationGuardian() const
+bool CPathfinder::isDestinationGuardian(const CPathfinderHelper * helper) const
 {
-	return gameInfo.guardingCreaturePosition(destination.node->coord) == destination.node->coord;
+	return helper->getKnownGuardingCreaturePosition(destination.node->coord) == destination.node->coord;
 }
 
 void CPathfinderHelper::initializePatrol()
@@ -497,7 +498,20 @@ bool CPathfinderHelper::passOneTurnLimitCheck(const PathNodeInfo & source) const
 
 int CPathfinderHelper::getGuardiansCount(int3 tile) const
 {
+	if(gameInfo.getMapHeader()->toroidal)
+	{
+		const auto * team = gameInfo.getPlayerTeam(owner);
+		return team ? PathfinderUtil::knownGuardians(tile, team->fogOfWarMap, gameInfo).size() : 0;
+	}
 	return gameInfo.getGuardingCreatures(tile).size();
+}
+
+int3 CPathfinderHelper::getKnownGuardingCreaturePosition(int3 tile) const
+{
+	if(!gameInfo.getMapHeader()->toroidal)
+		return gameInfo.guardingCreaturePosition(tile);
+	const auto * team = gameInfo.getPlayerTeam(owner);
+	return team ? PathfinderUtil::knownGuardingCreaturePosition(tile, team->fogOfWarMap, gameInfo) : int3(-1, -1, -1);
 }
 
 bool CPathfinderHelper::isTileBlockedByHole(const int3 & tile) const

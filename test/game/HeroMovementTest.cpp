@@ -1224,6 +1224,89 @@ TEST_F(HeroMovementTest, WrappedSailingDoesNotRevealHiddenCoast)
 	EXPECT_EQ(hero->visitablePos(), destination);
 }
 
+TEST_F(HeroMovementTest, WrappedPathfindingDoesNotRevealHiddenGuard)
+{
+	const PlayerColor player(0);
+	const int3 hiddenGuard(35, 10, 0), target(0, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(3, 10, 0), HeroTypeID(0), player)
+		.monster(hiddenGuard, CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hiddenGuard] = 0;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(2, 10, 0));
+	hero->setMovementPoints(3000);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(target), hiddenGuard);
+	auto callback = makeCallback(player);
+	const auto pathsFor = [&]()
+	{
+		auto paths = std::make_unique<CPathsInfo>(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(*paths, *callback, hero);
+		callback->calculatePaths(config);
+		return paths;
+	};
+	const auto hiddenPaths = pathsFor();
+	const auto * hiddenNode = hiddenPaths->getNode(target, EPathfindingLayer::LAND);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hiddenGuard] = 1;
+	const auto visiblePaths = pathsFor();
+	const auto * visibleNode = visiblePaths->getNode(target, EPathfindingLayer::LAND);
+	EXPECT_EQ(visibleNode->accessible, EPathAccessibility::GUARDED);
+	EXPECT_NE(hiddenNode->action, visibleNode->action);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hiddenGuard] = 0;
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const auto * guard = map()->getObject(map()->getTile(hiddenGuard).topVisitableObj());
+	ASSERT_NE(guard, nullptr);
+	ASSERT_TRUE(handler.removeObject(guard, player));
+	const auto unguardedPaths = pathsFor();
+	const auto * unguardedNode = unguardedPaths->getNode(target, EPathfindingLayer::LAND);
+	EXPECT_EQ(hiddenNode->accessible, unguardedNode->accessible);
+	EXPECT_EQ(hiddenNode->action, unguardedNode->action);
+	EXPECT_EQ(hiddenNode->reachable(), unguardedNode->reachable());
+	EXPECT_EQ(hiddenNode->moveRemains, unguardedNode->moveRemains);
+	for(int x = 0; x < map()->width; ++x)
+		for(int y = 0; y < map()->height; ++y)
+		{
+			const int3 tile(x, y, 0);
+			const auto * withGuard = hiddenPaths->getNode(tile, EPathfindingLayer::LAND);
+			const auto * withoutGuard = unguardedPaths->getNode(tile, EPathfindingLayer::LAND);
+			EXPECT_EQ(withGuard->accessible, withoutGuard->accessible) << tile.toString();
+			EXPECT_EQ(withGuard->reachable(), withoutGuard->reachable()) << tile.toString();
+			if(withGuard->reachable() && withoutGuard->reachable())
+			{
+				EXPECT_EQ(withGuard->action, withoutGuard->action) << tile.toString();
+				EXPECT_EQ(withGuard->turns, withoutGuard->turns) << tile.toString();
+				EXPECT_EQ(withGuard->moveRemains, withoutGuard->moveRemains) << tile.toString();
+			}
+		}
+}
+
+TEST_F(HeroMovementTest, WrappedPathfindingRecognizesVisibleGuardBesideHiddenGuard)
+{
+	const PlayerColor player(0);
+	const int3 hiddenGuard(35, 10, 0), visibleGuard(35, 11, 0), target(0, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(3, 10, 0), HeroTypeID(0), player)
+		.monster(hiddenGuard, CreatureID(0), 10).monster(visibleGuard, CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hiddenGuard] = 0;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(target), hiddenGuard);
+	auto callback = makeCallback(player);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *callback, hero);
+	callback->calculatePaths(config);
+	const auto * node = paths.getNode(target, EPathfindingLayer::LAND);
+	ASSERT_TRUE(node->reachable());
+	EXPECT_EQ(node->accessible, EPathAccessibility::GUARDED);
+}
+
 TEST_F(HeroMovementTest, sightRangeWrapsWithoutRevealingDistantTiles)
 {
 	checkToroidalSightRange(EMapFormat::SOD);
@@ -2908,6 +2991,30 @@ TEST_F(HeroMovementTest, MonsterGuardAcrossCornerStartsBattle)
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(0, 0, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	const auto * battle = gameState()->getBattle(player);
+	ASSERT_NE(battle, nullptr);
+	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+}
+
+TEST_F(HeroMovementTest, HiddenMonsterGuardAcrossCornerStillStartsBattle)
+{
+	const PlayerColor player(0);
+	const int3 guardPos(35, 35, 0), destination(0, 0, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}}).monster(guardPos, CreatureID(27), 100);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[guardPos] = 0;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	const auto * guard = dynamic_cast<const CArmedInstance *>(map()->getObject(map()->getTile(guardPos).topVisitableObj()));
+	ASSERT_NE(guard, nullptr);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	const auto * battle = gameState()->getBattle(player);
 	ASSERT_NE(battle, nullptr);
 	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
