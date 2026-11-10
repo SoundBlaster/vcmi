@@ -59,9 +59,10 @@ experimental until a real client session and focused tests verify it.
 1. Prototype the bounded, opt-in adventure-map trace and unit-test canonical
    copy mapping, hidden tiles, bounded maps and the viewport budget. The
    20-test standalone topology suite passed on macOS arm64; the client target
-   built. End-to-end output and real-client fog behavior remain to verify.
-2. Exercise it in a signed local client on the seam laboratory map and compare
-   consecutive camera/object positions with independent screenshots.
+   built. JSONL output was exercised in one local client session.
+2. A signed client session produced 1,800 records including both seam
+   crossings and an independent screenshot; see [the observation record](evidence/map-observation-client-2026-11-10.md).
+   Further synchronized visual comparison and broader fog cases remain open.
 3. Extend GUI observation incrementally, starting with window/widget geometry;
    define stable semantics and actionable roles only where the game supplies
    them. Consider a future protocol adapter separately.
