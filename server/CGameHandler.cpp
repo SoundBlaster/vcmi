@@ -111,6 +111,81 @@
 #define COMPLAIN_RET(txt) {complain(txt); return false;}
 #define COMPLAIN_RETF(txt, FORMAT) {complain(boost::str(boost::format(txt) % FORMAT)); return false;}
 
+namespace
+{
+enum class KnownLanding { FOUND, NONE, UNKNOWN };
+
+// Only consider routes whose tiles and guard neighborhoods are already known
+// to the player. Unknown terrain cannot become a server-side information leak.
+KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHeroInstance * hero, const std::optional<PathfinderStart> & start)
+{
+	const auto * team = gameState.getPlayerTeam(hero->getOwner());
+	if(!team)
+		return KnownLanding::UNKNOWN;
+	CPathsInfo paths(gameState.getMapSize(), hero);
+	auto config = start
+		? std::make_shared<SingleHeroPathfinderConfig>(paths, gameState, hero, *start)
+		: std::make_shared<SingleHeroPathfinderConfig>(paths, gameState, hero);
+	config->options.turnLimit = 0;
+	config->options.ignoreGuards = false;
+	config->options.useTeleportTwoWay = false;
+	config->options.useTeleportOneWay = false;
+	config->options.useTeleportOneWayRandom = false;
+	config->options.useTeleportWhirlpool = false;
+	CPathfinder pathfinder(gameState, config);
+	pathfinder.calculatePaths();
+	const auto topology = gameState.getMap().getTopology();
+	const auto pathIsKnown = [&](const CGPathNode * node)
+	{
+		for(const auto * step = node; step; step = step->theNodeBefore)
+		{
+			if((step->layer == EPathfindingLayer::AIR || step->layer == EPathfindingLayer::WATER) && step->moveRemains <= 0)
+				return false;
+			if(step != node && step->theNodeBefore && step->action != EPathNodeAction::NORMAL)
+				return false;
+			for(int dx = -1; dx <= 1; ++dx)
+				for(int dy = -1; dy <= 1; ++dy)
+				{
+					const auto pos = topology.canonicalize(step->coord + int3(dx, dy, 0));
+					if(!pos || !team->fogOfWarMap[*pos])
+						return false;
+				}
+		}
+		return true;
+	};
+	const int z = start ? start->position.z : hero->visitablePos().z;
+	bool unknownFrontier = !team->fogOfWarMap[start ? start->position : hero->visitablePos()];
+	for(int x = 0; x < paths.sizes.x; ++x)
+		for(int y = 0; y < paths.sizes.y; ++y)
+		{
+			const int3 tile(x, y, z);
+			const auto * node = paths.getNode(tile, EPathfindingLayer::LAND);
+			if(node->turns == 0 && node->theNodeBefore
+				&& (node->action == EPathNodeAction::NORMAL || node->action == EPathNodeAction::VISIT || node->action == EPathNodeAction::BATTLE)
+				&& pathIsKnown(node))
+				return KnownLanding::FOUND;
+			if(!unknownFrontier && team->fogOfWarMap[tile])
+				for(const auto layer : {EPathfindingLayer::AIR, EPathfindingLayer::WATER})
+				{
+					const auto * transient = paths.getNode(tile, layer);
+					if(transient->turns != 0 || transient->moveRemains <= 0)
+						continue;
+					for(int dx = -1; dx <= 1 && !unknownFrontier; ++dx)
+						for(int dy = -1; dy <= 1; ++dy)
+						{
+							const auto pos = topology.canonicalize(tile + int3(dx, dy, 0));
+							if(!pos || !team->fogOfWarMap[*pos])
+							{
+								unknownFrontier = true;
+								break;
+							}
+						}
+				}
+		}
+	return unknownFrontier ? KnownLanding::UNKNOWN : KnownLanding::NONE;
+}
+}
+
 template <typename T>
 void callWith(std::vector<T> args, std::function<void(T)> fun, ui32 which)
 {
@@ -991,6 +1066,26 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		&& dst != h->pos && cost > 0 && cost >= h->movementPointsRemaining()
 		&& (layer == EPathfindingLayer::AIR || layer == EPathfindingLayer::WATER))
 		return complainRet("Cannot exhaust movement points while flying or walking on water!");
+	if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD
+		&& dst != h->pos && !h->inBoat() && !canEmbarkLayer
+		// The regular pathfinder does not model all AIR/WATER switches that
+		// the server accepts when both abilities are active.
+		&& !(canFly && canWalkOnSea)
+		&& (layer == EPathfindingLayer::AIR || layer == EPathfindingLayer::WATER))
+	{
+		const auto sourceLayer = h->getConfirmedMovementLayer();
+		bool hadKnownLanding = sourceLayer == EPathfindingLayer::LAND;
+		if(sourceLayer == EPathfindingLayer::AUTO)
+		{
+			PathfinderMapView view(gameState(), h);
+			const auto * sourceTile = view.getTile(h->visitablePos());
+			hadKnownLanding = sourceTile->isLand() && !sourceTile->blocked();
+		}
+		else if(sourceLayer == EPathfindingLayer::AIR || sourceLayer == EPathfindingLayer::WATER)
+			hadKnownLanding = findKnownTransientLanding(gameState(), h, std::nullopt) == KnownLanding::FOUND;
+		if(hadKnownLanding && findKnownTransientLanding(gameState(), h, PathfinderStart{hmpos, layer, h->movementPointsRemaining() - cost}) == KnownLanding::NONE)
+			return complainRet("Cannot leave the known landing area while flying or walking on water!");
+	}
 
 	if (transit && !canFly && !(canWalkOnSea && t.isWater()) && !CGTeleport::isTeleport(objectToVisit))
 		return complainRet("Hero cannot transit over this tile!");

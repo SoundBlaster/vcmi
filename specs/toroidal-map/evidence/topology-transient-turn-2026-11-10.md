@@ -34,16 +34,11 @@ and WATER with 100 and 150 points, and a successful WATER crossing and return
 with more points. `BoundedTransientStepKeepsExistingLastMovementRule` checks
 the prior behavior on a bounded map.
 
-This is a partial safeguard, not a reachability guarantee: a hero may retain
-some points but lack a legal route to LAND or SAIL, and older saves may already
-contain stranded heroes. Preventing or recovering from those cases, including
-when the turn timer expires, is still required before considering G12 complete.
-The safeguard does not search hidden map cells or report their contents.
-`HeroMovementTest.ToroidalWaterWalkCanStillBeStrandedWithPointsRemaining`
-is an explicit characterization of this unresolved defect: after two WATER
-steps across the seam the hero has 100 points, all eight adjacent WATER moves
-are rejected by the safeguard, and the turn guard remains active. Replace
-this characterization with a success assertion when recovery is implemented.
+The last-points check alone did not guarantee reachability: a two-step WATER
+example still stranded the hero with 100 points. A subsequent partial
+[known-landing check](topology-known-landing-2026-11-10.md) rejects that
+particular second step when the relevant area is known. Recovery for other
+cases, including older saves and timer expiry, remains required for G12.
 The client, server and tests built successfully with the safeguard on macOS
 arm64. The full suite passed 1,473 tests from 226 suites without skips; four
 remain disabled. The prototype save and VMAP and the Complete legacy map

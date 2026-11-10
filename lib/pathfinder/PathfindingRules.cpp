@@ -83,8 +83,13 @@ void MovementCostRule::process(
 	destination.turn = destTurnsUsed;
 	destination.movementLeft = destMovePointsLeft;
 
+	// A hero may spend its last points landing on this turn. The special-layer
+	// limit only forbids ending the turn in the air or on water.
+	const bool landingOnSameTurn = source.node->turns == destTurnsUsed
+		&& (source.node->layer == EPathfindingLayer::AIR || source.node->layer == EPathfindingLayer::WATER)
+		&& destination.node->layer == EPathfindingLayer::LAND;
 	if(destination.isBetterWay() &&
-		((source.node->turns == destTurnsUsed && destMovePointsLeft) || pathfinderHelper->passOneTurnLimitCheck(source)))
+		((source.node->turns == destTurnsUsed && destMovePointsLeft) || landingOnSameTurn || pathfinderHelper->passOneTurnLimitCheck(source)))
 	{
 		pathfinderConfig->nodeStorage->commit(destination, source);
 
