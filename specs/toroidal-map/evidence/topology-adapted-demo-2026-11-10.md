@@ -165,3 +165,26 @@ mode using F4 and tried the town portrait again; Computer Use returned
 fullscreen setting. This adds an input-tool/window-location limitation to the
 observations; neither the source of the original discrepancy nor ordinary
 physical-mouse behavior has been established.
+
+## Later client startup diagnostics
+
+A rebuilt diagnostic app was tested after the save-format changes. With the
+client and its dependencies outside the app bundle, dyld stopped after finding
+`libvcmi.dylib` on TB5. Moving that library into the signed bundle moved the
+last dyld diagnostic to `libminizip.dylib`. A further test bundled 14 direct
+and transitive libraries; dyld loaded them and the process entered `main`.
+Process samples then showed its main thread waiting in `open` from
+`CBasicLogConfigurator::configureDefault`, before a game window appeared.
+The normal log path resolves through the isolated test log symlink to TB5.
+The samples do not include the system call's path argument, so the precise
+file and the operating-system cause are not independently established.
+
+Setting a temporary `HOME` in the test app's `LSEnvironment` did not change
+the running process's `HOME`; a second sample showed the same logging stack.
+The existing Lab and Test entries displayed removable-volume access as enabled
+in System Settings; the new Diagnostic app did not appear in that list. A
+system log recorded an All Files preflight for Diagnostic, not a confirmed
+removable-volume denial. These observations do not prove that permissions are
+the cause, nor do they verify the latest client visually. No system privacy
+setting was changed. Diagnostic dyld logs were retained in the isolated TB5
+runtime; the stalled processes were closed after inspection.
