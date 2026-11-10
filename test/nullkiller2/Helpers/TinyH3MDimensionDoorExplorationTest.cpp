@@ -154,24 +154,31 @@ TEST_F(TinyH3MDimensionDoorExplorationTest, ExploresAcrossToroidalSeamWithDimens
 	map()->getTile(int3(30, 10, 0)).terrainType = TerrainId::GRASS;
 	setMapVisibility(PLAYER, false);
 	setTileVisible(PLAYER, hero->visitablePos(), true);
-	for(const bool toroidal : {false, true})
+	map()->toroidal = false;
 	{
-		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
-		map()->toroidal = toroidal;
 		const auto gateway = makeGateway(PLAYER);
 		NK2AI::ExplorationHelper helper(hero, gateway->nullkiller.get());
-		const bool found = helper.considerDimensionDoorExplorationTargets();
-		EXPECT_EQ(found, toroidal);
-		if(found)
-		{
-			const auto goals = helper.makeComposition()->decompose(gateway->nullkiller.get());
-			EXPECT_TRUE(std::ranges::any_of(goals, [](const auto & goal)
-			{
-				const auto * cast = dynamic_cast<const NK2AI::Goals::AdventureSpellCast *>(goal.get());
-				return cast && cast->getSpell()->getId() == DIMENSION_DOOR && cast->tile == int3(30, 10, 0);
-			}));
-		}
+		EXPECT_FALSE(helper.considerDimensionDoorExplorationTargets());
 	}
+	map()->toroidal = true;
+	const auto selectLanding = [&]() -> std::optional<int3>
+	{
+		const auto gateway = makeGateway(PLAYER);
+		NK2AI::ExplorationHelper helper(hero, gateway->nullkiller.get());
+		if(!helper.considerDimensionDoorExplorationTargets())
+			return std::nullopt;
+		for(const auto & goal : helper.makeComposition()->decompose(gateway->nullkiller.get()))
+			if(const auto * cast = dynamic_cast<const NK2AI::Goals::AdventureSpellCast *>(goal.get()); cast && cast->getSpell()->getId() == DIMENSION_DOOR)
+				return cast->tile;
+		return std::nullopt;
+	};
+	const auto hiddenRockLanding = selectLanding();
+	ASSERT_TRUE(hiddenRockLanding.has_value());
+	EXPECT_GT(std::abs(hiddenRockLanding->x - hero->visitablePos().x), 9);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			map()->getTile(int3(x, y, 0)).terrainType = TerrainId::GRASS;
+	EXPECT_EQ(selectLanding(), hiddenRockLanding);
 }
 
 TEST_F(TinyH3MDimensionDoorExplorationTest, GeneratedDimensionDoorHeroDoesNotProbeHiddenTilesWhenGuardedLandingsTrigger)

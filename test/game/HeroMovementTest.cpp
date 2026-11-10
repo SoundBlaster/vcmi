@@ -1369,6 +1369,56 @@ TEST_F(HeroMovementTest, WrappedDimensionDoorCursorDoesNotRevealHiddenGuard)
 	EXPECT_EQ(view.getCursorForTarget(callback.get(), hero, boundedTarget), "guarded");
 }
 
+TEST_F(HeroMovementTest, WrappedDimensionDoorPreviewDoesNotRevealHiddenTerrain)
+{
+	const PlayerColor player(0);
+	const int3 source(0, 10, 0), destination(35, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(source, HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto & fog = gameState()->getPlayerTeam(player)->fogOfWarMap;
+	fog[destination] = 0;
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	auto callback = makeCallback(player);
+	JsonNode config;
+	config["rangeX"].Integer() = 3;
+	config["rangeY"].Integer() = 3;
+	config["ignoreFow"].Bool() = true;
+	config["exposeFow"].Bool() = true;
+	DimensionDoorEffect effect(nullptr, config);
+	map()->getTile(destination).terrainType = TerrainId::GRASS;
+	EXPECT_TRUE(effect.isValidTargetFrom(callback.get(), hero, source, destination));
+	EXPECT_TRUE(effect.isValidTargetFrom(gameState().get(), hero, source, destination));
+	map()->getTile(destination).terrainType = TerrainId::WATER;
+	EXPECT_TRUE(effect.isValidTargetFrom(callback.get(), hero, source, destination));
+	EXPECT_FALSE(effect.isValidTargetFrom(gameState().get(), hero, source, destination));
+	config["ignoreFow"].Bool() = false;
+	DimensionDoorEffect fogRestricted(nullptr, config);
+	EXPECT_FALSE(fogRestricted.isValidTargetFrom(callback.get(), hero, source, destination));
+	fog[destination] = 1;
+	EXPECT_FALSE(effect.isValidTargetFrom(callback.get(), hero, source, destination));
+	const int3 hiddenSource(0, 11, 0);
+	fog[hiddenSource] = 0;
+	map()->getTile(destination).terrainType = TerrainId::GRASS;
+	map()->getTile(hiddenSource).terrainType = TerrainId::GRASS;
+	EXPECT_TRUE(effect.isValidTargetFrom(callback.get(), hero, hiddenSource, destination));
+	EXPECT_TRUE(effect.isValidTargetFrom(gameState().get(), hero, hiddenSource, destination));
+	map()->getTile(hiddenSource).terrainType = TerrainId::WATER;
+	EXPECT_TRUE(effect.isValidTargetFrom(callback.get(), hero, hiddenSource, destination));
+	EXPECT_FALSE(effect.isValidTargetFrom(gameState().get(), hero, hiddenSource, destination));
+	fog[destination] = 0;
+	map()->setToroidalAndRebuild(false);
+	map()->getTile(destination).terrainType = TerrainId::WATER;
+	config["rangeX"].Integer() = 36;
+	DimensionDoorEffect bounded(nullptr, config);
+	EXPECT_FALSE(bounded.isValidTargetFrom(callback.get(), hero, source, destination));
+	map()->getTile(destination).terrainType = TerrainId::GRASS;
+	EXPECT_TRUE(bounded.isValidTargetFrom(callback.get(), hero, source, destination));
+}
+
 TEST_F(HeroMovementTest, WrappedPathfindingRecognizesVisibleGuardBesideHiddenGuard)
 {
 	const PlayerColor player(0);

@@ -95,6 +95,17 @@ bool DimensionDoorEffect::isValidTargetFrom(const IGameInfoCallback * cb, const 
 	if(!AdventureSpellRangedEffect::isValidTargetFrom(cb, caster, source, destination))
 		return false;
 
+	if(const auto * header = cb->getMapHeader(); header && header->toroidal)
+	{
+		const TerrainTile * knownDestination = cb->tryGetTile(destination);
+		if(!knownDestination)
+			return ignoresFogOfWar();
+		if(knownDestination->blocked())
+			return false;
+		if(exposeFow && !cb->tryGetTile(source))
+			return true;
+	}
+
 	const TerrainTile * dest = cb->getTileUnchecked(destination);
 	const TerrainTile * curr = cb->getTileUnchecked(source);
 

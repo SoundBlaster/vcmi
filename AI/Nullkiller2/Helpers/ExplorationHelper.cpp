@@ -705,7 +705,8 @@ int ExplorationHelper::estimateDimensionDoorContinuationValue(
 	if(movementPointsRemaining <= 0)
 		return 0;
 
-	const TerrainTile * sourceTile = cc->getTileUnchecked(tile);
+	const bool toroidal = cc->getMapHeader()->toroidal;
+	const TerrainTile * sourceTile = toroidal ? cc->tryGetTile(tile) : cc->getTileUnchecked(tile);
 	if(!sourceTile)
 		return 0;
 
@@ -717,7 +718,7 @@ int ExplorationHelper::estimateDimensionDoorContinuationValue(
 		if(!neighbour)
 			continue;
 
-		const TerrainTile * neighbourTile = cc->getTileUnchecked(*neighbour);
+		const TerrainTile * neighbourTile = toroidal ? cc->tryGetTile(*neighbour) : cc->getTileUnchecked(*neighbour);
 		if(!neighbourTile || !neighbourTile->isClear(sourceTile))
 			continue;
 
