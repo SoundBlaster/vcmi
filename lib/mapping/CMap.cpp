@@ -262,7 +262,18 @@ CMap::~CMap()
 
 bool CMap::isHoleAt(const int3 & pos) const
 {
-	return holePositions.contains(pos);
+	if(!toroidal)
+		return holePositions.contains(pos);
+	const auto topology = getTopology();
+	const auto tile = topology.canonicalize(pos);
+	if(!tile)
+		return false;
+	if(holePositions.contains(*tile))
+		return true;
+	return std::ranges::any_of(holePositions, [&](const int3 & hole)
+	{
+		return topology.canonicalize(hole) == tile;
+	});
 }
 
 bool CMap::hasStaticFootprintAcrossToroidalSeam(const CGObjectInstance & object) const

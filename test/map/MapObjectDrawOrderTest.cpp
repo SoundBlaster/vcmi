@@ -167,6 +167,30 @@ TEST_F(MapObjectDrawOrderTest, DetectsStaticOccupiedFootprintsAcrossToroidalSeam
 	EXPECT_FALSE(map.hasStaticFootprintAcrossToroidalSeam(*corner));
 }
 
+TEST_F(MapObjectDrawOrderTest, HoleLookupWrapsAndTracksHiddenObjects)
+{
+	map.width = 10;
+	map.height = 10;
+	map.initTerrain();
+	auto * outside = addObject('A', R"([ "V" ])", int3(-1, 5, 0), 0, Obj::HOLE);
+	auto * inside = addObject('B', R"([ "V" ])", int3(9, 5, 0), 0, Obj::HOLE);
+	map.showObject(outside);
+	EXPECT_TRUE(map.isHoleAt(int3(-1, 5, 0)));
+	EXPECT_FALSE(map.isHoleAt(int3(9, 5, 0)));
+	map.toroidal = true;
+	EXPECT_TRUE(map.isHoleAt(int3(9, 5, 0)));
+	EXPECT_FALSE(map.isHoleAt(int3(9, 5, 1)));
+	map.showObject(inside);
+	map.hideObject(outside);
+	EXPECT_TRUE(map.isHoleAt(int3(9, 5, 0)));
+	map.hideObject(inside);
+	EXPECT_FALSE(map.isHoleAt(int3(9, 5, 0)));
+	map.showObject(outside);
+	map.toroidal = false;
+	EXPECT_FALSE(map.isHoleAt(int3(9, 5, 0)));
+	EXPECT_TRUE(map.isHoleAt(int3(-1, 5, 0)));
+}
+
 TEST_F(MapObjectDrawOrderTest, ToroidalObjectFootprintOccupiesAndClearsWrappedTiles)
 {
 	map.width = 10;

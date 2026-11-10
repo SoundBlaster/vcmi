@@ -29,3 +29,25 @@ observation, and does not combine random placement with digging.
 
 Puzzle-map rendering, other levels, map editor authoring, and statistical
 distribution of random placement remain unverified.
+
+## Wrapped holes
+
+On 2026-11-10, a synthetic map placed a hole at raw anchor `(-1,10,0)` and
+made `(35,10,0)` the only eligible toroidal Grail location. Before the fix,
+the game chose the occupied location and `isHoleAt` failed to recognize the
+wrapped hole. Grail placement now canonicalizes hole positions before
+excluding them. On a toroidal map, hole lookup compares canonical positions;
+bounded lookup and the serialized raw positions remain unchanged. A direct
+canonical lookup is used first, followed by a scan of raw hole positions when
+needed; performance with unusually many holes has not been measured.
+
+`GrailTopologyTest.WrappedHoleIsNotAnEligibleGrailLocation` verifies the
+exclusion, dig status, invalid-level isolation and in-memory game-state
+restore. `MapObjectDrawOrderTest.HoleLookupWrapsAndTracksHiddenObjects`
+checks bounded and toroidal lookup, two raw positions that map to the same
+tile, and hiding. Those cases and four related Grail tests passed. The macOS
+arm64 client, server, editor and tests built; the full suite passed 1,437,
+skipped three optional external-input tests and reported five disabled tests
+(`full-suite-wrapped-grail-hole.log` on TB5). Existing linker warnings remain.
+The synthetic hole does not prove behavior for every legacy map or an on-disk
+save containing this case.

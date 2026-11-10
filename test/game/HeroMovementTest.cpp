@@ -719,6 +719,7 @@ class GrailTopologyTest : public TinyMapGameTest
 protected:
 	bool toroidal = true;
 	bool unspecified = false;
+	bool wrappedHole = false;
 
 	const Services * gameServices() override { return LIBRARY; }
 
@@ -732,6 +733,22 @@ protected:
 			for(int y = 0; y < loaded->height; ++y)
 				loaded->getTile(int3(x, y, 0)).terrainType = TerrainId::ROCK;
 		loaded->getTile(int3(35, 10, 0)).terrainType = TerrainId::GRASS;
+		if(wrappedHole)
+		{
+			const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "V" ] })";
+			JsonNode definition(text.data(), text.size(), "WrappedGrailHoleTest");
+			auto appearance = std::make_shared<ObjectTemplate>();
+			InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+			appearance->readJson(definition, resolver, false);
+			appearance->id = Obj::HOLE;
+			appearance->subid = MapObjectSubID(0);
+			auto hole = std::make_shared<CGObjectInstance>(gameState().get());
+			hole->ID = Obj::HOLE;
+			hole->appearance = appearance;
+			hole->pos = int3(-1, 10, 0);
+			hole->instanceName = "wrapped_grail_hole";
+			loaded->addNewObject(hole);
+		}
 	}
 
 	void startGame()
@@ -850,6 +867,23 @@ TEST_F(GrailTopologyTest, unspecifiedGrailCanBePlacedAtEdge)
 	unspecified = true;
 	startGame();
 	EXPECT_EQ(map()->grailPos, int3(35, 10, 0));
+}
+
+TEST_F(GrailTopologyTest, WrappedHoleIsNotAnEligibleGrailLocation)
+{
+	wrappedHole = true;
+	startGame();
+	EXPECT_EQ(map()->grailPos, int3(0, 10, 0));
+	EXPECT_TRUE(map()->isHoleAt(int3(35, 10, 0)));
+	EXPECT_TRUE(map()->isHoleAt(int3(-1, 10, 0)));
+	EXPECT_FALSE(map()->isHoleAt(int3(35, 10, 1)));
+	EXPECT_EQ(gameState()->getTileDigStatus(int3(35, 10, 0)), EDiggingStatus::TILE_OCCUPIED);
+	const auto bytes = gameState()->saveToMemory();
+	auto restored = std::make_shared<CGameState>();
+	restored->preInit(LIBRARY);
+	restored->loadFromMemory(bytes);
+	EXPECT_TRUE(restored->getMap().isHoleAt(int3(35, 10, 0)));
+	EXPECT_FALSE(restored->getMap().isHoleAt(int3(35, 10, 1)));
 }
 
 void HeroMovementTest::checkToroidalSeamMovement(EMapFormat format)

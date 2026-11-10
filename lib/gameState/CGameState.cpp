@@ -563,7 +563,8 @@ void CGameState::initGrailPosition(vstd::RNG & randomGenerator)
 		//remove tiles with holes
 		for(auto & elem : map->getObjects())
 			if(elem && elem->ID == Obj::HOLE)
-				allowedPos -= elem->anchorPos();
+				if(const auto tile = topology.canonicalize(elem->anchorPos()))
+					allowedPos -= *tile;
 
 		if(!allowedPos.empty())
 		{
