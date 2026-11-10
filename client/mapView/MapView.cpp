@@ -25,6 +25,7 @@
 #include "../adventureMap/AdventureMapInterface.h"
 #include "../GameEngine.h"
 #include "../GameInstance.h"
+#include "../PlayerLocalState.h"
 #include "../gui/WindowHandler.h"
 #include "../widgets/Buttons.h"
 #include "render/CAnimation.h"
@@ -37,6 +38,7 @@
 #include "../../lib/callback/CCallback.h"
 #include "../../lib/CConfigHandler.h"
 #include "../../lib/VCMIDirs.h"
+#include "../../lib/ResourceSet.h"
 #include "../../lib/texts/MetaString.h"
 #include "../../lib/texts/TextOperations.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
@@ -91,6 +93,37 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 		<< ':' << tileSize.x << ':' << tileSize.y << ':' << viewport.x << ':' << viewport.y << ':' << viewport.w << ':' << viewport.h
 		<< ':' << static_cast<int>(std::floor(static_cast<double>(center.x) / tileSize.x))
 		<< ':' << static_cast<int>(std::floor(static_cast<double>(center.y) / tileSize.y));
+	std::ostringstream playerState;
+	const auto player = callback->getPlayerID();
+	playerState << ",\"player_state\":";
+	if(player && player->isValidPlayer())
+	{
+		playerState << "{\"player\":" << player->getNum() << ",\"resources\":[";
+		bool firstResource = true;
+		const auto resources = callback->getResourceAmount();
+		for(const auto & [id, amount] : resources.nonZeroEntries())
+		{
+			if(!firstResource)
+				playerState << ',';
+			firstResource = false;
+			playerState << '[' << id.getNum() << ',' << amount << ']';
+		}
+		playerState << "],\"selected_hero\":";
+		const auto * hero = GAME->interface()->localState->getCurrentHero();
+		if(hero && hero->getOwner() == *player)
+		{
+			const auto position = hero->visitablePos();
+			playerState << "{\"id\":" << hero->id.getNum() << ",\"tile\":[" << position.x << ',' << position.y << ',' << position.z
+				<< "],\"movement\":" << hero->movementPointsRemaining() << ",\"mana\":" << hero->mana << '}';
+		}
+		else
+			playerState << "null";
+		playerState << '}';
+	}
+	else
+		playerState << "null";
+	const auto playerData = playerState.str();
+	key << playerData;
 	out << ",\"level\":" << model.getLevel()
 		<< ",\"map_size\":[" << header->width << ',' << header->height << ']'
 		<< ",\"toroidal\":" << (header->toroidal ? "true" : "false")
@@ -163,7 +196,7 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 	const auto guiTimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(trace.lastGuiScan.time_since_epoch()).count();
 	trace.file << "{\"version\":2,\"session\":" << trace.session << ",\"sequence\":" << trace.sequence++
 		<< ",\"show_count\":" << showCount << ",\"monotonic_ns\":" << timestamp << ",\"gui_observed_ns\":" << guiTimestamp
-		<< out.str() << trace.guiData << "}\n";
+		<< out.str() << playerData << trace.guiData << "}\n";
 	trace.file.flush();
 }
 }

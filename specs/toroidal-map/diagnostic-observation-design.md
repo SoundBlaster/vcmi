@@ -31,6 +31,15 @@ guarantee that pixels were visible or that the object was clickable. At most
 the game appends, never truncates an existing trace. No environment variable
 means no file and no viewport scan.
 
+For a valid player callback, the snapshot also contains the player's nonzero
+resource amounts and selected owned hero's identity, canonical visitable tile,
+remaining movement and mana. These values participate in change detection, so
+a resource or selected-hero change can trigger a snapshot even if the map and
+widget geometry are unchanged. Other players' private state is not requested;
+when no valid player callback exists, `player_state` is null. Resource IDs are
+numeric engine identifiers, and omitted resources have amount zero. This
+extension has built locally but still needs a running-game check.
+
 The subsequent prototype revision can include the top window's widget tree
 when that window derives from `CIntObject`. Nodes have per-record indices and
 parent indices, logical rectangles, active/disabled flags, and a coarse
@@ -61,8 +70,8 @@ it is not a complete entity/GUI snapshot and need not be repurposed.
 
 ## Evidence and limits
 
-Version 2 emits an initial snapshot, then only when the level, camera tile,
-viewport/zoom, visible object-copy set or observed GUI tree changes. After
+Version 2 emits an initial snapshot, then only when player state, level,
+camera tile, viewport/zoom, visible object-copy set or observed GUI tree changes. After
 the camera stops moving it emits its exact final position once. Sub-tile
 camera movement and sprite animation alone do not cause snapshots; each
 emitted record retains precise geometry at its own observation time. The
