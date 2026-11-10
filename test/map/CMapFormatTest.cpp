@@ -772,6 +772,85 @@ TEST(MapFormat, ToroidalBoatDemonstrationFixtureRoundTrips)
 	}
 }
 
+TEST(MapFormat, ToroidalOpenWaterCornerFixtureRoundTrips)
+{
+	const PlayerColor red(0), blue(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).name("Toroid Open Water Corner")
+		.description("Experimental open-water diagonal corner fixture.")
+		.playerActive(red).playerActive(blue)
+		.playerMainTown(red, int3(28, 28, 0), false)
+		.playerMainTown(blue, int3(12, 12, 0), false)
+		.town(int3(28, 28, 0), FactionID(0), red)
+		.town(int3(12, 12, 0), FactionID(0), blue)
+		.hero(int3(31, 30, 0), HeroTypeID(0), red)
+		.hero(int3(11, 14, 0), HeroTypeID(1), blue);
+	const auto bytes = builder.build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("ToroidOpenWaterCorner", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+
+	CRandomGenerator random(12345);
+	std::vector<int3> water;
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+		{
+			const bool redIsland = x >= 25 && x <= 30 && y >= 25 && y <= 30;
+			const bool blueIsland = x >= 7 && x <= 16 && y >= 7 && y <= 16;
+			if(!redIsland && !blueIsland)
+				water.emplace_back(x, y, 0);
+		}
+	auto * editor = map->getEditManager();
+	editor->getTerrainSelection().setSelection(water);
+	editor->drawTerrain(ETerrainId::WATER, 0, &random);
+
+	const int3 boatPosition(31, 30, 0);
+	auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::BOAT, BoatId::CASTLE);
+	const auto templates = factory->getTemplates(ETerrainId::WATER);
+	ASSERT_FALSE(templates.empty());
+	auto boat = factory->create(&callback, templates.front());
+	GameRandomizer objectRandomizer(callback);
+	objectRandomizer.setSeed(12345);
+	factory->configureObject(boat.get(), objectRandomizer);
+	boat->setAnchorPos(boatPosition + boat->getVisitableOffset());
+	map->generateUniqueInstanceName(boat.get());
+	map->addNewObject(boat);
+	ASSERT_EQ(boat->visitablePos(), boatPosition);
+
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&output);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	ASSERT_TRUE(reopened->toroidal);
+	EXPECT_FALSE(reopened->getTile(int3(30, 30, 0)).isWater());
+	for(const auto & position : water)
+		EXPECT_TRUE(reopened->getTile(position).isWater()) << position.toString();
+	const auto & objects = reopened->getTile(boatPosition).visitableObjects;
+	ASSERT_FALSE(objects.empty());
+	EXPECT_EQ(reopened->getObject(objects.back())->ID, Obj::BOAT);
+	ASSERT_FALSE(testing::Test::HasFailure());
+	if(const char * outputPath = std::getenv("VCMI_TOROID_OPEN_WATER_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream file(outputPath, std::ios::binary);
+		ASSERT_TRUE(file);
+		file.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+		file.close();
+		ASSERT_TRUE(file);
+	}
+}
+
 TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 {
 	auto bytes = makeToroidalDemoMap().build();
