@@ -21,6 +21,14 @@ but it does not independently show the prompt on screen or prove the cause
 of the blocked `open`. Filtered local logs are `tcc-lab-launch.log` and
 `tcc-lab-request.log` in the TB5 build root.
 
+After the user reported allowing the launch, the stalled process was stopped
+through Activity Monitor and the same lab bundle was launched again through
+Computer Use. The new process also remained in `dyld` before opening a game
+window; attaching Computer Use to it timed out. A targeted TCC log query for
+the new process showed an All Files preflight but no new removable-volume
+prompt or response. The reason for this second stall is therefore unconfirmed.
+This retry did not verify the current source revision in the GUI.
+
 ## Initial fixture and GUI observations
 
 `test/mock/ToroidalDemoMap.h` defines a deliberately sparse 36×36 grass map
