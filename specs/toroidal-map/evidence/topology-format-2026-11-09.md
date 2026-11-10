@@ -74,6 +74,13 @@ toroidal header for the mixed set, and still allowed a bounded header. The
 focused suite passed eight tests with one disabled. This is a loopback transport
 check, not a game start or a multiplayer session between actual clients.
 
+A separate test generates a VMAP from the adapted demo map and calls the real
+server's `prepareToStartGame()`. Game-state initialization succeeds for a
+compatible connection and is rejected for an incompatible one. The connection
+capability is set directly in this test; it does not combine the TCP handshake
+with the game start or call `startGameImmediately()`. The complete local suite
+passed 1,404 tests with four disabled (`full-suite-server-start.log` on TB5).
+
 On 2026-11-09 a versioned topology flag was added to the map header, JSON map
 header and binary serialization. A version-4 map header signals `toroidal`;
 legacy maps and older save formats default to bounded. The server checks a

@@ -20,6 +20,8 @@
 #include "../../lib/callback/EditorCallback.h"
 #include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/filesystem/CMemoryBuffer.h"
+#include "../../lib/filesystem/CFilesystemLoader.h"
+#include "../../lib/filesystem/Filesystem.h"
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGResource.h"
@@ -29,10 +31,12 @@
 #include "../../lib/mapping/TerrainTile.h"
 #include "../../lib/mapping/MapTopology.h"
 #include "../../lib/mapping/CMapService.h"
+#include "../../lib/mapping/CMapInfo.h"
 #include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/modding/IdentifierResolver.h"
 #include "../../lib/networkPacks/PacksForClient.h"
+#include "../../lib/network/NetworkInterface.h"
 #include "../../lib/spells/CSpellHandler.h"
 #include "../../lib/spells/Problem.h"
 #include "../../lib/spells/adventure/AdventureSpellMechanics.h"
@@ -43,7 +47,10 @@
 #include "../../lib/serializer/CMemorySerializer.h"
 #include "../../lib/serializer/CLoadFile.h"
 #include "../../lib/serializer/CSaveFile.h"
+#include "../../lib/serializer/ESerializationVersion.h"
+#include "../../lib/serializer/GameConnection.h"
 #include "../../server/CGameHandler.h"
+#include "../../server/CVCMIServer.h"
 
 class HeroMovementTest : public TinyMapGameTest
 {
@@ -64,6 +71,87 @@ protected:
 		loaded->setToroidalAndRebuild(true);
 	}
 };
+
+TEST(ToroidalDemoVmapTest, ServerStartRejectsAnIncompatiblePeer)
+{
+	const auto directory = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-start-%%%%-%%%%");
+	boost::filesystem::create_directory(directory);
+	struct TemporaryMap
+	{
+		boost::filesystem::path directory;
+		bool registered = false;
+		~TemporaryMap()
+		{
+			if(registered)
+				CResourceHandler::removeFilesystem("local", "mapEditor");
+			boost::filesystem::remove_all(directory);
+		}
+	} temporary{directory};
+
+	auto source = makeToroidalDemoMap().build();
+	CMemoryBuffer legacyBytes;
+	legacyBytes.write(source.data(), static_cast<si64>(source.size()));
+	legacyBytes.seek(0);
+	EditorCallback editor(nullptr);
+	CMapLoaderH3M legacyLoader("ToroidSeamLaboratory", "core", "ASCII", &legacyBytes);
+	auto map = legacyLoader.loadMap(&editor);
+	editor.setMap(map.get());
+	map->setToroidalAndRebuild(true);
+	CMapService service;
+	service.saveMap(map, directory / "server-start-test.vmap");
+	CResourceHandler::addFilesystem("local", "mapEditor", std::make_unique<CFilesystemLoader>("MAPEDITOR/", directory, 0));
+	const ResourcePath mapPath("MAPEDITOR/server-start-test", EResType::MAP);
+	temporary.registered = CResourceHandler::get("mapEditor")->existsResource(mapPath);
+	ASSERT_TRUE(temporary.registered);
+	auto header = service.loadMapHeader(mapPath);
+	ASSERT_TRUE(header->toroidal);
+
+	class StartCapture final : public INetworkConnection
+	{
+	public:
+		void sendPacket(const std::vector<std::byte> &) override {}
+		void setAsyncWritesEnabled(bool) override {}
+		void close() override {}
+	};
+	std::vector<std::shared_ptr<INetworkConnection>> transports;
+	const auto configure = [&](CVCMIServer & server, bool supported)
+	{
+		server.si = std::make_shared<StartInfo>();
+		server.si->mapname = "MAPEDITOR/server-start-test";
+		server.si->difficulty = static_cast<ui8>(EMapDifficulty::EASY);
+		server.si->mode = EStartMode::NEW_GAME;
+		server.mi = std::make_shared<CMapInfo>();
+		server.mi->fileURI = server.si->mapname;
+		for(int index = 0; index < static_cast<int>(header->players.size()); ++index)
+		{
+			const auto & player = header->players[index];
+			if(!(player.canHumanPlay || player.canComputerPlay))
+				continue;
+			auto & settings = server.si->playerInfos[PlayerColor(index)];
+			settings.color = PlayerColor(index);
+			settings.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(index));
+			settings.name = "Player";
+			settings.castle = player.defaultCastle();
+			settings.hero = player.defaultHero();
+			settings.bonus = PlayerStartingBonus::GOLD;
+		}
+		auto transport = std::make_shared<StartCapture>();
+		transports.push_back(transport);
+		auto connection = std::make_shared<GameConnection>(transport);
+		connection->setSerializationVersion(ESerializationVersion::CURRENT);
+		connection->setToroidalTopologySupported(supported);
+		server.activeConnections.push_back(connection);
+	};
+	CVCMIServer compatible(0, true);
+	configure(compatible, true);
+	ASSERT_TRUE(compatible.prepareToStartGame());
+	ASSERT_NE(compatible.gh, nullptr);
+	ASSERT_TRUE(compatible.gh->gameInfo().getMapHeader()->toroidal);
+	CVCMIServer incompatible(0, true);
+	configure(incompatible, false);
+	EXPECT_FALSE(incompatible.prepareToStartGame());
+	EXPECT_EQ(incompatible.gh, nullptr);
+}
 
 TEST_F(ToroidalDemoGameTest, HeroCrossesCornerAndBothEdges)
 {
