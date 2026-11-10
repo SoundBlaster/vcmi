@@ -25,3 +25,16 @@ This is a conservative save guard, not a representation of arbitrary tile
 orders or a policy for choosing between overlapping interactive objects.
 The editor diagnostic has been built but not exercised in its UI. An overlap
 whose visit order is stable can still have a different visual top object.
+
+The regression can optionally export its stable-overlap fixture using
+`VCMI_TOROID_OVERLAP_OUTPUT`; its object templates retain real resource
+animations so that the fixture can also be inspected in the editor. The
+focused test passed and produced a VMAP with SHA-256
+`beb969e74727b41abded569c2478026db3cacb9fb28d7bc0eb1d1ff63cd122b6`.
+An attempt to open it in three test editor bundles did not reach an editor
+window. Process samples showed two blocked in filesystem opens, one while
+loading dynamic libraries and another while opening a log file. The exact
+cause was not established; in particular, this does not prove that macOS
+privacy permissions caused the stall. The test editor processes were
+subsequently force-quit. The diagnostic's appearance and behavior in the UI
+remain unverified.

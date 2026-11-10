@@ -582,10 +582,11 @@ TEST(MapFormat, ToroidalInteractiveOverlapRejectsUnstableVisitOrder)
 		if(object && object->ID == Obj::RESOURCE)
 			resources.push_back(object.get());
 	ASSERT_EQ(resources.size(), 2u);
-	const auto makeAppearance = [](const std::string & mask)
+	const auto makeAppearance = [](const CGObjectInstance & original, const std::string & mask)
 	{
-		const auto text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": )" + mask + " }";
-		JsonNode definition(text.data(), text.size(), "WrappedInteractiveOrder");
+		JsonNode definition;
+		original.appearance->writeJson(definition, false);
+		definition["mask"] = JsonNode(mask.data(), mask.size(), "WrappedInteractiveOrder");
 		auto result = std::make_shared<ObjectTemplate>();
 		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
 		result->readJson(definition, resolver, false);
@@ -593,11 +594,11 @@ TEST(MapFormat, ToroidalInteractiveOverlapRejectsUnstableVisitOrder)
 	};
 	map->hideObject(resources[0]);
 	resources[0]->pos = int3(35, 10, 0);
-	resources[0]->appearance = makeAppearance(R"([ "A" ])");
+	resources[0]->appearance = makeAppearance(*resources[0], R"([ "A" ])");
 	map->showObject(resources[0]);
 	map->hideObject(resources[1]);
 	resources[1]->pos = int3(35, 10, 0);
-	resources[1]->appearance = makeAppearance(R"([ "A" ])");
+	resources[1]->appearance = makeAppearance(*resources[1], R"([ "A" ])");
 	map->showObject(resources[1]);
 	map->hideObject(resources[0]);
 	map->showObject(resources[0]);
@@ -608,7 +609,7 @@ TEST(MapFormat, ToroidalInteractiveOverlapRejectsUnstableVisitOrder)
 	}
 	map->hideObject(resources[1]);
 	resources[1]->pos = int3(0, 10, 0);
-	resources[1]->appearance = makeAppearance(R"([ "A0" ])");
+	resources[1]->appearance = makeAppearance(*resources[1], R"([ "A0" ])");
 	map->showObject(resources[1]);
 	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
 	const int3 overlap(35, 10, 0);
@@ -619,6 +620,15 @@ TEST(MapFormat, ToroidalInteractiveOverlapRejectsUnstableVisitOrder)
 	{
 		CMapSaverJson saver(&archive);
 		saver.saveMap(map);
+	}
+	if(const char * outputPath = std::getenv("VCMI_TOROID_OVERLAP_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream output(outputPath, std::ios::binary);
+		ASSERT_TRUE(output);
+		output.write(reinterpret_cast<const char *>(archive.getBuffer().data()), archive.getSize());
+		output.close();
+		ASSERT_TRUE(output);
 	}
 	archive.seek(0);
 	EditorCallback reopenedCallback(nullptr);
