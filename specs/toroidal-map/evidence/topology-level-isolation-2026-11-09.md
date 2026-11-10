@@ -1,5 +1,15 @@
 # Underground seam and level isolation
 
+On 2026-11-10 a two-player, two-level synthetic SoD game started with both
+teams' fog hidden. The real server move crossed from `(0,0,0)` to `(35,35,0)`.
+The test independently computed the expected wrapped sight circle and checked
+every cell: only the moving team saw the expected cells on level 0; its level 1
+and both levels of the other team stayed hidden. The focused test passed on
+macOS arm64 (`toroidal-fog-team-build.log` and `toroidal-fog-team-test.log` on
+TB5). All 48 movement tests then passed (`toroidal-fog-team-movement-suite.log`).
+This is a server game-state check with simulated players, not network delivery,
+allied-team behavior or rendered fog.
+
 On 2026-11-09 on macOS arm64 with copied Complete data, a two-level SoD
 fixture moved a hero from (0,1,1) to (35,1,1) through the underground seam.
 The server kept the hero on level 1, revealed the destination there, and

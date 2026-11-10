@@ -661,6 +661,42 @@ TEST_F(HeroMovementTest, sightRangeWrapsWithoutRevealingDistantTilesRoE)
 	checkToroidalSightRange(EMapFormat::ROE);
 }
 
+TEST_F(HeroMovementTest, CornerMovementRevealsOnlyTheMovingTeamAndLevel)
+{
+	const PlayerColor movingPlayer(0);
+	const PlayerColor otherPlayer(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(movingPlayer).playerActive(otherPlayer)
+		.hero(int3(1, 0, 0), HeroTypeID(0), movingPlayer)
+		.hero(int3(19, 18, 0), HeroTypeID(1), otherPlayer);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	ASSERT_NE(gameState()->getPlayerTeam(movingPlayer), gameState()->getPlayerTeam(otherPlayer));
+	setMapVisibility(movingPlayer, false);
+	setMapVisibility(otherPlayer, false);
+	auto * hero = findHeroByOwner(movingPlayer);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), movingPlayer);
+	CGameHandler handler(server, gameState());
+	const int3 destination(35, 35, 0);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, movingPlayer, EPathfindingLayer::LAND));
+	ASSERT_EQ(hero->visitablePos(), destination);
+	const int radius = hero->getSightRadius();
+	for(int z = 0; z < 2; ++z)
+		for(int x = 0; x < 36; ++x)
+			for(int y = 0; y < 36; ++y)
+			{
+				const int dx = std::min(std::abs(x - destination.x), 36 - std::abs(x - destination.x));
+				const int dy = std::min(std::abs(y - destination.y), 36 - std::abs(y - destination.y));
+				const bool expectedVisible = z == 0 && std::round(std::sqrt(dx * dx + dy * dy)) <= radius;
+				const int3 tile(x, y, z);
+				EXPECT_EQ(gameState()->isVisibleFor(tile, movingPlayer), expectedVisible) << tile.toString();
+				EXPECT_FALSE(gameState()->isVisibleFor(tile, otherPlayer)) << tile.toString();
+			}
+}
+
 TEST_F(HeroMovementTest, blockedToroidalStepIsRejected)
 {
 	checkBlockedToroidalStep(EMapFormat::SOD);
