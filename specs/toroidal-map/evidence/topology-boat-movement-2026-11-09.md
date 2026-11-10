@@ -136,3 +136,28 @@ passed using the separate TB5 build based on `0150dbd` plus this test. This
 checks the serialized game-state chunk and a subsequent server move; the test
 does not exercise the server save/load entry points, multiplayer, or GUI
 presentation.
+
+## Disembarking onto a nonblocking event
+
+On a toroidal map, the server accepted a sailing hero's disembarkation across
+an edge onto a visitable but nonblocking map event, while the pathfinder did
+not allow that direct transition. The hero left the boat and lost its movement
+points. `HeroMovementTest.BoatCannotDisembarkOntoNonblockingEventAcrossSeam`
+reproduced this using an event template with the ordinary event fixup; its
+expected rejection, position, movement and boat assertions failed before the
+change. The server now rejects a standard sailing-to-land step onto any
+visitable tile on toroidal maps, matching the existing pathfinding rule. This
+guard does not alter bounded maps or nonstandard movement.
+
+The test checks the event and boat remain present after rejection, then hides
+the event and successfully disembarks on the empty shore. Five focused boat
+and TCP-lobby tests passed on macOS arm64 with the TB5 build from `7958fe7`
+plus this change. The complete local suite ran 1,467 tests: 1,465 passed,
+two optional external prototype-file cases were skipped and four tests remain
+disabled. `Dead and Buried.h3m` from the Complete installation was supplied
+to the external legacy-map test. The log is `full-suite-shore-event-2026-11-10.log`
+in the TB5 runtime directory. The scenario uses a constructed game state and
+one edge; corner disembarkation onto events, graphical play, network play and
+airship behavior are not demonstrated by this test. A subsequent focused run
+passed after adding an assertion that the event remains visible in tile
+occupancy; the full-suite run predates that added assertion.

@@ -921,6 +921,8 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 	{
 		if(t.blocked())
 			return complainRet("Cannot disembark hero, tile is blocked!");
+		if(gameState().getMap().toroidal && movementMode == EMovementMode::STANDARD && t.visitable())
+			return complainRet("Cannot disembark hero onto a visitable object!");
 
 		//hole is neither visitable nor blocking, so check for it explicitly
 		if(pathfinderHelper->isTileBlockedByHole(hmpos))
