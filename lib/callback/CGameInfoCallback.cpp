@@ -403,12 +403,14 @@ bool CGameInfoCallback::isVisible(const CGObjectInstance * obj) const
 {
 	if(!getPlayerID().has_value())
 	{
-		// isVisibleFor calls isInTheMap internally, so we need to at least call that one to be consistent and to avoid array out of bounds.
+		// Unrestricted callbacks still require a valid map tile and level.
+		// On toroidal maps an object's entire footprint may wrap into the map.
+		const auto topology = gameState().getMap().getTopology();
 		return CGameState::iteratePositionsUntilTrue(
 			obj,
-			[this](const int3 & pos) -> bool
+			[&topology](const int3 & pos) -> bool
 			{
-				return gameState().getMap().isInTheMap(pos);
+				return topology.canonicalize(pos).has_value();
 			}
 		);
 	}

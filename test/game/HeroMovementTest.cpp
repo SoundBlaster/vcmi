@@ -1768,6 +1768,31 @@ TEST_F(HeroMovementTest, AmbientSoundSourcesFollowWrappedObjectFootprints)
 	EXPECT_EQ(mapAmbientSourceTiles(visitable, map()->getTopology()), (std::set<int3>{int3(35, 35, 1)}));
 }
 
+TEST_F(HeroMovementTest, UnrestrictedCallbackSeesObjectFullyAcrossToroidalCorner)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "V" ] })";
+	JsonNode definition(text.data(), text.size(), "FullyWrappedVisibility");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	CGObjectInstance object(gameState().get());
+	object.appearance = appearance;
+	object.pos = int3(-1, -1, 1);
+	EXPECT_FALSE(gameState()->isVisible(&object));
+	map()->toroidal = true;
+	EXPECT_TRUE(gameState()->isVisible(&object));
+	setMapVisibility(player, false);
+	EXPECT_FALSE(gameState()->isVisibleFor(&object, player));
+	revealMap(player);
+	EXPECT_TRUE(gameState()->isVisibleFor(&object, player));
+	object.pos.z = 2;
+	EXPECT_FALSE(gameState()->isVisible(&object));
+}
+
 TEST_F(HeroMovementTest, VisitablePositionWrapsCornerWithoutChangingLevel)
 {
 	const PlayerColor player(0);
