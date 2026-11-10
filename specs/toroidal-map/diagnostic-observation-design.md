@@ -86,6 +86,8 @@ experimental until a real client session and focused tests verify it.
 3. Prototype window/widget geometry. The standalone topology suite checks the
    bounded tree walk and parent indices. The initial 256-node, every-frame
    version truncated every tree and wrote 53 MB in one session. The
-   change-driven, larger-budget revision still requires a real session check.
+   [change-driven revision](evidence/observation-on-change-client-2026-11-10.md)
+   produced 24 snapshots in a separate client session; its world-view object
+   enumeration hit the explicit limit.
    Define stable semantics and actionable roles only where the
    game supplies them. Consider a future protocol adapter separately.
