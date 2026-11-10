@@ -60,7 +60,7 @@ for line in sys.stdin:
         with log.open("a") as output:
             output.write(json.dumps({"name": name, "args": args}) + "\\n")
         values = {
-            "screener.windows": {"windows": [{"windowID": 21, "processID": 42}]},
+            "screener.windows": {"windows": [{"windowID": 21, "processID": 42}, {"windowID": 22, "processID": 42}]},
             "screener.window_start": {"sessionID": "b1e32985-cf88-4992-8741-dac8d8a760ff"},
             "screener.window_capture": {"capturedFrames": 1},
             "screener.window_stop": {},
@@ -71,7 +71,7 @@ for line in sys.stdin:
             server.chmod(0o755)
             process = subprocess.Popen([sys.executable, str(MODULE), "--server", str(server),
                                         "--observation-file", str(trace), "--recordings-dir", directory,
-                                        "--bundle-id", "dev.test.game"], stdout=subprocess.PIPE,
+                                        "--bundle-id", "dev.test.game", "--window-id", "21", "--process-id", "42"], stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE, text=True, bufsize=1)
             try:
                 self.assertTrue(select.select([process.stdout], [], [], 10)[0])

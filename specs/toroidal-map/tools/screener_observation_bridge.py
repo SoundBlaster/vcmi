@@ -123,7 +123,11 @@ def main():
     parser.add_argument("--observation-file", required=True, help="Existing VCMI JSONL observation file")
     parser.add_argument("--recordings-dir", required=True, help="Local Screener trace directory")
     parser.add_argument("--bundle-id", required=True, help="Exact VCMI application bundle identifier")
+    parser.add_argument("--window-id", type=int, help="Explicit window ID when an app has multiple windows")
+    parser.add_argument("--process-id", type=int, help="Expected process ID for the selected window")
     args = parser.parse_args()
+    if (args.window_id is None) != (args.process_id is None):
+        parser.error("--window-id and --process-id must be supplied together")
     tail = ObservationTail(args.observation_file)
     client = None
     session = None
@@ -138,6 +142,8 @@ def main():
     try:
         client = MCPClient(args.server, args.recordings_dir)
         windows = client.tool("screener.windows", {"appBundleID": args.bundle_id})["windows"]
+        if args.window_id is not None:
+            windows = [window for window in windows if window["windowID"] == args.window_id and window["processID"] == args.process_id]
         if len(windows) != 1:
             raise RuntimeError("Expected exactly one visible window for {}; found {}".format(args.bundle_id, len(windows)))
         window = windows[0]

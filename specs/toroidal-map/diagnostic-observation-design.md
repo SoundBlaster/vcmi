@@ -113,6 +113,8 @@ timestamp. The image is captured after the event, not atomically with it;
 rapid changes can overtake capture. A replaced, truncated, invalid or overly
 large input fails explicitly. Screen permission, a visible unique window and
 the new Screener MCP executable are prerequisites. Ctrl-C stops the session.
+If an application exposes multiple windows, supply both `--window-id` and
+`--process-id` from `screener.windows` to select one explicitly.
 
 ```sh
 python3 specs/toroidal-map/tools/screener_observation_bridge.py \
@@ -125,9 +127,13 @@ python3 specs/toroidal-map/tools/screener_observation_bridge.py \
 The bridge was checked with a fake MCP server and temporary observations on
 macOS arm64: old, incomplete and duplicate records did not create checkpoints;
 a new event produced one request and Ctrl-C closed the session. File truncation
-was rejected. These checks do not establish capture of a real game window or
-cross-process timestamp synchronization. The corresponding Screener code is
-on the separate `codex/mcp-window-recording` branch, initially `ab05569`.
+was rejected. A later run used the real experimental MCP executable, a real
+Screener Fixture window and a synthetic observation: it produced one visual
+keyframe and a closed timeline, and the image showed the fixture. The first
+direct fixture-capture attempt crashed until the CLI initialized AppKit. These
+checks do not establish capture of a real game window or cross-process timestamp
+synchronization. The corresponding Screener work is on the separate
+`codex/mcp-window-recording` branch.
 
 ## Evidence and limits
 
