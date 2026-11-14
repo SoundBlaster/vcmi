@@ -134,6 +134,10 @@ result.
 | `ai` | Each advertised supported AI can plan and act using legal wrapped routes. | A1 | partial: Nullkiller2 neighborhoods, exploration heuristics, portal planning, confirmed initial layer and destination-object precheck | partial: scripted routes and interaction precheck, nearest-town planning, server-backed Town Portal selection and rejected cast, bounded and wrapped patrol paths, AI actor layer selection, and real Nullkiller2 actions across both seams including a played-out hero battle; later preview completed an AI turn across the north-south seam | pending | [AI route record](evidence/topology-ai-direct-route-2026-11-09.md); [replicated layer](evidence/topology-replicated-movement-layer-2026-11-10.md); [patrol radius](evidence/topology-ai-patrol-2026-11-10.md); [Town Portal planning](evidence/topology-ai-town-portal-2026-11-09.md); [Town Portal selection](evidence/nullkiller-town-portal-selection-2026-11-15.md); [game session](evidence/topology-gui-directional-2026-11-09.md); [AI battle](evidence/topology-nullkiller-battle-2026-11-15.md); [latest preview](evidence/topology-preview-d6d9135-2026-11-15.md); full AI audit and profile support undecided |
 | `ai` | Unsupported AI profiles are identified as unsupported. | A2 | partial: editor and scenario information warn that AI support is unverified | partial: translation files checked and scenario-list warning observed in current GUI | pending | [player status record](evidence/topology-ai-status-player-2026-11-10.md), [editor status](evidence/topology-editor-status-2026-11-09.md), [demo GUI](evidence/topology-adapted-demo-2026-11-10.md); profile-specific support and other displays unverified |
 
+River redraw also preserves unrelated terrain flags and replaces the previous
+river orientation on bounded and toroidal maps; see the
+[regression evidence](evidence/river-rotation-flags-2026-11-15.md).
+
 ## Specification evidence discipline
 
 `evidence_not_implementation` is a documentation/provenance constraint, not
