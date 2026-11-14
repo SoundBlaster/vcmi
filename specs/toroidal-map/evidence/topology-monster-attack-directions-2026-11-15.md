@@ -37,9 +37,16 @@ the same human/AI status, so the server confirms the battle result without
 a replay dialog. The test checks that the battle ends for both players, the
 defeated hero is removed, and a second move takes the surviving hero across
 the seam onto the vacated tile. The 16 hero cases, 16 monster cases and two
-AI dialog tests passed three consecutive runs. The victory is forced: actual
-combat, human-versus-AI result dialogs, defeat of the attacker, remote clients
-and restricted player visibility remain unverified here.
+AI dialog tests passed three consecutive runs. That run forced an attacker
+victory and did not test actual combat, defender victory, human-versus-AI
+result dialogs, remote clients or restricted player visibility.
+
+The same test was then extended to force defender victory for every direction
+and level. In those 16 additional cases, the battle ends for both players,
+the attacker is removed, and the defender remains at the destination. Built
+from `49f6629` plus the test change, all 32 opposing-hero cases and 16 monster
+cases passed three consecutive runs. These are server-side forced results,
+not played-out battles or remote multiplayer tests.
 
 A complete local `vcmitest` run with the old prototype VMAP and save, plus
 the Complete `Dead and Buried` H3M, passed 1,606 tests without skips; four

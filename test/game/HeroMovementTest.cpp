@@ -6572,7 +6572,8 @@ TEST_P(ToroidalHeroAttackTest, DirectAttackAcrossSeamUsesCorrectPlayers)
 	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
 		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
 	const auto [dx, dy] = directions.at(GetParam() % directions.size());
-	const int z = GetParam() / directions.size();
+	const int z = (GetParam() / directions.size()) % 2;
+	const bool attackerWins = GetParam() < 16;
 	const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
 	const int3 destination(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z);
 	const PlayerColor attacker(0), defender(1);
@@ -6612,18 +6613,28 @@ TEST_P(ToroidalHeroAttackTest, DirectAttackAcrossSeamUsesCorrectPlayers)
 	EXPECT_EQ(battle->getSidePlayer(BattleSide::DEFENDER), defender);
 	EXPECT_EQ(battle->getLocation(), destination);
 	EXPECT_EQ(gameState()->getBattle(defender), battle);
-	const auto defeatedHeroID = defenderHero->id;
-	handler.battles->cheatBattleVictory(attacker);
+	const auto attackerHeroID = attackerHero->id;
+	const auto defenderHeroID = defenderHero->id;
+	handler.battles->cheatBattleVictory(attackerWins ? attacker : defender);
 	// In this fixture both sides have the same human/AI status, so the result is confirmed immediately.
 	EXPECT_EQ(gameState()->getBattle(attacker), nullptr);
 	EXPECT_EQ(gameState()->getBattle(defender), nullptr);
-	EXPECT_EQ(map()->getObject(defeatedHeroID), nullptr);
-	EXPECT_EQ(attackerHero->visitablePos(), origin);
-	ASSERT_TRUE(handler.moveHero(attackerHero->id, attackerHero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, attacker, EPathfindingLayer::LAND));
-	EXPECT_EQ(attackerHero->visitablePos(), destination);
+	if(attackerWins)
+	{
+		EXPECT_EQ(map()->getObject(defenderHeroID), nullptr);
+		EXPECT_EQ(attackerHero->visitablePos(), origin);
+		ASSERT_TRUE(handler.moveHero(attackerHeroID, attackerHero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, attacker, EPathfindingLayer::LAND));
+		EXPECT_EQ(attackerHero->visitablePos(), destination);
+	}
+	else
+	{
+		EXPECT_EQ(map()->getObject(attackerHeroID), nullptr);
+		ASSERT_NE(map()->getObject(defenderHeroID), nullptr);
+		EXPECT_EQ(defenderHero->visitablePos(), destination);
+	}
 }
 
-INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalHeroAttackTest, ::testing::Range(0, 16));
+INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalHeroAttackTest, ::testing::Range(0, 32));
 
 TEST_F(HeroMovementTest, WrappedMonsterBattleUsesTheCanonicalVisitablePosition)
 {
