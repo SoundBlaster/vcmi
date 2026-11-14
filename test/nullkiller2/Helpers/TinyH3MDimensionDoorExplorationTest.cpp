@@ -154,13 +154,6 @@ TEST_F(TinyH3MDimensionDoorExplorationTest, ExploresAcrossToroidalSeamWithDimens
 	map()->getTile(int3(30, 10, 0)).terrainType = TerrainId::GRASS;
 	setMapVisibility(PLAYER, false);
 	setTileVisible(PLAYER, hero->visitablePos(), true);
-	map()->toroidal = false;
-	{
-		const auto gateway = makeGateway(PLAYER);
-		NK2AI::ExplorationHelper helper(hero, gateway->nullkiller.get());
-		EXPECT_FALSE(helper.considerDimensionDoorExplorationTargets());
-	}
-	map()->toroidal = true;
 	const auto selectLanding = [&]() -> std::optional<int3>
 	{
 		const auto gateway = makeGateway(PLAYER);
@@ -172,6 +165,11 @@ TEST_F(TinyH3MDimensionDoorExplorationTest, ExploresAcrossToroidalSeamWithDimens
 				return cast->tile;
 		return std::nullopt;
 	};
+	map()->toroidal = false;
+	const auto boundedLanding = selectLanding();
+	ASSERT_TRUE(boundedLanding.has_value());
+	EXPECT_LE(std::abs(boundedLanding->x - hero->visitablePos().x), 9);
+	map()->toroidal = true;
 	const auto hiddenRockLanding = selectLanding();
 	ASSERT_TRUE(hiddenRockLanding.has_value());
 	EXPECT_GT(std::abs(hiddenRockLanding->x - hero->visitablePos().x), 9);

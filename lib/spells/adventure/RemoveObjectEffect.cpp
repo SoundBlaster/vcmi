@@ -16,7 +16,6 @@
 #include "../../callback/IGameInfoCallback.h"
 #include "../../mapObjects/CGHeroInstance.h"
 #include "../../mapping/CMap.h"
-#include "../../mapping/CMapHeader.h"
 #include "../../networkPacks/PacksForClient.h"
 #include "../../modding/LibraryLoadContext.h"
 
@@ -48,10 +47,9 @@ bool RemoveObjectEffect::canBeCastAtImpl(spells::Problem & problem, const IGameI
 	if (!isTargetInRange(cb, caster, pos))
 		return false;
 
-	// A player-side target preview must not reveal objects on hidden toroidal
-	// tiles. The unrestricted server callback retains the authoritative check.
-	const auto * header = cb->getMapHeader();
-	if(header && header->toroidal && !ignoresFogOfWar() && !cb->tryGetTile(pos))
+	// Player-side previews must not reveal objects hidden by fog. The
+	// unrestricted server callback retains the authoritative check.
+	if(!ignoresFogOfWar() && !cb->tryGetTile(pos))
 		return false;
 
 	const TerrainTile * t = cb->getTileUnchecked(pos);

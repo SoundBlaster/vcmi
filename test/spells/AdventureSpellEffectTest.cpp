@@ -217,12 +217,14 @@ TEST(Spells_DimensionDoorEffect, validatesTargetFromPlannedSource)
 
 	EXPECT_CALL(game, isInTheMap(source)).WillOnce(::testing::Return(true));
 	EXPECT_CALL(game, isInTheMap(lowerScreenEdge)).WillOnce(::testing::Return(true));
+	EXPECT_CALL(game, tryGetTile(lowerScreenEdge)).WillOnce(::testing::Return(&tile));
 	EXPECT_CALL(game, getTileUnchecked(lowerScreenEdge)).WillOnce(::testing::Return(&tile));
 	EXPECT_CALL(game, getTileUnchecked(source)).WillOnce(::testing::Return(&tile));
 	EXPECT_TRUE(effect.isValidTargetFrom(&game, &caster, source, lowerScreenEdge));
 
 	EXPECT_CALL(game, isInTheMap(source)).WillOnce(::testing::Return(true));
 	EXPECT_CALL(game, isInTheMap(upperScreenEdge)).WillOnce(::testing::Return(true));
+	EXPECT_CALL(game, tryGetTile(upperScreenEdge)).WillOnce(::testing::Return(&tile));
 	EXPECT_CALL(game, getTileUnchecked(upperScreenEdge)).WillOnce(::testing::Return(&tile));
 	EXPECT_CALL(game, getTileUnchecked(source)).WillOnce(::testing::Return(&tile));
 	EXPECT_TRUE(effect.isValidTargetFrom(&game, &caster, source, upperScreenEdge));

@@ -15,7 +15,6 @@
 #include "../../IGameSettings.h"
 #include "../../callback/IGameInfoCallback.h"
 #include "../../mapObjects/CGHeroInstance.h"
-#include "../../mapping/CMapHeader.h"
 #include "../../mapping/TerrainTile.h"
 #include "../../networkPacks/PacksForClient.h"
 
@@ -55,25 +54,15 @@ std::string DimensionDoorEffect::getCursorForTarget(const IGameInfoCallback * cb
 	if(!cb->getSettings().getBoolean(EGameSettings::SPELLS_DIMENSION_DOOR_TRIGGERS_GUARDS))
 		return cursor;
 
-	if(const auto * header = cb->getMapHeader(); header && header->toroidal)
-	{
-		const auto player = caster->getCasterOwner();
-		if(!cb->isVisibleFor(pos, player) || !cb->tryGetTile(pos))
-			return cursor;
-		for(const auto * guard : cb->getGuardingCreatures(pos))
-			if(cb->isVisibleFor(guard->visitablePos(), player))
-				return cursorGuarded;
+	// The unrestricted server callback can see hidden guards as well. Cursor
+	// feedback must depend only on what the caster's player can observe.
+	const auto player = caster->getCasterOwner();
+	if(!cb->isVisibleFor(pos, player) || !cb->tryGetTile(pos))
 		return cursor;
-	}
-
-	// A hidden landing may be invalid or safe; only visible guarded landings need an attack cursor.
-	if(!exposeFow && !cb->isVisibleFor(pos, caster->getCasterOwner()))
-		return cursor;
-
-	if(!cb->isTileGuardedUnchecked(pos))
-		return cursor;
-
-	return cursorGuarded;
+	for(const auto * guard : cb->getGuardingCreatures(pos))
+		if(cb->isVisibleFor(guard->visitablePos(), player))
+			return cursorGuarded;
+	return cursor;
 }
 
 bool DimensionDoorEffect::canBeCastImpl(spells::Problem & problem, const IGameInfoCallback * cb, const spells::Caster * caster) const
@@ -95,16 +84,13 @@ bool DimensionDoorEffect::isValidTargetFrom(const IGameInfoCallback * cb, const 
 	if(!AdventureSpellRangedEffect::isValidTargetFrom(cb, caster, source, destination))
 		return false;
 
-	if(const auto * header = cb->getMapHeader(); header && header->toroidal)
-	{
-		const TerrainTile * knownDestination = cb->tryGetTile(destination);
-		if(!knownDestination)
-			return ignoresFogOfWar();
-		if(knownDestination->blocked())
-			return false;
-		if(exposeFow && !cb->tryGetTile(source))
-			return true;
-	}
+	const TerrainTile * knownDestination = cb->tryGetTile(destination);
+	if(!knownDestination)
+		return ignoresFogOfWar();
+	if(knownDestination->blocked())
+		return false;
+	if(exposeFow && !cb->tryGetTile(source))
+		return true;
 
 	const TerrainTile * dest = cb->getTileUnchecked(destination);
 	const TerrainTile * curr = cb->getTileUnchecked(source);

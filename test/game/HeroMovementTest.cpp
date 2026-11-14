@@ -1811,7 +1811,11 @@ TEST_F(HeroMovementTest, WrappedDimensionDoorCursorDoesNotRevealHiddenGuard)
 	map()->setToroidalAndRebuild(false);
 	const int3 boundedTarget(34, 10, 0);
 	fog[visibleGuard] = 0;
+	EXPECT_EQ(view.getCursorForTarget(callback.get(), hero, boundedTarget), "ordinary");
+	EXPECT_EQ(view.getCursorForTarget(gameState().get(), hero, boundedTarget), "ordinary");
+	fog[hiddenGuard] = 1;
 	EXPECT_EQ(view.getCursorForTarget(callback.get(), hero, boundedTarget), "guarded");
+	EXPECT_EQ(view.getCursorForTarget(gameState().get(), hero, boundedTarget), "guarded");
 }
 
 TEST_F(HeroMovementTest, WrappedDimensionDoorPreviewDoesNotRevealHiddenTerrain)
@@ -1858,10 +1862,15 @@ TEST_F(HeroMovementTest, WrappedDimensionDoorPreviewDoesNotRevealHiddenTerrain)
 	map()->setToroidalAndRebuild(false);
 	map()->getTile(destination).terrainType = TerrainId::WATER;
 	config["rangeX"].Integer() = 36;
+	config["ignoreFow"].Bool() = true;
 	DimensionDoorEffect bounded(nullptr, config);
-	EXPECT_FALSE(bounded.isValidTargetFrom(callback.get(), hero, source, destination));
+	EXPECT_TRUE(bounded.isValidTargetFrom(callback.get(), hero, source, destination));
+	EXPECT_FALSE(bounded.isValidTargetFrom(gameState().get(), hero, source, destination));
 	map()->getTile(destination).terrainType = TerrainId::GRASS;
 	EXPECT_TRUE(bounded.isValidTargetFrom(callback.get(), hero, source, destination));
+	fog[destination] = 1;
+	map()->getTile(destination).terrainType = TerrainId::WATER;
+	EXPECT_FALSE(bounded.isValidTargetFrom(callback.get(), hero, source, destination));
 }
 
 TEST_F(HeroMovementTest, WrappedPathfindingRecognizesVisibleGuardBesideHiddenGuard)
