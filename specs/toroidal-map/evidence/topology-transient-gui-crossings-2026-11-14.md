@@ -2,14 +2,15 @@
 
 The local macOS command-enabled client described in
 [the command-channel record](diagnostic-command-channel-2026-11-14.md)
-ran two disposable 36×36 toroidal maps using the ordinary adventure-map UI.
+ran three disposable 36×36 toroidal maps using the ordinary adventure-map UI.
 Its window title was `1.8.0.578e551`; the running package predates the final
 command-channel input guard and close-on-exec hardening. The client route
 filter and server known-landing checks were present. This is not an
 interactive test of the exact final committed executable.
 
-The map had Solmyr with 1,560 movement points and 100 mana, Water Walk and
-Flight, and visible water separating a start tile from a land destination.
+Each map had Solmyr with 100 mana, Water Walk and Flight, and visible water
+separating a start tile from a land destination. Starting movement points
+varied with the randomly chosen army, as recorded below.
 The spellbook and target tile were operated through the opt-in local command
 channel. The UI showed route arrows and, after a second target click, the hero
 on the destination. The observation trace recorded:
@@ -20,12 +21,14 @@ on the destination. The observation trace recorded:
 | Interior | Flight | `(15,16) → (15,17) → (15,18) → (15,19) → (15,20)` | 100 → 85 | 1,560 → 1,160 |
 | East/west seam | Water Walk | `(34,16) → (35,16) → (0,16) → (1,16) → (2,16)` | 100 → 92 | 1,560 → 1,160 |
 | East/west seam | Flight | `(34,16) → (35,16) → (0,16) → (1,16) → (2,16)` | 100 → 85 | 1,560 → 1,160 |
+| South/north seam | Water Walk | `(15,34) → (15,35) → (15,0) → (15,1) → (15,2)` | 100 → 92 | 1,500 → 1,100 |
+| South/north seam | Flight | `(15,34) → (15,35) → (15,0) → (15,1) → (15,2)` | 100 → 85 | 1,560 → 1,160 |
 
 All coordinates are on level 0. Each spell was tested after starting or
 restarting the scenario. The observation trace is
 `runtime/observation-command-test.jsonl` under the TB5 VCMI build tree;
-sequence numbers 7–12, 17–22, 26–34 and 37–44 respectively contain the four
-runs. Screenshots were observed interactively; no continuous recording was
+sequence numbers 7–12, 17–22, 26–34, 37–44, 91–98 and 102–110 respectively
+contain the six runs. Screenshots were observed interactively; no continuous recording was
 made, so this does not establish smooth animation. Clicking water without a
 spell did not produce a route in the separate interior scenario; that does
 not establish the result of a direct server request.
@@ -50,6 +53,6 @@ server movement request would do. The east shortcut did not demonstrate a
 safe one-step water transit; the ordinary GUI's automatic destination-layer
 selection is a possible reason.
 
-These cases do not establish crossings at the other edges or corners, moving
+These cases do not establish crossings in the reverse directions or at corners, moving
 guards, changed fog, general stranded-hero recovery, remote multiplayer, or
 animation smoothness.
