@@ -49,6 +49,8 @@ public:
 	/// Returns settings of the map format from the engine settings, null node for unknown formats
 	const JsonNode & getMapFormatSettings() const;
 	int getMapWidth() const;
+	/// Dimension used for size categories; rectangular maps are classified by their longer side.
+	int getLargestMapDimension() const;
 	int getVictoryIcon() const;
 	int getDefeatIcon() const;
 	/// Returns number of players that can be controlled by human or computer

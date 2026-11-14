@@ -124,6 +124,11 @@ int ScenarioListEntry::getMapWidth() const
 	return metadata["map"]["width"].Integer();
 }
 
+int ScenarioListEntry::getLargestMapDimension() const
+{
+	return std::max(getMapWidth(), static_cast<int>(metadata["map"]["height"].Integer()));
+}
+
 int ScenarioListEntry::getVictoryIcon() const
 {
 	return metadata["map"]["victoryIcon"].Integer();

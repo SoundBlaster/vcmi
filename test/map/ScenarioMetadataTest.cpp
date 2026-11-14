@@ -10,6 +10,9 @@
 #include "StdInc.h"
 
 #include "../../lib/json/JsonNode.h"
+#include "../../lib/mapping/CMapHeader.h"
+#include "../../lib/mapping/CMapInfo.h"
+#include "../../lib/mapping/ScenarioListEntry.h"
 #include "../../lib/mapping/ScenarioMetadata.h"
 #include "../../lib/texts/Languages.h"
 #include "../../lib/texts/MetaString.h"
@@ -70,4 +73,22 @@ TEST(ScenarioMetadataTest, textWithoutTranslationsUsesMetaString)
 	text["translations"].Struct();
 	TextLocalizationContainer translator;
 	EXPECT_EQ(ScenarioMetadata::textToString(text, &translator), "raw");
+}
+
+TEST(ScenarioMetadataTest, mapSizeIconUsesLongerDimension)
+{
+	CMapInfo info;
+	info.mapHeader = std::make_unique<CMapHeader>();
+	ScenarioListEntry entry;
+	for(const auto & [width, height, icon] : std::vector<std::tuple<int, int, int>>{
+		{36, 36, 0}, {36, 23, 0}, {23, 36, 0}, {36, 72, 1}, {72, 36, 1}})
+	{
+		SCOPED_TRACE(::testing::Message() << width << "x" << height);
+		info.mapHeader->width = width;
+		info.mapHeader->height = height;
+		EXPECT_EQ(info.getMapSizeIconId(), icon);
+		entry.metadata["map"] = ScenarioMetadata::mapToJson(*info.mapHeader);
+		EXPECT_EQ(entry.getLargestMapDimension(), std::max(width, height));
+		EXPECT_EQ(entry.getMapWidth(), width);
+	}
 }

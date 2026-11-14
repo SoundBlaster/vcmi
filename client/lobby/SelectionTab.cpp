@@ -125,7 +125,7 @@ bool mapSorter::operator()(const std::shared_ptr<ElementInfo> aaa, const std::sh
 			else
 				return (a.getHumanPlayers() < b.getHumanPlayers());
 		case _size: //by size of map
-			return (a.getMapWidth() < b.getMapWidth());
+			return (a.getLargestMapDimension() < b.getLargestMapDimension());
 		case _viccon: //by victory conditions
 			return (a.getVictoryIcon() < b.getVictoryIcon());
 		case _name: //by name
@@ -741,7 +741,7 @@ void SelectionTab::filter(int size, bool selectFirst)
 			continue;
 		}
 
-		if((elem->entry && (!size || elem->entry->getMapWidth() == size)) || tabType == ESelectionScreen::campaignList)
+		if((elem->entry && (!size || elem->entry->getLargestMapDimension() == size)) || tabType == ESelectionScreen::campaignList)
 		{
 			if(!isMapCompatibleWithLobbyPlayerCount(*elem))
 			{
@@ -1440,7 +1440,7 @@ void SelectionTab::ListItem::updateItem(std::shared_ptr<ElementInfo> info, bool 
 		labelAmountOfPlayers->setText(ostr.str());
 		labelAmountOfPlayers->setColor(color);
 		labelMapSizeLetter->enable();
-		labelMapSizeLetter->setText(getMapSizeName(info->entry->getMapWidth()));
+		labelMapSizeLetter->setText(getMapSizeName(info->entry->getLargestMapDimension()));
 		labelMapSizeLetter->setColor(color);
 		iconFolder->disable();
 		if(pictureEmptyLine)

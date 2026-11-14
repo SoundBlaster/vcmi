@@ -173,7 +173,7 @@ int CMapInfo::getMapSizeIconId() const
 	if(!mapHeader)
 		return 4;
 
-	switch(mapHeader->width)
+	switch(std::max(mapHeader->width, mapHeader->height))
 	{
 	case CMapHeader::MAP_SIZE_SMALL:
 		return 0;
