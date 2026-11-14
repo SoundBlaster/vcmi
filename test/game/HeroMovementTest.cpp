@@ -5112,6 +5112,55 @@ TEST_F(HeroMovementTest, AviationVehicleCanSettleInPlaceAfterAirTransit)
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 
+TEST_F(HeroMovementTest, GroupRecoveryPrevalidatesAviationVehicleAndStrandedHero)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 start(0, 5, 0), vehiclePosition(35, 5, 0), stranded(10, 15, 0), safeLand(5, 15, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(11, 15, 0), HeroTypeID(1), player)
+		.hero(int3(21, 25, 0), HeroTypeID(2), opponent);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != start && int3(x, y, 0) != stranded && int3(x, y, 0) != safeLand && int3(x, y, 0) != int3(20, 25, 0))
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * aviator = findHeroAt(int3(1, 5, 0));
+	auto * walker = findHeroAt(int3(11, 15, 0));
+	ASSERT_NE(aviator, nullptr);
+	ASSERT_NE(walker, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(vehiclePosition, BoatId::CASTLE, player);
+	auto * vehicle = dynamic_cast<CGBoat *>(map()->getObject(map()->getTile(vehiclePosition).topVisitableObj()));
+	ASSERT_NE(vehicle, nullptr);
+	vehicle->layer = EPathfindingLayer::AVIATE;
+	aviator->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(aviator->id, aviator->convertFromVisitablePos(vehiclePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	aviator->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(aviator->id, aviator->convertFromVisitablePos(start), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	map()->getTile(stranded).terrainType = TerrainId::WATER;
+	walker->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	walker->setMovementPoints(1);
+	auto * team = gameState()->getPlayerTeam(player);
+	ASSERT_NE(team, nullptr);
+	team->fogOfWarMap[safeLand] = 0;
+	EXPECT_FALSE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(aviator->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	EXPECT_EQ(walker->visitablePos(), stranded);
+	team->fogOfWarMap[safeLand] = 1;
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(aviator->getConfirmedMovementLayer(), EPathfindingLayer::AVIATE);
+	EXPECT_EQ(aviator->visitablePos(), start);
+	EXPECT_EQ(aviator->getBoat(), vehicle);
+	EXPECT_EQ(walker->visitablePos(), safeLand);
+	EXPECT_EQ(walker->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
 TEST_F(HeroMovementTest, SailingBoatCannotSwitchDirectlyToFlyingAcrossSeam)
 {
 	const PlayerColor player(0);

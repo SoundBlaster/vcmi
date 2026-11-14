@@ -29,5 +29,14 @@ change. The focused six tests passed. The full local suite passed 1,518 of
 and four tests remain disabled. The TB5 log is
 `runtime/full-suite-aviate-in-place-2026-11-14.log`. Linker warnings reported
 duplicate libraries and two missing search directories. This is not a GUI,
-remote multiplayer, actual mod or wall-clock timer test; mixed group recovery
-with such a vehicle also remains unverified.
+remote multiplayer, actual mod or wall-clock timer test.
+
+`HeroMovementTest.GroupRecoveryPrevalidatesAviationVehicleAndStrandedHero`
+adds a mixed group: the aviation vehicle crosses a seam in `AIR`, while a
+second hero is synthetically stranded on water with one movement point. When
+the only suitable land is hidden, group recovery leaves both heroes in place
+and the vehicle in `AIR`. After the tile is made visible, recovery settles
+the vehicle in `AVIATE` and moves the other hero to land. The vehicle identity
+is preserved. This and two related group and aviation tests passed on macOS
+arm64 using `af6b9c4` plus the added test. The visibility change and stranded
+state are synthetic; this does not establish packet ordering on remote clients.
