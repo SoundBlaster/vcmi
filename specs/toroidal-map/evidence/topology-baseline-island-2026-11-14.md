@@ -54,6 +54,11 @@ network request. Neither a turn transition nor spell expiration was tested.
 
 ## Interactive check pending
 
+Correction: the prepared GUI fixture had a toroidal version marker even
+though it lacked a topology field, so the original reader rejects its header.
+A separate corrected copy passes header loading, but has not been played.
+See [the old-reader check](topology-old-reader-2026-11-14.md).
+
 A separate baseline app and a bounded VMAP with one connected island were
 prepared for a GUI check with actual Flight and Water Walk spells. At the
 time of writing the app was waiting for macOS permission to access the TB5
