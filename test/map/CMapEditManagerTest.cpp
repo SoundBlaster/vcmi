@@ -224,6 +224,81 @@ TEST(MapManager, RedrawingRiverReplacesOnlyRiverRotationFlags)
 	}
 }
 
+TEST(MapManager, ToroidalLineBrushMatchesInteriorAtEdgesAndCorners)
+{
+	// Neighbourhoods cover all combinations around the center. Sprite groups
+	// contain interchangeable randomly selected artwork, so compare the group
+	// and orientation rather than requiring the same random variant.
+	const auto spriteGroup = [](int direction, bool road)
+	{
+		if(road)
+		{
+			for(const int upper : {1, 5, 7, 9, 11, 13, 14, 15, 16})
+				if(direction <= upper)
+					return upper;
+		}
+		else
+		{
+			for(const int upper : {3, 4, 6, 8, 10, 12})
+				if(direction <= upper)
+					return upper;
+		}
+		return -1;
+	};
+	for(const bool road : {true, false})
+		for(unsigned mask = 0; mask < 256; ++mask)
+		for(unsigned corner = 0; corner < 4; ++corner)
+		{
+			auto map = std::make_unique<CMap>(nullptr);
+			map->width = 12;
+			map->height = 12;
+			map->toroidal = true;
+			map->initTerrain();
+			CRandomGenerator random;
+			auto * editor = map->getEditManager();
+			editor->clearTerrain(&random);
+			for(const int z : {0, 1})
+			{
+				const int x = corner & 1 ? 11 : 0;
+				const int y = corner & 2 ? 11 : 0;
+				const std::array<int3, 4> centers{int3(6, 6, z), int3(x, 6, z), int3(6, y, z), int3(x, y, z)};
+				for(const auto & center : centers)
+				{
+					std::vector<int3> selection{center};
+					unsigned bit = 0;
+					for(int dy = -1; dy <= 1; ++dy)
+						for(int dx = -1; dx <= 1; ++dx)
+						{
+							if(dx == 0 && dy == 0)
+								continue;
+							if(mask & (1u << bit))
+								selection.push_back(*map->getTopology().canonicalize(center + int3(dx, dy, 0)));
+							++bit;
+						}
+					editor->getTerrainSelection().setSelection(selection);
+					if(road)
+						editor->drawRoad(RoadId::DIRT_ROAD, &random);
+					else
+						editor->drawRiver(RiverId::WATER_RIVER, &random);
+				}
+				const auto & interior = map->getTile(centers[0]);
+				for(size_t index = 1; index < centers.size(); ++index)
+				{
+					const auto & seam = map->getTile(centers[index]);
+					const int expected = road ? interior.roadDir : interior.riverDir;
+					const int actual = road ? seam.roadDir : seam.riverDir;
+					const int flags = road ? 0b00110000 : 0b00001100;
+					ASSERT_GE(spriteGroup(expected, road), 0);
+					ASSERT_GE(spriteGroup(actual, road), 0);
+					EXPECT_EQ(spriteGroup(actual, road), spriteGroup(expected, road))
+						<< "road=" << road << " mask=" << mask << " z=" << z << " center=" << centers[index].toString();
+					EXPECT_EQ(seam.extTileFlags & flags, interior.extTileFlags & flags)
+						<< "road=" << road << " mask=" << mask << " z=" << z << " center=" << centers[index].toString();
+				}
+			}
+		}
+}
+
 TEST(MapManager, DrawTerrain_View)
 {
 	try
