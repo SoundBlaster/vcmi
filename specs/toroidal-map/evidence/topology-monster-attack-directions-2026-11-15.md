@@ -31,3 +31,8 @@ The 16 hero cases, 16 monster cases and guarded-mine test passed three
 consecutive runs on macOS arm64, built from `2ac006f` plus the hero test.
 This stops at battle creation; actual combat, result confirmation, remote
 clients and restricted player visibility were not tested in this fixture.
+
+A complete local `vcmitest` run with the old prototype VMAP and save, plus
+the Complete `Dead and Buried` H3M, passed 1,606 tests without skips; four
+tests remained disabled. The log is `runtime/full-suite-combat-seams-2026-11-15.log`
+under the TB5 VCMI build root. This was a local run, not hosted CI.
