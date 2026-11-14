@@ -3361,6 +3361,63 @@ TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
 	EXPECT_EQ(hero->movementPointsRemaining(), disembarkRemaining);
 }
 
+TEST_F(HeroMovementTest, EmbarkAndDisembarkAcrossEveryToroidalSeamOnBothLevels)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const auto topology = map()->getTopology();
+
+	for(int z = 0; z < 2; ++z)
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				if(dx == 0 && dy == 0)
+					continue;
+				SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
+				const int3 shore(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+				const auto water = topology.canonicalize(shore + int3(dx, dy, 0));
+				ASSERT_TRUE(water);
+				map()->moveObject(hero->id, hero->convertFromVisitablePos(shore));
+				hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+				const auto oldTerrain = map()->getTile(*water).terrainType;
+				map()->getTile(*water).terrainType = TerrainId::WATER;
+				handler.createBoat(*water, BoatId::CASTLE, player);
+
+				ObjectInstanceID boatId;
+				for(const auto & [destination, layer] : {std::pair{*water, EPathfindingLayer::SAIL}, std::pair{shore, EPathfindingLayer::LAND}})
+				{
+					hero->setMovementPoints(3000);
+					CPathsInfo paths(gameState()->getMapSize(), hero);
+					auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+					CPathfinder pathfinder(*gameState(), config);
+					pathfinder.calculatePaths();
+					const auto * node = paths.getNode(destination, layer);
+					ASSERT_TRUE(node->reachable());
+					ASSERT_EQ(node->turns, 0);
+					ASSERT_NE(node->theNodeBefore, nullptr);
+					EXPECT_EQ(node->theNodeBefore->coord, hero->visitablePos());
+					const auto remaining = node->moveRemains;
+					ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, layer));
+					EXPECT_EQ(hero->visitablePos(), destination);
+					EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+					ASSERT_EQ(hero->inBoat(), layer == EPathfindingLayer::SAIL);
+					if(hero->inBoat())
+						boatId = hero->getBoat()->id;
+				}
+				ASSERT_NE(map()->getObject(boatId), nullptr);
+				map()->removeObject(boatId);
+				map()->getTile(*water).terrainType = oldTerrain;
+			}
+}
+
 TEST_F(HeroMovementTest, BoatCannotDisembarkOntoNonblockingEventAcrossSeam)
 {
 	const PlayerColor player(0);
