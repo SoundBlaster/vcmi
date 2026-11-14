@@ -621,7 +621,7 @@ std::optional<EPathfindingLayer> transientInPlaceLandingLayer(const CGameState &
 	return EPathfindingLayer::AVIATE;
 }
 
-std::optional<int3> adjacentAviationLanding(const CGameState & state, const CGHeroInstance * hero)
+std::optional<LandingStep> knownAviationLandingStep(const CGameState & state, const CGHeroInstance * hero)
 {
 	if(!hero->inBoat() || hero->getBoat()->layer != EPathfindingLayer::AVIATE
 		|| hero->getConfirmedMovementLayer() != EPathfindingLayer::AIR)
@@ -642,41 +642,55 @@ std::optional<int3> adjacentAviationLanding(const CGameState & state, const CGHe
 	CPathsInfo paths(state.getMapSize(), hero);
 	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, state, hero);
 	config->options.turnLimit = 0;
+	config->options.useTeleportTwoWay = false;
+	config->options.useTeleportOneWay = false;
+	config->options.useTeleportOneWayRandom = false;
+	config->options.useTeleportWhirlpool = false;
 	CPathfinder pathfinder(state, config);
 	pathfinder.calculatePaths();
 	const auto topology = state.getMap().getTopology();
 	const CGPathNode * best = nullptr;
-	for(const auto & direction : int3::getDirs())
+	const auto & map = state.getMap();
+	const auto knownRoute = [&](const CGPathNode * node)
 	{
-		const auto candidate = topology.canonicalize(source + direction);
-		if(!candidate || !team->fogOfWarMap[*candidate])
-			continue;
-		bool knownNeighborhood = true;
-		for(int dx = -1; dx <= 1 && knownNeighborhood; ++dx)
-			for(int dy = -1; dy <= 1; ++dy)
-			{
-				const auto neighbor = topology.canonicalize(*candidate + int3(dx, dy, 0));
-				if(!neighbor || !team->fogOfWarMap[*neighbor])
+		for(const auto * step = node; step; step = step->theNodeBefore)
+		{
+			if(!team->fogOfWarMap[step->coord]
+				|| (step != node && step->layer != EPathfindingLayer::AIR)
+				|| (step->layer == EPathfindingLayer::AIR && step->moveRemains <= 0)
+				|| (step->theNodeBefore && step->action != EPathNodeAction::NORMAL))
+				return false;
+			for(int dx = -1; dx <= 1; ++dx)
+				for(int dy = -1; dy <= 1; ++dy)
 				{
-					knownNeighborhood = false;
-					break;
+					const auto neighbor = topology.canonicalize(step->coord + int3(dx, dy, 0));
+					if(!neighbor || !team->fogOfWarMap[*neighbor])
+						return false;
 				}
-			}
-		const auto & tile = state.getMap().getTile(*candidate);
-		if(!knownNeighborhood || tile.blocked() || tile.visitable() || state.guardingCreaturePosition(*candidate).isValid())
-			continue;
-		FowTilesType hidden;
-		state.getTilesInRange(hidden, *candidate, hero->getSightRadius(), ETileVisibility::HIDDEN, hero->getOwner());
-		if(!hidden.empty())
-			continue;
-		const auto * node = paths.getNode(*candidate, EPathfindingLayer::AVIATE);
-		if(node->turns != 0 || node->action != EPathNodeAction::NORMAL || !node->theNodeBefore
-			|| node->theNodeBefore->coord != source || node->theNodeBefore->layer != EPathfindingLayer::AIR)
-			continue;
-		if(!best || node->getCost() < best->getCost())
+			FowTilesType hidden;
+			state.getTilesInRange(hidden, step->coord, hero->getSightRadius(), ETileVisibility::HIDDEN, hero->getOwner());
+			if(!hidden.empty())
+				return false;
+		}
+		return true;
+	};
+	for(int x = 0; x < map.width; ++x)
+		for(int y = 0; y < map.height; ++y)
+		{
+			const int3 candidate(x, y, source.z);
+			const auto * node = paths.getNode(candidate, EPathfindingLayer::AVIATE);
+			if(node->turns != 0 || !node->theNodeBefore || (best && node->getCost() >= best->getCost()))
+				continue;
+			const auto & tile = map.getTile(candidate);
+			if(tile.blocked() || tile.visitable() || state.guardingCreaturePosition(candidate).isValid() || !knownRoute(node))
+				continue;
 			best = node;
-	}
-	return best ? std::optional<int3>(best->coord) : std::nullopt;
+		}
+	if(!best)
+		return std::nullopt;
+	while(best->theNodeBefore && best->theNodeBefore->theNodeBefore)
+		best = best->theNodeBefore;
+	return LandingStep{best->coord, best->layer};
 }
 }
 
@@ -903,8 +917,12 @@ bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
 		}
 		if(hero->inBoat())
 		{
-			if(const auto landing = adjacentAviationLanding(gameState(), hero))
-				return moveHero(hero->id, hero->convertFromVisitablePos(*landing), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE);
+			if(const auto landing = knownAviationLandingStep(gameState(), hero))
+			{
+				const auto & [destination, nextLayer] = *landing;
+				return moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD,
+					nextLayer == EPathfindingLayer::AIR, player, nextLayer);
+			}
 			continue;
 		}
 		std::vector<LandingStep> route;

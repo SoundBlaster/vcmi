@@ -5265,6 +5265,38 @@ TEST_F(HeroMovementTest, ExpiredTimerMovesAviationVehicleOffBlockedTransitTile)
 	EXPECT_EQ(hero->visitablePos(), withEvent);
 	EXPECT_EQ(hero->movementPointsRemaining(), afterMove);
 	EXPECT_EQ(hero->getBoat(), vehicle);
+
+	// Restore the transit state, then surround it with a 3×3 obstacle so that
+	// the nearest legal hover requires more than one step in AIR.
+	reset.start = hero->anchorPos();
+	reset.movePoints = remaining;
+	handler.sendAndApply(reset);
+	ASSERT_EQ(hero->visitablePos(), start);
+	const std::string largeText = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "BBB", "BBB", "BBB" ] })";
+	JsonNode largeDefinition(largeText.data(), largeText.size(), "AviationWideBlocker");
+	auto largeAppearance = std::make_shared<ObjectTemplate>();
+	largeAppearance->readJson(largeDefinition, resolver, false);
+	auto largeObstacle = std::make_shared<CGObjectInstance>(gameState().get());
+	largeObstacle->pos = int3(1, 6, 0);
+	largeObstacle->instanceName = "aviation_wide_blocker";
+	largeObstacle->appearance = largeAppearance;
+	map()->hideObject(hero);
+	map()->addNewObject(largeObstacle);
+	map()->showObject(hero);
+	handler.turnTimerHandler->update(1000);
+	ASSERT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	ASSERT_NE(hero->visitablePos(), start);
+	const auto firstStep = hero->visitablePos();
+	const auto newlyHidden = *topology.canonicalize(firstStep + int3(1, 0, 0));
+	team->fogOfWarMap[newlyHidden] = 0;
+	handler.turnTimerHandler->update(1000);
+	EXPECT_EQ(hero->visitablePos(), firstStep);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	team->fogOfWarMap[newlyHidden] = 1;
+	handler.turnTimerHandler->update(1000);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AVIATE);
+	EXPECT_EQ(hero->getBoat(), vehicle);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 
 TEST_F(HeroMovementTest, SailingBoatCannotSwitchDirectlyToFlyingAcrossSeam)

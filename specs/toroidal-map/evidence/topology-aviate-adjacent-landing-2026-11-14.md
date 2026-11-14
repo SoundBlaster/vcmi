@@ -26,7 +26,8 @@ callback. The test then synthetically restores the same transit position and
 points with the event removed; automatic recovery chooses the same tile and
 cost. This comparison covers that fixture only, not all hidden-information
 channels. Visibility and movement-point changes and the second transit state
-are synthetic.
+are synthetic. A later [multi-step change](topology-aviate-multistep-2026-11-14.md)
+extends the adjacent-only search.
 
 The macOS arm64 TB5 server and tests built from `85ae321` plus this change.
 Eight focused tests passed. The full local suite before the final paired-event
