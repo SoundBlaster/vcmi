@@ -26,3 +26,11 @@ prompt was not visible to the agent, so its presence or absence and the cause
 of the wait are not established. The previous `a4b710a` client was left
 running separately. This record establishes build and signing, not successful
 startup, map loading or gameplay on `961e235`.
+
+After the user granted disk access, that same process continued startup; the
+client window identified itself as `1.8.0.961e235`. The diagnostic channel
+selected and loaded `Toroid Open Water Corner` `Autosave-111`. Computer Use
+showed its adventure map, and the observation stream reported a 36×36
+toroidal map with the selected hero at `(31,30,0)` and zero movement points.
+This establishes startup and save loading on that build, not a new crossing,
+continuous animation or the later minimap pixel-alignment change.

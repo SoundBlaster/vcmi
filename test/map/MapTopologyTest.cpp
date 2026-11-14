@@ -74,6 +74,9 @@ TEST(MapTopology, ToroidalMinimapClicksAddressTheTileUnderThePixel)
 	EXPECT_EQ(minimapPixelToTile(0, 150, 36, true), 0);
 	EXPECT_EQ(minimapPixelToTile(75, 150, 36, true), 18);
 	EXPECT_EQ(minimapPixelToTile(149, 150, 36, true), 35);
+	EXPECT_EQ(minimapPixelToTile(4, 150, 36, true), 1);
+	EXPECT_EQ(minimapPixelToTile(12, 150, 36, true), 2); // exact boundary selects the earlier tile
+	EXPECT_EQ(minimapPixelToTile(143, 144, 252, true), 251);
 	EXPECT_EQ(minimapPixelToTile(99, 100, 60, true), 59);
 	EXPECT_EQ(minimapPixelToTile(-1, 150, 36, true), 0);
 	EXPECT_EQ(minimapPixelToTile(150, 150, 36, true), 35);
