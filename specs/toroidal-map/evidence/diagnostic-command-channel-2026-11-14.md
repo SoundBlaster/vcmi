@@ -29,3 +29,21 @@ The running package was built before the final captured-input guard and
 close-on-exec hardening. Those later changes were built and tested separately,
 but the exact final binary was not exercised through this interactive run.
 The remaining route and fog scenarios require their own gameplay evidence.
+
+## Cursor-dependent widgets
+
+The original diagnostic click sent a mouse-move event with the requested
+coordinates but left `InputHandler`'s stored cursor position unchanged.
+`SelectionTab` reads that stored position when choosing a scenario, so the
+dispatched click could select a different row. Diagnostic clicks now update
+the cursor through `InputHandler::setCursorPosition` before pressing and
+releasing the mouse button, as ordinary mouse input does.
+
+The macOS arm64 client containing this change was rebuilt on TB5, signed, and
+launched using the same local test app. In the actual scenario list, successive
+socket clicks at `(470, 320)` and `(470, 395)` selected the fifth and eighth
+visible rows respectively, and the detail pane displayed their corresponding
+scenario names. The topology and command-channel executable passed all 26
+tests. These observations validate those interactions; they do not imply that
+an `accepted` response guarantees an action succeeded or that every widget has
+been exercised.

@@ -10,6 +10,7 @@
 #include "../GameEngine.h"
 #include "EventDispatcher.h"
 #include "Shortcut.h"
+#include "events/InputHandler.h"
 #include "../../lib/Point.h"
 
 namespace
@@ -28,7 +29,7 @@ bool dispatchDiagnosticCommand(const std::string & command)
 		if(x < 0 || y < 0 || x >= size.x || y >= size.y)
 			return false;
 		const Point p(x, y);
-		ENGINE->events().dispatchMouseMoved(Point(0, 0), p);
+		ENGINE->input().setCursorPosition(p);
 		ENGINE->events().dispatchMouseLeftButtonPressed(p, 0);
 		ENGINE->events().dispatchMouseLeftButtonReleased(p, 0);
 		return true;
