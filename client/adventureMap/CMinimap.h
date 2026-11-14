@@ -10,6 +10,7 @@
 #pragma once
 
 #include "../gui/CIntObject.h"
+#include "../../lib/int3.h"
 
 class ColorRGBA;
 using FowTilesType = std::set<int3>;
@@ -20,7 +21,9 @@ class IImage;
 
 class CMinimapInstance : public CIntObject
 {
+	int3 mapSize;
 	std::unique_ptr<Canvas> minimap;
+	std::unique_ptr<Canvas> scaledToroidalMinimap;
 	int level;
 
 	//get color of selected tile on minimap

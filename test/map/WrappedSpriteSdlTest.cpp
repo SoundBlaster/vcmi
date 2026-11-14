@@ -16,22 +16,20 @@
 
 #include <SDL3/SDL.h>
 
-TEST(WrappedSpriteSdl, ToroidalMinimapClickMatchesScaledSourcePixel)
+TEST(WrappedSpriteSdl, ToroidalMinimapRasterMatchesClickOnSoftwareCanvas)
 {
 	for(const auto & [mapWidth, displayWidth] : {std::pair{3, 2}, std::pair{5, 2}, std::pair{2, 3}, std::pair{36, 150}, std::pair{60, 100}, std::pair{72, 72}, std::pair{144, 73}, std::pair{144, 150}, std::pair{252, 144}, std::pair{252, 150}})
 	{
 		SCOPED_TRACE(::testing::Message() << "mapWidth=" << mapWidth << " displayWidth=" << displayWidth);
-		CanvasImage source(Point(mapWidth, 1), CanvasScalingPolicy::IGNORE);
-		{
-			auto canvas = source.getCanvas();
-			for(int x = 0; x < mapWidth; ++x)
-				canvas.drawPoint(Point(x, 0), ColorRGBA(x, 0, 0, 255));
-		}
 		CanvasImage scaled(Point(displayWidth, 1), CanvasScalingPolicy::IGNORE);
 		{
 			auto destination = scaled.getCanvas();
-			auto input = source.getCanvas();
-			destination.drawScaled(input, Point(0, 0), Point(displayWidth, 1));
+			for(int tile = 0; tile < mapWidth; ++tile)
+			{
+				const auto [first, end] = minimapTilePixelInterval(tile, displayWidth, mapWidth);
+				if(first < end)
+					destination.drawColor(Rect(first, 0, end - first, 1), ColorRGBA(tile, 0, 0, 255));
+			}
 		}
 		std::vector<uint8_t> pixels;
 		scaled.readPixelsRGBA(pixels);
@@ -41,7 +39,7 @@ TEST(WrappedSpriteSdl, ToroidalMinimapClickMatchesScaledSourcePixel)
 	}
 }
 
-TEST(WrappedSpriteSdl, ToroidalMinimapClickMatchesTextureScaledSourcePixel)
+TEST(WrappedSpriteSdl, ToroidalMinimapRasterMatchesClickThroughTexture)
 {
 	SDL_Surface * screen = SDL_CreateSurface(150, 1, SDL_PIXELFORMAT_RGBA32);
 	ASSERT_NE(screen, nullptr);
@@ -66,18 +64,18 @@ TEST(WrappedSpriteSdl, ToroidalMinimapClickMatchesTextureScaledSourcePixel)
 	for(const auto & [mapWidth, displayWidth] : {std::pair{3, 2}, std::pair{5, 2}, std::pair{2, 3}, std::pair{36, 150}, std::pair{60, 100}, std::pair{72, 72}, std::pair{144, 73}, std::pair{144, 150}, std::pair{252, 144}, std::pair{252, 150}})
 	{
 		SCOPED_TRACE(::testing::Message() << "mapWidth=" << mapWidth << " displayWidth=" << displayWidth);
-		CanvasImage source(Point(mapWidth, 1), CanvasScalingPolicy::IGNORE);
-		{
-			auto canvas = source.getCanvas();
-			for(int x = 0; x < mapWidth; ++x)
-				canvas.drawPoint(Point(x, 0), ColorRGBA(x, 0, 0, 255));
-		}
 		Texture target(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, displayWidth, 1), SDL_DestroyTexture);
 		ASSERT_NE(target, nullptr);
 		{
 			auto destination = Canvas::createFromRenderTarget(target.get(), Point(displayWidth, 1), CanvasScalingPolicy::IGNORE);
-			auto input = source.getCanvas();
-			destination.drawScaled(input, Point(0, 0), Point(displayWidth, 1));
+			Canvas preScaled(Point(displayWidth, 1), CanvasScalingPolicy::IGNORE);
+			for(int tile = 0; tile < mapWidth; ++tile)
+			{
+				const auto [first, end] = minimapTilePixelInterval(tile, displayWidth, mapWidth);
+				if(first < end)
+					preScaled.drawColor(Rect(first, 0, end - first, 1), ColorRGBA(tile, 0, 0, 255));
+			}
+			destination.drawScaled(preScaled, Point(0, 0), Point(displayWidth, 1));
 		}
 		Surface pixels(SDL_RenderReadPixels(renderer, nullptr), SDL_DestroySurface);
 		ASSERT_NE(pixels, nullptr);

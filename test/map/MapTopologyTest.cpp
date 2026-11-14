@@ -96,6 +96,27 @@ TEST(MapTopology, ToroidalMinimapClicksAddressTheTileUnderThePixel)
 			}
 }
 
+TEST(MapTopology, ToroidalMinimapTileIntervalsPartitionDisplayPixels)
+{
+	for(int mapExtent = 3; mapExtent <= 252; ++mapExtent)
+		for(int displayExtent = 1; displayExtent <= 150; ++displayExtent)
+		{
+			int previousEnd = 0;
+			for(int tile = 0; tile < mapExtent; ++tile)
+			{
+				const auto [first, end] = minimapTilePixelInterval(tile, displayExtent, mapExtent);
+				if(first != previousEnd || end < first || end > displayExtent)
+					FAIL() << "invalid interval: map=" << mapExtent << " display=" << displayExtent << " tile=" << tile;
+				for(int pixel = first; pixel < end; ++pixel)
+					if(minimapPixelToTile(pixel, displayExtent, mapExtent, true) != tile)
+						FAIL() << "wrong tile: map=" << mapExtent << " display=" << displayExtent << " pixel=" << pixel;
+				previousEnd = end;
+			}
+			if(previousEnd != displayExtent)
+				FAIL() << "uncovered pixels: map=" << mapExtent << " display=" << displayExtent;
+		}
+}
+
 TEST(MapTopology, WrapsEdgesAndCornersOnTheSameLevel)
 {
 	const MapTopology topology(100, 80, 2, true);

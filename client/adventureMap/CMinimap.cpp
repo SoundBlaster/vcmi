@@ -72,26 +72,38 @@ ColorRGBA CMinimapInstance::getTileColor(const int3 & pos, bool minimapShowHeroe
 void CMinimapInstance::refreshTile(const int3 &tile, bool minimapShowHeroes)
 {
 	if (level == tile.z)
-		minimap->drawPoint(Point(tile.x, tile.y), getTileColor(tile, minimapShowHeroes));
+	{
+		const auto color = getTileColor(tile, minimapShowHeroes);
+		minimap->drawPoint(Point(tile.x, tile.y), color);
+		if(scaledToroidalMinimap && tile.x >= 0 && tile.x < mapSize.x && tile.y >= 0 && tile.y < mapSize.y)
+		{
+			const auto [x0, x1] = minimapTilePixelInterval(tile.x, pos.w, mapSize.x);
+			const auto [y0, y1] = minimapTilePixelInterval(tile.y, pos.h, mapSize.y);
+			if(x0 < x1 && y0 < y1)
+				scaledToroidalMinimap->drawColor(Rect(x0, y0, x1 - x0, y1 - y0), color);
+		}
+	}
 }
 
 void CMinimapInstance::redrawMinimap()
 {
-	int3 mapSizes = GAME->interface()->cb->getMapSize();
 	const bool minimapShowHeroes = settings["adventure"]["minimapShowHeroes"].Bool();
 
-	for (int y = 0; y < mapSizes.y; ++y)
-		for (int x = 0; x < mapSizes.x; ++x)
-			minimap->drawPoint(Point(x, y), getTileColor(int3(x, y, level), minimapShowHeroes));
+	for (int y = 0; y < mapSize.y; ++y)
+		for (int x = 0; x < mapSize.x; ++x)
+			refreshTile(int3(x, y, level), minimapShowHeroes);
 }
 
 CMinimapInstance::CMinimapInstance(const Point & position, const Point & dimensions, int Level):
-	minimap(new Canvas(Point(GAME->interface()->cb->getMapSize().x, GAME->interface()->cb->getMapSize().y), CanvasScalingPolicy::IGNORE)),
+	mapSize(GAME->interface()->cb->getMapSize()),
+	minimap(new Canvas(Point(mapSize.x, mapSize.y), CanvasScalingPolicy::IGNORE)),
 	level(Level)
 {
 	pos += position;
 	pos.w = dimensions.x;
 	pos.h = dimensions.y;
+	if(GAME->interface()->cb->getMapHeader()->toroidal)
+		scaledToroidalMinimap = std::make_unique<Canvas>(pos.dimensions(), CanvasScalingPolicy::IGNORE);
 	redrawMinimap();
 }
 
@@ -99,7 +111,15 @@ CMinimapInstance::~CMinimapInstance() = default;
 
 void CMinimapInstance::showAll(Canvas & to)
 {
-	to.drawScaled(*minimap, pos.topLeft(), pos.dimensions());
+	if(!scaledToroidalMinimap)
+	{
+		to.drawScaled(*minimap, pos.topLeft(), pos.dimensions());
+		return;
+	}
+
+	// The raster and click mapping use identical logical pixel intervals;
+	// avoid renderer-dependent sampling at tile boundaries.
+	to.drawScaled(*scaledToroidalMinimap, pos.topLeft(), pos.dimensions());
 }
 
 CMinimap::CMinimap(const Rect & position)
