@@ -5899,6 +5899,83 @@ TEST_F(HeroMovementTest, HeroCollectsResourceAcrossToroidalCorner)
 	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
 }
 
+TEST_F(HeroMovementTest, HeroCollectsResourcesAcrossEveryToroidalEdgeAndCorner)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const auto topology = map()->getTopology();
+	for(int z = 0; z < 2; ++z)
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				if(dx == 0 && dy == 0)
+					continue;
+				SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
+				const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+				const auto destination = topology.canonicalize(origin + int3(dx, dy, 0));
+				ASSERT_TRUE(destination);
+				map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+				ASSERT_EQ(hero->visitablePos(), origin);
+				hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+				hero->setMovementPoints(3000);
+				auto object = handler.createNewObject(*destination, Obj::RESOURCE, MapObjectSubID(GameResID::GOLD));
+				auto * resource = dynamic_cast<CGResource *>(object.get());
+				ASSERT_NE(resource, nullptr);
+				resource->setAmount(1000);
+				handler.newObject(object, player);
+				const auto resourceID = resource->id;
+				ASSERT_TRUE(resourceID.hasValue());
+				ASSERT_EQ(resource->visitablePos(), *destination);
+				const auto goldBefore = gameState()->players.at(player).resources[GameResID::GOLD];
+				CPathsInfo paths(gameState()->getMapSize(), hero);
+				auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+				CPathfinder pathfinder(*gameState(), config);
+				pathfinder.calculatePaths();
+				const auto * node = paths.getNode(*destination, EPathfindingLayer::LAND);
+				ASSERT_TRUE(node->reachable());
+				ASSERT_NE(node->theNodeBefore, nullptr);
+				EXPECT_EQ(node->theNodeBefore->coord, origin);
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), origin);
+				const int stepCost = dx && dy ? 141 : 100;
+				EXPECT_EQ(hero->movementPointsRemaining(), 3000 - stepCost);
+				EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
+				EXPECT_EQ(map()->getObject(resourceID), nullptr);
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), *destination);
+				EXPECT_EQ(hero->movementPointsRemaining(), 3000 - 2 * stepCost);
+				EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
+			}
+	// The two charged requests are existing bounded-map behavior too.
+	const int3 origin(10, 10, 0), destination(11, 10, 0);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+	map()->setToroidalAndRebuild(false);
+	hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+	hero->setMovementPoints(3000);
+	auto object = handler.createNewObject(destination, Obj::RESOURCE, MapObjectSubID(GameResID::GOLD));
+	auto * resource = dynamic_cast<CGResource *>(object.get());
+	ASSERT_NE(resource, nullptr);
+	resource->setAmount(1000);
+	handler.newObject(object, player);
+	const auto goldBefore = gameState()->players.at(player).resources[GameResID::GOLD];
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 2900);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_EQ(hero->movementPointsRemaining(), 2800);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
+}
+
 TEST_F(HeroMovementTest, HeroCapturesMineAcrossToroidalSeam)
 {
 	const PlayerColor player(0);
