@@ -71,7 +71,35 @@ For most of configuration files, VCMI uses [JSON format](http://en.wikipedia.org
 
 ### Maps
 
-TODO: describe
+The editor imports Heroes III `.h3m` maps and writes VCMI `.vmap` maps.
+
+In this experimental fork, a VMAP is an archive with `header.json`. Its
+topology-related header fields are:
+
+- `versionMajor`: `3` for bounded maps written by this fork; `1414660100`
+  (`0x54520004`) for newly written toroidal maps.
+- `topology`: `"toroidal"` for a toroidal map. In older bounded headers it
+  may be absent or `"bounded"`.
+- `mapLevels`: the map dimensions and levels. Toroidal width and height must
+  each be at least 3.
+
+For example, these are the topology fields of a new toroidal header; a real
+header also requires the other map metadata:
+
+```json
+{
+    "versionMajor": 1414660100,
+    "topology": "toroidal"
+}
+```
+
+This fork also reads its earlier untagged version `4` toroidal prototypes,
+which cannot be distinguished reliably from an unrelated format using the
+same version. The new marker is branch-local, not an upstream allocation.
+Older readers reject tagged toroidal map headers; tagged toroidal saves also
+require a compatible reader. Use the editor to author maps and see
+[Map Editor](Map_Editor.md#connecting-opposite-edges-experimental-fork) for
+seam and object restrictions.
 
 ### Campaigns
 

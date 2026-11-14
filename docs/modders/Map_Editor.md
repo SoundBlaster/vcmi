@@ -170,6 +170,32 @@ You can modify general properties of the map
 
 <img width="307" src="https://user-images.githubusercontent.com/9308612/188781063-50ce65f8-aab4-43c3-a308-22acafa7d0a2.png">
 
+### Connecting opposite edges (experimental fork)
+
+In this experimental fork, **Map → General → Connect opposite map edges
+(experimental)** enables toroidal topology. North joins south and east joins
+west, including diagonal movement across corners. Each level wraps separately;
+crossing an edge does not change levels. Width and height must each be at
+least 3 tiles.
+
+Existing H3M and bounded VMAP maps remain bounded unless the setting is
+enabled. Save a converted map as a separate VMAP and keep the original. The
+setting changes movement, sight and other rules; it does not automatically
+repair terrain, roads, rivers, or scenario balance at the joined edges.
+Random-map generation and templates have not been verified for toroidal maps.
+
+Static object footprints can wrap across a seam if they fit within one map
+period. Review blocking and visitable cells on both sides. The validator warns
+when interactive objects overlap across a seam, and saving is rejected when the
+visit order cannot be preserved. Object footprints larger than the map are
+also rejected. Prefer adapted maps without overlapping interactive objects.
+
+Toroidal VMAPs and saves use experimental fork-specific format markers and
+are not compatible with older VCMI versions. AI and multiplayer support are
+still under verification. See [File Formats](File_Formats.md#maps) for the
+header fields and [the implementation matrix](../../specs/toroidal-map/implementation-matrix.md)
+for tested scenarios and known gaps.
+
 ## Player settings
 
 Open **Map** menu on the top and select **Player settings**
@@ -196,7 +222,9 @@ vcmieditor is independent application so potentially it can be installed just in
 
 ### Map compatibility
 
-vcmieditor haven't introduced any change into map format yet, so all maps made by vcmieditor can be easily played with any version of vcmi. At the same time, those maps can be open and read in the old map editor and vice verse - maps from old editor can be imported in the new editor. So, full compatibility is ensured here.
+The editor can import H3M maps and saves maps as VMAP. Compatibility depends
+on the VMAP version and features used. In this fork, experimental toroidal
+maps require a compatible build and cannot be opened by older VCMI readers.
 
 ### Mod compatibility
 
