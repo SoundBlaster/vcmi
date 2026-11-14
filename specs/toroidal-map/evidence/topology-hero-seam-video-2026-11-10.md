@@ -49,3 +49,23 @@ These checks cover only the inspected samples for one hero, terrain, camera
 mode, zoom and local client. Other diagonal directions, other artwork, boats,
 full-frame-by-frame inspection, visual latency and current builds after
 `c2457bd` remain unverified.
+
+## Native-frame corner reinspection
+
+On 2026-11-14 the two-second interval from 5.000 to 7.000 seconds of the
+same corner recording was re-examined. All 115 decoded frames in this interval
+were arranged in order on six contact sheets without frame-rate resampling.
+Each frame was cropped to the central 1,000×760 pixels and reduced to 250×190;
+the crop includes the moving hero and nearby ore and wood. The hero and these
+landmarks remain visible throughout the cropped sequence, with no obvious
+large jump in their relative positions during this crossing. This observation
+does not cover the entire viewport or prove that no subtle hitch occurred.
+
+The first and last frame timestamps in this interval were 5.000 and 6.991667
+seconds. Adjacent recorded timestamps averaged 17.471 ms, with a maximum of
+33.333 ms; none exceeded 50 ms. These are video presentation timestamps, not
+measurements of game render latency or actual display cadence. The six sheets
+are `runtime/hero-corner-native-motion-01.png` through `-06.png` on TB5.
+The source movie's SHA-256 still matches the value above. This strengthens the
+observation for one corner on build `c2457bd` only; current builds and other
+directions require their own continuous captures.
