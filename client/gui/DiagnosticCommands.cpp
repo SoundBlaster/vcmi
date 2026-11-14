@@ -20,7 +20,7 @@ bool dispatchDiagnosticCommand(const std::string & command)
 	std::istringstream stream(command);
 	std::string kind, value, extra;
 	stream >> kind;
-	if(kind == "click")
+	if(kind == "click" || kind == "hover")
 	{
 		int x, y;
 		if(!(stream >> x >> y) || (stream >> extra))
@@ -30,8 +30,11 @@ bool dispatchDiagnosticCommand(const std::string & command)
 			return false;
 		const Point p(x, y);
 		ENGINE->input().setCursorPosition(p);
-		ENGINE->events().dispatchMouseLeftButtonPressed(p, 0);
-		ENGINE->events().dispatchMouseLeftButtonReleased(p, 0);
+		if(kind == "click")
+		{
+			ENGINE->events().dispatchMouseLeftButtonPressed(p, 0);
+			ENGINE->events().dispatchMouseLeftButtonReleased(p, 0);
+		}
 		return true;
 	}
 	if(kind != "shortcut" || !(stream >> value) || (stream >> extra))

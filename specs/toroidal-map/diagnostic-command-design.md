@@ -14,7 +14,7 @@ Clients with access as the same OS user are trusted, including processes that
 can manipulate that user's files. This is not isolation from other processes
 running as that user.
 
-Commands deliver a logical GUI click or an allowlisted game shortcut to the
+Commands deliver a logical GUI pointer movement, click or an allowlisted game shortcut to the
 existing GUI event dispatcher on the GUI thread. They must respect the current
 window, normal client behavior, and server validation. Screen coordinates are
 logical VCMI GUI coordinates, not screenshot pixels. The response acknowledges
@@ -39,6 +39,7 @@ Send one event using `specs/toroidal-map/tools/vcmi_command.py --socket PATH`:
 
 ```text
 vcmi_command.py --socket PATH click X Y
+vcmi_command.py --socket PATH hover X Y
 vcmi_command.py --socket PATH shortcut cast
 vcmi_command.py --socket PATH shortcut southeast
 ```

@@ -9,14 +9,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--socket", required=True, help="Private Unix socket selected at VCMI launch")
     sub = parser.add_subparsers(dest="kind", required=True)
-    click = sub.add_parser("click", help="Click in logical VCMI GUI coordinates")
-    click.add_argument("x", type=int)
-    click.add_argument("y", type=int)
+    for kind in ("click", "hover"):
+        pointer = sub.add_parser(kind, help=f"{kind.title()} in logical VCMI GUI coordinates")
+        pointer.add_argument("x", type=int)
+        pointer.add_argument("y", type=int)
     shortcut = sub.add_parser("shortcut", help="Dispatch one allowlisted VCMI shortcut")
     shortcut.add_argument("name", choices=("cast", "return", "accept", "north", "south", "east", "west",
                                            "northeast", "northwest", "southeast", "southwest"))
     args = parser.parse_args()
-    command = f"click {args.x} {args.y}\n" if args.kind == "click" else f"shortcut {args.name}\n"
+    command = f"{args.kind} {args.x} {args.y}\n" if args.kind in ("click", "hover") else f"shortcut {args.name}\n"
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
             connection.settimeout(5)

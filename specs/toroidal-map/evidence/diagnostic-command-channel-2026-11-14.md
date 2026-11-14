@@ -47,3 +47,16 @@ scenario names. The topology and command-channel executable passed all 26
 tests. These observations validate those interactions; they do not imply that
 an `accepted` response guarantees an action succeeded or that every widget has
 been exercised.
+
+## Pointer movement without a click
+
+The `hover X Y` command uses the same bounded logical coordinates and stored
+cursor-position update as `click`, without pressing or releasing a button.
+On a signed macOS arm64 client built from `47fa818` plus this change, hover
+over New Game highlighted the menu item without opening it. In an ordinary
+bounded-map session, hover over a visible fountain and then a town changed the
+status text to the respective object without moving the selected hero. A
+negative x coordinate returned `error invalid_command`. The real socket
+transport tests are independent of the GUI dispatch and do not verify every
+hover receiver. Hovering an unseen tile retained the preceding object's status
+text on that build; the separate legacy UI correction addresses this.
