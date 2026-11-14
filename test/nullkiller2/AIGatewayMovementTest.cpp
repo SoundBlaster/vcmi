@@ -358,7 +358,7 @@ TEST_F(Nullkiller2_AIGateway, rejectedTownPortalDoesNotLeaveSelectedTownForAnoth
 		map()->setToroidalAndRebuild(toroidal);
 		gateway->selectedObject = ObjectInstanceID();
 		EXPECT_THROW(goal.accept(gateway.get()), NK2AI::cannotFulfillGoalException);
-		EXPECT_EQ(gateway->selectedObject, ObjectInstanceID());
+		EXPECT_EQ(gateway->selectedObject.load(), ObjectInstanceID());
 		const QuestionID question(toroidal ? 102 : 101);
 		gateway->showMapObjectSelectDialog(question, Component(), MetaString(), MetaString(), {town->id});
 		gateway->asyncTasks->wait();
@@ -401,7 +401,7 @@ TEST_F(Nullkiller2_AIGateway, rejectedTownPortalRequestDoesNotLeaveSelectedTown)
 	const QuestionID dialogQuestion(201);
 	requests->onSpellRequest = [&]
 	{
-		selectionDuringRequest = gateway->selectedObject;
+		selectionDuringRequest = gateway->selectedObject.load();
 		gateway->showMapObjectSelectDialog(dialogQuestion, Component(), MetaString(), MetaString(), {town->id});
 		gateway->asyncTasks->wait();
 		gateway->status.removeQuestion(dialogQuestion);
@@ -416,7 +416,7 @@ TEST_F(Nullkiller2_AIGateway, rejectedTownPortalRequestDoesNotLeaveSelectedTown)
 	ASSERT_EQ(requests->answers.size(), 1u);
 	EXPECT_EQ(requests->answers.front().questionID, dialogQuestion);
 	EXPECT_EQ(requests->answers.front().reply, town->id.getNum());
-	EXPECT_EQ(gateway->selectedObject, ObjectInstanceID());
+	EXPECT_EQ(gateway->selectedObject.load(), ObjectInstanceID());
 }
 
 TEST_F(Nullkiller2_AIGateway, plansDimensionDoorLandingAcrossToroidalSeam)

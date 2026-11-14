@@ -34,6 +34,19 @@ The five focused Town Portal and dialog tests passed three repeated runs.
 This is an ordering probe using a test double, not a claim that the real server
 produces that particular sequence.
 
+The gateway's selected object is shared between the goal and asynchronous
+dialog task. To avoid unsynchronized reads and writes when the goal cleanup
+and dialog overlap, it is now atomic. The dialog takes and clears the value
+with one `exchange` before answering, rather than writing it again after the
+answer acknowledgement; this also avoids a late clear by that dialog task.
+The five focused tests, including the scripted asynchronous selection, passed
+ten repeated runs. This is a code-level synchronization correction and a
+local functional check; ThreadSanitizer and real network scheduling were not
+tested. The complete local suite with this change passed 1,646 tests with
+four disabled using the same external fixtures; its log is
+`runtime/full-suite-atomic-town-selection-2026-11-15.log` under the TB5 build
+root.
+
 On macOS arm64, `vcmitest` and Nullkiller2 rebuilt on TB5. The focused Town
 Portal and dialog tests passed three consecutive runs after the dialog check
 was added. A complete local run with the same implementation and the earlier

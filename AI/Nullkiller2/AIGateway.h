@@ -89,7 +89,7 @@ public:
 	std::shared_ptr<CCallback> cc;
 	std::unique_ptr<AsyncRunner> asyncTasks;
 
-	ObjectInstanceID selectedObject;
+	std::atomic<ObjectInstanceID> selectedObject{ObjectInstanceID()};
 	/// result of the last adventure spell cast request, set before a waiting caller is released
 	std::atomic<bool> lastAdventureCastSucceeded = true;
 

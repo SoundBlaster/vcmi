@@ -810,14 +810,13 @@ void AIGateway::showMapObjectSelectDialog(QuestionID questionID, const Component
 	status.addQuestion(questionID, "Map object select question");
 	executeActionAsync("showMapObjectSelectDialog", [this, questionID, objects]()
 	{
+		const auto selection = selectedObject.exchange(ObjectInstanceID());
 		// selectedObject is only set by our own Town Portal cast; a dialog opened by a map object,
 		// e.g. Toll Town Gate, is cancelled instead of answered with a town that was not offered
-		if(vstd::contains(objects, selectedObject))
-			answerQuestion(questionID, selectedObject.getNum());
+		if(vstd::contains(objects, selection))
+			answerQuestion(questionID, selection.getNum());
 		else
 			cc->sendQuestionAnswer(std::nullopt, questionID);
-
-		selectedObject = ObjectInstanceID();
 	});
 }
 
