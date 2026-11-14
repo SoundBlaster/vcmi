@@ -33,6 +33,7 @@
 #include "../../lib/json/JsonNode.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGResource.h"
+#include "../../lib/mapObjects/CGCreature.h"
 #include "../../lib/mapObjects/CGPandoraBox.h"
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
@@ -6379,6 +6380,65 @@ TEST_F(HeroMovementTest, MonsterGuardAcrossCornerStartsBattle)
 	ASSERT_NE(battle, nullptr);
 	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
 }
+
+class ToroidalMonsterAttackTest : public HeroMovementTest, public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(ToroidalMonsterAttackTest, DirectAttackAcrossSeamUsesCorrectDefender)
+{
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions.at(GetParam() % directions.size());
+	const int z = GetParam() / directions.size();
+	const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+	const int3 destination(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z);
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}}).monster(destination, CreatureID(27), 1);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+	ASSERT_EQ(hero->visitablePos(), origin);
+	const auto guardID = map()->getTile(destination).topVisitableObj();
+	auto * guard = dynamic_cast<CGCreature *>(map()->getObject(guardID));
+	ASSERT_NE(guard, nullptr);
+	guard->agression = 127;
+	guard->neverFlees = true;
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * target = paths.getNode(destination, EPathfindingLayer::LAND);
+	ASSERT_TRUE(target->reachable());
+	ASSERT_NE(target->theNodeBefore, nullptr);
+	EXPECT_EQ(target->theNodeBefore->coord, origin);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	const auto * battle = gameState()->getBattle(player);
+	ASSERT_NE(battle, nullptr);
+	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+	EXPECT_EQ(battle->getLocation(), destination);
+	handler.battles->cheatBattleVictory(player);
+	auto resultDialog = handler.activities->topActivity(player);
+	ASSERT_NE(resultDialog, nullptr);
+	ASSERT_EQ(resultDialog->getType(), ActivityType::BattleDialog);
+	ASSERT_EQ(handler.activities->submitReply(resultDialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(map()->getObject(guardID), nullptr);
+	EXPECT_EQ(gameState()->getBattle(player), nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), destination);
+}
+
+INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalMonsterAttackTest, ::testing::Range(0, 16));
 
 TEST_F(HeroMovementTest, WrappedMonsterBattleUsesTheCanonicalVisitablePosition)
 {
