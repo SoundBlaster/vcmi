@@ -153,7 +153,6 @@ public:
 	void selectAbs(int position); //position: absolute position in curItems vector
 	void sliderMove(int slidPos);
 	void updateListItems();
-	int getLine() const;
 	int getLine(const Point & position) const;
 	/// Opens folder of the file and selects it; selects the first file if it is not found
 	void selectFileName(const std::string & fname);

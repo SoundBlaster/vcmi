@@ -511,7 +511,7 @@ void SelectionTab::onScenarioListReceived(const LobbyScenarioList & pack)
 
 void SelectionTab::clickReleased(const Point & cursorPosition)
 {
-	int line = getLine();
+	int line = getLine(cursorPosition - pos.topLeft());
 
 	if(line != -1 && curItems.size() > line)
 	{
@@ -579,7 +579,9 @@ void SelectionTab::keyPressed(EShortcut key)
 
 void SelectionTab::clickDouble(const Point & cursorPosition)
 {
-	int position = getLine();
+	int position = getLine(cursorPosition - pos.topLeft());
+	if(position < 0)
+		return;
 	int itemIndex = position + slider->getValue();
 
 	if(itemIndex >= curItems.size())
@@ -602,16 +604,15 @@ void SelectionTab::clickDouble(const Point & cursorPosition)
 		return;
 	}
 
-	if(getLine() != -1) //double clicked scenarios list
-	{
-		(static_cast<CLobbyScreen *>(parent))->buttonStart->clickPressed(cursorPosition);
-		(static_cast<CLobbyScreen *>(parent))->buttonStart->clickReleased(cursorPosition);
-	}
+	(static_cast<CLobbyScreen *>(parent))->buttonStart->clickPressed(cursorPosition);
+	(static_cast<CLobbyScreen *>(parent))->buttonStart->clickReleased(cursorPosition);
 }
 
 void SelectionTab::showPopupWindow(const Point & cursorPosition)
 {
-	int position = getLine();
+	int position = getLine(cursorPosition - pos.topLeft());
+	if(position < 0)
+		return;
 	int py = position + slider->getValue();
 
 	if(py >= curItems.size())
@@ -910,12 +911,6 @@ bool SelectionTab::receiveEvent(const Point & position, int eventType) const
 {
 	// FIXME: widget should instead have well-defined pos so events will be filtered using standard routine
 	return getLine(position - pos.topLeft()) != -1;
-}
-
-int SelectionTab::getLine() const
-{
-	Point clickPos = ENGINE->getCursorPosition() - pos.topLeft();
-	return getLine(clickPos);
 }
 
 int SelectionTab::getLine(const Point & clickPos) const
