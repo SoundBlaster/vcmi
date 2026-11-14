@@ -12,9 +12,11 @@
 #include "nullkiller2/NullkillerTest.h"
 #include "nullkiller2/ScriptedMovementClient.h"
 
+#include "lib/AsyncRunner.h"
 #include "lib/callback/CCallback.h"
 #include "AI/Nullkiller2/Pathfinding/Actions/TownPortalAction.h"
 #include "AI/Nullkiller2/Pathfinding/Actions/DimensionDoorAction.h"
+#include "AI/Nullkiller2/Goals/AdventureSpellCast.h"
 #include "lib/mapObjects/CGTownInstance.h"
 #include "lib/mapObjects/CGResource.h"
 #include "lib/mapping/TerrainTile.h"
@@ -27,6 +29,20 @@ const CGHeroInstance * getNearestHero(const Nullkiller * aiNk, const CGTownInsta
 namespace
 {
 const PlayerColor PLAYER(0);
+
+class SelectionRecordingClient : public ScriptedMovementClient
+{
+public:
+	using ScriptedMovementClient::ScriptedMovementClient;
+	std::vector<QuestionAnswer> answers;
+
+	int sendRequest(const CPackForServer & request, PlayerColor player, bool wait) override
+	{
+		if(const auto * answer = dynamic_cast<const QuestionAnswer *>(&request))
+			answers.push_back(*answer);
+		return ScriptedMovementClient::sendRequest(request, player, wait);
+	}
+};
 
 class Nullkiller2_AIGateway : public NullkillerTest
 {
@@ -294,6 +310,54 @@ TEST_F(Nullkiller2_AIGateway, plansUnskilledTownPortalToNearestTownAcrossSeam)
 				return dynamic_cast<const NK2AI::AIPathfinding::TownPortalAction *>(node.specialAction.get()) != nullptr;
 			});
 		})) << "AI should consider the same nearest town as the game spell";
+	}
+}
+
+TEST_F(Nullkiller2_AIGateway, rejectedTownPortalDoesNotLeaveSelectedTownForAnotherDialog)
+{
+	const SpellID spell(SpellID::decode("core:townPortal"));
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(PLAYER)
+		.hero({5, 5, 0}, HeroTypeID(0), PLAYER)
+		.heroPrimary(0, 0, 20, 20)
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({spell})
+		.hero({9, 10, 0}, HeroTypeID(1), PLAYER)
+		.town({10, 10, 0}, FactionID(0), PLAYER);
+	startWithMap(std::move(builder));
+	revealMap(PLAYER);
+	hero = findHeroByOwner(PLAYER);
+	auto * town = findFirst<CGTownInstance>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(town, nullptr);
+	ASSERT_NE(town->getVisitingHero(), nullptr);
+	ASSERT_TRUE(town->setCreature(SlotID(0), CreatureID::ARCHER, 1));
+	hero->mana = 200;
+	hero->setMovementPoints(3000);
+	auto recordingClient = std::make_unique<SelectionRecordingClient>(gameState());
+	auto * selections = recordingClient.get();
+	client = std::move(recordingClient);
+	callback = makeCallback(PLAYER, client.get());
+	gateway = makeGateway(callback);
+	client->notify(*gateway);
+	NK2AI::Goals::AdventureSpellCast goal(hero, spell);
+	goal.town = town;
+	goal.settile(town->visitablePos());
+
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
+		map()->setToroidalAndRebuild(toroidal);
+		gateway->selectedObject = ObjectInstanceID();
+		EXPECT_THROW(goal.accept(gateway.get()), NK2AI::cannotFulfillGoalException);
+		EXPECT_EQ(gateway->selectedObject, ObjectInstanceID());
+		const QuestionID question(toroidal ? 102 : 101);
+		gateway->showMapObjectSelectDialog(question, Component(), MetaString(), MetaString(), {town->id});
+		gateway->asyncTasks->wait();
+		ASSERT_FALSE(selections->answers.empty());
+		EXPECT_EQ(selections->answers.back().questionID, question);
+		EXPECT_FALSE(selections->answers.back().reply.has_value());
+		gateway->status.removeQuestion(question);
 	}
 }
 

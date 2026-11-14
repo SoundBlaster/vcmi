@@ -54,8 +54,6 @@ void AdventureSpellCast::accept(AIGateway * aiGw)
 		if(hero->getVisitedTown() == town)
 			throw goalFulfilledException(sptr(*this));
 
-		aiGw->selectedObject = town->id;
-
 		if(town->getVisitingHero() && town->tempOwner == aiGw->playerID && !town->getUpperArmy()->stacksCount())
 		{
 			aiGw->cc->swapGarrisonHero(town);
@@ -80,6 +78,11 @@ void AdventureSpellCast::accept(AIGateway * aiGw)
 		problem.getAll(reasons);
 		throw cannotFulfillGoalException("Can not cast " + spell->getNameTranslated() + " at " + tile.toString() + ": " + boost::algorithm::join(reasons, "; "));
 	}
+
+	// Only publish the town once local checks have succeeded; otherwise an unrelated
+	// later object-selection dialog could consume a target from a rejected goal.
+	if(town && townPortalEffect)
+		aiGw->selectedObject = town->id;
 
 	const auto wait = aiGw->cc->waitTillRealize;
 	aiGw->cc->waitTillRealize = true;
