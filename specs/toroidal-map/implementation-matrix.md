@@ -112,7 +112,9 @@ explicit in-memory toroidal opt-in. See the
 [bounded seam regression](evidence/bounded-seam-regression-2026-11-14.md).
 
 Repeated client transit-route checks reuse validated prefixes within one path
-graph and reuse a search workspace within each route check. The
+graph and reuse a search workspace within each route check. A known-landing
+search can stop after settling a valid landing; recovery searches needing an
+actual route still calculate the full graph. The
 [timing record](evidence/transient-landing-performance-2026-11-14.md) measures
 one synthetic case; first-route and server costs remain unbounded by that
 result.

@@ -88,3 +88,42 @@ three external fixtures configured, the complete suite passed 1,541 tests;
 four remain disabled. The log is
 `runtime/full-suite-landing-scratch-2026-11-14.log` on TB5. Client and server
 targets built on macOS arm64, with the existing linker warnings noted above.
+
+## Stop after a settled known landing
+
+When only the existence of a known landing is requested, the pathfinder can
+now stop after it removes a qualifying land node from its priority queue. Its
+predecessor chain is already settled and must satisfy the same visibility,
+movement-point and interaction checks as the complete search. If no such
+queued node is found, the search completes and the existing scan handles
+terminal nodes and the unknown-frontier result. Recovery requests for an
+actual plain route still build and scan the complete graph. Queue links are
+cleared on early return before a scratch graph can be reused.
+
+On 2026-11-15, the same opt-in probe was run before and after this change on
+the same Mac, in separate local runs. Median times, in milliseconds:
+
+| Movement points | One landing before | One landing after | First route before | First route after |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,200 | 0.74 | 0.32 | 1.56 | 0.48 |
+| 3,000 | 2.62 | 0.33 | 16.08 | 1.45 |
+| 6,000 | 9.55 | 0.31 | 129.49 | 7.86 |
+
+The logs are `runtime/landing-early-baseline-2026-11-15.log` and
+`runtime/landing-early-after-2026-11-15.log` on TB5. The land tile in this
+fixture is readily reachable, so these results do not bound searches where a
+landing is distant or unknown. They do not measure frame pacing, actual
+server concurrency, or multiplayer latency.
+
+The route-agreement test also compares early results with full plain-route
+searches on an object-free water map, including limited visibility, both
+knowledge policies, and starts near opposite edges. It verifies that an
+interrupted search clears heap links and that its graph can then be reused
+for a complete search.
+
+The macOS arm64 client, server and test targets built. With the prototype
+VMAP and save and the Complete H3M fixtures supplied, the full local suite
+passed 1,661 tests; four tests were disabled. The test log is
+`runtime/full-suite-landing-early-2026-11-15.log` on TB5. SpecPM validation
+reported no errors or warnings. The build retained existing linker warnings
+about duplicate libraries and absent search directories.
