@@ -22,3 +22,7 @@ than deciding that policy.
 The two resource and three road tests passed on macOS arm64 from `dc58aa0`
 plus this test change. Other resources, protected objects, network clients,
 GUI route execution and older game binaries remain unverified here.
+
+The complete local suite then passed 1,533 tests without skips, including the
+optional old map and save fixtures and a Complete map; four tests remain
+disabled. The TB5 log is `runtime/full-suite-seam-interactions-2026-11-14.log`.
