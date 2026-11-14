@@ -49,3 +49,18 @@ at the `Saves` scan; a process sample showed a directory open waiting. The
 filtered TCC query for the first process did not show a removable-volume
 prompt; the cause of the wait is not established. Neither attempt reached an
 observable game window, so no graphical or interactive route result is claimed.
+
+### Subsequent macOS launch
+
+After the user approved launching the game, the local-log client opened its
+window, loaded the map list, and started an ordinary bundled scenario through
+to its adventure screen. The log also records the test map's header being
+loaded while scanning the scenario list. This confirms startup and a basic
+ordinary-map launch, not the toroidal Flight or Water Walk behavior. Attempts
+to focus the scenario filter through Computer Use did not succeed; the
+prepared toroidal map and its routes have not yet been exercised in the GUI.
+
+The window title identifies this separately packaged client as `360ffdf`.
+It includes the route-filtering work prepared before `506fc7b`, but was
+packaged before that commit's final cache synchronization change. It is not
+evidence that the exact final committed binary was interactively tested.
