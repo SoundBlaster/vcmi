@@ -362,7 +362,7 @@ public:
 
 	friend class CVCMIServer;
 private:
-	void landTransientHeroInPlace(const CGHeroInstance * hero);
+	void landTransientHeroInPlace(const CGHeroInstance * hero, EPathfindingLayer layer);
 	void getVictoryLossMessage(PlayerColor player, const EVictoryLossCheckResult & victoryLossCheckResult, InfoWindow & out) const;
 	/// Returns army of the object, throws if the object does not exist or has no army
 	const CArmedInstance * getArmyOrThrow(ObjectInstanceID id, const std::string & context);

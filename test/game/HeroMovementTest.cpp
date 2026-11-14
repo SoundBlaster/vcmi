@@ -5036,6 +5036,82 @@ TEST_F(HeroMovementTest, HeroCanEmbarkAviationVehicleAcrossToroidalSeam)
 	EXPECT_EQ(hero->visitablePos(), destination);
 }
 
+TEST_F(HeroMovementTest, AviationVehicleCanSettleInPlaceAfterAirTransit)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 start(0, 5, 0), vehiclePosition(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent).hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), opponent)
+		.terrain(vehiclePosition, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	gameState()->players.at(player).human = true;
+	gameState()->players.at(player).status = EPlayerStatus::INGAME;
+	gameState()->actingPlayers.insert(player);
+	gameState()->getStartInfo()->turnTimerInfo.turnTimer = 1;
+	gameState()->getStartInfo()->turnTimerInfo.baseTimer = 0;
+	handler.turnTimerHandler->onGameplayStart(player);
+	handler.turnTimerHandler->onPlayerGetTurn(player);
+	handler.createBoat(vehiclePosition, BoatId::CASTLE, player);
+	auto * vehicle = dynamic_cast<CGBoat *>(map()->getObject(map()->getTile(vehiclePosition).topVisitableObj()));
+	ASSERT_NE(vehicle, nullptr);
+	vehicle->layer = EPathfindingLayer::AVIATE;
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(vehiclePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	ASSERT_TRUE(hero->inBoat());
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(start), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	const auto remaining = hero->movementPointsRemaining();
+	const std::string text = R"({ "animation": "test.def", "mask": [ "V" ] })";
+	JsonNode definition(text.data(), text.size(), "AviationInPlaceEvent");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	appearance->id = Obj::EVENT;
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto event = std::make_shared<CGObjectInstance>(gameState().get());
+	event->ID = Obj::EVENT;
+	event->pos = start;
+	event->instanceName = "aviation_in_place_event";
+	event->appearance = appearance;
+	map()->hideObject(hero);
+	map()->addNewObject(event);
+	map()->showObject(hero);
+	EXPECT_FALSE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	map()->hideObject(hero);
+	map()->removeObject(event->id);
+	map()->showObject(hero);
+	const int3 hiddenNeighbor(35, 5, 0);
+	auto * team = gameState()->getPlayerTeam(player);
+	ASSERT_NE(team, nullptr);
+	team->fogOfWarMap[hiddenNeighbor] = 0;
+	EXPECT_FALSE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
+	team->fogOfWarMap[hiddenNeighbor] = 1;
+	ASSERT_TRUE(handler.turnTimerHandler->isTimerEnabled(player));
+	ASSERT_TRUE(gameState()->isPlayerMakingTurn(player));
+	ASSERT_EQ(handler.activities->topActivity(player), nullptr);
+	handler.turnTimerHandler->update(1);
+	handler.turnTimerHandler->update(1);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AVIATE);
+	// The manual group-settlement path must use the same vehicle layer.
+	hero->setConfirmedMovementLayer(EPathfindingLayer::AIR);
+	ASSERT_TRUE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_EQ(hero->visitablePos(), start);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AVIATE);
+	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+	EXPECT_EQ(hero->getBoat(), vehicle);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
 TEST_F(HeroMovementTest, SailingBoatCannotSwitchDirectlyToFlyingAcrossSeam)
 {
 	const PlayerColor player(0);
