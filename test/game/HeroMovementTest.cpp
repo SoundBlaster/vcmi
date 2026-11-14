@@ -1151,6 +1151,31 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 		EXPECT_EQ(loadedState->getMap().toroidal, toroidal);
 		if(scenario == 1)
 		{
+			// Reopen the actual file in a separate state to exercise the persisted
+			// departure point without changing the ordinary landing check below.
+			auto recoveryState = std::make_shared<CGameState>();
+			recoveryState->preInit(LIBRARY);
+			auto recoveryChunk = loaded.openChunk(SaveFileFormat::CHUNK_GAMESTATE, recoveryState.get());
+			recoveryState->loadGame(recoveryChunk->iser);
+			GameHandlerTestServer recoveryServer(recoveryState, player);
+			CGameHandler recovery(recoveryServer, recoveryState);
+			recoveryChunk->iser & recovery;
+			ASSERT_TRUE(recoveryChunk->isFullyRead());
+			auto * recoveryHero = recoveryState->getHero(airborneHeroID);
+			ASSERT_NE(recoveryHero, nullptr);
+			ASSERT_EQ(recoveryHero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+			recoveryHero->setMovementPoints(1); // simulate a stranded loaded hero
+			auto * team = recoveryState->getPlayerTeam(player);
+			ASSERT_NE(team, nullptr);
+			for(int z = 0; z < recoveryState->getMap().levels(); ++z)
+				for(int x = 0; x < recoveryState->getMap().width; ++x)
+					for(int y = 0; y < recoveryState->getMap().height; ++y)
+						team->fogOfWarMap[int3(x, y, z)] = 1;
+			ASSERT_TRUE(recovery.tryRecoverTransientHeroes(player));
+			EXPECT_EQ(recoveryHero->visitablePos(), int3(1, 0, 0));
+			EXPECT_EQ(recoveryHero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+			EXPECT_EQ(recoveryHero->movementPointsRemaining(), 0);
+
 			GameHandlerTestServer restoredServer(loadedState, player);
 			CGameHandler restored(restoredServer, loadedState);
 			game->iser & restored;

@@ -29,6 +29,8 @@ not fabricate an origin, and after a current-version memory serialization
 verifies the timer-driven return with zero movement points. Probe objects check
 that source leave and destination event callbacks do not run. The fixture does
 not itself prove an on-disk save/load, real timer scheduling or GUI behavior.
+A later [disk-save test](topology-return-origin-disk-save-2026-11-14.md)
+checks a separate synthetic recovery after reopening a real save file.
 
 The TCP loopback lobby test moves a hero into AIR on the server, artificially
 reduces its movement points to one, then sends a manual end-turn request. Both
