@@ -8,6 +8,8 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 
 def create_fixture(source, output, seam):
+    if seam not in (None, "horizontal", "vertical", "corner"):
+        raise ValueError(f"unknown fixture kind: {seam}")
     with ZipFile(source) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}
 
@@ -18,13 +20,18 @@ def create_fixture(source, output, seam):
         rows, columns = range(14, 19), (33, 34, 2, 3, 4)
     elif seam == "vertical":
         rows, columns = (33, 34, 2, 3, 4), range(13, 18)
+    elif seam == "corner":
+        rows, columns = (), ()
     else:
         rows, columns = range(20, 23), range(13, 18)
-    for y in rows:
-        for x in columns:
-            if not terrain[y][x].startswith("wt"):
-                raise ValueError(f"expected water at {x},{y}")
-            terrain[y][x] = "gr49_"
+    cells = [(x, y) for y in rows for x in columns]
+    if seam == "corner":
+        cells = [(x, y) for y in (33, 34) for x in (33, 34)]
+        cells += [(x, y) for y in (1, 2, 3) for x in (1, 2, 3)]
+    for x, y in cells:
+        if not terrain[y][x].startswith("wt"):
+            raise ValueError(f"expected water at {x},{y}")
+        terrain[y][x] = "gr49_"
     files["surface_terrain.json"] = json.dumps(terrain).encode()
 
     if seam:
@@ -32,15 +39,16 @@ def create_fixture(source, output, seam):
         heroes = [obj for obj in objects if obj.get("instanceName") == "hero_2"]
         if len(heroes) != 1 or (heroes[0]["x"], heroes[0]["y"]) != (16, 16):
             raise ValueError("expected the original route-safety hero")
-        if seam == "horizontal":
-            heroes[0]["x"] = 35  # Object anchor; visitable tile (34, 16).
-        else:
-            heroes[0]["y"] = 34  # Visitable tile (15, 34).
+        if seam in ("horizontal", "corner"):
+            heroes[0]["x"] = 35  # Object anchor is one tile east of the visitable tile.
+        if seam in ("vertical", "corner"):
+            heroes[0]["y"] = 34
         files["objects.json"] = json.dumps(objects).encode()
 
     texts = json.loads(files["russian.json"])
     name = {"horizontal": "Toroidal Water Seam Crossing Lab",
-            "vertical": "Toroidal Water Vertical Crossing Lab"}.get(seam, "Toroidal Water Crossing Lab")
+            "vertical": "Toroidal Water Vertical Crossing Lab",
+            "corner": "Toroidal Water Corner Crossing Lab"}.get(seam, "Toroidal Water Crossing Lab")
     texts["header.name"] = name
     texts["header.description"] = "Experimental wraparound map. AI support is not yet verified. Test map: two shores separated by water."
     files["russian.json"] = json.dumps(texts).encode()
@@ -56,7 +64,8 @@ def main():
     args = parser.parse_args()
     for filename, seam in (("toroidal-water-crossing-lab.vmap", None),
                            ("toroidal-water-seam-crossing-lab.vmap", "horizontal"),
-                           ("toroidal-water-vertical-crossing-lab.vmap", "vertical")):
+                           ("toroidal-water-vertical-crossing-lab.vmap", "vertical"),
+                           ("toroidal-water-corner-crossing-lab.vmap", "corner")):
         create_fixture(args.source, args.output_dir / filename, seam)
         print(args.output_dir / filename)
 
