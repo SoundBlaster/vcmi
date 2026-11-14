@@ -42,6 +42,28 @@ Logs on TB5:
 `runtime/minimap-renderer-independent-topology.log`, and
 `runtime/full-suite-minimap-raster-2026-11-14.log`.
 
-The updated GUI, SDL2, noninteger compositor scaling and other GPU backends
-remain unverified. The copied test client currently open is from `961e235`,
-before the minimap correction.
+## Interactive check on the updated client
+
+The clean `fae12b1` client was built on TB5, copied into the existing signed
+preview app, had its library references rewritten to the bundled frameworks,
+and was re-signed and verified. The separately bundled engine library and
+server remain from `961e235`; the only changes to client, server and library
+source between those revisions are the minimap changes. The window title is
+therefore still `1.8.0.961e235`, not the client source revision. The updated
+client's post-signing SHA-256 is
+`840b06033f3b870bae9e331bf161c29049b7d9d51db040cb2b9e7b8bb656858d`;
+the bundled library remains
+`59aa0556c0a62c8a5e0100c65d63714792f895d58742f09fdf6515ce7bfd9d68`.
+It started and loaded the `Toroid Open Water Corner` test save without
+additional user intervention.
+
+On its 36×36 map and 144×144 logical minimap, diagnostic clicks on the four
+inside corner pixels centered the camera on tiles `(0,0)`, `(35,0)`, `(0,35)`
+and `(35,35)`, respectively, as recorded by the observation stream. Computer
+Use showed the final map after selection. The 11-record local trace is
+`runtime/observation-minimap-fae12b1-2026-11-14.jsonl` on TB5, SHA-256
+`81ca6ddbeb94390ddd1446119ce350586b028573e99e469225a767c4156bff78`.
+This GUI check uses an integer 4:1 minimap scale; it does not demonstrate
+the original fractional-scale mismatch, all terrain colors, fog updates, or
+animation continuity. SDL2, noninteger compositor scaling and other GPU
+backends remain unverified.
