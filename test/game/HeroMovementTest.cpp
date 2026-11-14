@@ -806,6 +806,12 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 				return host.state->isVisibleFor(tile, red) && guest.state->isVisibleFor(tile, red);
 			});
 	});
+	auto * startInfo = server.gh->gameInfo().gameState().getStartInfo();
+	startInfo->turnTimerInfo.turnTimer = 1;
+	startInfo->turnTimerInfo.baseTimer = 0;
+	server.gh->turnTimerHandler->onGameplayStart(red);
+	server.gh->turnTimerHandler->onGameplayStart(blue);
+	server.gh->turnTimerHandler->onPlayerGetTurn(red);
 	flight.requestID = 26;
 	host.codec->sendPack(flight);
 	pumpUntil([&] {
@@ -816,11 +822,6 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(host.results.contains(26)) << host.failure;
 	ASSERT_TRUE(host.results.at(26));
 	ASSERT_EQ(server.gh->gameState().getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::AIR);
-	auto * startInfo = server.gh->gameInfo().gameState().getStartInfo();
-	startInfo->turnTimerInfo.turnTimer = 1;
-	startInfo->turnTimerInfo.baseTimer = 0;
-	server.gh->turnTimerHandler->onGameplayStart(red);
-	server.gh->turnTimerHandler->onPlayerGetTurn(red);
 	server.gh->turnTimerHandler->update(1);
 	ASSERT_EQ(server.gh->gameState().getHero(hero->id)->visitablePos(), airborne);
 	server.gh->turnTimerHandler->update(1);
@@ -838,6 +839,32 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), landed->visitablePos());
 		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), landed->movementPointsRemaining());
 	}
+	// After the landing, the next timer tick must actually transfer the turn.
+	// Give the next player enough time to submit its own end-turn request.
+	startInfo->turnTimerInfo.turnTimer = 100000;
+	server.gh->turnTimerHandler->update(1);
+	pumpUntil([&] { return host.state->actingPlayers.contains(blue) && guest.state->actingPlayers.contains(blue); });
+	ASSERT_TRUE(server.gh->gameState().actingPlayers.contains(blue));
+	ASSERT_TRUE(host.state->actingPlayers.contains(blue)) << host.failure;
+	ASSERT_TRUE(guest.state->actingPlayers.contains(blue)) << guest.failure;
+	const auto blueTurnPause = server.gh->activities->topActivity(blue);
+	ASSERT_NE(blueTurnPause, nullptr);
+	QuestionAnswer acceptBlueTurn(blueTurnPause->getActiveQuestionID(), 0);
+	acceptBlueTurn.player = blue;
+	acceptBlueTurn.requestID = 29;
+	guest.codec->sendPack(acceptBlueTurn);
+	pumpUntil([&] { return guest.results.contains(29); });
+	ASSERT_TRUE(guest.results.contains(29));
+	ASSERT_TRUE(guest.results.at(29));
+	// The remaining test covers a manual turn without a timer.
+	startInfo->turnTimerInfo.turnTimer = 0;
+	EndTurn finishBlueAfterTimer;
+	finishBlueAfterTimer.player = blue;
+	finishBlueAfterTimer.requestID = 28;
+	guest.codec->sendPack(finishBlueAfterTimer);
+	pumpUntil([&] { return guest.results.contains(28) && host.state->actingPlayers.contains(red) && guest.state->actingPlayers.contains(red); });
+	ASSERT_TRUE(guest.results.contains(28)) << guest.failure;
+	ASSERT_TRUE(guest.results.at(28)) << testing::PrintToString(guest.systemMessages);
 	// Exercise manual end turn and the in-place landing packet over TCP.
 	// Establish the AIR state synthetically; landing is server-driven.
 	TryMoveHero stageAir;
@@ -3948,6 +3975,39 @@ TEST_F(HeroMovementTest, ExpiredTimerWaitsUntilAutomaticLandingIsAllowed)
 	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 	EXPECT_TRUE(gameState()->actingPlayers.contains(player));
+}
+
+TEST_F(HeroMovementTest, ExpiredTimerLandsHeroWhoEnteredWaterDuringTheTurn)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 land(0, 5, 0), water(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), opponent).terrain(water, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	gameState()->players.at(player).human = true;
+	gameState()->players.at(player).status = EPlayerStatus::INGAME;
+	gameState()->actingPlayers.insert(player);
+	gameState()->getStartInfo()->turnTimerInfo.turnTimer = 1;
+	gameState()->getStartInfo()->turnTimerInfo.baseTimer = 0;
+	handler.turnTimerHandler->onGameplayStart(player);
+	handler.turnTimerHandler->onPlayerGetTurn(player);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	ASSERT_TRUE(handler.hasHeroInTransientMovement(player));
+	handler.turnTimerHandler->update(1);
+	handler.turnTimerHandler->update(1);
+	EXPECT_EQ(hero->visitablePos(), land);
+	EXPECT_EQ(hero->movementPointsRemaining(), 100);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 
 TEST_F(HeroMovementTest, AutomaticLandingDoesNotTriggerAnEvent)

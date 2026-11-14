@@ -1365,7 +1365,12 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		if(h->getBoat() && !h->getBoat()->onboardAssaultAllowed)
 			lookForGuards = IGNORE_GUARDS;
 
-		turnTimerHandler->setEndTurnAllowed(h->getOwner(), !movingOntoWater && !movingOntoObstacle);
+		// On toroidal maps the timer must be able to reach its transient-layer
+		// recovery path. That path still refuses to end the turn until every
+		// hero has landed; the legacy gate would prevent recovery from running.
+		const bool toroidalTransient = gameState().getMap().toroidal && transit && !h->inBoat()
+			&& (layer == EPathfindingLayer::AIR || layer == EPathfindingLayer::WATER);
+		turnTimerHandler->setEndTurnAllowed(h->getOwner(), toroidalTransient || (!movingOntoWater && !movingOntoObstacle));
 		doMove(TryMoveHero::SUCCESS, lookForGuards, visitDest, LEAVING_TILE);
 		statistics->getPlayerAccumulator(asker).movementPointsUsed += tmh.movePoints;
 		return true;
