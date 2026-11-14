@@ -47,6 +47,16 @@ cover the indexed matches, not all callers or all possible coordinate logic.
 The draw-order candidates were also inspected; wrapped-layer tests cover
 selected cases, while general overlap behavior remains open.
 
+The indexed `CGameHandler` candidates were checked against the current
+implementation. Movement rejects an out-of-storage destination and tests
+adjacency with wrapped displacement; guard positions come from the map's
+guard cache and are checked for its invalid sentinel. Shipyard creation uses
+the topology-aware `bestLocation`; object creation requires a valid visitable
+cell and adds the object's local anchor offset, which may extend outside the
+rectangle. Other indexed matches concern filenames or counters. This is a
+source classification of those candidates, not an audit of every caller,
+packet or object-creation mode.
+
 The indexed H3M and VMAP format matches were reviewed separately from world
 movement. An H3M is loaded as a bounded physical grid before an author opts
 into toroidal conversion; its location checks therefore describe legacy

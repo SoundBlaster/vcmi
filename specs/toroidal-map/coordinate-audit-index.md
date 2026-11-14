@@ -347,7 +347,7 @@ regenerating the index resets manually recorded statuses.
 | `mapeditor/validator.h` | 85 | unreviewed |
 | `mapeditor/windownewmap.cpp` | 42, 84, 85, 125, 224, 225, 234, 237, 238, 291, 350 | unreviewed |
 | `mapeditor/windownewmap.h` | 29, 30, 69 | unreviewed |
-| `server/CGameHandler.cpp` | 784, 798, 907, 942, 952, 1828, 2508, 2588, 3860, 4621, 4644 | unreviewed |
+| `server/CGameHandler.cpp` | 784, 798, 907, 942, 952, 1828, 2508, 2588, 3860, 4621, 4644 | reviewed indexed candidates: canonical movement and guard positions, wrapped adjacency, canonical shipyard output and object-creation input; remaining matches are local offsets or non-map arithmetic |
 | `server/CreatureValueEstimator.cpp` | 67, 68, 95, 105, 256 | unreviewed |
 | `server/NetPacksServer.cpp` | 328 | unreviewed |
 | `server/battles/BattleFlowProcessor.cpp` | 701, 861 | unreviewed |
