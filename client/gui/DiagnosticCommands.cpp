@@ -7,6 +7,7 @@
 
 #if defined(__unix__) || defined(__APPLE__)
 #include "DiagnosticCommandChannel.h"
+#include "DiagnosticTextCommand.h"
 #include "../GameEngine.h"
 #include "EventDispatcher.h"
 #include "Shortcut.h"
@@ -17,6 +18,11 @@ namespace
 {
 bool dispatchDiagnosticCommand(const std::string & command)
 {
+	if(const auto text = diagnosticTextCommand(command))
+	{
+		ENGINE->events().dispatchTextInput(*text);
+		return true;
+	}
 	std::istringstream stream(command);
 	std::string kind, value, extra;
 	stream >> kind;
@@ -40,7 +46,7 @@ bool dispatchDiagnosticCommand(const std::string & command)
 	if(kind != "shortcut" || !(stream >> value) || (stream >> extra))
 		return false;
 	static const std::map<std::string, EShortcut> shortcuts = {
-		{"cast", EShortcut::ADVENTURE_CAST_SPELL}, {"return", EShortcut::GLOBAL_RETURN},
+		{"cast", EShortcut::ADVENTURE_CAST_SPELL}, {"return", EShortcut::GLOBAL_RETURN}, {"backspace", EShortcut::GLOBAL_BACKSPACE},
 		{"accept", EShortcut::GLOBAL_ACCEPT}, {"north", EShortcut::ADVENTURE_MOVE_HERO_NN},
 		{"south", EShortcut::ADVENTURE_MOVE_HERO_SS}, {"east", EShortcut::ADVENTURE_MOVE_HERO_EE},
 		{"west", EShortcut::ADVENTURE_MOVE_HERO_WW}, {"northeast", EShortcut::ADVENTURE_MOVE_HERO_NE},

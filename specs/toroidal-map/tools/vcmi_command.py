@@ -14,10 +14,19 @@ def main():
         pointer.add_argument("x", type=int)
         pointer.add_argument("y", type=int)
     shortcut = sub.add_parser("shortcut", help="Dispatch one allowlisted VCMI shortcut")
-    shortcut.add_argument("name", choices=("cast", "return", "accept", "north", "south", "east", "west",
+    shortcut.add_argument("name", choices=("cast", "return", "accept", "backspace", "north", "south", "east", "west",
                                            "northeast", "northwest", "southeast", "southwest"))
+    typed = sub.add_parser("text", help="Append printable ASCII text to the focused game input")
+    typed.add_argument("value")
     args = parser.parse_args()
-    command = f"{args.kind} {args.x} {args.y}\n" if args.kind in ("click", "hover") else f"shortcut {args.name}\n"
+    if args.kind == "text":
+        if not 1 <= len(args.value) <= 250 or any(not 32 <= ord(c) <= 126 for c in args.value):
+            parser.error("text must contain 1 to 250 printable ASCII characters")
+        command = f"text {args.value}\n"
+    elif args.kind in ("click", "hover"):
+        command = f"{args.kind} {args.x} {args.y}\n"
+    else:
+        command = f"shortcut {args.name}\n"
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
             connection.settimeout(5)

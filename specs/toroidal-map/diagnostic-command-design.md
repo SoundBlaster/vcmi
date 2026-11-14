@@ -14,7 +14,7 @@ Clients with access as the same OS user are trusted, including processes that
 can manipulate that user's files. This is not isolation from other processes
 running as that user.
 
-Commands deliver a logical GUI pointer movement, click or an allowlisted game shortcut to the
+Commands deliver a logical GUI pointer movement, click, printable ASCII text, or an allowlisted game shortcut to the
 existing GUI event dispatcher on the GUI thread. They must respect the current
 window, normal client behavior, and server validation. Screen coordinates are
 logical VCMI GUI coordinates, not screenshot pixels. The response acknowledges
@@ -42,6 +42,8 @@ vcmi_command.py --socket PATH click X Y
 vcmi_command.py --socket PATH hover X Y
 vcmi_command.py --socket PATH shortcut cast
 vcmi_command.py --socket PATH shortcut southeast
+vcmi_command.py --socket PATH text '127.0.0.1'
+vcmi_command.py --socket PATH shortcut backspace
 ```
 
 `accepted` means only that an event was delivered to the dispatcher. The
@@ -51,3 +53,12 @@ bytes per connection, and drops an incomplete request after two seconds. It
 does not automatically remove pre-existing paths. A private directory also
 prevents other users on the machine from connecting before socket permissions
 are restricted.
+
+The `text` command sends 1–250 printable ASCII characters as one normal GUI
+text-input event. It appends to whichever input currently has focus; it does
+not select, clear or submit the field, and it cannot attest that any widget
+accepted the event. It rejects control characters, non-ASCII bytes and empty
+text. Use the `backspace` shortcut to delete text. As with clicks and
+shortcuts, inspect the current screen before sending it: a focused chat or
+console also receives ordinary text events. This is an experimental local
+diagnostic facility, not an agent grant or authorization boundary.

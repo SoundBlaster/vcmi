@@ -61,3 +61,19 @@ transport tests are independent of the GUI dispatch and do not verify every
 hover receiver. Hovering an unseen tile retained the preceding object's status
 text on that build; the [separate legacy UI correction](statusbar-fog-hover-2026-11-14.md)
 addresses this.
+
+## Text input
+
+The macOS arm64 client was rebuilt with printable ASCII `text` and
+`backspace` commands. Three standalone channel tests passed, including
+validation of empty, oversized, control-character and non-ASCII payloads.
+An independent local socket stub observed the Python CLI send exactly one
+framed `text 127.0.0.1` command and return the acknowledgement; the CLI
+rejected a newline before connecting. These checks do not exercise a real
+text widget.
+
+A development-signed test client was then launched, but remained in the OS
+`open` call while initializing its log on TB5 before it created a diagnostic
+socket. The stack does not establish why the call is waiting. GUI text
+delivery and the new backspace command remain unverified until that client
+reaches a suitable input field.

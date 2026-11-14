@@ -251,6 +251,7 @@ set(vcmiclientcommon_HEADERS
 
 	gui/CIntObject.h
 	gui/DiagnosticCommandChannel.h
+	gui/DiagnosticTextCommand.h
 	gui/DiagnosticCommands.h
 	gui/ControllerPromptFamily.h
 	gui/CursorHandler.h

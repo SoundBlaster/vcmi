@@ -6,6 +6,20 @@
 
 #if defined(__unix__) || defined(__APPLE__)
 #include "../../client/gui/DiagnosticCommandChannel.h"
+#include "../../client/gui/DiagnosticTextCommand.h"
+
+TEST(DiagnosticCommandChannelTest, ParsesBoundedPrintableText)
+{
+	EXPECT_EQ(diagnosticTextCommand("text 127.0.0.1"), "127.0.0.1");
+	EXPECT_EQ(diagnosticTextCommand("text  two words "), " two words ");
+	EXPECT_TRUE(diagnosticTextCommand("text " + std::string(250, 'a')));
+	EXPECT_FALSE(diagnosticTextCommand("text " + std::string(251, 'a')));
+	EXPECT_FALSE(diagnosticTextCommand("text "));
+	EXPECT_FALSE(diagnosticTextCommand("text a\nb"));
+	EXPECT_FALSE(diagnosticTextCommand("text a\tb"));
+	EXPECT_FALSE(diagnosticTextCommand(std::string("text \xC3\xA9")));
+	EXPECT_FALSE(diagnosticTextCommand("textual hello"));
+}
 
 TEST(DiagnosticCommandChannelTest, HandlesBoundedRequestsAndPreservesExistingFiles)
 {
