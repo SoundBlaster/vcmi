@@ -35,12 +35,22 @@ tile; the current distinction preserves that route. A guard revealed later
 can still invalidate a route, so this does not eliminate the need for
 interruption handling and recovery.
 
-The TCP lobby movement test passed, but does not exercise this exact unknown
-frontier rejection on two replicas. The current client and server do not yet
-share a demonstrated guarantee that every displayed route will survive the
-conservative server check. GUI feedback, cursor scouting, other partially
-revealed layouts, path invalidation during movement, old saves and general
-recovery remain unverified.
+The TCP lobby test now also checks unknown-frontier rejection on two replicas.
+The test directly establishes an identical hidden adjacent tile on the server
+and replicas: it is a synthetic state, since normal fog packets reveal cells
+observed by a hero. The movement request and failed acknowledgement travel
+over TCP. Both replicas receive the failed move and retain the same position,
+movement points and fog as the server. The test restores visibility through a
+normal network packet and continues the game. It passed three consecutive
+runs. As a negative control, temporarily restoring the former NONE-only check
+made this particular request succeed and the test fail; the current guard was
+then restored and rebuilt.
+
+The current client and server do not yet share a demonstrated guarantee that
+every displayed route will survive the conservative server check. GUI
+feedback, cursor scouting, naturally reached unknown-frontier rejection,
+other partially revealed layouts, path invalidation during movement, old saves
+and general recovery remain unverified.
 
 On the macOS arm64 TB5 build, client, server and test executable built. The
 full suite after the route-knowledge change ran 1,506 tests: 1,503 passed and

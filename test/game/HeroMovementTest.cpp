@@ -636,6 +636,49 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), pointsBeforeRejectedFlight);
 		EXPECT_EQ(redVisibility(*peer->state), redFogBeforeRejection);
 	}
+
+	// Synthesize the same fog frontier on the server and both replicas before
+	// retrying. Normal FoW packets cannot create this artificial state because
+	// owned observers immediately reveal nearby tiles again.
+	const int3 hiddenFrontier(2, 34, 0);
+	const_cast<CGameState &>(server.gh->gameState()).getPlayerTeam(red)->fogOfWarMap[hiddenFrontier] = 0;
+	host.state->getPlayerTeam(red)->fogOfWarMap[hiddenFrontier] = 0;
+	guest.state->getPlayerTeam(red)->fogOfWarMap[hiddenFrontier] = 0;
+	ASSERT_FALSE(server.gh->gameState().isVisibleFor(hiddenFrontier, red));
+	ASSERT_FALSE(host.state->isVisibleFor(hiddenFrontier, red));
+	ASSERT_FALSE(guest.state->isVisibleFor(hiddenFrontier, red));
+	const auto fogBeforeUnknownRejection = redVisibility(server.gh->gameState());
+	ASSERT_EQ(redVisibility(*host.state), fogBeforeUnknownRejection);
+	ASSERT_EQ(redVisibility(*guest.state), fogBeforeUnknownRejection);
+	host.failedMoves.clear();
+	guest.failedMoves.clear();
+	unsafeFlight.requestID = 33;
+	host.codec->sendPack(unsafeFlight);
+	pumpUntil([&] { return host.results.contains(33) && host.failedMoves.contains(hero->id) && guest.failedMoves.contains(hero->id); });
+	ASSERT_TRUE(host.results.contains(33)) << host.failure;
+	EXPECT_FALSE(host.results.at(33));
+	ASSERT_TRUE(host.failedMoves.contains(hero->id));
+	ASSERT_TRUE(guest.failedMoves.contains(hero->id));
+	EXPECT_EQ(server.gh->gameState().getHero(hero->id)->visitablePos(), airborne);
+	EXPECT_EQ(server.gh->gameState().getHero(hero->id)->movementPointsRemaining(), pointsBeforeRejectedFlight);
+	EXPECT_EQ(redVisibility(server.gh->gameState()), fogBeforeUnknownRejection);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), airborne);
+		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), pointsBeforeRejectedFlight);
+		EXPECT_EQ(redVisibility(*peer->state), fogBeforeUnknownRejection);
+	}
+	FoWChange restoreVisibility;
+	restoreVisibility.player = red;
+	restoreVisibility.mode = ETileVisibility::REVEALED;
+	restoreVisibility.tiles.insert(hiddenFrontier);
+	server.gh->sendAndApply(restoreVisibility);
+	pumpUntil([&] {
+		return host.state->isVisibleFor(hiddenFrontier, red)
+			&& guest.state->isVisibleFor(hiddenFrontier, red);
+	});
+	ASSERT_TRUE(host.state->isVisibleFor(hiddenFrontier, red));
+	ASSERT_TRUE(guest.state->isVisibleFor(hiddenFrontier, red));
 	EndTurn prematureEnd;
 	prematureEnd.player = red;
 	prematureEnd.requestID = 21;
