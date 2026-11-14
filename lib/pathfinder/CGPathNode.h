@@ -14,6 +14,8 @@
 #include "../int3.h"
 
 #include <boost/heap/fibonacci_heap.hpp>
+#include <map>
+#include <mutex>
 
 class CGHeroInstance;
 class CGObjectInstance;
@@ -204,8 +206,12 @@ private:
 
 	uint32_t currentGeneration = 1;
 	CGPathNode unreachableNode;
+	const CGameState * routeSafetyState = nullptr;
+	mutable std::mutex routeSafetyMutex;
+	mutable std::map<const CGPathNode *, bool> routeSafetyCache;
 
 	void beginSearch();
+	bool isKnownSafeRoute(const CGPathNode * destination) const;
 
 	inline
 	CGPathNode * getNodeForWrite(const int3 & coord, const ELayer layer)
@@ -229,6 +235,7 @@ public:
 
 	CPathsInfo(const int3 & Sizes, const CGHeroInstance * hero_);
 	~CPathsInfo();
+	void configureRouteSafety(const CGameState * state);
 	void prepareForReuse(const CGHeroInstance * hero_);
 	const CGPathNode * getPathInfo(const int3 & tile, const ELayer layer = ELayer::AUTO) const;
 	bool getPath(CGPath & out, const int3 & dst, const ELayer layer = ELayer::AUTO) const;

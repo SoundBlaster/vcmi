@@ -18,6 +18,7 @@
 #include "../GameLibrary.h"
 #include "../callback/IGameInfoCallback.h"
 #include "../mapObjects/CGHeroInstance.h"
+#include "../mapping/CMapHeader.h"
 #include "../mapping/TerrainTile.h"
 
 struct PathfinderMapView::Impl
@@ -93,12 +94,15 @@ SingleHeroPathfinderConfig::SingleHeroPathfinderConfig(CPathsInfo & out, const I
 	: PathfinderConfig(std::make_shared<NodeStorage>(out, hero), gs, buildRuleSet())
 	, hero(hero)
 {
+	const auto * header = gs.tryGetMapHeader();
+	out.configureRouteSafety(header && header->toroidal && !hero->inBoat() ? &gs.gameState() : nullptr);
 }
 
 SingleHeroPathfinderConfig::SingleHeroPathfinderConfig(CPathsInfo & out, const IGameInfoCallback & gs, const CGHeroInstance * hero, const PathfinderStart & start)
 	: PathfinderConfig(std::make_shared<NodeStorage>(out, hero, start), gs, buildRuleSet())
 	, hero(hero)
 {
+	out.configureRouteSafety(nullptr);
 	if(hero->inBoat() || !gs.isInTheMap(start.position) || start.position.z != hero->visitablePos().z
 		|| (start.layer != EPathfindingLayer::AIR && start.layer != EPathfindingLayer::WATER)
 		|| start.movementPoints < 0)

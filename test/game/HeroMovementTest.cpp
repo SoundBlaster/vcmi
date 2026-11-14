@@ -650,6 +650,18 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	const auto fogBeforeUnknownRejection = redVisibility(server.gh->gameState());
 	ASSERT_EQ(redVisibility(*host.state), fogBeforeUnknownRejection);
 	ASSERT_EQ(redVisibility(*guest.state), fogBeforeUnknownRejection);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		const auto * replicaHero = peer->state->getHero(hero->id);
+		CPathsInfo replicaPaths(peer->state->getMapSize(), replicaHero);
+		auto replicaConfig = std::make_shared<SingleHeroPathfinderConfig>(replicaPaths, *peer->state, replicaHero);
+		CPathfinder replicaSearch(*peer->state, replicaConfig);
+		replicaSearch.calculatePaths();
+		ASSERT_TRUE(replicaPaths.getNode(int3(1, 34, 0), EPathfindingLayer::AIR)->reachable());
+		CGPath unsafeRoute;
+		EXPECT_FALSE(replicaPaths.getPath(unsafeRoute, int3(1, 34, 0), EPathfindingLayer::AIR));
+		EXPECT_FALSE(replicaPaths.getPathInfo(int3(1, 34, 0), EPathfindingLayer::AIR)->reachable());
+	}
 	host.failedMoves.clear();
 	guest.failedMoves.clear();
 	unsafeFlight.requestID = 33;
@@ -3874,6 +3886,17 @@ TEST_F(HeroMovementTest, UnknownShoreDoesNotChangeTransientMoveAcceptance)
 	CGameHandler handler(server, gameState());
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(first), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
 	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	const auto canPlanSecondStep = [&]()
+	{
+		CPathsInfo paths(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+		CPathfinder finder(*gameState(), config);
+		finder.calculatePaths();
+		CGPath route;
+		return paths.getPath(route, second, EPathfindingLayer::WATER);
+	};
+	const bool planWithHiddenWater = canPlanSecondStep();
+	EXPECT_FALSE(planWithHiddenWater);
 	ASSERT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(second), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
 	EXPECT_EQ(hero->movementPointsRemaining(), 200);
 	map()->moveObject(hero->id, hero->convertFromVisitablePos(first));
@@ -3881,6 +3904,7 @@ TEST_F(HeroMovementTest, UnknownShoreDoesNotChangeTransientMoveAcceptance)
 	hero->setMovementPoints(200);
 	map()->getTile(hidden).terrainType = TerrainId::GRASS;
 	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	EXPECT_EQ(canPlanSecondStep(), planWithHiddenWater);
 	ASSERT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(second), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
 	EXPECT_EQ(hero->movementPointsRemaining(), 200);
 }
@@ -6304,10 +6328,7 @@ TEST_F(HeroMovementTest, EmergencyRelocationAvoidsOccupiedLand)
 	EXPECT_EQ(hero->visitablePos(), safeLand);
 }
 
-// Reproducer: pathfinding currently offers this route, but the authoritative
-// server rejects its final step to preserve a known landing. Enable when both
-// sides use compatible route validation.
-TEST_F(HeroMovementTest, DISABLED_TransientClientServerRouteAgreement)
+TEST_F(HeroMovementTest, TransientClientServerRouteAgreement)
 {
 	const PlayerColor player(0);
 	const int3 island(18, 18, 0), destination(25, 18, 0);
@@ -6329,15 +6350,95 @@ TEST_F(HeroMovementTest, DISABLED_TransientClientServerRouteAgreement)
 	CPathfinder finder(*gameState(), config);
 	finder.calculatePaths();
 	CGPath route;
-	ASSERT_TRUE(paths.getPath(route, destination, EPathfindingLayer::WATER));
 	ASSERT_EQ(paths.getNode(destination, EPathfindingLayer::WATER)->turns, 0);
-	ASSERT_EQ(route.nodes.size(), 8u);
-	for(int x = 18; x <= 25; ++x)
-		ASSERT_EQ(route.nodes[25 - x].coord, int3(x, 18, 0));
+	std::array<bool, 8> concurrentResults{};
+	std::vector<std::thread> readers;
+	for(size_t i = 0; i < concurrentResults.size(); ++i)
+		readers.emplace_back([&, i]()
+		{
+			CGPath concurrentRoute;
+			concurrentResults[i] = paths.getPath(concurrentRoute, destination, EPathfindingLayer::WATER);
+		});
+	for(auto & reader : readers)
+		reader.join();
+	EXPECT_TRUE(std::none_of(concurrentResults.begin(), concurrentResults.end(), [](bool result) { return result; }));
+	EXPECT_FALSE(paths.getPath(route, destination, EPathfindingLayer::WATER));
+	EXPECT_FALSE(paths.getPathInfo(destination, EPathfindingLayer::WATER)->reachable());
+	ASSERT_TRUE(paths.getPath(route, int3(24, 18, 0), EPathfindingLayer::WATER));
+	ASSERT_EQ(route.nodes.size(), 7u);
+	// Reusing a path cache after movement points change must discard the
+	// previous safety decision as well as the previous path graph.
+	hero->setMovementPoints(1500);
+	auto updatedConfig = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder updatedFinder(*gameState(), updatedConfig);
+	updatedFinder.calculatePaths();
+	EXPECT_TRUE(paths.getPath(route, destination, EPathfindingLayer::WATER));
+	hero->setMovementPoints(1200);
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
-	for(int x = 19; x <= 25; ++x)
+	for(int x = 19; x <= 24; ++x)
 		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(x, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER)) << x;
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+}
+
+TEST_F(HeroMovementTest, FlightClientServerRouteAgreementAcrossSeam)
+{
+	const PlayerColor player(0);
+	const int3 island(0, 18, 0), destination(29, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 18, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != island)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(1200);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder finder(*gameState(), config);
+	finder.calculatePaths();
+	CGPath route;
+	ASSERT_TRUE(paths.getNode(destination, EPathfindingLayer::AIR)->reachable());
+	EXPECT_FALSE(paths.getPath(route, destination, EPathfindingLayer::AIR));
+	EXPECT_FALSE(paths.getPathInfo(destination, EPathfindingLayer::AIR)->reachable());
+	ASSERT_TRUE(paths.getPath(route, int3(30, 18, 0), EPathfindingLayer::AIR));
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	for(int x = 35; x >= 30; --x)
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(x, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR)) << x;
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+}
+
+TEST_F(HeroMovementTest, TransientRouteSafetyWorksOnLargeMap)
+{
+	const PlayerColor player(0);
+	const int3 island(126, 126, 0), destination(133, 126, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(252, false).playerActive(player).hero(int3(127, 126, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 252; ++x)
+		for(int y = 0; y < 252; ++y)
+			if(int3(x, y, 0) != island)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(1200);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder finder(*gameState(), config);
+	finder.calculatePaths();
+	CGPath route;
+	EXPECT_FALSE(paths.getPath(route, destination, EPathfindingLayer::WATER));
+	EXPECT_FALSE(paths.getPathInfo(destination, EPathfindingLayer::WATER)->reachable());
+	EXPECT_TRUE(paths.getPath(route, int3(132, 126, 0), EPathfindingLayer::WATER));
 }
 
 void HeroMovementTest::checkSingleIslandTransitStopsBeforeStranding(SpellID spell, BonusType bonus, EPathfindingLayer layer)
@@ -6436,12 +6537,15 @@ TEST_F(HeroMovementTest, VisibleShoreRemainsReachableNearFog)
 	ASSERT_EQ(paths.getNode(shore, EPathfindingLayer::LAND)->turns, 0);
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
-	for(int x = 2; x <= 20; ++x)
+	ASSERT_GT(route.nodes.size(), 2u);
+	for(size_t index = route.nodes.size() - 1; index > 0; --index)
 	{
-		SCOPED_TRACE(x);
-		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(x, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+		const auto & step = route.nodes[index - 1];
+		SCOPED_TRACE(step.coord.toString());
+		ASSERT_EQ(step.turns, 0);
+		const bool transit = step.layer == EPathfindingLayer::WATER || step.layer == EPathfindingLayer::AIR;
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(step.coord), EMovementMode::STANDARD, transit, player, step.layer));
 	}
-	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->visitablePos(), shore);
 }
 
@@ -6483,6 +6587,17 @@ TEST_F(HeroMovementTest, HiddenGuardDoesNotChangeTransitSafetyDecision)
 	map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
 	hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
 	hero->setMovementPoints(1000);
+	const auto canPlanNext = [&]()
+	{
+		CPathsInfo paths(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+		CPathfinder finder(*gameState(), config);
+		finder.calculatePaths();
+		CGPath route;
+		return paths.getPath(route, next, EPathfindingLayer::WATER);
+	};
+	const bool pathWithGuard = canPlanNext();
+	EXPECT_TRUE(pathWithGuard);
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
 	const bool withGuard = handler.moveHero(hero->id, hero->convertFromVisitablePos(next), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER);
@@ -6491,6 +6606,7 @@ TEST_F(HeroMovementTest, HiddenGuardDoesNotChangeTransitSafetyDecision)
 	hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
 	hero->setMovementPoints(1000);
 	setVisibleArea();
+	EXPECT_EQ(canPlanNext(), pathWithGuard);
 	const bool withoutGuard = handler.moveHero(hero->id, hero->convertFromVisitablePos(next), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER);
 	EXPECT_EQ(withGuard, withoutGuard);
 	EXPECT_TRUE(withoutGuard);
