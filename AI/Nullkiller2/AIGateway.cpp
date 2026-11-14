@@ -1528,6 +1528,18 @@ void AIGateway::endTurn()
 	do
 	{
 		cc->endTurn();
+		if(status.haveTurn())
+		{
+			// A rejected end-turn can remain rejected until the world changes.
+			// Avoid flooding the server while retaining prompt interruption and
+			// allowing state updates to acquire the game-state lock.
+			auto unlock = vstd::makeUnlockSharedGuard(CGameState::mutex);
+			for(int i = 0; i < 10 && status.haveTurn(); ++i)
+			{
+				status.waitForTurnEnd(std::chrono::milliseconds(100));
+				nullkiller->makingTurnInterruption.interruptionPoint();
+			}
+		}
 	}
 	while(status.haveTurn()); //for some reasons, our request may fail -> stop requesting end of turn only after we've received a confirmation that it's over
 
@@ -1715,6 +1727,12 @@ bool AIStatus::haveTurn()
 {
 	std::unique_lock<std::mutex> lock(mx);
 	return havingTurn;
+}
+
+bool AIStatus::waitForTurnEnd(std::chrono::milliseconds timeout)
+{
+	std::unique_lock<std::mutex> lock(mx);
+	return cv.wait_for(lock, timeout, [this] { return !havingTurn; });
 }
 
 void AIStatus::attemptedAnsweringQuestion(QuestionID questionID, int answerRequestID)

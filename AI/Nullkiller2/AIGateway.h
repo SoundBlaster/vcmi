@@ -64,6 +64,7 @@ public:
 	void madeTurn();
 	void waitTillFree();
 	bool haveTurn();
+	bool waitForTurnEnd(std::chrono::milliseconds timeout);
 	void attemptedAnsweringQuestion(QuestionID questionID, int answerRequestID);
 	void receivedAnswerConfirmation(int answerRequestID, int result);
 	void heroVisit(const CGObjectInstance * obj, bool started);

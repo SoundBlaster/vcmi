@@ -15,10 +15,16 @@
 #include "nullkiller2/NullkillerTest.h"
 
 #include "lib/CPlayerState.h"
+#include "lib/callback/IClient.h"
 #include "lib/gameState/CGameState.h"
 #include "lib/gameState/QuestInfo.h"
 #include "lib/mapObjects/CGHeroInstance.h"
 #include "lib/mapObjects/Quest.h"
+#include "lib/networkPacks/PacksForClient.h"
+#include "lib/networkPacks/PacksForServer.h"
+#include "lib/serializer/CTypeList.h"
+
+#include <future>
 
 namespace
 {
@@ -57,6 +63,89 @@ TinyH3M::TinyH3MBuilder makeQuestGuardMap()
 }
 
 class Nullkiller2_AIUtility : public NullkillerTest {};
+}
+
+TEST(Nullkiller2_AIStatus, RetryWaitDoesNotReportARejectedTurnAsFinished)
+{
+	NK2AI::AIStatus status(nullptr);
+	status.startedTurn();
+	EXPECT_FALSE(status.waitForTurnEnd(std::chrono::milliseconds(20)));
+	EXPECT_TRUE(status.haveTurn());
+}
+
+TEST(Nullkiller2_AIStatus, RetryWaitWakesWhenTurnEnds)
+{
+	NK2AI::AIStatus status(nullptr);
+	status.startedTurn();
+	std::promise<void> started;
+	auto startedFuture = started.get_future();
+	auto waiting = std::async(std::launch::async, [&] {
+		started.set_value();
+		return status.waitForTurnEnd(std::chrono::seconds(2));
+	});
+	startedFuture.wait();
+	EXPECT_EQ(waiting.wait_for(std::chrono::milliseconds(20)), std::future_status::timeout);
+	status.madeTurn();
+	EXPECT_EQ(waiting.wait_for(std::chrono::seconds(1)), std::future_status::ready);
+	EXPECT_TRUE(waiting.get());
+}
+
+TEST_F(Nullkiller2_AIUtility, RejectedEndTurnRetriesWithoutHoldingGameStateLock)
+{
+	ASSERT_NO_FATAL_FAILURE(startWithMap(makeQuestlessSeerMap()));
+	gameState()->players.at(PLAYER).status = EPlayerStatus::INGAME;
+	class RetryClient : public IClient
+	{
+	public:
+		NK2AI::AIGateway * gateway = nullptr;
+		std::promise<void> firstRequest;
+		std::vector<std::chrono::steady_clock::time_point> attempts;
+		std::optional<BattleAction> makeSurrenderRetreatDecision(PlayerColor, const BattleID &, const BattleStateInfoForRetreat &) override { return std::nullopt; }
+		int sendRequest(const CPackForServer & request, PlayerColor, bool) override
+		{
+			if(dynamic_cast<const EndTurn *>(&request))
+			{
+				attempts.push_back(std::chrono::steady_clock::now());
+				PackageApplied reply;
+				reply.packType = CTypeList::getInstance().getTypeID<EndTurn>(nullptr);
+				reply.result = attempts.size() > 1;
+				gateway->requestRealized(&reply);
+				if(attempts.size() == 1)
+					firstRequest.set_value();
+			}
+			return static_cast<int>(attempts.size());
+		}
+	} client;
+	auto first = client.firstRequest.get_future();
+	auto gateway = makeGateway(PLAYER, &client);
+	client.gateway = gateway.get();
+	gateway->status.startedTurn();
+	auto turn = std::async(std::launch::async, [&] {
+		withGameStateReadLock([&] { gateway->endTurn(); });
+	});
+	const auto firstResult = first.wait_for(std::chrono::seconds(2));
+	if(firstResult != std::future_status::ready)
+		gateway->status.madeTurn();
+	EXPECT_EQ(firstResult, std::future_status::ready);
+	if(firstResult != std::future_status::ready)
+	{
+		turn.get();
+		return;
+	}
+	auto writer = std::async(std::launch::async, [] {
+		std::unique_lock lock(CGameState::mutex);
+		return true;
+	});
+	EXPECT_EQ(writer.wait_for(std::chrono::milliseconds(500)), std::future_status::ready);
+	EXPECT_TRUE(writer.get());
+	const auto finished = turn.wait_for(std::chrono::seconds(3));
+	if(finished != std::future_status::ready)
+		gateway->status.madeTurn();
+	EXPECT_EQ(finished, std::future_status::ready);
+	turn.get();
+	ASSERT_EQ(client.attempts.size(), 2);
+	EXPECT_GE(client.attempts[1] - client.attempts[0], std::chrono::milliseconds(800));
+	EXPECT_FALSE(gateway->status.haveTurn());
 }
 
 TEST_F(Nullkiller2_AIUtility, neighbourEnumerationWrapsAtCorners)
