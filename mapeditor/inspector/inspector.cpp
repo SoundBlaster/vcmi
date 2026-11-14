@@ -44,6 +44,8 @@
 #include "townspellswidget.h"
 #include "../translator.h"
 
+#include <QSignalBlocker>
+
 //===============IMPLEMENT OBJECT INITIALIZATION FUNCTIONS================
 Initializer::Initializer(MapController & controller, CGObjectInstance * o, const PlayerColor & pl)
 	: controller(controller)
@@ -552,6 +554,7 @@ void Inspector::updateProperties()
 {
 	if(!obj)
 		return;
+	const QSignalBlocker blocker(table);
 	table->setRowCount(0); //cleanup table
 
 	addProperty(QObject::tr("Identifier"), obj);
