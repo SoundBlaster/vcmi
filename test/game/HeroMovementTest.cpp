@@ -5299,6 +5299,48 @@ TEST_F(HeroMovementTest, ExpiredTimerMovesAviationVehicleOffBlockedTransitTile)
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 
+TEST_F(HeroMovementTest, AviationRecoveryFindsKnownRouteOnLargeToroidalMap)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 start(0, 0, 0), vehiclePosition(251, 251, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(252, false).playerActive(player).playerActive(opponent)
+		.hero(int3(1, 0, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), opponent)
+		.terrain(vehiclePosition, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(vehiclePosition, BoatId::CASTLE, player);
+	auto * vehicle = dynamic_cast<CGBoat *>(map()->getObject(map()->getTile(vehiclePosition).topVisitableObj()));
+	ASSERT_NE(vehicle, nullptr);
+	vehicle->layer = EPathfindingLayer::AVIATE;
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(vehiclePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "BBB", "BBB", "BBB" ] })";
+	JsonNode definition(text.data(), text.size(), "LargeAviationBlocker");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto obstacle = std::make_shared<CGObjectInstance>(gameState().get());
+	obstacle->pos = int3(1, 1, 0);
+	obstacle->instanceName = "large_aviation_blocker";
+	obstacle->appearance = appearance;
+	map()->addNewObject(obstacle);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(start), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_TRUE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	ASSERT_TRUE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AVIATE);
+	EXPECT_EQ(hero->getBoat(), vehicle);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
 TEST_F(HeroMovementTest, SailingBoatCannotSwitchDirectlyToFlyingAcrossSeam)
 {
 	const PlayerColor player(0);

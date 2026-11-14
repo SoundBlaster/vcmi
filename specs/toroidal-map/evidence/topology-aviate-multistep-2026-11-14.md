@@ -28,3 +28,10 @@ The TB5 log is `runtime/full-suite-aviate-route-2026-11-14.log`.
 This is a synthetic map and directly driven timer, not GUI or remote-network
 evidence. The tests do not prove confidentiality for every hidden object,
 multi-hero interaction, timing or recovery after arbitrary world changes.
+
+`HeroMovementTest.AviationRecoveryFindsKnownRouteOnLargeToroidalMap` uses a
+252×252 synthetic map: an aviation vehicle crosses both seams at a corner,
+enters `AIR` above a 3×3 blocker and settles in `AVIATE` after two direct
+automatic recovery calls. This test and the 36×36 timer case passed on macOS
+arm64 from `71e242c` plus the added test. The large case took 38 ms in this
+run; this is a single local observation, not a general performance benchmark.
