@@ -49,7 +49,7 @@ bool canLandTransientHeroInPlace(const CGameState & gameState, const CGHeroInsta
 
 // Movement validation may use a route over explored tiles with player-known
 // guards. Automatic recovery additionally requires known guard neighborhoods.
-KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHeroInstance * hero, const std::optional<PathfinderStart> & start, std::vector<LandingStep> * plainRoute, LandingKnowledge knowledge)
+KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHeroInstance * hero, const std::optional<PathfinderStart> & start, std::vector<LandingStep> * plainRoute, LandingKnowledge knowledge, CPathsInfo * scratch)
 {
 	const auto * team = gameState.getPlayerTeam(hero->getOwner());
 	if(!team)
@@ -58,7 +58,16 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 	const auto layer = start ? start->layer : hero->getConfirmedMovementLayer();
 	if(!plainRoute && canLandTransientHeroAt(gameState, hero, position, layer))
 		return KnownLanding::FOUND;
-	CPathsInfo paths(gameState.getMapSize(), hero);
+	std::unique_ptr<CPathsInfo> ownedPaths;
+	if(!scratch)
+	{
+		ownedPaths = std::make_unique<CPathsInfo>(gameState.getMapSize(), hero);
+		scratch = ownedPaths.get();
+	}
+	else if(scratch->sizes != gameState.getMapSize())
+		throw std::invalid_argument("Transient landing scratch dimensions do not match the map");
+	scratch->prepareForReuse(hero);
+	CPathsInfo & paths = *scratch;
 	auto config = start
 		? std::make_shared<SingleHeroPathfinderConfig>(paths, gameState, hero, *start)
 		: std::make_shared<SingleHeroPathfinderConfig>(paths, gameState, hero);

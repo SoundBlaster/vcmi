@@ -7640,6 +7640,33 @@ TEST_F(HeroMovementTest, TransientClientServerRouteAgreement)
 		}
 	EXPECT_GT(accepted, 0);
 	EXPECT_GT(rejected, 0);
+	CPathsInfo landingScratch(gameState()->getMapSize(), hero);
+	for(const bool revealNeighbor : {true, false})
+	{
+		gameState()->getPlayerTeam(player)->fogOfWarMap[int3(22, 19, 0)] = revealNeighbor;
+		for(int x = 19; x <= 25; ++x)
+			for(const auto knowledge : {LandingKnowledge::PLAYER_ROUTE, LandingKnowledge::SAFE_RECOVERY})
+			{
+				const PathfinderStart candidate{int3(x, 18, 0), EPathfindingLayer::WATER, 1200 - 100 * (x - 18)};
+				const auto expected = findKnownTransientLanding(*gameState(), hero, candidate, nullptr, knowledge);
+				const auto actual = findKnownTransientLanding(*gameState(), hero, candidate, nullptr, knowledge, &landingScratch);
+				EXPECT_EQ(actual, expected) << candidate.position.toString() << " visible=" << revealNeighbor;
+			}
+	}
+	gameState()->getPlayerTeam(player)->fogOfWarMap[int3(22, 19, 0)] = 1;
+	for(int x = 19; x <= 24; ++x)
+	{
+		const PathfinderStart candidate{int3(x, 18, 0), EPathfindingLayer::WATER, 1200 - 100 * (x - 18)};
+		std::vector<LandingStep> expectedRoute, actualRoute;
+		const auto expected = findKnownTransientLanding(*gameState(), hero, candidate, &expectedRoute, LandingKnowledge::SAFE_RECOVERY);
+		const auto actual = findKnownTransientLanding(*gameState(), hero, candidate, &actualRoute, LandingKnowledge::SAFE_RECOVERY, &landingScratch);
+		EXPECT_EQ(actual, expected) << candidate.position.toString();
+		EXPECT_EQ(actualRoute, expectedRoute) << candidate.position.toString();
+	}
+	CPathsInfo wrongSize(int3(3, 3, 1), hero);
+	const PathfinderStart invalidScratchStart{int3(19, 18, 0), EPathfindingLayer::WATER, 1100};
+	EXPECT_THROW(findKnownTransientLanding(*gameState(), hero, invalidScratchStart, nullptr,
+		LandingKnowledge::PLAYER_ROUTE, &wrongSize), std::invalid_argument);
 	// Reusing a path cache after movement points change must discard the
 	// previous safety decision as well as the previous path graph.
 	hero->setMovementPoints(1500);

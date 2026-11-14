@@ -123,6 +123,17 @@ bool CPathsInfo::isKnownSafeRoute(const CGPathNode * destination) const
 	std::reverse(steps.begin(), steps.end());
 	// Search is deferred until a route or cursor is requested. The nested
 	// landing search reads raw nodes and cannot recursively validate routes.
+	std::unique_ptr<CPathsInfo> landingScratch;
+	const auto findLanding = [&](const std::optional<PathfinderStart> & start)
+	{
+		const auto position = start ? start->position : hero->visitablePos();
+		const auto layer = start ? start->layer : hero->getConfirmedMovementLayer();
+		if(canLandTransientHeroAt(*routeSafetyState, hero, position, layer))
+			return KnownLanding::FOUND;
+		if(!landingScratch)
+			landingScratch = std::make_unique<CPathsInfo>(routeSafetyState->getMapSize(), hero);
+		return findKnownTransientLanding(*routeSafetyState, hero, start, nullptr, LandingKnowledge::PLAYER_ROUTE, landingScratch.get());
+	};
 	const auto layer = hero->getConfirmedMovementLayer();
 	bool hadKnownLanding = layer == ELayer::LAND;
 	if(layer == ELayer::AUTO)
@@ -132,7 +143,7 @@ bool CPathsInfo::isKnownSafeRoute(const CGPathNode * destination) const
 		hadKnownLanding = tile->isLand() && !tile->blocked();
 	}
 	else if(layer == ELayer::AIR || layer == ELayer::WATER)
-		hadKnownLanding = findKnownTransientLanding(*routeSafetyState, hero, std::nullopt, nullptr, LandingKnowledge::PLAYER_ROUTE) == KnownLanding::FOUND;
+		hadKnownLanding = findLanding(std::nullopt) == KnownLanding::FOUND;
 	bool safe = true;
 	for(size_t index = 1; index < steps.size(); ++index)
 	{
@@ -163,8 +174,7 @@ bool CPathsInfo::isKnownSafeRoute(const CGPathNode * destination) const
 			safe = false;
 			break;
 		}
-		const bool hasLanding = findKnownTransientLanding(*routeSafetyState, hero,
-			PathfinderStart{step->coord, step->layer, step->moveRemains}, nullptr, LandingKnowledge::PLAYER_ROUTE) == KnownLanding::FOUND;
+		const bool hasLanding = findLanding(PathfinderStart{step->coord, step->layer, step->moveRemains}) == KnownLanding::FOUND;
 		if(hadKnownLanding && !hasLanding)
 		{
 			safe = false;

@@ -59,3 +59,32 @@ four tests remained disabled. The TB5 log is
 reported no errors or warnings. The macOS arm64 client and server targets
 also built; the linker reported existing duplicate-library and missing-search-
 directory warnings. This does not verify a running client or server.
+
+## Reusing a landing-search workspace
+
+Within a single route validation, landing searches now reuse an exclusively
+owned graph allocation. Each search resets its workspace and reconstructs the
+path graph with the current start, movement points and knowledge policy. The
+workspace is not shared between route validations or server requests.
+
+The same local timing probe after this change produced these medians, in
+milliseconds:
+
+| Movement points | One landing search | First route, tiles | First route | Next shared-prefix route |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,200 | 0.70 | 5 | 1.58 | 0.48 |
+| 3,000 | 2.80 | 10 | 16.65 | 1.29 |
+| 6,000 | 10.02 | 20 | 135.89 | 4.64 |
+
+These are separate local runs, not a statistical performance guarantee. The
+first route is still costly in the 6,000-point stress case. The single-search
+measurement does not reuse a workspace. No game frame pacing or server
+concurrency was measured.
+
+The route-agreement test compares fresh and reused workspaces at multiple
+starts, with both knowledge policies and a changing fog tile; recovery routes
+are compared as well. Twenty-nine related tests passed three runs. With all
+three external fixtures configured, the complete suite passed 1,541 tests;
+four remain disabled. The log is
+`runtime/full-suite-landing-scratch-2026-11-14.log` on TB5. Client and server
+targets built on macOS arm64, with the existing linker warnings noted above.
