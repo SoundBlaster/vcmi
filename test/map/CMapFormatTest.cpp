@@ -862,7 +862,7 @@ TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 	auto map = loader.loadMap(&callback);
 	callback.setMap(map.get());
 	map->setToroidalAndRebuild(true);
-	map->name = MetaString::createFromRawString("Toroid Visual Seams");
+	map->name = MetaString::createFromRawString("Toroid Road Axes");
 
 	CRandomGenerator random(12345);
 	auto * editor = map->getEditManager();
@@ -877,6 +877,7 @@ TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 	for(int n : {33, 34, 35, 0, 1, 2, 3})
 	{
 		road.emplace_back(n, 3, 0);
+		road.emplace_back(10, n, 0);
 		river.emplace_back(5, n, 0);
 	}
 	editor->getTerrainSelection().setSelection(road);
@@ -901,7 +902,7 @@ TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 		EXPECT_EQ(reopened->getTile(pos).getRiverID(), RiverId::WATER_RIVER) << pos.toString();
 	for(const int x : {35, 0})
 		EXPECT_EQ(reopened->getTile(int3(x, 12, 0)).getTerrainID(), ETerrainId::DIRT);
-	for(const auto & pos : {int3(35, 3, 0), int3(0, 3, 0), int3(5, 35, 0), int3(5, 0, 0)})
+	for(const auto & pos : {int3(35, 3, 0), int3(0, 3, 0), int3(10, 35, 0), int3(10, 0, 0), int3(5, 35, 0), int3(5, 0, 0)})
 	{
 		const auto & before = map->getTile(pos);
 		const auto & after = reopened->getTile(pos);

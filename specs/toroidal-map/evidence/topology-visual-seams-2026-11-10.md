@@ -55,3 +55,28 @@ the revealed map showed no apparent blank border. These are discrete samples,
 not a recorded continuous frame sequence or a measurement of frame pacing.
 The session was exited without saving; after the client stopped, the temporary
 copies were removed and the diagnostic profile's TB5 links restored.
+
+## Road across both axes
+
+On 2026-11-15 the fixture generator was extended with a dirt road at `x=10`
+across rows `35` and `0`, in addition to the horizontal road across columns
+`35` and `0`. The focused round-trip test passed and produced a separate map,
+`runtime/complete-data/Maps/toroid-road-axes-2026-11-15.vmap`, SHA-256
+`10039a23a4376106db02128141b6ae8c77b8b84065ce6117c278c99284b5e56b`.
+The earlier map and its recorded hash were not replaced.
+
+The macOS arm64 preview built from `496d90b` loaded this map. After revealing
+the map in an unsaved test session, one Computer Use screenshot showed both
+the east-west dirt road and the north-south dirt road as continuous lines at
+their respective seams. The adjacent river was also visible. The client was
+closed and its server stopped. A new test save directory was created by the
+game; the game session itself was not saved manually. The client log and
+player observation trace are under `runtime/gui-road-axes-2026-11-15/` on
+the TB5 build root. The screenshot was observed during the session and is not
+retained in that directory.
+
+This checks one type of road and one static camera position, not all road
+orientations, other road artwork, live editing or continuous scrolling. Between
+`496d90b` and `0b06ec7`, the inspected road renderer, map-view cache and road
+brush source files had no changes; the visual observation is still of the
+`496d90b` binary, not a later rebuilt client.
