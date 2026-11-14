@@ -6023,6 +6023,59 @@ TEST_F(HeroMovementTest, HeroCapturesMineAcrossToroidalSeam)
 	EXPECT_EQ(hero->visitablePos(), minePosition);
 }
 
+TEST_F(HeroMovementTest, GuardedMineAcrossSeamPreservesVisitThroughBattle)
+{
+	const PlayerColor player(0);
+	const int3 origin(10, 0, 0), minePosition(10, 35, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 0, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 100}});
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	auto object = handler.createNewObject(minePosition, Obj::MINE, MapObjectSubID(0));
+	auto * mine = dynamic_cast<CGMine *>(object.get());
+	ASSERT_NE(mine, nullptr);
+	mine->setOwner(PlayerColor::NEUTRAL);
+	ASSERT_TRUE(mine->setCreature(SlotID(0), CreatureID(0), 1));
+	handler.newObject(object, player);
+	ASSERT_EQ(mine->visitablePos(), minePosition);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(minePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), minePosition);
+	EXPECT_EQ(mine->getOwner(), PlayerColor::NEUTRAL);
+	auto dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::BlockingDialog);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(mine->getOwner(), PlayerColor::NEUTRAL);
+	EXPECT_EQ(gameState()->getBattle(player), nullptr);
+	EXPECT_EQ(handler.activities->findVisit(mine->id), nullptr);
+
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->anchorPos(), EMovementMode::STANDARD, false, player, EPathfindingLayer::AUTO));
+	dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::BlockingDialog);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 1), ReplyOutcome::Accepted);
+	const auto * battle = gameState()->getBattle(player);
+	ASSERT_NE(battle, nullptr);
+	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), mine);
+	EXPECT_NE(handler.activities->findVisit(mine->id), nullptr);
+	handler.battles->cheatBattleVictory(player);
+	auto resultDialog = handler.activities->topActivity(player);
+	ASSERT_NE(resultDialog, nullptr);
+	ASSERT_EQ(resultDialog->getType(), ActivityType::BattleDialog);
+	ASSERT_EQ(handler.activities->submitReply(resultDialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(mine->getOwner(), player);
+	EXPECT_EQ(hero->visitablePos(), minePosition);
+	EXPECT_EQ(handler.activities->findVisit(mine->id), nullptr);
+}
+
 TEST_F(HeroMovementTest, HeroCanRevisitMineOnTheSameToroidalTile)
 {
 	const PlayerColor player(0);
