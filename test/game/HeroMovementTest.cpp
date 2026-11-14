@@ -5934,6 +5934,165 @@ TEST_F(HeroMovementTest, crossedSeamAndFogSurviveGameStateReload)
 	EXPECT_FALSE(restored->isVisibleFor(hiddenTile, player));
 }
 
+TEST_F(HeroMovementTest, ServerDiskReloadPreservesBothTeamsFogAfterCornerCrossing)
+{
+	const PlayerColor red(0), blue(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(red).playerActive(blue)
+		.hero(int3(1, 0, 0), HeroTypeID(0), red)
+		.hero(int3(19, 18, 0), HeroTypeID(1), blue);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	ASSERT_NE(gameState()->getPlayerTeam(red), gameState()->getPlayerTeam(blue));
+	setMapVisibility(red, false);
+	setMapVisibility(blue, false);
+	const int3 blueUnderground(8, 9, 1);
+	gameState()->getPlayerTeam(blue)->fogOfWarMap[blueUnderground] = 1;
+	auto * hero = findHeroByOwner(red);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	hero->setMovementPoints(3000);
+	const auto heroID = hero->id;
+	class Capture final : public INetworkConnection
+	{
+	public:
+		void sendPacket(const std::vector<std::byte> & packet) override { bytes = packet; }
+		void setAsyncWritesEnabled(bool) override {}
+		void close() override {}
+		std::vector<std::byte> bytes;
+	};
+	class ReloadableServer final : public GameHandlerTestServer
+	{
+	public:
+		ReloadableServer(std::shared_ptr<CGameState> state, PlayerColor player)
+			: GameHandlerTestServer(state, player), state(std::move(state)), transport(std::make_shared<Capture>()), sender(transport), receiver(transport)
+		{
+			sender.setSerializationVersion(ESerializationVersion::CURRENT);
+			receiver.setSerializationVersion(ESerializationVersion::CURRENT);
+		}
+		void applyPack(CPackForClient & pack) override
+		{
+			if(dynamic_cast<TryMoveHero *>(&pack) && !replicas.empty())
+			{
+				sender.sendPack(pack);
+				for(const auto & replica : replicas)
+				{
+					receiver.setCallback(*replica);
+					auto decoded = receiver.retrievePack(transport->bytes);
+					if(auto * movement = dynamic_cast<TryMoveHero *>(decoded.get()))
+					{
+						replica->apply(*movement);
+						++delivered;
+					}
+					else
+						ADD_FAILURE() << "Expected TryMoveHero after network decoding";
+				}
+			}
+			state->apply(pack);
+		}
+		std::shared_ptr<CGameState> state;
+		std::vector<std::shared_ptr<CGameState>> replicas;
+		int delivered = 0;
+	private:
+		std::shared_ptr<Capture> transport;
+		GameConnection sender;
+		GameConnection receiver;
+	} server(gameState(), red);
+	CGameHandler handler(server, gameState());
+	const int3 corner(35, 35, 0);
+	ASSERT_TRUE(handler.moveHero(heroID, hero->convertFromVisitablePos(corner), EMovementMode::STANDARD, false, red, EPathfindingLayer::LAND));
+	ASSERT_EQ(hero->visitablePos(), corner);
+	ASSERT_TRUE(gameState()->isVisibleFor(corner, red));
+	ASSERT_FALSE(gameState()->isVisibleFor(corner, blue));
+	ASSERT_FALSE(gameState()->isVisibleFor(int3(35, 35, 1), red));
+	ASSERT_TRUE(gameState()->isVisibleFor(blueUnderground, blue));
+	const auto fogSnapshot = [](const CGameState & state, PlayerColor player)
+	{
+		std::vector<bool> result;
+		for(int z = 0; z < state.getMap().levels(); ++z)
+			for(int x = 0; x < state.getMap().width; ++x)
+				for(int y = 0; y < state.getMap().height; ++y)
+					result.push_back(state.isVisibleFor(int3(x, y, z), player));
+		return result;
+	};
+	const auto redFog = fogSnapshot(*gameState(), red);
+	const auto blueFog = fogSnapshot(*gameState(), blue);
+	const auto remaining = hero->movementPointsRemaining();
+
+	const auto directory = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-seam-server-save-%%%%-%%%%");
+	boost::filesystem::create_directories(directory / "Saves");
+	boost::filesystem::create_directories(directory / "config");
+	{
+		std::ofstream config((directory / "config/serverSettings.json").c_str());
+		config << "{}";
+	}
+	auto * local = dynamic_cast<CFilesystemList *>(CResourceHandler::get("local"));
+	ASSERT_NE(local, nullptr);
+	auto loader = std::make_shared<CFilesystemLoader>("", directory, 4);
+	local->addLoader(loader, true);
+	struct TemporaryFilesystem
+	{
+		CFilesystemList * local;
+		ISimpleResourceLoader * loader;
+		boost::filesystem::path directory;
+		~TemporaryFilesystem()
+		{
+			local->removeLoader(loader);
+			boost::filesystem::remove_all(directory);
+		}
+	} temporary{local, loader.get(), directory};
+	const std::string name = "Saves/" + directory.filename().string();
+	const auto savePath = directory / (name + ".vsgm1");
+	ASSERT_TRUE(loader->createResource(name + ".vsgm1"));
+	ASSERT_TRUE(local->createResource(name + ".vsgm1"));
+	const auto selectedPath = CResourceHandler::get()->getResourceName(ResourcePath(name, EResType::SAVEGAME));
+	ASSERT_TRUE(selectedPath.has_value());
+	ASSERT_TRUE(boost::filesystem::equivalent(*selectedPath, savePath));
+	handler.save(name, PlayerColor::NEUTRAL, 0);
+	ASSERT_TRUE(boost::filesystem::exists(savePath));
+	StartInfo loadInfo = *gameState()->getStartInfo();
+	loadInfo.mapname = name;
+	CGameHandler restored(server, gameState());
+	ASSERT_NO_THROW(restored.load(loadInfo));
+	server.state = restored.gs;
+	ASSERT_TRUE(restored.gameState().getMap().toroidal);
+	ASSERT_EQ(restored.gameState().getMap().levels(), 2);
+	auto * loadedHero = restored.gs->getHero(heroID);
+	ASSERT_NE(loadedHero, nullptr);
+	EXPECT_EQ(loadedHero->visitablePos(), corner);
+	EXPECT_EQ(loadedHero->movementPointsRemaining(), remaining);
+	EXPECT_EQ(loadedHero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(fogSnapshot(restored.gameState(), red), redFog);
+	EXPECT_EQ(fogSnapshot(restored.gameState(), blue), blueFog);
+	const auto loadedSnapshot = restored.gs->saveToMemory();
+	for(int i = 0; i < 2; ++i)
+	{
+		auto replica = std::make_shared<CGameState>();
+		replica->preInit(LIBRARY);
+		replica->loadFromMemory(loadedSnapshot);
+		ASSERT_EQ(fogSnapshot(*replica, red), redFog);
+		ASSERT_EQ(fogSnapshot(*replica, blue), blueFog);
+		server.replicas.push_back(std::move(replica));
+	}
+
+	const int3 returnTile(0, 0, 0);
+	ASSERT_TRUE(restored.moveHero(heroID, loadedHero->convertFromVisitablePos(returnTile), EMovementMode::STANDARD, false, red, EPathfindingLayer::LAND));
+	EXPECT_EQ(loadedHero->visitablePos(), returnTile);
+	EXPECT_LT(loadedHero->movementPointsRemaining(), remaining);
+	EXPECT_EQ(fogSnapshot(restored.gameState(), blue), blueFog);
+	EXPECT_FALSE(restored.gameState().isVisibleFor(int3(0, 0, 1), red));
+	ASSERT_EQ(server.delivered, 2);
+	for(const auto & replica : server.replicas)
+	{
+		const auto * replicatedHero = replica->getHero(heroID);
+		ASSERT_NE(replicatedHero, nullptr);
+		EXPECT_EQ(replicatedHero->visitablePos(), returnTile);
+		EXPECT_EQ(replicatedHero->movementPointsRemaining(), loadedHero->movementPointsRemaining());
+		EXPECT_EQ(fogSnapshot(*replica, red), fogSnapshot(restored.gameState(), red));
+		EXPECT_EQ(fogSnapshot(*replica, blue), blueFog);
+	}
+}
+
 TEST_F(HeroMovementTest, TownAppearanceUsesWrappedAnchorTerrain)
 {
 	const PlayerColor player(0);
