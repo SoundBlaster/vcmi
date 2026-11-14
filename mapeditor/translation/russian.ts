@@ -1367,8 +1367,8 @@ Warning: levels cannot be removed once added.</source>
         <translation>Соединить противоположные края карты (экспериментально)</translation>
     </message>
     <message>
-        <source>North joins south and east joins west on each level. Design terrain and roads to match across the edges. Static objects cannot cross an edge. AI and multiplayer support are not yet verified.</source>
-        <translation>На каждом уровне север соединяется с югом, а восток — с западом. Продумайте рельеф и дороги на стыках. Неподвижные объекты не могут пересекать край карты. Поддержка AI и multiplayer пока не проверена.</translation>
+        <source>North joins south and east joins west on each level. Design terrain and roads to match across the edges. Check objects that overlap across a seam. AI and multiplayer support are not yet verified.</source>
+        <translation>На каждом уровне север соединяется с югом, а восток — с западом. Продумайте рельеф и дороги на стыках. Проверьте объекты, перекрывающиеся через край карты. Поддержка AI и multiplayer пока не проверена.</translation>
     </message>
 </context>
 <context>
