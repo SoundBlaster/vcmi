@@ -38,6 +38,14 @@ made, so this does not establish smooth animation. Clicking water without a
 spell did not produce a route in the separate interior scenario; that does
 not establish the result of a direct server request.
 
+In subsequent restarts, each spell also made a round trip across each cardinal
+seam within the same turn. Water Walk and Flight each followed
+`(34,16) → (35,16) → (0,16) → (1,16) → (2,16)` and the reverse route, then
+`(15,34) → (15,35) → (15,0) → (15,1) → (15,2)` and the reverse route on the
+other fixture. Each run started with 1,560 movement points and ended with
+760; Water Walk consumed 8 mana and Flight 15. Trace sequences 179–194,
+197–210, 214–229 and 232–246 contain these four round trips, respectively.
+
 To regenerate the fixtures locally, use
 `python3 specs/toroidal-map/tools/make_water_crossing_fixtures.py SOURCE OUTPUT_DIR`.
 The source is the separately prepared `toroidal-route-safety-flight-waterwalk.vmap`
@@ -58,6 +66,5 @@ server movement request would do. The east shortcut did not demonstrate a
 safe one-step water transit; the ordinary GUI's automatic destination-layer
 selection is a possible reason.
 
-These cases do not establish reverse cardinal crossings for the two spells,
-moving guards, changed fog, general stranded-hero
+These cases do not establish moving guards, changed fog, general stranded-hero
 recovery, remote multiplayer, or animation smoothness.
