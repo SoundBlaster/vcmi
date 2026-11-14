@@ -2571,6 +2571,41 @@ TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)
 	EXPECT_FALSE(guards(int3(0, 0, 0), int3(35, 35, 0)));
 }
 
+TEST_F(HeroMovementTest, GuardListIncludesEachMonsterOnlyOnce)
+{
+	const PlayerColor player(0);
+	const int3 west(0, 5, 0), east(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.monster(west, CreatureID(0), 10).monster(east, CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	revealMap(player);
+	auto callback = makeCallback(player);
+	for(const bool toroidal : {false, true})
+	{
+		map()->setToroidalAndRebuild(toroidal);
+		map()->calculateGuardingGreaturePositions();
+		const auto guards = gameState()->guardingCreatures(east);
+		const auto countAt = [&](const int3 & position)
+		{
+			return std::ranges::count_if(guards, [&](const auto * guard) { return guard->visitablePos() == position; });
+		};
+		EXPECT_EQ(countAt(east), 1);
+		EXPECT_EQ(countAt(west), toroidal ? 1 : 0);
+		EXPECT_EQ(guards.size(), toroidal ? 2u : 1u);
+		EXPECT_EQ(callback->getGuardingCreatures(east).size(), toroidal ? 2u : 1u);
+		if(toroidal)
+		{
+			auto & fog = gameState()->getPlayerTeam(player)->fogOfWarMap;
+			fog[west] = 0;
+			const auto knownGuards = callback->getGuardingCreatures(east);
+			ASSERT_EQ(knownGuards.size(), 1u);
+			EXPECT_EQ(knownGuards.front()->visitablePos(), east);
+			fog[west] = 1;
+		}
+	}
+}
+
 TEST_F(HeroMovementTest, CoastalTilesRecognizeWaterAcrossToroidalCorner)
 {
 	const PlayerColor player(0);

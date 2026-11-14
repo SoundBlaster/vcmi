@@ -1302,6 +1302,11 @@ void CGameState::calculatePaths(const std::shared_ptr<PathfinderConfig> & config
 std::vector<const CGObjectInstance*> CGameState::guardingCreatures (int3 pos) const
 {
 	std::vector<const CGObjectInstance*> guards;
+	const auto addGuard = [&guards](const CGObjectInstance * object)
+	{
+		if(!vstd::contains(guards, object))
+			guards.push_back(object);
+	};
 	const int3 originalPos = pos;
 	if (!map->isInTheMap(pos))
 		return guards;
@@ -1318,7 +1323,7 @@ std::vector<const CGObjectInstance*> CGameState::guardingCreatures (int3 pos) co
 			if(object->isBlockedVisitable())
 			{
 				if (object->ID == Obj::MONSTER) // Monster
-					guards.push_back(object);
+					addGuard(object);
 			}
 		}
 	}
@@ -1339,7 +1344,7 @@ std::vector<const CGObjectInstance*> CGameState::guardingCreatures (int3 pos) co
 
 						if (object->ID == Obj::MONSTER  &&  map->checkForVisitableDir(*neighbor, &map->getTile(originalPos), originalPos)) // Monster being able to attack investigated tile
 						{
-							guards.push_back(object);
+							addGuard(object);
 						}
 					}
 				}
