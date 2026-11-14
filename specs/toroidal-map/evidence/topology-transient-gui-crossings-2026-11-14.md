@@ -74,11 +74,18 @@ trip described above, then crossed southward once more. At `(15,2,0)`, with
 successful. The hero then moved to `(16,2,0)` with 260 points. Loading that
 save through the game interface restored `(15,2,0)`, 360 movement points,
 85 mana, and `toroidal: true` in the observation trace (sequences 247–262).
-The GUI showed the hero on the expected shore after loading. This verifies
-one local graphical save/load of a landed hero after a spell crossing; the
-continued Flight effect, a save while actually in transit, and remote clients
-were not independently verified. The save was created in the local test
-profile and is not included in the repository.
+The GUI showed the hero on the expected shore after loading.
+
+In a separate restart, Flight reduced mana from 100 to 85, and the hero
+crossed southward to `(15,2,0)` with 1,100 movement points. After saving and
+loading that state in the GUI, the player selected the original shore without
+recasting. The client displayed a route, and the hero followed
+`(15,2) → (15,1) → (15,0) → (15,35) → (15,34)` with mana still at 85 and
+700 movement points remaining. Trace sequences 264–279 cover this run.
+The successful crossing demonstrates that the necessary Flight capability
+was still effective in this particular loaded game. A save while actually
+in transit and remote clients were not independently verified. The saves
+were created in the local test profile and are not in the repository.
 
 These cases do not establish moving guards, changed fog, general stranded-hero
 recovery, remote multiplayer, or animation smoothness.
