@@ -16,7 +16,9 @@
 #include "nullkiller2/NullkillerTest.h"
 
 #include "lib/gameState/CGameState.h"
+#include "lib/CPlayerState.h"
 #include "lib/mapObjects/CGHeroInstance.h"
+#include "lib/mapObjects/CGResource.h"
 #include "lib/mapObjects/MiscObjects.h"
 #include "lib/networkPacks/PacksForServer.h"
 
@@ -94,6 +96,48 @@ TEST_F(ExecuteHeroChainMovementTest, blockingVisitOnRouteStopsChainForReplanning
 	EXPECT_EQ(gameState()->getObjInstance(scrollID), nullptr) << "the hero must pick up the scroll";
 	EXPECT_EQ(hero->visitablePos(), HERO_POS) << "picking up a scroll does not move the hero";
 	EXPECT_EQ(client.movementRequests, 1) << "the chain must stop after the pickup instead of following the stale route";
+}
+
+TEST_F(ExecuteHeroChainMovementTest, plannedCornerResourceVisitUsesRealServer)
+{
+	const int3 start(0, 0, 0), destination(35, 35, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(PLAYER).playerActive(ENEMY)
+		.hero(int3(1, 0, 0), HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID(0), 1}})
+		.hero(int3(20, 20, 0), HeroTypeID(1), ENEMY)
+		.resource(destination, GameResID::GOLD, 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	auto * hero = findHeroByOwner(PLAYER);
+	auto * resource = findFirst<CGResource>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(resource, nullptr);
+	ASSERT_EQ(hero->visitablePos(), start);
+	ASSERT_EQ(resource->visitablePos(), destination);
+	const auto resourceID = resource->id;
+	const auto goldBefore = gameState()->players.at(PLAYER).resources[GameResID::GOLD];
+	hero->setMovementPoints(2000);
+
+	MoveCountingClient client(gameState(), PLAYER);
+	auto gateway = makeGateway(PLAYER, &client);
+	const auto paths = withGameStateReadLock([&]
+	{
+		preparePlanning(*gateway);
+		return gateway->nullkiller->pathfinder->getPathInfo(destination);
+	});
+	const auto path = std::ranges::find_if(paths, [&](const auto & candidate)
+	{
+		return candidate.targetHero == hero && !candidate.nodes.empty() && candidate.turn() == 0
+			&& candidate.firstTileToGet() == destination;
+	});
+	ASSERT_NE(path, paths.end());
+	EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(*path, resource).accept(gateway.get()); }));
+	EXPECT_EQ(client.movementRequests, 1);
+	EXPECT_EQ(gameState()->getMap().getObject(resourceID), nullptr);
+	EXPECT_EQ(gameState()->players.at(PLAYER).resources[GameResID::GOLD], goldBefore + 1000);
+	EXPECT_EQ(hero->visitablePos(), start);
 }
 
 TEST_F(ExecuteHeroChainMovementTest, repeatedIdleChainFailsForReplanning)

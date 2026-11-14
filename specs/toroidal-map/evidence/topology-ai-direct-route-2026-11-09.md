@@ -29,11 +29,27 @@ cache on movement, as the real client does; this independent fixture change
 was committed as `134a6c9`. `vcmitest` built (`ai-seam-build.log`), and
 `./vcmitest --gtest_filter=Nullkiller2_AIGateway.*` passed six tests
 (`ai-seam-tests.log`). A full `./vcmitest` run passed 1,333 tests with three
-disabled (`ai-seam-full-tests.log`). Obstacles, boat use, strategic choices,
-other AI profiles, and real client/server execution remain unverified.
+disabled (`ai-seam-full-tests.log`). At that revision, obstacles, boat use,
+strategic choices, other AI profiles, and real client/server execution were
+unverified.
 
 Source baseline `134a6c9` with local test change:
 
 ```text
 e10931c5b02bb82358be2235e3489e24cec3bae3298f747bdb8811fe218ad665  test/nullkiller2/AIGatewayMovementTest.cpp
 ```
+
+## Planned interaction through the server
+
+`ExecuteHeroChainMovementTest.plannedCornerResourceVisitUsesRealServer`
+initializes a toroidal game with a hero at `(0,0)` and a gold pile at
+`(35,35)`. Nullkiller2's own pathfinder supplies a same-turn plan whose first
+target is the wrapped corner. `ExecuteHeroChain` sends one movement request
+through `GameHandlerTestClient`, which deep-copies it and calls the real
+server request handler. The server removes the resource and credits 1,000
+gold while the hero remains on the starting tile, as for a blocking visit.
+
+This test and six related AI movement tests passed three consecutive runs on
+macOS arm64. Client and server share the fixture's game state in one process;
+the test does not exercise a real network connection, the full strategic
+turn loop, fog exploration, or other objects and corners.

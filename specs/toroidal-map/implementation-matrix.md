@@ -93,6 +93,11 @@ bounded and toroidal maps with two levels and two teams. See the
 [full-map fog record](evidence/full-map-fog-range-2026-11-14.md) for the
 scope and the remaining multiplayer and rendering limitations.
 
+Nullkiller2's planned corner resource visit also reached the real server
+request handler in a shared-state test fixture; this does not yet establish a
+full AI turn or a graphical multiplayer session. See the
+[AI route record](evidence/topology-ai-direct-route-2026-11-09.md).
+
 ## Persistence, compatibility and supported profiles
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
