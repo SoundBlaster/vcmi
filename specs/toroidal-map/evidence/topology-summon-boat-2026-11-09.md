@@ -27,5 +27,11 @@ Summon Boat and shipyard cases passed (`shipyard-seam-tests.log`). This is a
 synthetic in-memory topology switch; it does not establish that the fixture
 passes the current authored-map restriction on static objects.
 
-Other levels, boat priority and ties, GUI effects and multiplayer remain
+Two additional server-side cast tests cover level and selection behavior. In
+the first, bounded mode chooses a surface boat while toroidal mode chooses a
+closer boat across the seam on the underground level. In the second, two
+boats have equal wrapped distance and the later candidate wins; after marking
+a farther boat as last used by the caster, the farther boat wins instead.
+All eight `SummonBoatTopologyTest` cases passed three consecutive runs on
+macOS arm64. GUI effects, other level arrangements and multiplayer remain
 unverified here.
