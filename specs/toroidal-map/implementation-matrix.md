@@ -93,6 +93,12 @@ bounded and toroidal maps with two levels and two teams. See the
 [full-map fog record](evidence/full-map-fog-range-2026-11-14.md) for the
 scope and the remaining multiplayer and rendering limitations.
 
+Two graphical clients on one Mac also joined a loopback lobby, started the
+demo map, executed a corner crossing, transferred the turn and moved the
+second hero. The [graphical loopback record](evidence/topology-graphical-loopback-2026-11-14.md)
+documents the limited observations and the autosave; remote play, reload and
+full state agreement remain unverified by this run.
+
 Nullkiller2's planned moves and resource visits across all seams and corners
 on both levels also reached the real server request handler in shared-state
 test fixtures; this does not yet establish a full AI turn or a graphical
