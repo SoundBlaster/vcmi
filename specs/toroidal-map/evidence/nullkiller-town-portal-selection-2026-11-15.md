@@ -34,6 +34,18 @@ The five focused Town Portal and dialog tests passed three repeated runs.
 This is an ordering probe using a test double, not a claim that the real server
 produces that particular sequence.
 
+`Nullkiller2_AIGateway.townPortalDialogSelectsWrappedTownThroughServer` then
+exercises the actual server handler with an expert Earth Magic hero and two
+towns on a revealed toroidal map. A test client serializes requests into an
+in-process `CGameHandler`, forwards the server's selection dialog and
+acknowledgements to Nullkiller, and lets its asynchronous dialog task answer.
+The server moves the hero from `(0,10)` to the selected town near the opposite
+edge, spends mana and movement points, and the gateway ends with no pending
+question or selected object. The new test and five related Town Portal/dialog
+tests passed ten repeated runs. The client and server share an in-process
+game state; request delivery is a test adapter, not TCP, a graphical session,
+or a full AI turn.
+
 The gateway's selected object is shared between the goal and asynchronous
 dialog task. To avoid unsynchronized reads and writes when the goal cleanup
 and dialog overlap, it is now atomic. The dialog takes and clears the value
@@ -54,8 +66,8 @@ version of the regression test passed 1,645 tests with four disabled; its log
 is `runtime/full-suite-town-portal-target-2026-11-15.log` under the TB5 VCMI
 build root. The later test-only extension was checked in the focused run.
 That first run predates the second cleanup change. The focused Town Portal
-and dialog tests for both changes passed three times after it; they do not
-establish the ordering of a real asynchronous spell dialog and its reply.
+and dialog tests for both changes passed three times after it; that run did
+not exercise the real server's spell dialog and reply.
 With the second change, a complete local run with the same external fixtures
 passed 1,646 tests with four disabled. Its log is
 `runtime/full-suite-town-selection-cleanup-2026-11-15.log` under the same

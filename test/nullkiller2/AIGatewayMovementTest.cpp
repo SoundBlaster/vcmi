@@ -9,6 +9,7 @@
 #include "StdInc.h"
 
 #include "mock/TinyH3MBuilder.h"
+#include "mock/GameHandlerTestServer.h"
 #include "nullkiller2/NullkillerTest.h"
 #include "nullkiller2/ScriptedMovementClient.h"
 
@@ -20,6 +21,8 @@
 #include "lib/mapObjects/CGTownInstance.h"
 #include "lib/mapObjects/CGResource.h"
 #include "lib/mapping/TerrainTile.h"
+#include "lib/serializer/CMemorySerializer.h"
+#include "server/CGameHandler.h"
 
 namespace NK2AI
 {
@@ -50,6 +53,97 @@ public:
 		}
 		return ScriptedMovementClient::sendRequest(request, player, wait);
 	}
+};
+
+class TownDialogTestServer : public GameHandlerTestServer
+{
+public:
+	using GameHandlerTestServer::GameHandlerTestServer;
+
+	void applyPack(CPackForClient & pack) override
+	{
+		GameHandlerTestServer::applyPack(pack);
+		if(const auto * dialog = dynamic_cast<const MapObjectSelectDialog *>(&pack))
+		{
+			std::lock_guard lock(mutex);
+			pendingDialog = *dialog;
+		}
+	}
+
+	void sendPack(CPackForClient & pack, GameConnectionID) override
+	{
+		if(const auto * applied = dynamic_cast<const PackageApplied *>(&pack))
+		{
+			std::lock_guard lock(mutex);
+			responses.emplace(applied->requestID, *applied);
+		}
+	}
+
+	std::optional<MapObjectSelectDialog> takeDialog()
+	{
+		std::lock_guard lock(mutex);
+		return std::exchange(pendingDialog, std::nullopt);
+	}
+
+	std::optional<PackageApplied> takeResponse(int requestID)
+	{
+		std::lock_guard lock(mutex);
+		auto it = responses.find(requestID);
+		if(it == responses.end())
+			return std::nullopt;
+		auto result = it->second;
+		responses.erase(it);
+		return result;
+	}
+
+private:
+	std::mutex mutex;
+	std::optional<MapObjectSelectDialog> pendingDialog;
+	std::map<int, PackageApplied> responses;
+};
+
+class TownPortalServerClient : public IClient
+{
+public:
+	TownPortalServerClient(const std::shared_ptr<CGameState> & state, PlayerColor player)
+		: server(state, player), handler(server, state)
+	{
+		state->actingPlayers.insert(player);
+	}
+
+	std::optional<BattleAction> makeSurrenderRetreatDecision(PlayerColor, const BattleID &, const BattleStateInfoForRetreat &) override
+	{
+		return std::nullopt;
+	}
+
+	int sendRequest(const CPackForServer & request, PlayerColor player, bool) override
+	{
+		const int requestID = ++lastRequestID;
+		request.player = player;
+		request.requestID = requestID;
+		if(dynamic_cast<const QuestionAnswer *>(&request))
+			gateway->requestSent(&request, requestID);
+		auto serverRequest = CMemorySerializer::deepCopy(request);
+		handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, *serverRequest);
+		auto response = server.takeResponse(requestID);
+		if(!response)
+			throw std::runtime_error("Server did not acknowledge request");
+		if(auto dialog = server.takeDialog())
+		{
+			++dialogs;
+			gateway->showMapObjectSelectDialog(dialog->questionID, dialog->icon, dialog->title, dialog->description, dialog->objects);
+		}
+		gateway->requestRealized(&*response);
+		return requestID;
+	}
+
+	NK2AI::AIGateway * gateway = nullptr;
+	std::atomic<int> dialogs = 0;
+
+private:
+	TownDialogTestServer server;
+	CGameHandler handler;
+	std::atomic<int> lastRequestID = 0;
 };
 
 class Nullkiller2_AIGateway : public NullkillerTest
@@ -417,6 +511,46 @@ TEST_F(Nullkiller2_AIGateway, rejectedTownPortalRequestDoesNotLeaveSelectedTown)
 	EXPECT_EQ(requests->answers.front().questionID, dialogQuestion);
 	EXPECT_EQ(requests->answers.front().reply, town->id.getNum());
 	EXPECT_EQ(gateway->selectedObject.load(), ObjectInstanceID());
+}
+
+TEST_F(Nullkiller2_AIGateway, townPortalDialogSelectsWrappedTownThroughServer)
+{
+	const SpellID spell(SpellID::decode("core:townPortal"));
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(PLAYER)
+		.hero({1, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroPrimary(0, 0, 20, 20)
+		.heroSecondarySkills({{SecondarySkill::EARTH_MAGIC, 3}})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({spell})
+		.town({35, 10, 0}, FactionID(0), PLAYER)
+		.town({10, 10, 0}, FactionID(0), PLAYER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	const auto towns = findAll<CGTownInstance>();
+	const auto target = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().x == 35; });
+	ASSERT_NE(target, towns.end());
+	const auto * town = *target;
+	ASSERT_EQ(town->getVisitingHero(), nullptr);
+	hero->mana = 200;
+	hero->setMovementPoints(3000);
+	TownPortalServerClient serverClient(gameState(), PLAYER);
+	auto actualGateway = makeGateway(PLAYER, &serverClient);
+	serverClient.gateway = actualGateway.get();
+	NK2AI::Goals::AdventureSpellCast goal(hero, spell);
+	goal.town = town;
+
+	EXPECT_THROW(withGameStateReadLock([&] { goal.accept(actualGateway.get()); }), NK2AI::goalFulfilledException);
+	EXPECT_EQ(serverClient.dialogs.load(), 1);
+	EXPECT_EQ(hero->visitablePos(), town->visitablePos());
+	EXPECT_LT(hero->mana, 200);
+	EXPECT_LT(hero->movementPointsRemaining(), 3000);
+	EXPECT_TRUE(actualGateway->lastAdventureCastSucceeded.load());
+	EXPECT_EQ(actualGateway->status.getQuestionsCount(), 0);
+	EXPECT_EQ(actualGateway->selectedObject.load(), ObjectInstanceID());
 }
 
 TEST_F(Nullkiller2_AIGateway, plansDimensionDoorLandingAcrossToroidalSeam)
