@@ -66,5 +66,19 @@ server movement request would do. The east shortcut did not demonstrate a
 safe one-step water transit; the ordinary GUI's automatic destination-layer
 selection is a possible reason.
 
+## Save and load after a Flight crossing
+
+On the south/north fixture, the same client cast Flight and made the round
+trip described above, then crossed southward once more. At `(15,2,0)`, with
+360 movement points and 85 mana, the game reported that the new save was
+successful. The hero then moved to `(16,2,0)` with 260 points. Loading that
+save through the game interface restored `(15,2,0)`, 360 movement points,
+85 mana, and `toroidal: true` in the observation trace (sequences 247–262).
+The GUI showed the hero on the expected shore after loading. This verifies
+one local graphical save/load of a landed hero after a spell crossing; the
+continued Flight effect, a save while actually in transit, and remote clients
+were not independently verified. The save was created in the local test
+profile and is not included in the repository.
+
 These cases do not establish moving guards, changed fog, general stranded-hero
 recovery, remote multiplayer, or animation smoothness.
