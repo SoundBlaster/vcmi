@@ -64,3 +64,16 @@ The window title identifies this separately packaged client as `360ffdf`.
 It includes the route-filtering work prepared before `506fc7b`, but was
 packaged before that commit's final cache synchronization change. It is not
 evidence that the exact final committed binary was interactively tested.
+
+### Toroidal scenario loaded with user assistance
+
+The user selected and started `toroidal-route-safety-flight-waterwalk.vmap` in
+the same packaged client. The server log records the map file opening and the
+local observation trace reports `toroidal: true`, a 36×36 map, and selected
+hero 2 at visitable tile `(15,16,0)` with 1,500 movement points and 100 mana.
+The spellbook showed both Water Walk and Flight. These observations confirm
+the scenario loads and the spells appear in the UI; neither spell was cast
+and no route was exercised in this interactive attempt. A Computer Use click on
+Water Walk moved the pointer but did not activate the spell. The local trace
+is `runtime/observation-route-safety-2026-11-14.jsonl` under the TB5 VCMI
+build tree; it is diagnostic evidence, not a continuous video recording.
