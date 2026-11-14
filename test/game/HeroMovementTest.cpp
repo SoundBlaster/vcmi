@@ -3517,6 +3517,61 @@ TEST_F(HeroMovementTest, RoadCostsAgreeAcrossEveryToroidalEdgeAndCorner)
 			}
 }
 
+TEST_F(HeroMovementTest, MixedRoadTransitionsAgreeAcrossToroidalSeams)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	struct RoadCase { RoadId source; RoadId destination; int baseCost; };
+	const std::array cases = {
+		RoadCase{RoadId::COBBLESTONE_ROAD, RoadId::GRAVEL_ROAD, 50},
+		RoadCase{RoadId::GRAVEL_ROAD, RoadId::COBBLESTONE_ROAD, 65},
+		RoadCase{RoadId::COBBLESTONE_ROAD, RoadId::NO_ROAD, 100},
+		RoadCase{RoadId::NO_ROAD, RoadId::COBBLESTONE_ROAD, 100},
+	};
+	const std::array directions = {int3(-1, 0, 0), int3(1, 0, 0), int3(-1, -1, 0), int3(1, 1, 0)};
+	const auto topology = map()->getTopology();
+	for(int z = 0; z < 2; ++z)
+		for(const auto & direction : directions)
+			for(const auto & road : cases)
+			{
+				SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << direction.toString()
+					<< " road=" << road.source.getNum() << "," << road.destination.getNum());
+				const int3 origin(direction.x < 0 ? 0 : 35, direction.y < 0 ? 0 : direction.y > 0 ? 35 : 17, z);
+				const auto destination = topology.canonicalize(origin + direction);
+				ASSERT_TRUE(destination);
+				map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+				ASSERT_EQ(hero->visitablePos(), origin);
+				hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+				hero->setMovementPoints(3000);
+				map()->getTile(origin).roadType = road.source;
+				map()->getTile(*destination).roadType = road.destination;
+				const int expectedCost = direction.y ? static_cast<int>(road.baseCost * M_SQRT2) : road.baseCost;
+				CPathsInfo paths(gameState()->getMapSize(), hero);
+				auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+				CPathfinder pathfinder(*gameState(), config);
+				pathfinder.calculatePaths();
+				const auto * node = paths.getNode(*destination, EPathfindingLayer::LAND);
+				ASSERT_TRUE(node->reachable());
+				ASSERT_EQ(node->turns, 0);
+				ASSERT_NE(node->theNodeBefore, nullptr);
+				EXPECT_EQ(node->theNodeBefore->coord, origin);
+				EXPECT_EQ(node->moveRemains, 3000 - expectedCost);
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), *destination);
+				EXPECT_EQ(hero->movementPointsRemaining(), 3000 - expectedCost);
+				map()->getTile(origin).roadType = RoadId::NO_ROAD;
+				map()->getTile(*destination).roadType = RoadId::NO_ROAD;
+			}
+}
+
 TEST_F(HeroMovementTest, ObjectEntranceDirectionIsRespectedAcrossToroidalSeams)
 {
 	const PlayerColor player(0);
