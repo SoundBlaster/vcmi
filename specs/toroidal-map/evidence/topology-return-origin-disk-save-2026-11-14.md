@@ -14,6 +14,9 @@ additional disk round trip passed locally on macOS arm64 in a temporary test
 filesystem on TB5. It is a synthetic single-player server fixture: it does
 not establish actual timer scheduling, graphical save/load, multiplayer
 restoration or recovery from older saves that have no recorded origin.
+The later [known-land recovery evidence](topology-emergency-known-land-2026-11-14.md)
+includes a generated older-version file without an origin and a synthetic
+stranding after directly loading its game and server chunks.
 
 The previous full suite at `e46d07a` passed 1,500 tests with four disabled;
 this change adds assertions to an existing test, which passed separately. No

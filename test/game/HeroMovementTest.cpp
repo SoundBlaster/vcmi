@@ -1230,6 +1230,50 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 			const auto * priorHero = priorRestored.gs->getHero(airborneHeroID);
 			ASSERT_NE(priorHero, nullptr);
 			EXPECT_EQ(priorHero->getPathfindingStartLayer(), EPathfindingLayer::AIR);
+
+			// Write and reopen the last server-state version before transit origins
+			// existed. Then construct a stranded hero with an unsuitable origin.
+			const auto noOriginVersion = ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
+			const auto noOriginPath = directory / (name + "-no-origin.vsgm1");
+			CMemorySerializer noOriginHeader, noOriginGame;
+			noOriginHeader.oser.version = noOriginVersion;
+			noOriginGame.oser.version = noOriginVersion;
+			gameState()->saveHeader(noOriginHeader.oser);
+			gameState()->saveGame(noOriginGame.oser);
+			noOriginGame.oser & handler;
+			CSaveFile noOriginSave(noOriginVersion);
+			noOriginSave.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*gameState()).toBytes());
+			noOriginSave.addChunk(SaveFileFormat::CHUNK_HEADER, noOriginHeader.extractBuffer());
+			noOriginSave.addChunk(SaveFileFormat::CHUNK_GAMESTATE, noOriginGame.extractBuffer());
+			noOriginSave.write(noOriginPath);
+			ASSERT_EQ(CLoadFile::readVersion(noOriginPath), noOriginVersion);
+			CLoadFile noOriginLoaded(noOriginPath);
+			auto noOriginState = std::make_shared<CGameState>();
+			noOriginState->preInit(LIBRARY);
+			auto noOriginChunk = noOriginLoaded.openChunk(SaveFileFormat::CHUNK_GAMESTATE, noOriginState.get());
+			noOriginState->loadGame(noOriginChunk->iser);
+			GameHandlerTestServer noOriginServer(noOriginState, player);
+			CGameHandler noOriginRecovery(noOriginServer, noOriginState);
+			noOriginChunk->iser & noOriginRecovery;
+			ASSERT_TRUE(noOriginChunk->isFullyRead());
+			auto * noOriginHero = noOriginState->getHero(airborneHeroID);
+			ASSERT_NE(noOriginHero, nullptr);
+			ASSERT_EQ(noOriginHero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+			noOriginHero->setMovementPoints(1);
+			noOriginState->getMap().getTile(int3(1, 0, 0)).terrainType = TerrainId::WATER;
+			auto * noOriginTeam = noOriginState->getPlayerTeam(player);
+			ASSERT_NE(noOriginTeam, nullptr);
+			for(int z = 0; z < noOriginState->getMap().levels(); ++z)
+				for(int x = 0; x < noOriginState->getMap().width; ++x)
+					for(int y = 0; y < noOriginState->getMap().height; ++y)
+						noOriginTeam->fogOfWarMap[int3(x, y, z)] = 1;
+			ASSERT_TRUE(noOriginRecovery.tryRecoverTransientHeroes(player));
+			EXPECT_NE(noOriginHero->visitablePos(), int3(0, 0, 0));
+			EXPECT_NE(noOriginHero->visitablePos(), int3(1, 0, 0));
+			EXPECT_TRUE(noOriginState->getMap().getTile(noOriginHero->visitablePos()).isLand());
+			EXPECT_EQ(noOriginHero->visitablePos().z, 0);
+			EXPECT_EQ(noOriginHero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+			EXPECT_EQ(noOriginHero->movementPointsRemaining(), 0);
 		}
 		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::CURRENT;
 		EXPECT_EQ(CLoadFile::readVersion(path), expectedVersion);
