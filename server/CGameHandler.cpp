@@ -751,7 +751,7 @@ bool CGameHandler::tryLandTransientHeroesInPlace(PlayerColor player)
 	return !landingHeroes.empty();
 }
 
-bool CGameHandler::tryReturnStrandedTransientHero(PlayerColor player)
+bool CGameHandler::tryRecoverTransientHeroes(PlayerColor player)
 {
 	if(!gameState().getMap().toroidal)
 		return false;
@@ -760,70 +760,97 @@ bool CGameHandler::tryReturnStrandedTransientHero(PlayerColor player)
 	if(!state || !team)
 		return false;
 
-	// Until multi-hero recovery has an atomic plan, do not move any of them
-	// when more than one hero needs to land.
-	const CGHeroInstance * hero = nullptr;
-	for(const auto * candidate : state->getHeroes())
+	struct RecoveryPlan
 	{
-		const auto layer = candidate->getConfirmedMovementLayer();
+		const CGHeroInstance * hero;
+		std::optional<int3> destination; // absent means a safe in-place landing
+	};
+	std::vector<RecoveryPlan> plans;
+	std::set<int3> reservedDestinations;
+	const auto topology = gameState().getMap().getTopology();
+	// Validate the complete plan before moving any hero. A manual end-turn
+	// must not move one hero when another cannot be recovered.
+	for(const auto * hero : state->getHeroes())
+	{
+		const auto layer = hero->getConfirmedMovementLayer();
 		if(layer != EPathfindingLayer::AIR && layer != EPathfindingLayer::WATER)
 			continue;
-		if(hero || candidate->inBoat())
+		if(hero->inBoat())
 			return false;
-		hero = candidate;
-	}
-	if(!hero)
-		return false;
-	std::vector<LandingStep> ordinaryRoute;
-	if(findKnownTransientLanding(gameState(), hero, std::nullopt, &ordinaryRoute) == KnownLanding::FOUND)
-		return false;
-	const auto entry = transientReturnLand.find(hero->id);
-	if(entry == transientReturnLand.end() || !gameState().getMap().isInTheMap(entry->second))
-		return false;
-	const auto destination = entry->second;
-	const auto & tile = gameState().getMap().getTile(destination);
-	if(!team->fogOfWarMap[destination] || !tile.isLand() || !tile.getTerrain()->isPassable()
-		|| tile.blocked() || gameState().getMap().isHoleAt(destination)
-		|| gameState().guardingCreaturePosition(destination).isValid())
-		return false;
-	// A recovery must neither reveal terrain nor disclose an unseen guard.
-	FowTilesType hidden;
-	gameInfo().getTilesInRange(hidden, destination, hero->getSightRadius(), ETileVisibility::HIDDEN, player);
-	if(!hidden.empty())
-		return false;
-	const auto topology = gameState().getMap().getTopology();
-	for(int dx = -1; dx <= 1; ++dx)
-		for(int dy = -1; dy <= 1; ++dy)
+		if(canLandTransientHeroInPlace(gameState(), hero))
 		{
-			const auto neighbor = topology.canonicalize(destination + int3(dx, dy, 0));
-			if(!neighbor || !team->fogOfWarMap[*neighbor])
-				return false;
+			plans.push_back({hero, std::nullopt});
+			continue;
 		}
-	// Hidden events do not prevent the return and must not be activated by it.
-	// Other visitable objects still require an explicit overlap policy.
-	for(const auto & id : tile.visitableObjects)
-		if(gameState().getObjInstance(id)->ID != Obj::EVENT)
+		std::vector<LandingStep> ordinaryRoute;
+		if(findKnownTransientLanding(gameState(), hero, std::nullopt, &ordinaryRoute) == KnownLanding::FOUND)
 			return false;
-	TryMoveHero rescue;
-	rescue.id = hero->id;
-	rescue.start = hero->anchorPos();
-	rescue.end = hero->convertFromVisitablePos(destination);
-	rescue.result = TryMoveHero::TELEPORTATION;
-	rescue.movePoints = 0;
-	rescue.movementLayer = EPathfindingLayer::LAND;
-	// A hero in transit did not visit the object below it; neither leave nor
-	// destination visit callbacks are appropriate for an emergency return.
-	auto moveActivity = std::make_shared<HeroMovementActivity>(this, rescue, hero);
-	activities->addActivity(moveActivity);
-	sendAndApply(rescue);
-	moveActivity->finish();
-	heroMovementLayers[hero->id] = {destination, EPathfindingLayer::LAND};
-	transientReturnLand.erase(hero->id);
-	InfoWindow notice;
-	notice.player = player;
-	notice.text.appendTextID("vcmi.toroidal.transientReturn");
-	notice.text.replaceTextID(hero->getNameTextID());
-	showInfoDialog(&notice);
+		const auto entry = transientReturnLand.find(hero->id);
+		if(entry == transientReturnLand.end() || !gameState().getMap().isInTheMap(entry->second))
+			return false;
+		const auto destination = entry->second;
+		const auto & tile = gameState().getMap().getTile(destination);
+		if(!reservedDestinations.insert(destination).second || !team->fogOfWarMap[destination]
+			|| !tile.isLand() || !tile.getTerrain()->isPassable() || tile.blocked()
+			|| gameState().getMap().isHoleAt(destination)
+			|| gameState().guardingCreaturePosition(destination).isValid())
+			return false;
+		// A recovery must neither reveal terrain nor disclose an unseen guard.
+		FowTilesType hidden;
+		gameInfo().getTilesInRange(hidden, destination, hero->getSightRadius(), ETileVisibility::HIDDEN, player);
+		if(!hidden.empty())
+			return false;
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				const auto neighbor = topology.canonicalize(destination + int3(dx, dy, 0));
+				if(!neighbor || !team->fogOfWarMap[*neighbor])
+					return false;
+			}
+		// Hidden events do not prevent the return and must not be activated.
+		for(const auto & id : tile.visitableObjects)
+			if(gameState().getObjInstance(id)->ID != Obj::EVENT)
+				return false;
+		plans.push_back({hero, destination});
+	}
+	if(plans.empty())
+		return false;
+	// Keep the activity open for the entire group. Its final settlement can
+	// run victory checks, so no hero pointer may be used after it finishes.
+	TryMoveHero activityMove;
+	activityMove.id = plans.front().hero->id;
+	activityMove.start = plans.front().hero->anchorPos();
+	activityMove.end = activityMove.start;
+	auto recoveryActivity = std::make_shared<HeroMovementActivity>(this, activityMove, plans.front().hero);
+	activities->addActivity(recoveryActivity);
+	for(const auto & plan : plans)
+	{
+		const auto * hero = plan.hero;
+		if(!plan.destination)
+		{
+			landTransientHeroInPlace(hero);
+			continue;
+		}
+		const auto destination = *plan.destination;
+		TryMoveHero rescue;
+		rescue.id = hero->id;
+		rescue.start = hero->anchorPos();
+		rescue.end = hero->convertFromVisitablePos(destination);
+		rescue.result = TryMoveHero::TELEPORTATION;
+		rescue.movePoints = 0;
+		rescue.movementLayer = EPathfindingLayer::LAND;
+		// A hero in transit did not visit the object below it; neither leave nor
+		// destination visit callbacks are appropriate for an emergency return.
+		sendAndApply(rescue);
+		heroMovementLayers[hero->id] = {destination, EPathfindingLayer::LAND};
+		transientReturnLand.erase(hero->id);
+		InfoWindow notice;
+		notice.player = player;
+		notice.text.appendTextID("vcmi.toroidal.transientReturn");
+		notice.text.replaceTextID(hero->getNameTextID());
+		showInfoDialog(&notice);
+	}
+	recoveryActivity->finish();
 	return true;
 }
 
@@ -853,7 +880,7 @@ bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
 		const bool transit = nextLayer == EPathfindingLayer::AIR || nextLayer == EPathfindingLayer::WATER;
 		return moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, transit, player, nextLayer);
 	}
-	return tryReturnStrandedTransientHero(player);
+	return tryRecoverTransientHeroes(player);
 }
 
 void CGameHandler::onPlayerTurnEnded(PlayerColor which)

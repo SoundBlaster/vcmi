@@ -16,9 +16,10 @@ activated. The movement activity brackets the packet as in normal movement.
 The origin is versioned in server save state. The immediately preceding
 version loads without one; it does not invent a location. A removed or
 relocated hero loses its stored origin, as does a hero that lands normally.
-The implementation does not cover multiple simultaneous transient heroes,
-old saves without an origin, an occupied or unsuitable origin, vehicles or all
-hidden-object and dynamic-world cases. It therefore cannot guarantee that a
+At this revision the implementation did not cover multiple simultaneous transient
+heroes; a later [group recovery change](topology-multiple-transient-return-2026-11-14.md)
+handles a constrained subset. Old saves without an origin, an occupied or
+unsuitable origin, vehicles and other hidden-object and dynamic-world cases remain. It therefore cannot guarantee that a
 timer or AI turn always finishes. G12 remains pending.
 
 `HeroMovementTest.StrandedWaterWalkerReturnsToTheLandWhereTransitStarted`

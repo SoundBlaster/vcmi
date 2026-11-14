@@ -273,7 +273,7 @@ public:
 	bool hasHeroInTransientMovement(PlayerColor player) const;
 	bool tryLandTransientHeroesInPlace(PlayerColor player);
 	bool tryAutoLandTransientHero(PlayerColor player);
-	bool tryReturnStrandedTransientHero(PlayerColor player);
+	bool tryRecoverTransientHeroes(PlayerColor player);
 	void onNewTurn();
 	void addStatistics(StatisticDataSet &stat) const;
 	void sendQuestionResolved(QuestionID questionID);

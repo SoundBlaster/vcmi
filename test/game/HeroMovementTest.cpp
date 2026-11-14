@@ -4073,6 +4073,84 @@ TEST_F(HeroMovementTest, ExpiredTimerWaitsWhenNoSafeLandingExists)
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 
+TEST_F(HeroMovementTest, MultipleTransientHeroesRecoverOnlyWhenTheWholePlanIsSafe)
+{
+	const PlayerColor player(0);
+	const int3 firstLand(0, 5, 0), secondLand(0, 15, 0);
+	const int3 firstWater(35, 5, 0), secondWater(35, 15, 0), thirdLand(10, 25, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(1, 15, 0), HeroTypeID(1), player)
+		.hero(int3(11, 25, 0), HeroTypeID(2), player)
+		.terrain(firstWater, TerrainId::WATER).terrain(secondWater, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->toroidal = true;
+	revealMap(player);
+	auto * first = findHeroAt(int3(1, 5, 0));
+	auto * second = findHeroAt(int3(1, 15, 0));
+	auto * third = findHeroAt(int3(11, 25, 0));
+	ASSERT_NE(first, nullptr);
+	ASSERT_NE(second, nullptr);
+	ASSERT_NE(third, nullptr);
+	class RecordingServer : public GameHandlerTestServer
+	{
+	public:
+		using GameHandlerTestServer::GameHandlerTestServer;
+		std::vector<std::string> events;
+		void applyPack(CPackForClient & pack) override
+		{
+			if(const auto * blocked = dynamic_cast<const PlayerBlocked *>(&pack); blocked && blocked->reason == PlayerBlocked::ONGOING_MOVEMENT)
+				events.push_back(blocked->startOrEnd == PlayerBlocked::BLOCKADE_STARTED ? "begin" : "end");
+			if(dynamic_cast<const TryMoveHero *>(&pack))
+				events.push_back("move");
+			GameHandlerTestServer::applyPack(pack);
+		}
+	};
+	RecordingServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	for(auto * hero : {first, second})
+	{
+		hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+		hero->setMovementPoints(300);
+	}
+	ASSERT_TRUE(handler.moveHero(first->id, first->convertFromVisitablePos(firstWater), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	ASSERT_TRUE(handler.moveHero(second->id, second->convertFromVisitablePos(secondWater), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	first->setMovementPoints(1);
+	second->setMovementPoints(1);
+	third->setConfirmedMovementLayer(EPathfindingLayer::AIR);
+	ASSERT_EQ(third->visitablePos(), thirdLand);
+
+	const std::string text = R"({ "animation": "test.def", "mask": [ "V" ] })";
+	JsonNode definition(text.data(), text.size(), "BlockedMultiHeroReturn");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	appearance->id = Obj::EVENT;
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto occupied = std::make_shared<CGObjectInstance>(gameState().get());
+	occupied->ID = Obj::RESOURCE;
+	occupied->pos = secondLand;
+	occupied->instanceName = "blocked_multi_hero_return";
+	occupied->appearance = appearance;
+	map()->addNewObject(occupied);
+	server.events.clear();
+	EXPECT_FALSE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_TRUE(server.events.empty());
+	EXPECT_EQ(first->visitablePos(), firstWater);
+	EXPECT_EQ(second->visitablePos(), secondWater);
+	EXPECT_EQ(third->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	map()->removeObject(occupied->id);
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(server.events, (std::vector<std::string>{"begin", "move", "move", "move", "end"}));
+	EXPECT_EQ(first->visitablePos(), firstLand);
+	EXPECT_EQ(second->visitablePos(), secondLand);
+	EXPECT_EQ(first->movementPointsRemaining(), 0);
+	EXPECT_EQ(second->movementPointsRemaining(), 0);
+	EXPECT_EQ(third->visitablePos(), thirdLand);
+	EXPECT_EQ(third->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
 TEST_F(HeroMovementTest, AutomaticLandingCanSkipAStrandedHero)
 {
 	const PlayerColor player(0), opponent(1);

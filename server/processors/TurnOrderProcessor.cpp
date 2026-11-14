@@ -416,11 +416,16 @@ bool TurnOrderProcessor::onPlayerEndsTurn(PlayerColor which)
 		gameHandler->complain("Cannot end turn before resolving activities!");
 		return false;
 	}
-	if(gameHandler->hasHeroInTransientMovement(which) && !gameHandler->tryLandTransientHeroesInPlace(which)
-		&& !gameHandler->tryReturnStrandedTransientHero(which))
+	if(gameHandler->hasHeroInTransientMovement(which))
 	{
-		gameHandler->complain("Cannot end turn while a hero is flying or walking on water!");
-		return false;
+		if(!gameHandler->tryLandTransientHeroesInPlace(which) && !gameHandler->tryRecoverTransientHeroes(which))
+		{
+			gameHandler->complain("Cannot end turn while a hero is flying or walking on water!");
+			return false;
+		}
+		// Recovery activity settlement may have already ended the game or turn.
+		if(!isPlayerMakingTurn(which) || gameHandler->gameInfo().getPlayerStatus(which) != EPlayerStatus::INGAME)
+			return true;
 	}
 
 	gameHandler->onPlayerTurnEnded(which);
