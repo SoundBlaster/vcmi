@@ -39,7 +39,17 @@ checked into this repository. The generator refuses to overwrite existing
 maps and checks the expected terrain and hero. Its output uses plain grass
 tiles without matching coast art and is diagnostic, not a polished map.
 
-These are positive short crossings to already visible land with ample movement
-points. They do not establish unsafe-route rejection in the GUI, crossings at
-the other edges or corners, moving guards, changed fog, general stranded-hero
-recovery, remote multiplayer, or animation smoothness.
+In a separate restart of the seam scenario, the hero spent 1,300 points on
+land, ending at `(34,15,0)` with 260 points, then cast Water Walk (100 → 92
+mana). Clicking the visible opposite shore twice showed no route arrows and
+did not move the hero; an east shortcut also left the hero in place. The
+trace records the setup at sequences 48–90. The same four-step crossing cost
+400 points in the positive runs above. This is a GUI observation: it does
+not by itself identify the rejection mechanism or establish what a direct
+server movement request would do. The east shortcut did not demonstrate a
+safe one-step water transit; the ordinary GUI's automatic destination-layer
+selection is a possible reason.
+
+These cases do not establish crossings at the other edges or corners, moving
+guards, changed fog, general stranded-hero recovery, remote multiplayer, or
+animation smoothness.
