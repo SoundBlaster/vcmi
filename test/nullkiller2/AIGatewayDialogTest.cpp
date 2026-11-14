@@ -63,3 +63,25 @@ TEST_F(Nullkiller2_AIGatewayDialog, answersDialogWithoutTargetTile)
 	// server would resolve the question once it applies the answer
 	gateway->status.removeQuestion(QuestionID(55));
 }
+
+TEST_F(Nullkiller2_AIGatewayDialog, rejectedAnswerKeepsQuestionPendingUntilAnotherAnswerSucceeds)
+{
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(PLAYER).hero({5, 5, 0}, HeroTypeID(0), PLAYER);
+	startWithMap(std::move(builder));
+
+	AnswerRecordingClient client;
+	auto gateway = makeGateway(PLAYER, &client);
+	const QuestionID question(56);
+
+	gateway->status.addQuestion(question, "test question");
+	gateway->status.attemptedAnsweringQuestion(question, 101);
+	gateway->status.receivedAnswerConfirmation(101, false);
+	EXPECT_EQ(gateway->status.getQuestionsCount(), 1);
+
+	// A rejection does not tell us whether the server still expects a different answer.
+	// Only a separately submitted and accepted answer clears the AI's pending question.
+	gateway->status.attemptedAnsweringQuestion(question, 102);
+	gateway->status.receivedAnswerConfirmation(102, true);
+	EXPECT_EQ(gateway->status.getQuestionsCount(), 0);
+}

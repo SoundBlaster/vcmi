@@ -22,6 +22,31 @@ and its movement cost remain applied. Its earlier assertions still check a
 single rejected step and a successful step. This is a local server fixture,
 not a complete audit of every visitor, client or AI consumer.
 
+## Dialog acknowledgement consumers
+
+`CPlayerInterface::requestRealized` calls the movement controller on a
+`QuestionAnswer` acknowledgement without checking its result. The controller
+clears its wait for that answer and can resume a movement sequence; this source
+inspection does not establish a reproducible player-facing failure.
+
+Nullkiller2 takes the result into account: `AIStatus::receivedAnswerConfirmation`
+removes a question on success but keeps it on rejection. `waitTillFree` waits
+while that question remains, and the rejection branch has a TODO for a safe
+retry. The same handling exists at baseline `30e9207`, although this branch
+reports more visitor failures as rejected acknowledgements. The focused
+`Nullkiller2_AIGatewayDialog.rejectedAnswerKeepsQuestionPendingUntilAnotherAnswerSucceeds`
+test exercises the state transition with a synthetic rejected acknowledgement
+and a separately supplied successful retry; it does not reproduce a normal
+gameplay rejection or implement an automatic retry.
+
+Simply clearing the question would be unsafe: `answerQuestion` can reject an
+invalid or missing answer while the activity still requires a valid one. A
+generic recovery needs a reason-aware protocol or a separately justified
+recovery for each dialog type, along with checks for answer and event ordering.
+The current boolean alone does not distinguish these situations. This remains
+an open compatibility and AI-liveness issue, not a demonstrated toroidal-only
+failure.
+
 The new source comment and test clarify existing branch behavior; they do not
 introduce a new protocol field, rollback, exactly-once delivery, or a rule that
 false always means no change. Further review of AI retry and partial-result
