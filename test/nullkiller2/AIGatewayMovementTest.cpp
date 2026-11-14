@@ -35,11 +35,19 @@ class SelectionRecordingClient : public ScriptedMovementClient
 public:
 	using ScriptedMovementClient::ScriptedMovementClient;
 	std::vector<QuestionAnswer> answers;
+	int spellRequests = 0;
+	std::function<void()> onSpellRequest;
 
 	int sendRequest(const CPackForServer & request, PlayerColor player, bool wait) override
 	{
 		if(const auto * answer = dynamic_cast<const QuestionAnswer *>(&request))
 			answers.push_back(*answer);
+		if(dynamic_cast<const CastAdvSpell *>(&request))
+		{
+			++spellRequests;
+			if(onSpellRequest)
+				onSpellRequest();
+		}
 		return ScriptedMovementClient::sendRequest(request, player, wait);
 	}
 };
@@ -359,6 +367,46 @@ TEST_F(Nullkiller2_AIGateway, rejectedTownPortalDoesNotLeaveSelectedTownForAnoth
 		EXPECT_FALSE(selections->answers.back().reply.has_value());
 		gateway->status.removeQuestion(question);
 	}
+}
+
+TEST_F(Nullkiller2_AIGateway, rejectedTownPortalRequestDoesNotLeaveSelectedTown)
+{
+	const SpellID spell(SpellID::decode("core:townPortal"));
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(PLAYER)
+		.hero({5, 5, 0}, HeroTypeID(0), PLAYER)
+		.heroPrimary(0, 0, 20, 20)
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({spell})
+		.town({10, 10, 0}, FactionID(0), PLAYER);
+	startWithMap(std::move(builder));
+	revealMap(PLAYER);
+	hero = findHeroByOwner(PLAYER);
+	auto * town = findFirst<CGTownInstance>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(town, nullptr);
+	ASSERT_EQ(town->getVisitingHero(), nullptr);
+	hero->mana = 200;
+	hero->setMovementPoints(3000);
+	auto recordingClient = std::make_unique<SelectionRecordingClient>(gameState());
+	auto * requests = recordingClient.get();
+	client = std::move(recordingClient);
+	callback = makeCallback(PLAYER, client.get());
+	gateway = makeGateway(callback);
+	client->notify(*gateway);
+	// The scripted client returns immediately; supply the result a rejected server
+	// acknowledgement would have stored before releasing a real waiting caller.
+	gateway->lastAdventureCastSucceeded = false;
+	ObjectInstanceID selectionDuringRequest;
+	requests->onSpellRequest = [&] { selectionDuringRequest = gateway->selectedObject; };
+	NK2AI::Goals::AdventureSpellCast goal(hero, spell);
+	goal.town = town;
+	goal.settile(town->visitablePos());
+
+	EXPECT_THROW(withGameStateReadLock([&] { goal.accept(gateway.get()); }), NK2AI::cannotFulfillGoalException);
+	EXPECT_EQ(requests->spellRequests, 1);
+	EXPECT_EQ(selectionDuringRequest, town->id);
+	EXPECT_EQ(gateway->selectedObject, ObjectInstanceID());
 }
 
 TEST_F(Nullkiller2_AIGateway, plansDimensionDoorLandingAcrossToroidalSeam)

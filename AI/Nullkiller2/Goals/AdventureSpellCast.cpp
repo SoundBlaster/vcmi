@@ -10,6 +10,7 @@
 #include "StdInc.h"
 #include "AdventureSpellCast.h"
 #include "../AIGateway.h"
+#include "../../../lib/ScopeGuard.h"
 #include "../../../lib/spells/ISpellMechanics.h"
 #include "../../../lib/spells/Problem.h"
 #include "../../../lib/spells/adventure/TownPortalEffect.h"
@@ -81,8 +82,14 @@ void AdventureSpellCast::accept(AIGateway * aiGw)
 
 	// Only publish the town once local checks have succeeded; otherwise an unrelated
 	// later object-selection dialog could consume a target from a rejected goal.
-	if(town && townPortalEffect)
+	const bool selectingTown = town && townPortalEffect;
+	if(selectingTown)
 		aiGw->selectedObject = town->id;
+	const auto clearTownSelection = vstd::makeScopeGuard([aiGw, selectingTown]()
+	{
+		if(selectingTown)
+			aiGw->selectedObject = ObjectInstanceID();
+	});
 
 	const auto wait = aiGw->cc->waitTillRealize;
 	aiGw->cc->waitTillRealize = true;
