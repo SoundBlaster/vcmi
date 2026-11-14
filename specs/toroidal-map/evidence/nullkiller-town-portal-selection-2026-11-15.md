@@ -46,6 +46,20 @@ tests passed ten repeated runs. The client and server share an in-process
 game state; request delivery is a test adapter, not TCP, a graphical session,
 or a full AI turn.
 
+`Nullkiller2_AIGateway.serverRejectedTownPortalClearsSelection` uses the same
+server adapter for a negative case. After the AI's local validation and just
+before server processing, the fixture deliberately sets the hero's mana to
+zero. The real spell handler rejects the cast, and its negative acknowledgement
+reaches the gateway. The hero remains at the origin, no selection dialog is
+opened, and the gateway has neither a pending question nor a selected town.
+Both server-backed cases and five related tests passed five repeated runs.
+The mana change is injected by the test; this does not establish how often it
+can happen in a normal game or cover remote-network scheduling.
+The complete local suite with these two server-backed tests passed 1,648
+tests with four disabled. Its log is
+`runtime/full-suite-ai-town-server-2026-11-15.log` under the TB5 VCMI build
+root; this is not hosted CI.
+
 The gateway's selected object is shared between the goal and asynchronous
 dialog task. To avoid unsynchronized reads and writes when the goal cleanup
 and dialog overlap, it is now atomic. The dialog takes and clears the value

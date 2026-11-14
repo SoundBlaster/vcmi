@@ -123,6 +123,8 @@ public:
 		request.requestID = requestID;
 		if(dynamic_cast<const QuestionAnswer *>(&request))
 			gateway->requestSent(&request, requestID);
+		if(dynamic_cast<const CastAdvSpell *>(&request) && beforeSpell)
+			beforeSpell();
 		auto serverRequest = CMemorySerializer::deepCopy(request);
 		handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, *serverRequest);
 		auto response = server.takeResponse(requestID);
@@ -139,6 +141,7 @@ public:
 
 	NK2AI::AIGateway * gateway = nullptr;
 	std::atomic<int> dialogs = 0;
+	std::function<void()> beforeSpell;
 
 private:
 	TownDialogTestServer server;
@@ -549,6 +552,43 @@ TEST_F(Nullkiller2_AIGateway, townPortalDialogSelectsWrappedTownThroughServer)
 	EXPECT_LT(hero->mana, 200);
 	EXPECT_LT(hero->movementPointsRemaining(), 3000);
 	EXPECT_TRUE(actualGateway->lastAdventureCastSucceeded.load());
+	EXPECT_EQ(actualGateway->status.getQuestionsCount(), 0);
+	EXPECT_EQ(actualGateway->selectedObject.load(), ObjectInstanceID());
+}
+
+TEST_F(Nullkiller2_AIGateway, serverRejectedTownPortalClearsSelection)
+{
+	const SpellID spell(SpellID::decode("core:townPortal"));
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(PLAYER)
+		.hero({1, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroPrimary(0, 0, 20, 20)
+		.heroSecondarySkills({{SecondarySkill::EARTH_MAGIC, 3}})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({spell})
+		.town({35, 10, 0}, FactionID(0), PLAYER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	hero = findHeroByOwner(PLAYER);
+	auto * town = findFirst<CGTownInstance>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(town, nullptr);
+	const auto origin = hero->visitablePos();
+	hero->mana = 200;
+	hero->setMovementPoints(3000);
+	TownPortalServerClient serverClient(gameState(), PLAYER);
+	auto actualGateway = makeGateway(PLAYER, &serverClient);
+	serverClient.gateway = actualGateway.get();
+	// Emulate the server seeing changed resources after the AI's local validation.
+	serverClient.beforeSpell = [&] { hero->mana = 0; };
+	NK2AI::Goals::AdventureSpellCast goal(hero, spell);
+	goal.town = town;
+
+	EXPECT_THROW(withGameStateReadLock([&] { goal.accept(actualGateway.get()); }), NK2AI::cannotFulfillGoalException);
+	EXPECT_FALSE(actualGateway->lastAdventureCastSucceeded.load());
+	EXPECT_EQ(serverClient.dialogs.load(), 0);
+	EXPECT_EQ(hero->visitablePos(), origin);
 	EXPECT_EQ(actualGateway->status.getQuestionsCount(), 0);
 	EXPECT_EQ(actualGateway->selectedObject.load(), ObjectInstanceID());
 }
