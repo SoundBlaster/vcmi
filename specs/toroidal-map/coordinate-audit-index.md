@@ -232,7 +232,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/filesystem/PngStripWriter.cpp` | 24, 27, 29, 30, 42, 43, 97, 100, 115 | unreviewed |
 | `lib/filesystem/PngStripWriter.h` | 32, 35 | unreviewed |
 | `lib/gameState/CGameState.cpp` | 527, 530, 536, 538, 545, 554, 598, 674, 795, 1001, 1007, 1074, 1291, 1310, 1333, 1335, 1336, 1343 | partial: Grail placement and Favorable Winds initialization use topology and have focused tests; guard neighborhood wraps and its result now deduplicates repeated monsters; other candidates unreviewed |
-| `lib/gameState/GameStatePackVisitor.cpp` | 322, 545, 551, 555, 559, 563, 567, 571, 575, 579, 787, 1655 | partial: movement direction uses wrapped displacement; guard cache removal updates across one corner and both adjoining edges, other candidates unreviewed |
+| `lib/gameState/GameStatePackVisitor.cpp` | 322, 545, 551, 555, 559, 563, 567, 571, 575, 579, 787, 1655 | partial: movement direction uses wrapped displacement; guard cache removal and moved-object refresh are tested, including corner and adjoining edges; other candidates unreviewed |
 | `lib/gameState/UpgradeInfo.cpp` | 24, 44, 46, 47 | unreviewed |
 | `lib/gameState/UpgradeInfo.h` | 45 | unreviewed |
 | `lib/int3.h` | 31, 32, 103, 108, 110, 112, 114, 121, 123, 124, 128, 130, 133, 135, 138, 140, 143, 145, 182, 196 | partial: `findClosestTile` is used only by the conditional, unsupported RMG; other general coordinate operations remain unchanged |

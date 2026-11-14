@@ -319,7 +319,16 @@ void GameStatePackVisitor::visitChangeObjPos(ChangeObjPos & pack)
 		logNetwork->error("Wrong ChangeObjPos: object %d doesn't exist!", pack.objid.getNum());
 		return;
 	}
+	const int3 oldPosition = obj->anchorPos();
+	const int3 dimensions(obj->getWidth(), obj->getHeight(), 1);
 	gs.getMap().moveObject(pack.objid, pack.nPos + obj->getVisitableOffset());
+	// Moving any blocking visitable object may change which neighboring monsters can guard it.
+	const auto refreshGuards = [&](const int3 & position)
+	{
+		gs.getMap().calculateGuardingGreaturePositions(position - dimensions - int3(1, 1, 0), position + int3(1, 1, 0));
+	};
+	refreshGuards(oldPosition);
+	refreshGuards(obj->anchorPos());
 
 	if(auto * hero = dynamic_cast<CGHeroInstance *>(obj))
 	{

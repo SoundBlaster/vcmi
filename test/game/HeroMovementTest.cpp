@@ -2966,6 +2966,99 @@ TEST_F(HeroMovementTest, removingCornerGuardRefreshesWrappedGuardCache)
 		EXPECT_EQ(gameState()->guardingCreaturePosition(tile), int3(-1, -1, -1));
 }
 
+class MovedGuardCacheTest : public HeroMovementTest, public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(MovedGuardCacheTest, MovingMonsterRefreshesOldAndNewNeighborhoods)
+{
+	const PlayerColor player(0);
+	const bool toroidal = GetParam() % 2 != 0;
+	const int newLevel = GetParam() / 2;
+	const int3 oldPosition(35, 35, 0), newPosition(10, 10, newLevel);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(21, 20, 0), HeroTypeID(0), player)
+		.monster(oldPosition, CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(toroidal);
+	map()->calculateGuardingGreaturePositions();
+	const auto guardID = map()->getTile(oldPosition).topVisitableObj();
+	ASSERT_NE(map()->getObject(guardID), nullptr);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(oldPosition), oldPosition);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(int3(34, 35, 0)), oldPosition);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(newPosition), int3(-1, -1, -1));
+	if(toroidal)
+		ASSERT_EQ(gameState()->guardingCreaturePosition(int3(0, 0, 0)), oldPosition);
+	const auto snapshot = gameState()->saveToMemory();
+	std::vector<std::shared_ptr<CGameState>> replicas;
+	for(int i = 0; i < 2; ++i)
+	{
+		auto replica = std::make_shared<CGameState>();
+		replica->preInit(LIBRARY);
+		replica->loadFromMemory(snapshot);
+		replicas.push_back(std::move(replica));
+	}
+	class Capture final : public INetworkConnection
+	{
+	public:
+		void sendPacket(const std::vector<std::byte> & packet) override { bytes = packet; }
+		void setAsyncWritesEnabled(bool) override {}
+		void close() override {}
+		std::vector<std::byte> bytes;
+	};
+	class MirrorServer final : public GameHandlerTestServer
+	{
+	public:
+		MirrorServer(const std::shared_ptr<CGameState> & state, PlayerColor player, const std::vector<std::shared_ptr<CGameState>> & replicas)
+			: GameHandlerTestServer(state, player), replicas(replicas), transport(std::make_shared<Capture>()), sender(transport), receiver(transport)
+		{
+			sender.setSerializationVersion(ESerializationVersion::CURRENT);
+			receiver.setSerializationVersion(ESerializationVersion::CURRENT);
+		}
+		void applyPack(CPackForClient & pack) override
+		{
+			if(dynamic_cast<ChangeObjPos *>(&pack))
+			{
+				sender.sendPack(pack);
+				for(const auto & replica : replicas)
+				{
+					receiver.setCallback(*replica);
+					auto decoded = receiver.retrievePack(transport->bytes);
+					if(auto * change = dynamic_cast<ChangeObjPos *>(decoded.get()))
+					{
+						replica->apply(*change);
+						++delivered;
+					}
+					else
+						ADD_FAILURE() << "Expected ChangeObjPos after network decoding";
+				}
+			}
+			GameHandlerTestServer::applyPack(pack);
+		}
+		int delivered = 0;
+	private:
+		std::vector<std::shared_ptr<CGameState>> replicas;
+		std::shared_ptr<Capture> transport;
+		GameConnection sender;
+		GameConnection receiver;
+	} server(gameState(), player, replicas);
+	CGameHandler handler(server, gameState());
+	handler.changeObjPos(guardID, newPosition, player);
+	ASSERT_EQ(server.delivered, 2);
+	replicas.push_back(gameState());
+	for(const auto & state : replicas)
+	{
+		EXPECT_EQ(state->getMap().getObject(guardID)->visitablePos(), newPosition);
+		EXPECT_EQ(state->guardingCreaturePosition(oldPosition), int3(-1, -1, -1));
+		EXPECT_EQ(state->guardingCreaturePosition(int3(34, 35, 0)), int3(-1, -1, -1));
+		EXPECT_EQ(state->guardingCreaturePosition(newPosition), newPosition);
+		EXPECT_EQ(state->guardingCreaturePosition(int3(11, 10, newLevel)), newPosition);
+		EXPECT_EQ(state->guardingCreaturePosition(int3(0, 0, 0)), int3(-1, -1, -1));
+	}
+}
+
+INSTANTIATE_TEST_SUITE_P(MapTopologies, MovedGuardCacheTest, ::testing::Range(0, 4));
+
 TEST_F(HeroMovementTest, grailCanBeDugAfterCrossingToroidalCorner)
 {
 	const PlayerColor player(0);
