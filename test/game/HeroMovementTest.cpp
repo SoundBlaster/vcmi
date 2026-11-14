@@ -3680,6 +3680,36 @@ TEST_F(HeroMovementTest, AlreadyStrandedWaterWalkerCanContinueExploring)
 	EXPECT_EQ(hero->movementPointsRemaining(), 100);
 }
 
+TEST_F(HeroMovementTest, FogExplorationCanStrandWaterWalkerOnUnchangedMap)
+{
+	const PlayerColor player(0);
+	const int3 island(18, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != island)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(1200);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	// This documents an unresolved liveness defect. The unknown frontier makes
+	// the known-landing check inconclusive even after return becomes impossible.
+	for(int x = 19; x <= 29; ++x)
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(x, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	EXPECT_EQ(hero->movementPointsRemaining(), 100);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(30, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
+	EXPECT_TRUE(handler.hasHeroInTransientMovement(player));
+	EXPECT_EQ(hero->visitablePos(), int3(29, 18, 0));
+
+}
+
 TEST_F(HeroMovementTest, ToroidalTransientLandingSearchWorksOn252Map)
 {
 	const PlayerColor player(0);
