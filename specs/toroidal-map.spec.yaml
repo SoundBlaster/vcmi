@@ -62,6 +62,9 @@ constraints:
   - id: transient_route_safety
     level: MUST
     statement: Flight and Water Walk routes must not knowingly leave an on-foot hero without a legal landing reachable in the current turn. Validation uses the player's known map state, must not disclose hidden terrain through a rejection, and preserves legal exploration and routes to reachable landing sites. States made unsafe by changed conditions, old saves or interrupted movement still require a safe recovery path.
+  - id: transient_emergency_relocation
+    level: MUST
+    statement: When ordinary landing is unavailable, emergency relocation of an on-foot transient hero may use a previously revealed, passable and unoccupied land tile on the same level, without revealing additional terrain or triggering object visits. The hero and possessions are preserved, remaining movement is spent and the owner is notified. A group recovery plan must be validated before any hero is moved; an unsuitable or unknown destination must not be invented.
   - id: authority
     level: MUST
     statement: Client route selection and authoritative server validation use consistent topology and movement rules. Illegal or blocked crossings are rejected without applying movement or its effects.
@@ -147,6 +150,11 @@ evidence:
   - id: bounded_transient_baseline
     kind: documentation
     path: specs/toroidal-map/evidence/topology-baseline-island-2026-11-14.md
+    supports:
+      - provenance
+  - id: transient_emergency_evidence
+    kind: documentation
+    path: specs/toroidal-map/evidence/topology-emergency-known-land-2026-11-14.md
     supports:
       - provenance
   - id: user_intent_and_scenarios

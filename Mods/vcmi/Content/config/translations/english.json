@@ -1240,6 +1240,7 @@
 	"vcmi.systemOptions.videoGroup": "Video Settings",
 	"vcmi.tavernWindow.inviteHero": "Invite hero",
 	"vcmi.toroidal.transientReturn": "Unable to land safely, %s returned to the tile where the journey began. All remaining movement points were spent.",
+	"vcmi.toroidal.transientRelocation": "Unable to land safely, %s was moved to a known safe land tile. All remaining movement points were spent.",
 	"vcmi.townHall.missingBase": "Base building %s must be built first",
 	"vcmi.townHall.noCreaturesToRecruit": "There are no creatures to recruit!",
 	"vcmi.townStructure.bank.borrow": "You enter the bank. A banker sees you and says: \"We have made a special offer for you. You can take a loan of 2500 gold from us for 5 days. You will have to repay 500 gold every day.\"",

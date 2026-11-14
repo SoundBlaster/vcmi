@@ -851,7 +851,9 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 			});
 	});
 	auto * startInfo = server.gh->gameInfo().gameState().getStartInfo();
-	startInfo->turnTimerInfo.turnTimer = 1;
+	// Keep the live timer from expiring while the TCP movement is in flight;
+	// the two explicit ticks below exercise the countdown deterministically.
+	startInfo->turnTimerInfo.turnTimer = 100000;
 	startInfo->turnTimerInfo.baseTimer = 0;
 	server.gh->turnTimerHandler->onGameplayStart(red);
 	server.gh->turnTimerHandler->onGameplayStart(blue);
@@ -866,6 +868,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(host.results.contains(26)) << host.failure;
 	ASSERT_TRUE(host.results.at(26));
 	ASSERT_EQ(server.gh->gameState().getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::AIR);
+	startInfo->turnTimerInfo.turnTimer = 1;
+	server.gh->turnTimerHandler->onPlayerGetTurn(red);
 	server.gh->turnTimerHandler->update(1);
 	ASSERT_EQ(server.gh->gameState().getHero(hero->id)->visitablePos(), airborne);
 	server.gh->turnTimerHandler->update(1);
@@ -998,6 +1002,60 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), rescueOrigin);
 		EXPECT_EQ(peer->state->getHero(hero->id)->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), 0);
+	}
+
+	// A synthetic replicated movement packet creates a stranded AIR state
+	// without a recorded origin, as in an older save. End turn must replicate
+	// the fallback landing and preserve the already revealed fog on both peers.
+	EndTurn finishBlueBeforeFallback;
+	finishBlueBeforeFallback.player = blue;
+	finishBlueBeforeFallback.requestID = 34;
+	guest.codec->sendPack(finishBlueBeforeFallback);
+	pumpUntil([&] { return guest.results.contains(34) && host.state->actingPlayers.contains(red) && guest.state->actingPlayers.contains(red); });
+	ASSERT_TRUE(guest.results.contains(34)) << guest.failure;
+	ASSERT_TRUE(guest.results.at(34));
+	TryMoveHero stageWithoutOrigin;
+	stageWithoutOrigin.id = hero->id;
+	stageWithoutOrigin.start = server.gh->gameState().getHero(hero->id)->anchorPos();
+	stageWithoutOrigin.end = hero->convertFromVisitablePos(*rescueWater);
+	stageWithoutOrigin.result = TryMoveHero::TELEPORTATION;
+	stageWithoutOrigin.movePoints = 1;
+	stageWithoutOrigin.movementLayer = EPathfindingLayer::AIR;
+	server.gh->sendAndApply(stageWithoutOrigin);
+	pumpUntil([&] {
+		return host.state->getHero(hero->id)->visitablePos() == *rescueWater
+			&& guest.state->getHero(hero->id)->visitablePos() == *rescueWater;
+	});
+	ASSERT_EQ(host.state->getHero(hero->id)->visitablePos(), *rescueWater);
+	ASSERT_EQ(guest.state->getHero(hero->id)->visitablePos(), *rescueWater);
+	const auto fogBeforeFallback = redVisibility(server.gh->gameState());
+	ASSERT_EQ(redVisibility(*host.state), fogBeforeFallback);
+	ASSERT_EQ(redVisibility(*guest.state), fogBeforeFallback);
+	EndTurn finishWithoutOrigin;
+	finishWithoutOrigin.player = red;
+	finishWithoutOrigin.requestID = 35;
+	host.codec->sendPack(finishWithoutOrigin);
+	pumpUntil([&] {
+		return host.results.contains(35) && host.state->actingPlayers.contains(blue) && guest.state->actingPlayers.contains(blue);
+	});
+	ASSERT_TRUE(host.results.contains(35)) << host.failure;
+	ASSERT_TRUE(host.results.at(35)) << testing::PrintToString(host.systemMessages);
+	const auto * fallbackHero = server.gh->gameState().getHero(hero->id);
+	ASSERT_NE(fallbackHero, nullptr);
+	const auto fallbackPosition = fallbackHero->visitablePos();
+	EXPECT_NE(fallbackPosition, *rescueWater);
+	EXPECT_TRUE(server.gh->gameState().getMap().getTile(fallbackPosition).isLand());
+	EXPECT_EQ(fallbackHero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(fallbackHero->movementPointsRemaining(), 0);
+	EXPECT_EQ(redVisibility(server.gh->gameState()), fogBeforeFallback);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		const auto * replica = peer->state->getHero(hero->id);
+		ASSERT_NE(replica, nullptr);
+		EXPECT_EQ(replica->visitablePos(), fallbackPosition);
+		EXPECT_EQ(replica->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+		EXPECT_EQ(replica->movementPointsRemaining(), 0);
+		EXPECT_EQ(redVisibility(*peer->state), fogBeforeFallback);
 	}
 }
 
@@ -3897,7 +3955,7 @@ TEST_F(HeroMovementTest, StrandedWaterWalkerReturnsToTheLandWhereTransitStarted)
 	EXPECT_EQ(hero->visitablePos(), strandedPosition);
 	EXPECT_EQ(hero->movementPointsRemaining(), 100);
 
-	// Old branch saves have no recorded origin and must not invent one.
+	// An old save with no recorded origin must not recover to hidden terrain.
 	CMemorySerializer oldArchive;
 	oldArchive.oser.version = ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
 	oldArchive.iser.version = ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
@@ -3907,8 +3965,10 @@ TEST_F(HeroMovementTest, StrandedWaterWalkerReturnsToTheLandWhereTransitStarted)
 	oldArchive.iser.cb = gameState().get();
 	oldArchive.iser & oldHandler;
 	ASSERT_TRUE(oldArchive.isFullyRead());
+	team->fogOfWarMap[island] = 0;
 	EXPECT_FALSE(oldHandler.tryAutoLandTransientHero(player));
 	EXPECT_EQ(hero->visitablePos(), strandedPosition);
+	team->fogOfWarMap[island] = 1;
 
 	// Current saves preserve the server-owned origin across a restore.
 	CMemorySerializer archive;
@@ -4170,6 +4230,10 @@ TEST_F(HeroMovementTest, MultipleTransientHeroesRecoverOnlyWhenTheWholePlanIsSaf
 		.hero(int3(1, 15, 0), HeroTypeID(1), player)
 		.hero(int3(11, 25, 0), HeroTypeID(2), player)
 		.terrain(firstWater, TerrainId::WATER).terrain(secondWater, TerrainId::WATER);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != firstLand && int3(x, y, 0) != secondLand && int3(x, y, 0) != thirdLand)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
 	startWithMap(std::move(builder));
 	map()->toroidal = true;
 	revealMap(player);
@@ -5907,6 +5971,9 @@ TEST_F(HeroMovementTest, TransientRecoveryMustNotReturnHeroToAnotherLevel)
 	// Simulate a stale recovery origin, as could appear in inconsistent saved
 	// state: the hero is now stranded on another level with no points to land.
 	map()->moveObject(hero->id, hero->convertFromVisitablePos(undergroundWater));
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			map()->getTile(int3(x, y, 1)).terrainType = TerrainId::WATER;
 	hero->setMovementPoints(1);
 	ASSERT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::WATER);
 	CMemorySerializer archive;
@@ -5921,6 +5988,276 @@ TEST_F(HeroMovementTest, TransientRecoveryMustNotReturnHeroToAnotherLevel)
 	EXPECT_EQ(hero->visitablePos(), undergroundWater);
 	EXPECT_EQ(hero->movementPointsRemaining(), 1);
 	EXPECT_TRUE(handler.hasHeroInTransientMovement(player));
+}
+
+TEST_F(HeroMovementTest, OldSaveCanRecoverToNearestKnownSafeLand)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 18, 0), water(1, 18, 0), nearest(35, 18, 0), farther(5, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 18, 0), HeroTypeID(0), player)
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}});
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != origin && int3(x, y, 0) != nearest && int3(x, y, 0) != farther)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	const auto army = hero->getArmyStrength();
+	const auto * spellbook = hero->getArt(ArtifactPosition::SPELLBOOK);
+	ASSERT_GT(army, 0);
+	ASSERT_NE(spellbook, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	map()->getTile(origin).terrainType = TerrainId::WATER;
+	hero->setMovementPoints(1);
+
+	// The preceding save version cannot contain a recorded transit origin.
+	CMemorySerializer archive;
+	archive.oser.version = ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
+	archive.iser.version = ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
+	archive.oser & handler;
+	GameHandlerTestServer restoredServer(gameState(), player);
+	CGameHandler restored(restoredServer, gameState());
+	archive.iser.cb = gameState().get();
+	archive.iser & restored;
+	ASSERT_TRUE(archive.isFullyRead());
+	ASSERT_TRUE(restored.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->visitablePos(), nearest);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+	EXPECT_EQ(hero->getArmyStrength(), army);
+	EXPECT_EQ(hero->getArt(ArtifactPosition::SPELLBOOK), spellbook);
+	EXPECT_FALSE(restored.hasHeroInTransientMovement(player));
+}
+
+TEST_F(HeroMovementTest, EmergencyRelocationDoesNotRevealHiddenLand)
+{
+	const PlayerColor player(0);
+	const int3 start(18, 18, 0), hiddenLand(19, 18, 0), knownLand(28, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != start && int3(x, y, 0) != hiddenLand && int3(x, y, 0) != knownLand)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	map()->getTile(start).terrainType = TerrainId::WATER;
+	hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	hero->setMovementPoints(1);
+	auto * team = gameState()->getPlayerTeam(player);
+	ASSERT_NE(team, nullptr);
+	team->fogOfWarMap[hiddenLand] = 0;
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->visitablePos(), knownLand);
+	EXPECT_FALSE(team->fogOfWarMap[hiddenLand]);
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+}
+
+TEST_F(HeroMovementTest, EmergencyRelocationReservesOtherHeroesOrigins)
+{
+	const PlayerColor player(0);
+	const int3 firstWater(9, 10, 0), secondOrigin(11, 10, 0), secondWater(12, 10, 0), fallback(5, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(10, 10, 0), HeroTypeID(0), player)
+		.hero(int3(12, 10, 0), HeroTypeID(1), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != firstWater && int3(x, y, 0) != secondOrigin && int3(x, y, 0) != fallback)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * first = findHeroAt(int3(10, 10, 0));
+	auto * second = findHeroAt(int3(12, 10, 0));
+	ASSERT_NE(first, nullptr);
+	ASSERT_NE(second, nullptr);
+	for(auto * hero : {first, second})
+		hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	map()->getTile(firstWater).terrainType = TerrainId::WATER;
+	first->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	first->setMovementPoints(1);
+	second->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(second->id, second->convertFromVisitablePos(secondWater), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	second->setMovementPoints(1);
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(first->visitablePos(), fallback);
+	EXPECT_EQ(second->visitablePos(), secondOrigin);
+	EXPECT_EQ(first->movementPointsRemaining(), 0);
+	EXPECT_EQ(second->movementPointsRemaining(), 0);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
+TEST_F(HeroMovementTest, EmergencyRelocationPrioritizesHeroWithLargerSight)
+{
+	const PlayerColor player(0);
+	const int3 firstWater(19, 18, 0), secondWater(21, 18, 0);
+	const int3 sharedLand(20, 18, 0), otherLand(5, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(20, 18, 0), HeroTypeID(0), player)
+		.hero(int3(22, 18, 0), HeroTypeID(1), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != firstWater && int3(x, y, 0) != secondWater
+				&& int3(x, y, 0) != sharedLand && int3(x, y, 0) != otherLand)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * first = findHeroAt(int3(20, 18, 0));
+	auto * second = findHeroAt(int3(22, 18, 0));
+	ASSERT_NE(first, nullptr);
+	ASSERT_NE(second, nullptr);
+	const int smallSight = first->getSightRadius();
+	second->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::SIGHT_RADIUS, BonusSource::OTHER, 4, BonusSourceID()));
+	ASSERT_GE(second->getSightRadius(), smallSight + 4);
+	const int3 hidden(5, 18 + smallSight + 1, 0);
+	ASSERT_LT(hidden.y, 36);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	for(auto * hero : {first, second})
+	{
+		map()->getTile(hero->visitablePos()).terrainType = TerrainId::WATER;
+		hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+		hero->setMovementPoints(1);
+	}
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(first->visitablePos(), otherLand);
+	EXPECT_EQ(second->visitablePos(), sharedLand);
+	EXPECT_FALSE(gameState()->getPlayerTeam(player)->fogOfWarMap[hidden]);
+}
+
+TEST_F(HeroMovementTest, EmergencyRelocationCanReassignOriginWhenNeededForGroup)
+{
+	const PlayerColor player(0);
+	const int3 firstWater(19, 18, 0), secondWater(21, 18, 0);
+	const int3 secondOrigin(20, 18, 0), otherLand(5, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(20, 18, 0), HeroTypeID(0), player)
+		.hero(int3(21, 18, 0), HeroTypeID(1), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != firstWater && int3(x, y, 0) != secondOrigin && int3(x, y, 0) != otherLand)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * first = findHeroAt(int3(20, 18, 0));
+	auto * second = findHeroAt(int3(21, 18, 0));
+	ASSERT_NE(first, nullptr);
+	ASSERT_NE(second, nullptr);
+	const int smallSight = second->getSightRadius();
+	first->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::SIGHT_RADIUS, BonusSource::OTHER, 4, BonusSourceID()));
+	ASSERT_GE(first->getSightRadius(), smallSight + 4);
+	for(auto * hero : {first, second})
+		hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	map()->getTile(firstWater).terrainType = TerrainId::WATER;
+	first->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	first->setMovementPoints(1);
+	second->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(second->id, second->convertFromVisitablePos(secondWater), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	second->setMovementPoints(1);
+	const int3 hidden(5, 18 + smallSight + 1, 0);
+	ASSERT_LT(hidden.y, 36);
+	gameState()->getPlayerTeam(player)->fogOfWarMap[hidden] = 0;
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(first->visitablePos(), secondOrigin);
+	EXPECT_EQ(second->visitablePos(), otherLand);
+	EXPECT_FALSE(gameState()->getPlayerTeam(player)->fogOfWarMap[hidden]);
+}
+
+TEST_F(HeroMovementTest, EmergencyRelocationFindsNearbyLandOnLargeMap)
+{
+	const PlayerColor player(0);
+	const int3 water(126, 126, 0), expectedLand(125, 126, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(252, false).playerActive(player).hero(int3(127, 126, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	map()->getTile(water).terrainType = TerrainId::WATER;
+	hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	hero->setMovementPoints(1);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->visitablePos(), expectedLand);
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+}
+
+TEST_F(HeroMovementTest, EmergencyRecoveryPrefersRecordedOrigin)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 18, 0), departure(1, 18, 0), stranded(9, 18, 0), closerLand(10, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 18, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != origin && int3(x, y, 0) != closerLand)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(departure), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	// Isolate recovery preference from ordinary movement by constructing a stranded state.
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(stranded));
+	hero->setMovementPoints(1);
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+}
+
+TEST_F(HeroMovementTest, EmergencyRelocationAvoidsOccupiedLand)
+{
+	const PlayerColor player(0);
+	const int3 start(18, 18, 0), occupied(19, 18, 0), safeLand(25, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.resource(occupied, GameResID::GOLD, 10);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != start && int3(x, y, 0) != occupied && int3(x, y, 0) != safeLand)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	map()->getTile(start).terrainType = TerrainId::WATER;
+	hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	hero->setMovementPoints(1);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->visitablePos(), safeLand);
 }
 
 void HeroMovementTest::checkSingleIslandTransitStopsBeforeStranding(SpellID spell, BonusType bonus, EPathfindingLayer layer)

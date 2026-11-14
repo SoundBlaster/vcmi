@@ -778,11 +778,42 @@ bool CGameHandler::tryRecoverTransientHeroes(PlayerColor player)
 	struct RecoveryPlan
 	{
 		const CGHeroInstance * hero;
-		std::optional<int3> destination; // absent means a safe in-place landing
+		std::optional<int3> destination;
+		std::optional<int3> preferredOrigin;
+		bool returnsToOrigin;
+		bool needsRelocation;
 	};
 	std::vector<RecoveryPlan> plans;
 	std::set<int3> reservedDestinations;
 	const auto topology = gameState().getMap().getTopology();
+	const auto safeDestination = [&](const CGHeroInstance * hero, const int3 & destination)
+	{
+		if(!gameState().getMap().isInTheMap(destination) || destination.z != hero->visitablePos().z
+			|| reservedDestinations.contains(destination) || !team->fogOfWarMap[destination])
+			return false;
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				const auto neighbor = topology.canonicalize(destination + int3(dx, dy, 0));
+				if(!neighbor || !team->fogOfWarMap[*neighbor])
+					return false;
+			}
+		const auto & tile = gameState().getMap().getTile(destination);
+		if(!tile.isLand() || !tile.getTerrain()->isPassable() || tile.blocked()
+			|| gameState().getMap().isHoleAt(destination)
+			|| gameState().guardingCreaturePosition(destination).isValid())
+			return false;
+		// Emergency relocation must not reveal any terrain or unseen guards.
+		FowTilesType hidden;
+		gameInfo().getTilesInRange(hidden, destination, hero->getSightRadius(), ETileVisibility::HIDDEN, player);
+		if(!hidden.empty())
+			return false;
+		// Hidden events are not visited during an emergency relocation.
+		return std::all_of(tile.visitableObjects.begin(), tile.visitableObjects.end(), [&](const ObjectInstanceID & id)
+		{
+			return gameState().getObjInstance(id)->ID == Obj::EVENT;
+		});
+	};
 	// Validate the complete plan before moving any hero. A manual end-turn
 	// must not move one hero when another cannot be recovered.
 	for(const auto * hero : state->getHeroes())
@@ -794,43 +825,71 @@ bool CGameHandler::tryRecoverTransientHeroes(PlayerColor player)
 			return false;
 		if(canLandTransientHeroInPlace(gameState(), hero))
 		{
-			plans.push_back({hero, std::nullopt});
+			plans.push_back({hero, std::nullopt, std::nullopt, false, false});
 			continue;
 		}
 		std::vector<LandingStep> ordinaryRoute;
 		if(findKnownTransientLanding(gameState(), hero, std::nullopt, &ordinaryRoute) == KnownLanding::FOUND)
 			return false;
 		const auto entry = transientReturnLand.find(hero->id);
-		if(entry == transientReturnLand.end() || !gameState().getMap().isInTheMap(entry->second)
-			|| entry->second.z != hero->visitablePos().z)
-			return false;
-		const auto destination = entry->second;
-		const auto & tile = gameState().getMap().getTile(destination);
-		if(!reservedDestinations.insert(destination).second || !team->fogOfWarMap[destination]
-			|| !tile.isLand() || !tile.getTerrain()->isPassable() || tile.blocked()
-			|| gameState().getMap().isHoleAt(destination)
-			|| gameState().guardingCreaturePosition(destination).isValid())
-			return false;
-		// A recovery must neither reveal terrain nor disclose an unseen guard.
-		FowTilesType hidden;
-		gameInfo().getTilesInRange(hidden, destination, hero->getSightRadius(), ETileVisibility::HIDDEN, player);
-		if(!hidden.empty())
-			return false;
-		for(int dx = -1; dx <= 1; ++dx)
-			for(int dy = -1; dy <= 1; ++dy)
-			{
-				const auto neighbor = topology.canonicalize(destination + int3(dx, dy, 0));
-				if(!neighbor || !team->fogOfWarMap[*neighbor])
-					return false;
-			}
-		// Hidden events do not prevent the return and must not be activated.
-		for(const auto & id : tile.visitableObjects)
-			if(gameState().getObjInstance(id)->ID != Obj::EVENT)
-				return false;
-		plans.push_back({hero, destination});
+		if(entry != transientReturnLand.end() && safeDestination(hero, entry->second))
+			plans.push_back({hero, std::nullopt, entry->second, false, true});
+		else
+			plans.push_back({hero, std::nullopt, std::nullopt, false, true});
 	}
 	if(plans.empty())
 		return false;
+	// Larger sight ranges impose stricter fog requirements. Allocate those
+	// heroes first, while preserving other recorded origins whenever possible.
+	std::vector<RecoveryPlan *> relocationPlans;
+	std::set<int3> preferredOrigins;
+	for(auto & plan : plans)
+		if(plan.needsRelocation)
+		{
+			relocationPlans.push_back(&plan);
+			if(plan.preferredOrigin)
+				preferredOrigins.insert(*plan.preferredOrigin);
+		}
+	std::stable_sort(relocationPlans.begin(), relocationPlans.end(), [](const RecoveryPlan * left, const RecoveryPlan * right)
+	{
+		const int leftSight = left->hero->getSightRadius();
+		const int rightSight = right->hero->getSightRadius();
+		return leftSight != rightSight ? leftSight > rightSight : left->preferredOrigin.has_value() && !right->preferredOrigin.has_value();
+	});
+	for(auto * plan : relocationPlans)
+	{
+		if(plan->preferredOrigin && safeDestination(plan->hero, *plan->preferredOrigin))
+		{
+			plan->destination = plan->preferredOrigin;
+			plan->returnsToOrigin = true;
+			reservedDestinations.insert(*plan->destination);
+			continue;
+		}
+		const auto heroPosition = plan->hero->visitablePos();
+		const auto & map = gameState().getMap();
+		for(const bool allowOtherOrigins : {false, true})
+		{
+			std::optional<ui32> bestDistance;
+			for(int x = 0; x < map.width; ++x)
+				for(int y = 0; y < map.height; ++y)
+				{
+					const int3 candidate(x, y, heroPosition.z);
+					if(!allowOtherOrigins && preferredOrigins.contains(candidate))
+						continue;
+					const auto distance = topology.horizontalDistanceSquaredIgnoringLevel(heroPosition, candidate);
+					if(distance && (!bestDistance || *distance < *bestDistance) && safeDestination(plan->hero, candidate))
+					{
+						plan->destination = candidate;
+						bestDistance = *distance;
+					}
+				}
+			if(plan->destination)
+				break;
+		}
+		if(!plan->destination)
+			return false;
+		reservedDestinations.insert(*plan->destination);
+	}
 	// Keep the activity open for the entire group. Its final settlement can
 	// run victory checks, so no hero pointer may be used after it finishes.
 	TryMoveHero activityMove;
@@ -862,7 +921,7 @@ bool CGameHandler::tryRecoverTransientHeroes(PlayerColor player)
 		transientReturnLand.erase(hero->id);
 		InfoWindow notice;
 		notice.player = player;
-		notice.text.appendTextID("vcmi.toroidal.transientReturn");
+		notice.text.appendTextID(plan.returnsToOrigin ? "vcmi.toroidal.transientReturn" : "vcmi.toroidal.transientRelocation");
 		notice.text.replaceTextID(hero->getNameTextID());
 		showInfoDialog(&notice);
 	}

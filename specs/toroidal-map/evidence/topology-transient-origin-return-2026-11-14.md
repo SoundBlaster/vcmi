@@ -4,7 +4,7 @@ A server records the confirmed LAND tile when an on-foot hero enters AIR or
 WATER transit on a toroidal map. If no ordinary safe known landing path is
 available, an expired timer or manual end-turn request can return a single
 transient hero to that exact tile, consume remaining movement points and notify
-the owning player. This does not choose an arbitrary known location.
+the owning player. At that revision it did not choose another known location.
 
 The return requires the tile to remain passable, unguarded, known and free of
 blocking or other visitable objects; a nonblocking event is permitted without
@@ -18,8 +18,9 @@ version loads without one; it does not invent a location. A removed or
 relocated hero loses its stored origin, as does a hero that lands normally.
 At this revision the implementation did not cover multiple simultaneous transient
 heroes; a later [group recovery change](topology-multiple-transient-return-2026-11-14.md)
-handles a constrained subset. Old saves without an origin, an occupied or
-unsuitable origin, vehicles and other hidden-object and dynamic-world cases remain. It therefore cannot guarantee that a
+handles a constrained subset. A later [emergency relocation change](topology-emergency-known-land-2026-11-14.md)
+also handles some missing or unsuitable origins using previously known land.
+Vehicles and other hidden-object and dynamic-world cases remain. It therefore cannot guarantee that a
 timer or AI turn always finishes. G12 remains pending.
 
 `HeroMovementTest.StrandedWaterWalkerReturnsToTheLandWhereTransitStarted`
