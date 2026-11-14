@@ -7686,6 +7686,62 @@ TEST_F(HeroMovementTest, TransientRouteSafetyWorksOnLargeMap)
 	EXPECT_FALSE(paths.getPath(route, destination, EPathfindingLayer::WATER));
 	EXPECT_FALSE(paths.getPathInfo(destination, EPathfindingLayer::WATER)->reachable());
 	EXPECT_TRUE(paths.getPath(route, int3(132, 126, 0), EPathfindingLayer::WATER));
+
+	// Opt-in timing of the same server-side search, excluding map setup.
+	if(std::getenv("VCMI_TOROID_LANDING_BENCH"))
+	{
+		for(const int points : {1200, 3000, 6000})
+		{
+			std::vector<double> elapsed;
+			for(int sample = 0; sample < 12; ++sample)
+			{
+				const auto before = std::chrono::steady_clock::now();
+				const auto result = findKnownTransientLanding(*gameState(), hero,
+					PathfinderStart{int3(127, 126, 0), EPathfindingLayer::WATER, points}, nullptr, LandingKnowledge::PLAYER_ROUTE);
+				const auto after = std::chrono::steady_clock::now();
+				ASSERT_EQ(result, KnownLanding::FOUND);
+				if(sample > 0)
+					elapsed.push_back(std::chrono::duration<double, std::milli>(after - before).count());
+			}
+			std::ranges::sort(elapsed);
+			std::cout << "Landing benchmark points=" << points << " samples=" << elapsed.size()
+				<< " median_ms=" << elapsed[elapsed.size() / 2] << " max_ms=" << elapsed.back() << std::endl;
+		}
+		for(const auto & [points, distance] : {std::pair{1200, 5}, std::pair{3000, 10}, std::pair{6000, 20}})
+		{
+			std::vector<double> elapsed, nextElapsed;
+			hero->setMovementPoints(points);
+			for(int sample = 0; sample < 6; ++sample)
+			{
+				CPathsInfo freshPaths(gameState()->getMapSize(), hero);
+				auto freshConfig = std::make_shared<SingleHeroPathfinderConfig>(freshPaths, *gameState(), hero);
+				CPathfinder freshFinder(*gameState(), freshConfig);
+				freshFinder.calculatePaths();
+				CGPath selected;
+				const auto before = std::chrono::steady_clock::now();
+				const bool accepted = freshPaths.getPath(selected, int3(126 + distance, 126, 0), EPathfindingLayer::WATER);
+				const auto after = std::chrono::steady_clock::now();
+				ASSERT_TRUE(accepted);
+				const auto * nextNode = freshPaths.getNode(int3(127 + distance, 126, 0), EPathfindingLayer::WATER);
+				ASSERT_NE(nextNode->theNodeBefore, nullptr);
+				ASSERT_EQ(nextNode->theNodeBefore->coord, int3(126 + distance, 126, 0));
+				const auto nextBefore = std::chrono::steady_clock::now();
+				const bool nextAccepted = freshPaths.getPath(selected, int3(127 + distance, 126, 0), EPathfindingLayer::WATER);
+				const auto nextAfter = std::chrono::steady_clock::now();
+				ASSERT_TRUE(nextAccepted);
+				if(sample > 0)
+				{
+					elapsed.push_back(std::chrono::duration<double, std::milli>(after - before).count());
+					nextElapsed.push_back(std::chrono::duration<double, std::milli>(nextAfter - nextBefore).count());
+				}
+			}
+			std::ranges::sort(elapsed);
+			std::ranges::sort(nextElapsed);
+			std::cout << "Route benchmark points=" << points << " distance=" << distance << " samples=" << elapsed.size()
+				<< " median_ms=" << elapsed[elapsed.size() / 2] << " max_ms=" << elapsed.back()
+				<< " next_median_ms=" << nextElapsed[nextElapsed.size() / 2] << " next_max_ms=" << nextElapsed.back() << std::endl;
+		}
+	}
 }
 
 void HeroMovementTest::checkSingleIslandTransitStopsBeforeStranding(SpellID spell, BonusType bonus, EPathfindingLayer layer)
