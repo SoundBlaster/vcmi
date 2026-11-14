@@ -63,6 +63,8 @@ class CGameHandler : public Environment, public IGameEventCallback
 	// prevents a later unrelated relocation from reusing stale layer state.
 	std::map<ObjectInstanceID, std::pair<int3, EPathfindingLayer>> heroMovementLayers;
 	bool legacyMovementLayerUnknown = false;
+	// Server-owned origin for a possible emergency return from on-foot transit.
+	std::map<ObjectInstanceID, int3> transientReturnLand;
 
 public:
 	std::unique_ptr<HeroPoolProcessor> heroPool;
@@ -271,6 +273,7 @@ public:
 	bool hasHeroInTransientMovement(PlayerColor player) const;
 	bool tryLandTransientHeroesInPlace(PlayerColor player);
 	bool tryAutoLandTransientHero(PlayerColor player);
+	bool tryReturnStrandedTransientHero(PlayerColor player);
 	void onNewTurn();
 	void addStatistics(StatisticDataSet &stat) const;
 	void sendQuestionResolved(QuestionID questionID);
@@ -306,6 +309,16 @@ public:
 			legacyMovementLayerUnknown = true;
 			heroMovementLayers.clear();
 		}
+		if(h.hasFeature(Handler::Version::TOROIDAL_TRANSIENT_RETURN))
+		{
+			h & transientReturnLand;
+			if(!h.saving)
+				for(const auto & [id, position] : transientReturnLand)
+					if(!id.hasValue() || position.x < 0 || position.y < 0 || position.z < 0)
+						throw std::runtime_error("Invalid transient return point in saved server state");
+		}
+		else if(!h.saving)
+			transientReturnLand.clear();
 	}
 
 	/// applies replay recording options of this game to the log kept inside the gamestate

@@ -905,6 +905,56 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(server.gh->gameState().actingPlayers.contains(blue));
 	ASSERT_TRUE(host.state->actingPlayers.contains(blue));
 	ASSERT_TRUE(guest.state->actingPlayers.contains(blue));
+
+	// Re-enter AIR through the network, then simulate exhausted movement and
+	// end the turn. Both peers must apply the emergency return and zero points.
+	EndTurn finishBlueBeforeRescue;
+	finishBlueBeforeRescue.player = blue;
+	finishBlueBeforeRescue.requestID = 30;
+	guest.codec->sendPack(finishBlueBeforeRescue);
+	pumpUntil([&] { return guest.results.contains(30) && host.state->actingPlayers.contains(red) && guest.state->actingPlayers.contains(red); });
+	ASSERT_TRUE(guest.results.contains(30));
+	ASSERT_TRUE(guest.results.at(30));
+	const auto rescueOrigin = server.gh->gameState().getHero(hero->id)->visitablePos();
+	std::optional<int3> rescueWater;
+	for(int dx = -1; dx <= 1 && !rescueWater; ++dx)
+		for(int dy = -1; dy <= 1; ++dy)
+		{
+			const auto candidate = topology.canonicalize(rescueOrigin + int3(dx, dy, 0));
+			if(candidate && server.gh->gameState().getMap().getTile(*candidate).isWater())
+			{
+				rescueWater = candidate;
+				break;
+			}
+		}
+	ASSERT_TRUE(rescueWater.has_value());
+	server.gh->setMovePoints(hero->id, 500);
+	pumpUntil([&] { return host.state->getHero(hero->id)->movementPointsRemaining() == 500; });
+	MoveHero departForRescue({hero->convertFromVisitablePos(*rescueWater)}, EPathfindingLayer::AIR, hero->id, true);
+	departForRescue.player = red;
+	departForRescue.requestID = 31;
+	host.codec->sendPack(departForRescue);
+	pumpUntil([&] { return host.results.contains(31) && guest.state->getHero(hero->id)->visitablePos() == *rescueWater; });
+	ASSERT_TRUE(host.results.contains(31));
+	ASSERT_TRUE(host.results.at(31));
+	server.gh->setMovePoints(hero->id, 1);
+	pumpUntil([&] { return host.state->getHero(hero->id)->movementPointsRemaining() == 1 && guest.state->getHero(hero->id)->movementPointsRemaining() == 1; });
+	EndTurn finishStranded;
+	finishStranded.player = red;
+	finishStranded.requestID = 32;
+	host.codec->sendPack(finishStranded);
+	pumpUntil([&] {
+		return host.results.contains(32) && host.state->actingPlayers.contains(blue) && guest.state->actingPlayers.contains(blue)
+			&& host.state->getHero(hero->id)->visitablePos() == rescueOrigin && guest.state->getHero(hero->id)->visitablePos() == rescueOrigin;
+	});
+	ASSERT_TRUE(host.results.contains(32)) << host.failure;
+	ASSERT_TRUE(host.results.at(32)) << testing::PrintToString(host.systemMessages);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), rescueOrigin);
+		EXPECT_EQ(peer->state->getHero(hero->id)->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), 0);
+	}
 }
 
 TEST(ToroidalDemoVmapTest, DecodesExternalUntaggedPrototypeSave)
@@ -1079,7 +1129,7 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 			ASSERT_NE(priorHero, nullptr);
 			EXPECT_EQ(priorHero->getPathfindingStartLayer(), EPathfindingLayer::AIR);
 		}
-		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
+		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::CURRENT;
 		EXPECT_EQ(CLoadFile::readVersion(path), expectedVersion);
 		std::ifstream file(path.c_str(), std::ios::binary);
 		std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
@@ -3680,12 +3730,13 @@ TEST_F(HeroMovementTest, AlreadyStrandedWaterWalkerCanContinueExploring)
 	EXPECT_EQ(hero->movementPointsRemaining(), 100);
 }
 
-TEST_F(HeroMovementTest, FogExplorationCanStrandWaterWalkerOnUnchangedMap)
+TEST_F(HeroMovementTest, StrandedWaterWalkerReturnsToTheLandWhereTransitStarted)
 {
 	const PlayerColor player(0);
 	const int3 island(18, 18, 0);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
-	builder.size(36, false).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player);
+	builder.size(36, false).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}});
 	for(int x = 0; x < 36; ++x)
 		for(int y = 0; y < 36; ++y)
 			if(int3(x, y, 0) != island)
@@ -3694,20 +3745,111 @@ TEST_F(HeroMovementTest, FogExplorationCanStrandWaterWalkerOnUnchangedMap)
 	map()->setToroidalAndRebuild(true);
 	auto * hero = findHeroByOwner(player);
 	ASSERT_NE(hero, nullptr);
+	const auto originalArmyStrength = hero->getArmyStrength();
+	const auto * originalSpellbook = hero->getArt(ArtifactPosition::SPELLBOOK);
+	ASSERT_GT(originalArmyStrength, 0);
+	ASSERT_NE(originalSpellbook, nullptr);
 	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
 	hero->setMovementPoints(1200);
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
-	// This documents an unresolved liveness defect. The unknown frontier makes
-	// the known-landing check inconclusive even after return becomes impossible.
+	// The unknown frontier makes the known-landing check inconclusive even
+	// after an ordinary return has become impossible.
 	for(int x = 19; x <= 29; ++x)
 		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(x, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
 	EXPECT_EQ(hero->movementPointsRemaining(), 100);
 	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(30, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+	const auto strandedPosition = hero->visitablePos();
+	auto * team = gameState()->getPlayerTeam(player);
+	ASSERT_TRUE(team->fogOfWarMap[island]);
+	team->fogOfWarMap[island] = 0;
 	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
-	EXPECT_TRUE(handler.hasHeroInTransientMovement(player));
-	EXPECT_EQ(hero->visitablePos(), int3(29, 18, 0));
+	team->fogOfWarMap[island] = 1;
+	map()->getTile(island).terrainType = TerrainId::WATER;
+	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
+	map()->getTile(island).terrainType = TerrainId::GRASS;
+	const std::string eventDefinition = R"({ "animation": "test.def", "mask": [ "V" ] })";
+	JsonNode eventJson(eventDefinition.data(), eventDefinition.size(), "TransientReturnEvent");
+	auto eventAppearance = std::make_shared<ObjectTemplate>();
+	eventAppearance->id = Obj::EVENT;
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	eventAppearance->readJson(eventJson, resolver, false);
+	auto occupied = std::make_shared<CGObjectInstance>(gameState().get());
+	occupied->ID = Obj::RESOURCE;
+	occupied->pos = island;
+	occupied->instanceName = "transient_return_occupied";
+	occupied->appearance = eventAppearance;
+	map()->addNewObject(occupied);
+	ASSERT_FALSE(map()->getTile(island).visitableObjects.empty());
+	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
+	map()->removeObject(occupied->id);
 
+	// Invisible events must neither disclose themselves by blocking recovery
+	// nor receive a leave callback for a hero that merely flew over them.
+	struct LeaveProbe : CGObjectInstance
+	{
+		using CGObjectInstance::CGObjectInstance;
+		mutable bool left = false;
+		mutable bool visited = false;
+		void onHeroVisit(IGameEventCallback &, const CGHeroInstance *) const override { visited = true; }
+		void onHeroLeave(IGameEventCallback &, const CGHeroInstance *) const override { left = true; }
+	};
+	auto hiddenEvent = std::make_shared<LeaveProbe>(gameState().get());
+	hiddenEvent->ID = Obj::EVENT;
+	hiddenEvent->pos = island;
+	hiddenEvent->instanceName = "transient_return_event";
+	hiddenEvent->appearance = eventAppearance;
+	map()->addNewObject(hiddenEvent);
+	auto sourceEvent = std::make_shared<LeaveProbe>(gameState().get());
+	sourceEvent->ID = Obj::EVENT;
+	sourceEvent->pos = strandedPosition;
+	sourceEvent->instanceName = "transient_source_event";
+	sourceEvent->appearance = eventAppearance;
+	map()->hideObject(hero);
+	map()->addNewObject(sourceEvent);
+	map()->showObject(hero);
+	EXPECT_EQ(hero->visitablePos(), strandedPosition);
+	EXPECT_EQ(hero->movementPointsRemaining(), 100);
+
+	// Old branch saves have no recorded origin and must not invent one.
+	CMemorySerializer oldArchive;
+	oldArchive.oser.version = ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
+	oldArchive.iser.version = ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
+	oldArchive.oser & handler;
+	GameHandlerTestServer oldServer(gameState(), player);
+	CGameHandler oldHandler(oldServer, gameState());
+	oldArchive.iser.cb = gameState().get();
+	oldArchive.iser & oldHandler;
+	ASSERT_TRUE(oldArchive.isFullyRead());
+	EXPECT_FALSE(oldHandler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->visitablePos(), strandedPosition);
+
+	// Current saves preserve the server-owned origin across a restore.
+	CMemorySerializer archive;
+	archive.oser & handler;
+	GameHandlerTestServer restoredServer(gameState(), player);
+	CGameHandler restored(restoredServer, gameState());
+	archive.iser.cb = gameState().get();
+	archive.iser & restored;
+	ASSERT_TRUE(archive.isFullyRead());
+	gameState()->players.at(player).human = true;
+	gameState()->players.at(player).status = EPlayerStatus::INGAME;
+	gameState()->actingPlayers.insert(player);
+	gameState()->getStartInfo()->turnTimerInfo.turnTimer = 1;
+	gameState()->getStartInfo()->turnTimerInfo.baseTimer = 0;
+	restored.turnTimerHandler->onGameplayStart(player);
+	restored.turnTimerHandler->onPlayerGetTurn(player);
+	restored.turnTimerHandler->update(1);
+	restored.turnTimerHandler->update(1);
+	EXPECT_FALSE(restored.hasHeroInTransientMovement(player));
+	EXPECT_EQ(hero->visitablePos(), island);
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+	EXPECT_EQ(hero->getOwner(), player);
+	EXPECT_EQ(hero->getArmyStrength(), originalArmyStrength);
+	EXPECT_EQ(hero->getArt(ArtifactPosition::SPELLBOOK), originalSpellbook);
+	EXPECT_FALSE(sourceEvent->left);
+	EXPECT_FALSE(hiddenEvent->visited);
+	EXPECT_NE(gameState()->getObjInstance(hiddenEvent->id), nullptr);
 }
 
 TEST_F(HeroMovementTest, ToroidalTransientLandingSearchWorksOn252Map)
@@ -4083,10 +4225,9 @@ TEST_F(HeroMovementTest, AutomaticLandingDoesNotTriggerAnEvent)
 	ASSERT_TRUE(landing->reachable());
 	ASSERT_EQ(landing->turns, 0);
 	ASSERT_EQ(landing->action, EPathNodeAction::NORMAL);
-	const auto remaining = hero->movementPointsRemaining();
-	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
-	EXPECT_EQ(hero->visitablePos(), water);
-	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+	ASSERT_TRUE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->visitablePos(), land);
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
 	EXPECT_NE(map()->getObject(event->id), nullptr);
 }
 

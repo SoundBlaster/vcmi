@@ -725,6 +725,7 @@ void CGameHandler::landTransientHeroInPlace(const CGHeroInstance * hero)
 	landing.movePoints = hero->movementPointsRemaining();
 	landing.movementLayer = EPathfindingLayer::LAND;
 	sendAndApply(landing);
+	transientReturnLand.erase(hero->id);
 	heroMovementLayers[hero->id] = {position, EPathfindingLayer::LAND};
 }
 
@@ -748,6 +749,82 @@ bool CGameHandler::tryLandTransientHeroesInPlace(PlayerColor player)
 	for(const auto * hero : landingHeroes)
 		landTransientHeroInPlace(hero);
 	return !landingHeroes.empty();
+}
+
+bool CGameHandler::tryReturnStrandedTransientHero(PlayerColor player)
+{
+	if(!gameState().getMap().toroidal)
+		return false;
+	const auto * state = gameState().getPlayerState(player);
+	const auto * team = gameState().getPlayerTeam(player);
+	if(!state || !team)
+		return false;
+
+	// Until multi-hero recovery has an atomic plan, do not move any of them
+	// when more than one hero needs to land.
+	const CGHeroInstance * hero = nullptr;
+	for(const auto * candidate : state->getHeroes())
+	{
+		const auto layer = candidate->getConfirmedMovementLayer();
+		if(layer != EPathfindingLayer::AIR && layer != EPathfindingLayer::WATER)
+			continue;
+		if(hero || candidate->inBoat())
+			return false;
+		hero = candidate;
+	}
+	if(!hero)
+		return false;
+	std::vector<LandingStep> ordinaryRoute;
+	if(findKnownTransientLanding(gameState(), hero, std::nullopt, &ordinaryRoute) == KnownLanding::FOUND)
+		return false;
+	const auto entry = transientReturnLand.find(hero->id);
+	if(entry == transientReturnLand.end() || !gameState().getMap().isInTheMap(entry->second))
+		return false;
+	const auto destination = entry->second;
+	const auto & tile = gameState().getMap().getTile(destination);
+	if(!team->fogOfWarMap[destination] || !tile.isLand() || !tile.getTerrain()->isPassable()
+		|| tile.blocked() || gameState().getMap().isHoleAt(destination)
+		|| gameState().guardingCreaturePosition(destination).isValid())
+		return false;
+	// A recovery must neither reveal terrain nor disclose an unseen guard.
+	FowTilesType hidden;
+	gameInfo().getTilesInRange(hidden, destination, hero->getSightRadius(), ETileVisibility::HIDDEN, player);
+	if(!hidden.empty())
+		return false;
+	const auto topology = gameState().getMap().getTopology();
+	for(int dx = -1; dx <= 1; ++dx)
+		for(int dy = -1; dy <= 1; ++dy)
+		{
+			const auto neighbor = topology.canonicalize(destination + int3(dx, dy, 0));
+			if(!neighbor || !team->fogOfWarMap[*neighbor])
+				return false;
+		}
+	// Hidden events do not prevent the return and must not be activated by it.
+	// Other visitable objects still require an explicit overlap policy.
+	for(const auto & id : tile.visitableObjects)
+		if(gameState().getObjInstance(id)->ID != Obj::EVENT)
+			return false;
+	TryMoveHero rescue;
+	rescue.id = hero->id;
+	rescue.start = hero->anchorPos();
+	rescue.end = hero->convertFromVisitablePos(destination);
+	rescue.result = TryMoveHero::TELEPORTATION;
+	rescue.movePoints = 0;
+	rescue.movementLayer = EPathfindingLayer::LAND;
+	// A hero in transit did not visit the object below it; neither leave nor
+	// destination visit callbacks are appropriate for an emergency return.
+	auto moveActivity = std::make_shared<HeroMovementActivity>(this, rescue, hero);
+	activities->addActivity(moveActivity);
+	sendAndApply(rescue);
+	moveActivity->finish();
+	heroMovementLayers[hero->id] = {destination, EPathfindingLayer::LAND};
+	transientReturnLand.erase(hero->id);
+	InfoWindow notice;
+	notice.player = player;
+	notice.text.appendTextID("vcmi.toroidal.transientReturn");
+	notice.text.replaceTextID(hero->getNameTextID());
+	showInfoDialog(&notice);
+	return true;
 }
 
 bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
@@ -776,7 +853,7 @@ bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
 		const bool transit = nextLayer == EPathfindingLayer::AIR || nextLayer == EPathfindingLayer::WATER;
 		return moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, transit, player, nextLayer);
 	}
-	return false;
+	return tryReturnStrandedTransientHero(player);
 }
 
 void CGameHandler::onPlayerTurnEnded(PlayerColor which)
@@ -954,6 +1031,7 @@ bool CGameHandler::removeObject(const CGObjectInstance * obj, const PlayerColor 
 	ro.objectID = obj->id;
 	ro.initiator = initiator;
 	heroMovementLayers.erase(obj->id);
+	transientReturnLand.erase(obj->id);
 	sendAndApply(ro);
 
 	checkVictoryLossConditionsForAll(); //e.g. if monster escaped (removing objs after battle is done directly by endBattle, not this function)
@@ -1235,7 +1313,20 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			else if(result == TryMoveHero::TELEPORTATION)
 				tmh.movementLayer = h->inBoat() ? h->getBoat()->layer : EPathfindingLayer::LAND;
 		}
+		const auto previousLayer = h->getConfirmedMovementLayer();
+		const auto origin = h->visitablePos();
+		const bool leftLandForTransit = gameState().getMap().toroidal && !h->inBoat()
+			&& result == TryMoveHero::SUCCESS && tmh.start != tmh.end
+			&& (tmh.movementLayer == EPathfindingLayer::AIR || tmh.movementLayer == EPathfindingLayer::WATER)
+			&& (previousLayer == EPathfindingLayer::LAND || previousLayer == EPathfindingLayer::AUTO)
+			&& gameState().getMap().getTile(origin).isLand();
 		sendAndApply(tmh);
+		if(leftLandForTransit)
+			transientReturnLand[hid] = origin;
+		else if(gameState().getMap().toroidal && tmh.start != tmh.end
+			&& (result == TryMoveHero::TELEPORTATION || result == TryMoveHero::EMBARK
+				|| result == TryMoveHero::DISEMBARK || tmh.movementLayer == EPathfindingLayer::LAND))
+			transientReturnLand.erase(hid);
 		if(gameState().getMap().toroidal && tmh.start != tmh.end
 			&& (result == TryMoveHero::SUCCESS || result == TryMoveHero::TELEPORTATION
 				|| result == TryMoveHero::EMBARK || result == TryMoveHero::DISEMBARK))
@@ -1796,6 +1887,7 @@ void CGameHandler::giveHero(ObjectInstanceID id, PlayerColor player, ObjectInsta
 void CGameHandler::changeObjPos(ObjectInstanceID objid, int3 newPos, const PlayerColor & initiator)
 {
 	heroMovementLayers.erase(objid);
+	transientReturnLand.erase(objid);
 	ChangeObjPos cop;
 	cop.objid = objid;
 	cop.nPos = newPos;
