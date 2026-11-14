@@ -17,3 +17,17 @@ On macOS arm64, `vcmitest` built from `0a04fb7` plus the test change. The
 consecutive runs. The battle result is forced rather than played out; this
 does not establish negotiation, defeat, level-up dialogs, graphical combat,
 remote clients, or interactions with multiple nearby guards.
+
+## Two opposing heroes
+
+`AllSeamsAndLevels/ToroidalHeroAttackTest.DirectAttackAcrossSeamUsesCorrectPlayers`
+uses another synthetic two-player SoD fixture on the same map dimensions.
+It relocates the heroes and reveals both players' maps as test setup. For all
+eight directions on both levels, the pathfinder chooses the adjacent enemy;
+the server starts a battle at that tile with the correct hero and player on
+each side, and both players' game-state lookups identify the same battle.
+
+The 16 hero cases, 16 monster cases and guarded-mine test passed three
+consecutive runs on macOS arm64, built from `2ac006f` plus the hero test.
+This stops at battle creation; actual combat, result confirmation, remote
+clients and restricted player visibility were not tested in this fixture.

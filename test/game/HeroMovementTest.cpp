@@ -6440,6 +6440,59 @@ TEST_P(ToroidalMonsterAttackTest, DirectAttackAcrossSeamUsesCorrectDefender)
 
 INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalMonsterAttackTest, ::testing::Range(0, 16));
 
+class ToroidalHeroAttackTest : public HeroMovementTest, public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(ToroidalHeroAttackTest, DirectAttackAcrossSeamUsesCorrectPlayers)
+{
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions.at(GetParam() % directions.size());
+	const int z = GetParam() / directions.size();
+	const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+	const int3 destination(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z);
+	const PlayerColor attacker(0), defender(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(attacker).playerActive(defender)
+		.hero(int3(19, 18, 0), HeroTypeID(0), attacker).heroGarrison({{CreatureID::ARCHER, 1}})
+		.hero(int3(25, 25, 0), HeroTypeID(1), defender).heroGarrison({{CreatureID::ARCHER, 1}});
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(attacker);
+	revealMap(defender);
+	auto * attackerHero = findHeroByOwner(attacker);
+	auto * defenderHero = findHeroByOwner(defender);
+	ASSERT_NE(attackerHero, nullptr);
+	ASSERT_NE(defenderHero, nullptr);
+	map()->moveObject(attackerHero->id, attackerHero->convertFromVisitablePos(origin));
+	map()->moveObject(defenderHero->id, defenderHero->convertFromVisitablePos(destination));
+	ASSERT_EQ(attackerHero->visitablePos(), origin);
+	ASSERT_EQ(defenderHero->visitablePos(), destination);
+	attackerHero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), attackerHero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), attackerHero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * target = paths.getNode(destination, EPathfindingLayer::LAND);
+	ASSERT_TRUE(target->reachable());
+	ASSERT_NE(target->theNodeBefore, nullptr);
+	EXPECT_EQ(target->theNodeBefore->coord, origin);
+	GameHandlerTestServer server(gameState(), attacker);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(attackerHero->id, attackerHero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, attacker, EPathfindingLayer::LAND));
+	const auto * battle = gameState()->getBattle(attacker);
+	ASSERT_NE(battle, nullptr);
+	EXPECT_EQ(battle->getSideHero(BattleSide::ATTACKER), attackerHero);
+	EXPECT_EQ(battle->getSideHero(BattleSide::DEFENDER), defenderHero);
+	EXPECT_EQ(battle->getSidePlayer(BattleSide::ATTACKER), attacker);
+	EXPECT_EQ(battle->getSidePlayer(BattleSide::DEFENDER), defender);
+	EXPECT_EQ(battle->getLocation(), destination);
+	EXPECT_EQ(gameState()->getBattle(defender), battle);
+}
+
+INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalHeroAttackTest, ::testing::Range(0, 16));
+
 TEST_F(HeroMovementTest, WrappedMonsterBattleUsesTheCanonicalVisitablePosition)
 {
 	const PlayerColor player(0);
