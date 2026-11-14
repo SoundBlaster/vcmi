@@ -1,0 +1,36 @@
+diff --git a/test/game/HeroMovementTest.cpp b/test/game/HeroMovementTest.cpp
+index ab3c2f2..527c7bf 100644
+--- a/test/game/HeroMovementTest.cpp
++++ b/test/game/HeroMovementTest.cpp
+@@ -197,3 +197,31 @@ TEST_F(HeroMovementTest, cursedGroundBlocksHighLevelAdventureSpells)
+ 	moveHero(cursedTile);
+ 	EXPECT_FALSE(canCast(dimensionDoor));
+ }
++
++
++// Temporary baseline experiment: added test only, engine sources are unchanged.
++#define BASELINE_ISLAND_PROBE(TestName, BonusKind, LayerName) \
++TEST_F(HeroMovementTest, TestName) \
++{ \
++ const PlayerColor player(0); \
++ const int3 island(18, 18, 0); \
++ TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD); \
++ builder.size(36, false).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player); \
++ for(int x=0; x<36; ++x) for(int y=0; y<36; ++y) if(int3(x,y,0)!=island) builder.terrain(int3(x,y,0), TerrainId::WATER); \
++ startWithMap(std::move(builder)); revealMap(player); \
++ auto * hero=findHeroByOwner(player); ASSERT_NE(hero,nullptr); \
++ hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusKind, BonusSource::OTHER, 0, BonusSourceID())); \
++ hero->setMovementPoints(1200); \
++ CPathsInfo paths(gameState()->getMapSize(),hero); \
++ auto config=std::make_shared<SingleHeroPathfinderConfig>(paths,*gameState(),hero); \
++ CPathfinder pathfinder(*gameState(),config); pathfinder.calculatePaths(); \
++ const int3 water(19,18,0); CGPath automatic; \
++ EXPECT_TRUE(paths.getNode(water, LayerName)->reachable()); \
++ EXPECT_FALSE(paths.getPath(automatic,water,EPathfindingLayer::AUTO)); \
++ GameHandlerTestServer server(gameState(),player); CGameHandler handler(server,gameState()); \
++ for(int x=19; x<=29; ++x) ASSERT_TRUE(handler.moveHero(hero->id,hero->convertFromVisitablePos(int3(x,18,0)),EMovementMode::STANDARD,true,player,LayerName)); \
++ EXPECT_EQ(hero->visitablePos(),int3(29,18,0)); EXPECT_EQ(hero->movementPointsRemaining(),100); \
++}
++BASELINE_ISLAND_PROBE(BaselineIslandWaterWalkProbe, BonusType::WATER_WALKING, EPathfindingLayer::WATER)
++BASELINE_ISLAND_PROBE(BaselineIslandFlightProbe, BonusType::FLYING_MOVEMENT, EPathfindingLayer::AIR)
++#undef BASELINE_ISLAND_PROBE
