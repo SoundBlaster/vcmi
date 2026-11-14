@@ -57,6 +57,7 @@
 #include "../../lib/bonuses/Bonus.h"
 #include "../../lib/pathfinder/CPathfinder.h"
 #include "../../lib/pathfinder/PathfinderOptions.h"
+#include "../../lib/pathfinder/TransientLanding.h"
 #include "../../lib/rmg/CMapGenOptions.h"
 #include "../../lib/serializer/CMemorySerializer.h"
 #include "../../lib/serializer/CLoadFile.h"
@@ -6413,6 +6414,56 @@ TEST_F(HeroMovementTest, InPlaceFlightLandingPreventsUnsafeDeparture)
 	EXPECT_EQ(hero->visitablePos(), shore);
 	EXPECT_EQ(hero->movementPointsRemaining(), 150);
 	ASSERT_TRUE(handler.tryLandTransientHeroesInPlace(player));
+}
+
+TEST_F(HeroMovementTest, HiddenEventPreventsInPlaceFlightRecovery)
+{
+	const PlayerColor player(0);
+	const int3 origin(10, 10, 0), shore(11, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != origin && int3(x, y, 0) != shore)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(250);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	map()->getTile(origin).terrainType = TerrainId::WATER;
+	hero->setMovementPoints(199);
+	ASSERT_TRUE(canLandTransientHeroInPlace(*gameState(), hero));
+	const std::string text = R"({ "animation": "test.def", "mask": [ "V" ] })";
+	JsonNode definition(text.data(), text.size(), "HiddenFlightEvent");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	appearance->id = Obj::EVENT;
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto event = std::make_shared<CGObjectInstance>(gameState().get());
+	event->ID = Obj::EVENT;
+	event->pos = shore;
+	event->instanceName = "hidden_flight_event";
+	event->appearance = appearance;
+	map()->hideObject(hero);
+	map()->addNewObject(event);
+	map()->showObject(hero);
+	EXPECT_FALSE(canLandTransientHeroInPlace(*gameState(), hero));
+	EXPECT_EQ(findKnownTransientLanding(*gameState(), hero, std::nullopt, nullptr, LandingKnowledge::PLAYER_ROUTE), KnownLanding::NONE);
+	EXPECT_FALSE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_FALSE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->visitablePos(), shore);
+	EXPECT_EQ(hero->movementPointsRemaining(), 199);
+	map()->hideObject(hero);
+	map()->removeObject(event->id);
+	map()->showObject(hero);
+	EXPECT_TRUE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 }
 
 TEST_F(HeroMovementTest, TransientRecoveryMustNotReturnHeroToAnotherLevel)
