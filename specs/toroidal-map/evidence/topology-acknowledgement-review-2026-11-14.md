@@ -29,7 +29,7 @@ not a complete audit of every visitor, client or AI consumer.
 clears its wait for that answer and can resume a movement sequence; this source
 inspection does not establish a reproducible player-facing failure.
 
-Nullkiller2 takes the result into account: `AIStatus::receivedAnswerConfirmation`
+At the time of review, Nullkiller2 took the result into account: `AIStatus::receivedAnswerConfirmation`
 removes a question on success but keeps it on rejection. `waitTillFree` waits
 while that question remains, and the rejection branch has a TODO for a safe
 retry. The same handling exists at baseline `30e9207`, although this branch
@@ -51,6 +51,41 @@ The new source comment and test clarify existing branch behavior; they do not
 introduce a new protocol field, rollback, exactly-once delivery, or a rule that
 false always means no change. Further review of AI retry and partial-result
 handling is needed before treating this as a general-purpose agent contract.
+
+## Server-confirmed question closure
+
+Nullkiller now consumes the server's `QuestionResolved` notification. A
+previously rejected answer remains pending until the question is explicitly
+reported closed or a later answer succeeds. When resolution arrives while an
+answer request is in flight, the AI waits for that request's acknowledgement
+before releasing the question. It ignores resolution broadcasts for other
+questions and tolerates an asynchronous answer sent after resolution. No
+answer is retried automatically. Questions without a resolution notification
+and genuinely invalid answers may still need a reason-aware recovery.
+
+The client now registers a request with its player interface before sending it
+to the network or the prediction path, preventing a reply on another thread
+from overtaking Nullkiller's registration. This order change is based on code
+inspection; a naturally occurring race was not reproduced. Unrecognized answer
+acknowledgements are logged rather than asserting.
+
+The synthetic `resolvedQuestionClearsRejectedAnswerWithoutAffectingOtherQuestions`
+test failed before the change: the server-resolution callback left both
+questions pending. Tests now cover both resolution/acknowledgement orders,
+multiple in-flight rejected answers, an unrelated resolution broadcast, and a late
+answer. Two additional tests use the real in-process server handler: a bounded
+hero level-up delivers resolution before a successful acknowledgement, and a
+toroidal hero level-up rejects an invalid answer, then a separately supplied
+valid answer resolves the activity and clears the AI's pending question. The
+adapter forwards server events to the gateway; it is not TCP or a full AI turn.
+Eleven related tests passed five repeated runs on macOS arm64.
+
+The complete local suite passed 1,661 tests with four disabled, using the
+prototype VMAP/save and the Complete H3M; log
+`runtime/full-suite-ai-question-resolution-2026-11-15.log` is on TB5. That
+run used the same implementation before the rejected-answer server test was
+switched from a bounded to a toroidal fixture; the latter version passed in
+the repeated focused run. GUI and remote-network scheduling remain unverified.
 
 On macOS arm64, `vcmitest` and `vcmiserver` rebuilt. The expanded bounded
 acknowledgement test passed. The preceding full run at `e46d07a` passed 1,500

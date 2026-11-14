@@ -110,7 +110,7 @@ TEST_F(Nullkiller2_AIGatewayDialog, rejectedAnswerKeepsQuestionPendingUntilAnoth
 	EXPECT_EQ(gateway->status.getQuestionsCount(), 1);
 
 	// A rejection does not tell us whether the server still expects a different answer.
-	// Only a separately submitted and accepted answer clears the AI's pending question.
+	// This scenario clears it with a separately submitted and accepted answer.
 	gateway->status.attemptedAnsweringQuestion(question, 102);
 	gateway->status.receivedAnswerConfirmation(102, true);
 	EXPECT_EQ(gateway->status.getQuestionsCount(), 0);
