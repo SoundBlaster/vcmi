@@ -1308,7 +1308,9 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		}
 		else if(sourceLayer == EPathfindingLayer::AIR || sourceLayer == EPathfindingLayer::WATER)
 			hadKnownLanding = findKnownTransientLanding(gameState(), h, std::nullopt) == KnownLanding::FOUND;
-		if(hadKnownLanding && findKnownTransientLanding(gameState(), h, PathfinderStart{hmpos, layer, h->movementPointsRemaining() - cost}) == KnownLanding::NONE)
+		// A fog frontier cannot be assumed to contain a safe landing. Require a
+		// known route instead of treating an unknown shore as a safe destination.
+		if(hadKnownLanding && findKnownTransientLanding(gameState(), h, PathfinderStart{hmpos, layer, h->movementPointsRemaining() - cost}) != KnownLanding::FOUND)
 			return complainRet("Cannot leave the known landing area while flying or walking on water!");
 	}
 

@@ -13,7 +13,7 @@ on an unrevealed tile. Adventure-spell targeting is processed before that
 ordinary-hover check and is a separate case. None of these source observations
 replaces the pending graphical test, or establishes another game's behavior.
 
-The present toroidal server has a three-way landing search: FOUND, NONE and
+The original toroidal server guard had a three-way landing search: FOUND, NONE and
 UNKNOWN. It rejects a transition from a known safe landing to NONE, but permits
 UNKNOWN to avoid treating unseen terrain as a known obstruction. The existing
 single-island reproduction shows this may lead to stranding as fog is revealed.
@@ -36,8 +36,8 @@ Candidate safeguards need to satisfy all of the following:
   saves without a reliable recorded origin. A route guard alone cannot prove
   those cases safe.
 
-Requiring a *known* landing is one possible implementation, but the current
-search also requires every route tile's guard neighborhood to be revealed.
-Blindly treating every UNKNOWN as failure could therefore reject a legitimate
-visible-shore route near fog. This tradeoff needs an executable regression
-test and review before changing the guard.
+Requiring a *known* landing is one possible implementation, but the search
+also requires every route tile's guard neighborhood to be revealed. Treating
+UNKNOWN as failure can therefore reject a route even if a landing exists
+beyond fog. The subsequent [guard change](topology-unknown-frontier-guard-2026-11-14.md)
+passes one visible-shore route near fog; broader route and GUI coverage remains open.
