@@ -2636,6 +2636,48 @@ TEST_F(HeroMovementTest, blockedToroidalStepIsRejectedRoE)
 	checkBlockedToroidalStep(EMapFormat::ROE);
 }
 
+TEST_F(HeroMovementTest, ImpassableTerrainBlocksEveryToroidalEdgeAndCorner)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const auto topology = map()->getTopology();
+	for(int z = 0; z < 2; ++z)
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				if(dx == 0 && dy == 0)
+					continue;
+				SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
+				const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+				const auto destination = topology.canonicalize(origin + int3(dx, dy, 0));
+				ASSERT_TRUE(destination);
+				map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+				hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+				hero->setMovementPoints(3000);
+				const auto originalTerrain = map()->getTile(*destination).terrainType;
+				map()->getTile(*destination).terrainType = TerrainId::ROCK;
+				CPathsInfo paths(gameState()->getMapSize(), hero);
+				auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+				CPathfinder pathfinder(*gameState(), config);
+				pathfinder.calculatePaths();
+				EXPECT_FALSE(paths.getNode(*destination, EPathfindingLayer::LAND)->reachable());
+				EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), origin);
+				EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+				map()->getTile(*destination).terrainType = originalTerrain;
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), *destination);
+			}
+}
+
 TEST_F(HeroMovementTest, MovementAcknowledgementReportsRejectedAndAcceptedRequests)
 {
 	const PlayerColor player(0), opponent(1);
