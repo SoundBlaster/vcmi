@@ -5885,6 +5885,44 @@ TEST_F(HeroMovementTest, InPlaceFlightLandingPreventsUnsafeDeparture)
 	ASSERT_TRUE(handler.tryLandTransientHeroesInPlace(player));
 }
 
+TEST_F(HeroMovementTest, TransientRecoveryMustNotReturnHeroToAnotherLevel)
+{
+	const PlayerColor player(0);
+	const int3 origin(0, 5, 0), surfaceWater(35, 5, 0), undergroundWater(10, 10, 1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.terrain(surfaceWater, TerrainId::WATER).terrain(undergroundWater, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(surfaceWater), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+
+	// Simulate a stale recovery origin, as could appear in inconsistent saved
+	// state: the hero is now stranded on another level with no points to land.
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(undergroundWater));
+	hero->setMovementPoints(1);
+	ASSERT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::WATER);
+	CMemorySerializer archive;
+	archive.oser & handler;
+	GameHandlerTestServer restoredServer(gameState(), player);
+	CGameHandler restored(restoredServer, gameState());
+	archive.iser.cb = gameState().get();
+	archive.iser & restored;
+	ASSERT_TRUE(archive.isFullyRead());
+	EXPECT_FALSE(restored.tryRecoverTransientHeroes(player));
+	EXPECT_FALSE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->visitablePos(), undergroundWater);
+	EXPECT_EQ(hero->movementPointsRemaining(), 1);
+	EXPECT_TRUE(handler.hasHeroInTransientMovement(player));
+}
+
 void HeroMovementTest::checkSingleIslandTransitStopsBeforeStranding(SpellID spell, BonusType bonus, EPathfindingLayer layer)
 {
 	const PlayerColor player(0);

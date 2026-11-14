@@ -801,7 +801,8 @@ bool CGameHandler::tryRecoverTransientHeroes(PlayerColor player)
 		if(findKnownTransientLanding(gameState(), hero, std::nullopt, &ordinaryRoute) == KnownLanding::FOUND)
 			return false;
 		const auto entry = transientReturnLand.find(hero->id);
-		if(entry == transientReturnLand.end() || !gameState().getMap().isInTheMap(entry->second))
+		if(entry == transientReturnLand.end() || !gameState().getMap().isInTheMap(entry->second)
+			|| entry->second.z != hero->visitablePos().z)
 			return false;
 		const auto destination = entry->second;
 		const auto & tile = gameState().getMap().getTile(destination);
