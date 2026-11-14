@@ -5709,9 +5709,12 @@ TEST_P(ToroidalRectangularVmapTest, ServerAndPathfinderCrossEverySeamOnBothLevel
 {
 	const int width = GetParam() ? 23 : 36;
 	const int height = GetParam() ? 36 : 23;
-	const PlayerColor player(0);
+	const PlayerColor player(0), enemy(1);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
-	builder.size(36, true).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player);
+	builder.size(36, true).playerActive(player).playerActive(enemy)
+		.hero(int3(1, 0, 0), HeroTypeID(0), player)
+		.hero(int3(19, 18, 0), HeroTypeID(1), enemy)
+		.resource(int3(width - 1, height - 1, 0), GameResID::GOLD, 10);
 	const auto source = builder.build();
 	CMemoryBuffer legacyBytes;
 	legacyBytes.write(source.data(), static_cast<si64>(source.size()));
@@ -5729,10 +5732,31 @@ TEST_P(ToroidalRectangularVmapTest, ServerAndPathfinderCrossEverySeamOnBothLevel
 			for(int y = 0; y < height; ++y)
 				authored->getTile(int3(x, y, z)).terrainType = ETerrainId::GRASS;
 	authored->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+	authored->name = MetaString::createFromRawString("Toroid Rectangle " + std::to_string(width) + "x" + std::to_string(height));
+	CRandomGenerator roadRandom(12345);
+	std::vector<int3> roads;
+	for(int offset = -3; offset <= 3; ++offset)
+	{
+		roads.emplace_back(MapTopology::wrapCoordinate(offset, width), 4, 0);
+		roads.emplace_back(8, MapTopology::wrapCoordinate(offset, height), 0);
+	}
+	authored->getEditManager()->getTerrainSelection().setSelection(roads);
+	authored->getEditManager()->drawRoad(RoadId::DIRT_ROAD, &roadRandom);
 	CMemoryBuffer archive;
 	{
 		CMapSaverJson saver(&archive);
 		saver.saveMap(authored);
+	}
+	if(const char * outputDirectory = std::getenv("VCMI_TOROID_RECT_OUTPUT_DIR"))
+	{
+		const auto outputPath = boost::filesystem::path(outputDirectory) /
+			("toroid-rectangle-" + std::to_string(width) + "x" + std::to_string(height) + ".vmap");
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream file(outputPath.string(), std::ios::binary);
+		ASSERT_TRUE(file);
+		file.write(reinterpret_cast<const char *>(archive.getBuffer().data()), archive.getSize());
+		file.close();
+		ASSERT_TRUE(file);
 	}
 	ToroidalMemoryMapService service(archive.getBuffer());
 	auto header = service.loadMapHeader(ResourcePath("memory"));
@@ -5743,13 +5767,16 @@ TEST_P(ToroidalRectangularVmapTest, ServerAndPathfinderCrossEverySeamOnBothLevel
 	info.mapname = "memory";
 	info.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
 	info.mode = EStartMode::NEW_GAME;
-	auto & settings = info.playerInfos[player];
-	settings.color = player;
-	settings.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(0));
-	settings.name = "Player";
-	settings.castle = header->players[0].defaultCastle();
-	settings.hero = header->players[0].defaultHero();
-	settings.bonus = PlayerStartingBonus::GOLD;
+	for(const PlayerColor color : {player, enemy})
+	{
+		auto & settings = info.playerInfos[color];
+		settings.color = color;
+		settings.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(color.getNum()));
+		settings.name = "Player";
+		settings.castle = header->players[color.getNum()].defaultCastle();
+		settings.hero = header->players[color.getNum()].defaultHero();
+		settings.bonus = PlayerStartingBonus::GOLD;
+	}
 	auto state = std::make_shared<CGameState>();
 	state->preInit(LIBRARY);
 	GameRandomizer randomizer(*state);
@@ -5770,6 +5797,15 @@ TEST_P(ToroidalRectangularVmapTest, ServerAndPathfinderCrossEverySeamOnBothLevel
 				state->getPlayerTeam(player)->fogOfWarMap[int3(x, y, z)] = 1;
 	GameHandlerTestServer server(state, player);
 	CGameHandler handler(server, state);
+	const int3 resourcePosition(width - 1, height - 1, 0);
+	const auto resourceID = map.getTile(resourcePosition).topVisitableObj();
+	ASSERT_NE(map.getObject(resourceID), nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
+	const auto goldBefore = state->players.at(player).resources[GameResID::GOLD];
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(resourcePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(state->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
+	EXPECT_EQ(map.getObject(resourceID), nullptr);
 	const auto topology = map.getTopology();
 	for(int z = 0; z < 2; ++z)
 		for(int dx = -1; dx <= 1; ++dx)
