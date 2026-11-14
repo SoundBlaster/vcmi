@@ -29,12 +29,12 @@ regenerating the index resets manually recorded statuses.
 | `AI/MMAI/common.h` | 77 | unreviewed |
 | `AI/Nullkiller2/AIUtility.cpp` | 384 | unreviewed |
 | `AI/Nullkiller2/AIUtility.h` | 144, 145, 147, 149, 160, 165, 172, 177 | unreviewed |
-| `AI/Nullkiller2/Analyzers/DangerHitMapAnalyzer.cpp` | 81, 83, 133, 219, 221, 257 | unreviewed |
+| `AI/Nullkiller2/Analyzers/DangerHitMapAnalyzer.cpp` | 81, 83, 133, 219, 221, 257 | reviewed candidates: map dimensions allocate the hit map; distance limits bound pathfinder turns |
 | `AI/Nullkiller2/Analyzers/HeroManager.cpp` | 146 | unreviewed |
 | `AI/Nullkiller2/Analyzers/ObjectClusterizer.cpp` | 22, 37, 60, 61, 97, 103, 496 | partial: Dimension Door reach and cluster representative fixed and tested after baseline; other candidates unreviewed |
-| `AI/Nullkiller2/Behaviors/EscapeBehavior.cpp` | 186 | unreviewed |
+| `AI/Nullkiller2/Behaviors/EscapeBehavior.cpp` | 186 | reviewed candidate: map dimensions bound enumeration of pathfinder results |
 | `AI/Nullkiller2/Behaviors/ExplorationBehavior.cpp` | 64, 65, 216, 217, 878 | unreviewed |
-| `AI/Nullkiller2/Behaviors/GatherArmyBehavior.cpp` | 235, 297 | unreviewed |
+| `AI/Nullkiller2/Behaviors/GatherArmyBehavior.cpp` | 235, 297 | reviewed candidates: compare pathfinder turn counts, not coordinate distances |
 | `AI/Nullkiller2/Behaviors/StartupBehavior.cpp` | 55, 105 | reviewed: nearest-hero threshold uses topology; map width scales recruitment, not distance |
 | `AI/Nullkiller2/Engine/Nullkiller.cpp` | 378, 380 | unreviewed |
 | `AI/Nullkiller2/Engine/PriorityEvaluator.cpp` | 1651 | unreviewed |
@@ -50,11 +50,11 @@ regenerating the index resets manually recorded statuses.
 | `AI/Nullkiller2/Pathfinding/AIPathfinder.cpp` | 97, 98 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/AIPathfinder.h` | 35, 36 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/ObjectGraph.cpp` | 52 | unreviewed |
-| `AI/Nullkiller2/Pathfinding/ObjectGraphCalculator.cpp` | 59, 68, 91, 108, 138 | unreviewed |
+| `AI/Nullkiller2/Pathfinding/ObjectGraphCalculator.cpp` | 59, 68, 91, 108, 138 | reviewed candidates: neighbor iteration uses topology-aware foreach_neighbour; cost comes from pathfinder |
 | `AI/Nullkiller2/Pathfinding/ObjectGraphCalculator.h` | 43, 44 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/Rules/AIMovementAfterDestinationRule.cpp` | 86, 158 | unreviewed |
 | `AI/Nullkiller2/pforeach.h` | 12, 21, 23 | unreviewed |
-| `AI/StupidAI/StupidAI.cpp` | 98, 214, 218, 332 | unreviewed |
+| `AI/StupidAI/StupidAI.cpp` | 98, 214, 218, 332 | reviewed candidates: combat hex geometry, outside adventure-map topology |
 | `client/ClientCommandManager.cpp` | 378, 379, 397, 398 | unreviewed |
 | `client/GameEngine.cpp` | 259, 261, 263 | unreviewed |
 | `client/adventureMap/AdventureMapInterface.cpp` | 232, 235, 238, 241, 254, 266, 272 | unreviewed |
