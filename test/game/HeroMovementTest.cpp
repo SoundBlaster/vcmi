@@ -4478,6 +4478,51 @@ TEST_F(HeroMovementTest, ExpiredTimerLandsHeroWhoEnteredWaterDuringTheTurn)
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 
+TEST_F(HeroMovementTest, ExpiredTimerRelocatesStrandedHeroWhenOriginIsLost)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 origin(0, 18, 0), water(1, 18, 0), safeLand(35, 18, 0), hidden(10, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent)
+		.hero(int3(1, 18, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), opponent);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != origin && int3(x, y, 0) != safeLand)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	gameState()->players.at(player).human = true;
+	gameState()->players.at(player).status = EPlayerStatus::INGAME;
+	gameState()->actingPlayers.insert(player);
+	gameState()->getStartInfo()->turnTimerInfo.turnTimer = 1;
+	gameState()->getStartInfo()->turnTimerInfo.baseTimer = 0;
+	handler.turnTimerHandler->onGameplayStart(player);
+	handler.turnTimerHandler->onPlayerGetTurn(player);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
+
+	// Simulate a changed world and an interrupted route after departure.
+	map()->getTile(origin).terrainType = TerrainId::WATER;
+	hero->setMovementPoints(1);
+	auto * team = gameState()->getPlayerTeam(player);
+	ASSERT_NE(team, nullptr);
+	team->fogOfWarMap[hidden] = 0;
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	EXPECT_EQ(hero->visitablePos(), safeLand);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+	EXPECT_FALSE(team->fogOfWarMap[hidden]);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
 TEST_F(HeroMovementTest, AutomaticLandingDoesNotTriggerAnEvent)
 {
 	const PlayerColor player(0);
