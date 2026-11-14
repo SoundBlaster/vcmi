@@ -5701,6 +5701,108 @@ TEST_F(HeroMovementTest, MinimumToroidalMapGuardCoversWrappedNeighborsWithoutCro
 	EXPECT_EQ(battle->getLocation(), guardPosition);
 }
 
+class ToroidalRectangularVmapTest : public ::testing::Test, public ::testing::WithParamInterface<bool>
+{
+};
+
+TEST_P(ToroidalRectangularVmapTest, ServerAndPathfinderCrossEverySeamOnBothLevels)
+{
+	const int width = GetParam() ? 23 : 36;
+	const int height = GetParam() ? 36 : 23;
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player);
+	const auto source = builder.build();
+	CMemoryBuffer legacyBytes;
+	legacyBytes.write(source.data(), static_cast<si64>(source.size()));
+	legacyBytes.seek(0);
+	EditorCallback editor(nullptr);
+	CMapLoaderH3M legacyLoader("RectangularToroid", "core", "ASCII", &legacyBytes);
+	auto authored = legacyLoader.loadMap(&editor);
+	editor.setMap(authored.get());
+	// The H3M seed is square; construct a distinct rectangular VMAP before starting the game.
+	authored->width = width;
+	authored->height = height;
+	authored->initTerrain();
+	for(int z = 0; z < 2; ++z)
+		for(int x = 0; x < width; ++x)
+			for(int y = 0; y < height; ++y)
+				authored->getTile(int3(x, y, z)).terrainType = ETerrainId::GRASS;
+	authored->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
+	CMemoryBuffer archive;
+	{
+		CMapSaverJson saver(&archive);
+		saver.saveMap(authored);
+	}
+	ToroidalMemoryMapService service(archive.getBuffer());
+	auto header = service.loadMapHeader(ResourcePath("memory"));
+	ASSERT_EQ(header->width, width);
+	ASSERT_EQ(header->height, height);
+	ASSERT_TRUE(header->toroidal);
+	StartInfo info;
+	info.mapname = "memory";
+	info.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
+	info.mode = EStartMode::NEW_GAME;
+	auto & settings = info.playerInfos[player];
+	settings.color = player;
+	settings.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(0));
+	settings.name = "Player";
+	settings.castle = header->players[0].defaultCastle();
+	settings.hero = header->players[0].defaultHero();
+	settings.bonus = PlayerStartingBonus::GOLD;
+	auto state = std::make_shared<CGameState>();
+	state->preInit(LIBRARY);
+	GameRandomizer randomizer(*state);
+	Load::ProgressAccumulator progress;
+	state->init(&service, &info, randomizer, progress, false);
+	auto & map = state->getMap();
+	ASSERT_EQ(map.width, width);
+	ASSERT_EQ(map.height, height);
+	ASSERT_TRUE(map.toroidal);
+	CGHeroInstance * hero = nullptr;
+	for(const auto & object : map.objects)
+		if(auto * candidate = dynamic_cast<CGHeroInstance *>(object.get()); candidate && candidate->getOwner() == player)
+			hero = candidate;
+	ASSERT_NE(hero, nullptr);
+	for(int z = 0; z < 2; ++z)
+		for(int x = 0; x < width; ++x)
+			for(int y = 0; y < height; ++y)
+				state->getPlayerTeam(player)->fogOfWarMap[int3(x, y, z)] = 1;
+	GameHandlerTestServer server(state, player);
+	CGameHandler handler(server, state);
+	const auto topology = map.getTopology();
+	for(int z = 0; z < 2; ++z)
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				if(dx == 0 && dy == 0)
+					continue;
+				SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
+				const int3 origin(dx < 0 ? 0 : dx > 0 ? width - 1 : width / 2,
+					dy < 0 ? 0 : dy > 0 ? height - 1 : height / 2, z);
+				const auto destination = topology.canonicalize(origin + int3(dx, dy, 0));
+				ASSERT_TRUE(destination);
+				map.moveObject(hero->id, hero->convertFromVisitablePos(origin));
+				ASSERT_EQ(hero->visitablePos(), origin);
+				hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+				hero->setMovementPoints(3000);
+				CPathsInfo paths(state->getMapSize(), hero);
+				auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
+				CPathfinder pathfinder(*state, config);
+				pathfinder.calculatePaths();
+				const auto * node = paths.getNode(*destination, EPathfindingLayer::LAND);
+				ASSERT_TRUE(node->reachable());
+				ASSERT_NE(node->theNodeBefore, nullptr);
+				EXPECT_EQ(node->theNodeBefore->coord, origin);
+				const auto remaining = node->moveRemains;
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), *destination);
+				EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+			}
+}
+
+INSTANTIATE_TEST_SUITE_P(BothAspectRatios, ToroidalRectangularVmapTest, ::testing::Bool());
+
 TEST_F(HeroMovementTest, HeroCanEmbarkAndDisembarkAcrossToroidalCorner)
 {
 	const PlayerColor player(0);
