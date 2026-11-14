@@ -41,5 +41,41 @@ SHA-256 values for the signed bundle binaries and the session evidence:
 5a8e306d901987e7bd061007f6ffee4682367dccec64499adc100c482d5d486e  observations.jsonl
 ```
 
-Finder or Launch Services launch, remote multiplayer and smoothness of
-scrolling or movement animation were not checked in this session.
+Remote multiplayer and smoothness of scrolling or movement animation were
+not checked in this session.
+
+## macOS application launch attempt
+
+Computer Use asked macOS to open the signed preview bundle by path. It
+created the correct `vcmiclient` process, but no game window appeared within
+30 seconds. A process sample showed the main thread blocked in `open` while
+the default logger was being configured. The configured log directory
+`~/Library/Logs/vcmi` is a symlink to this checkout's TB5 runtime. The sample
+does not identify the precise path being opened.
+
+A separate signed experimental bundle used a small launcher to execute the
+same client with a new private `/tmp` log directory. It opened the local log
+and progressed to `Loading filesystem .../vcmi/Saves`, but still produced no
+window within 30 seconds. Its process sample showed a directory iterator
+blocked in `open`; the user-data directory, including `Saves`, is on TB5.
+The system log recorded All Files preflights but did not show a removable
+volume prompt or decision for either launch. Neither observation establishes
+why the filesystem call waited. The two test processes were stopped before
+gameplay; the experimental launcher bundle and its binary were removed.
+
+Logs and process samples are in `runtime/finder-preview-d6d9135-2026-11-15/`
+under the TB5 build root. Ordinary Launch Services startup is not verified;
+the direct launch with a local log remains the successful route demonstrated
+above. An interactive Terminal invocation using a fresh private log directory
+is:
+
+```sh
+preview_log_dir="$(mktemp -d /tmp/vcmi-toroid-preview.XXXXXX)"
+cd '/Volumes/TB5/Developer/Builds/GitHub/VCMI-8dd012bf29c2d973/runtime/VCMI Toroid Preview d6d9135.app/Contents/MacOS'
+./vcmiclient --logLocation "$preview_log_dir"
+```
+
+The successful run was launched by the testing environment, not by an
+interactive Terminal; the two processes may have different macOS permissions.
+Computer Use refused to open Terminal for this check, so this command was not
+verified through the Terminal application.
