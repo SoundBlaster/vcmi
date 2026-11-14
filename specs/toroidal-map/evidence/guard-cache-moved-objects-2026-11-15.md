@@ -28,3 +28,11 @@ the TB5 log is `runtime/full-suite-moved-guard-2026-11-15.log` under the VCMI
 build root. It included the old prototype map and save and the Complete
 `Dead and Buried` H3M. Other object shapes, mod scripts, and remote clients
 remain unverified.
+
+An additional synthetic toroidal test moves a non-monster blocking object
+with a directional entrance onto a tile adjacent across a seam to a stationary
+monster. The cached guard disappears when that entrance blocks the attack
+direction and reappears when the object moves away. This is a model fixture,
+not a test of a particular mod's object or visual presentation. The added
+test and five existing movement/removal cases passed on macOS arm64 with
+`01f8c7b` plus the test change.

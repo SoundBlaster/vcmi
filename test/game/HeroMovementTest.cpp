@@ -3059,6 +3059,36 @@ TEST_P(MovedGuardCacheTest, MovingMonsterRefreshesOldAndNewNeighborhoods)
 
 INSTANTIATE_TEST_SUITE_P(MapTopologies, MovedGuardCacheTest, ::testing::Range(0, 4));
 
+TEST_F(HeroMovementTest, MovingBlockingObjectUpdatesAdjacentGuardCache)
+{
+	const PlayerColor player(0);
+	const int3 guardPosition(35, 35, 0), target(35, 0, 0), initial(10, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(21, 20, 0), HeroTypeID(0), player)
+		.monster(guardPosition, CreatureID(0), 10).resource(initial, GameResID::GOLD, 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	auto * object = findFirst<CGResource>();
+	ASSERT_NE(object, nullptr);
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["---", "---", "---"], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "MovedBlockingObject");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	ASSERT_FALSE(appearance->isVisitableFrom(0, -1));
+	map()->hideObject(object);
+	object->appearance = appearance;
+	map()->showObject(object);
+	map()->calculateGuardingGreaturePositions();
+	ASSERT_EQ(gameState()->guardingCreaturePosition(target), guardPosition);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.changeObjPos(object->id, target, player);
+	EXPECT_EQ(gameState()->guardingCreaturePosition(target), int3(-1, -1, -1));
+	handler.changeObjPos(object->id, initial, player);
+	EXPECT_EQ(gameState()->guardingCreaturePosition(target), guardPosition);
+}
+
 TEST_F(HeroMovementTest, grailCanBeDugAfterCrossingToroidalCorner)
 {
 	const PlayerColor player(0);
