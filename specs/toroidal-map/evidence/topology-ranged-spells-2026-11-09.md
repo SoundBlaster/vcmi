@@ -7,6 +7,21 @@ toroidal map moves the hero to the destination and spends mana and movement
 points. Both tests passed on macOS arm64. They do not verify the client cursor,
 animation, hidden destinations, guards, other terrain or other spells.
 
+`AllSeamsAndLevels/ToroidalDimensionDoorTest.CastAcrossSeamPreservesLevelAndChargesCost`
+extends the server-side positive case to all eight edge and corner directions
+on both levels of a synthetic 36×36 SoD map. Test setup reveals the map and
+relocates the hero to the source. Each cast reaches the expected destination
+on the same level and spends mana and movement points. The 16 cases and the
+two earlier bounded/toroidal comparisons passed on macOS arm64, built from
+`6e91eac` plus the test change. They do not exercise gameplay on the way to
+the source, exact costs, hidden or blocked targets, GUI or multiplayer.
+
+With the same test change, a complete local `vcmitest` run using the prototype
+VMAP and save plus the Complete `Dead and Buried` H3M passed 1,644 tests with
+no skips; four tests were disabled. The log is
+`runtime/full-suite-hero-outcomes-dimension-door-2026-11-15.log` under the TB5
+VCMI build root. This was a local macOS arm64 run, not hosted CI.
+
 An additional SoD test casts Scuttle Boat through the server handler at a
 revealed boat across the horizontal seam. The bounded map rejects the
 out-of-range cast without spending mana; with toroidal topology the cast
