@@ -116,19 +116,13 @@ namespace
 enum class KnownLanding { FOUND, NONE, UNKNOWN };
 using LandingStep = std::pair<int3, EPathfindingLayer>;
 
-bool canLandTransientHeroInPlace(const CGameState & gameState, const CGHeroInstance * hero)
+bool canLandTransientHeroAt(const CGameState & gameState, const CGHeroInstance * hero, const int3 & position, EPathfindingLayer layer)
 {
-	if(hero->inBoat() || hero->getConfirmedMovementLayer() != EPathfindingLayer::AIR)
+	if(hero->inBoat() || layer != EPathfindingLayer::AIR)
 		return false;
-	const auto position = hero->visitablePos();
 	const auto & tile = gameState.getMap().getTile(position);
 	const auto * team = gameState.getPlayerTeam(hero->getOwner());
-	if(!team || !tile.isLand() || !tile.getTerrain()->isPassable()
-		|| tile.objectVisitedBy(hero->id).hasValue()
-		|| gameState.guardingCreaturePosition(position).isValid())
-		return false;
-	if(!std::all_of(tile.blockingObjects.begin(), tile.blockingObjects.end(),
-		[hero](const auto & id) { return id == hero->id; }))
+	if(!team)
 		return false;
 	const auto topology = gameState.getMap().getTopology();
 	for(int dx = -1; dx <= 1; ++dx)
@@ -138,7 +132,19 @@ bool canLandTransientHeroInPlace(const CGameState & gameState, const CGHeroInsta
 			if(!neighbor || !team->fogOfWarMap[*neighbor])
 				return false;
 		}
+	if(!tile.isLand() || !tile.getTerrain()->isPassable()
+		|| tile.objectVisitedBy(hero->id).hasValue()
+		|| gameState.guardingCreaturePosition(position).isValid())
+		return false;
+	if(!std::all_of(tile.blockingObjects.begin(), tile.blockingObjects.end(),
+		[hero](const auto & id) { return id == hero->id; }))
+		return false;
 	return true;
+}
+
+bool canLandTransientHeroInPlace(const CGameState & gameState, const CGHeroInstance * hero)
+{
+	return canLandTransientHeroAt(gameState, hero, hero->visitablePos(), hero->getConfirmedMovementLayer());
 }
 
 // Only consider routes whose tiles and guard neighborhoods are already known
@@ -148,6 +154,10 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 	const auto * team = gameState.getPlayerTeam(hero->getOwner());
 	if(!team)
 		return KnownLanding::UNKNOWN;
+	const auto position = start ? start->position : hero->visitablePos();
+	const auto layer = start ? start->layer : hero->getConfirmedMovementLayer();
+	if(!plainRoute && canLandTransientHeroAt(gameState, hero, position, layer))
+		return KnownLanding::FOUND;
 	CPathsInfo paths(gameState.getMapSize(), hero);
 	auto config = start
 		? std::make_shared<SingleHeroPathfinderConfig>(paths, gameState, hero, *start)

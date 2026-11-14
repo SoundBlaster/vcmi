@@ -5783,3 +5783,56 @@ TEST_F(HeroMovementTest, cursedGroundBlocksHighLevelAdventureSpells)
 	moveHero(cursedTile);
 	EXPECT_FALSE(canCast(dimensionDoor));
 }
+
+TEST_F(HeroMovementTest, FlightCanLandInPlaceOnOnlyReachableShore)
+{
+	const PlayerColor player(0);
+	const int3 origin(10, 10, 0), water(11, 10, 0), shore(12, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != origin && int3(x, y, 0) != shore)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(300);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_TRUE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_EQ(hero->visitablePos(), shore);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+}
+
+TEST_F(HeroMovementTest, InPlaceFlightLandingPreventsUnsafeDeparture)
+{
+	const PlayerColor player(0);
+	const int3 origin(10, 10, 0), shore(11, 10, 0), water(12, 10, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != origin && int3(x, y, 0) != shore)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(250);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_EQ(hero->movementPointsRemaining(), 150);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	EXPECT_EQ(hero->visitablePos(), shore);
+	EXPECT_EQ(hero->movementPointsRemaining(), 150);
+	ASSERT_TRUE(handler.tryLandTransientHeroesInPlace(player));
+}
