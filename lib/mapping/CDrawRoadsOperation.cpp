@@ -416,7 +416,7 @@ void CDrawRiversOperation::updateTile(TerrainTile & tile, const LinePattern & pa
 	const std::pair<int, int> & mapping  = pattern.riverMapping;
 	
 	tile.riverDir = gen->nextInt(mapping.first, mapping.second);
-	tile.extTileFlags = (tile.extTileFlags & 0b00111111) | (flip << 2);
+	tile.extTileFlags = (tile.extTileFlags & 0b11110011) | (flip << 2);
 }
 
 RiverId CDrawRiversOperation::getIdentifier(TerrainTile & tile) const

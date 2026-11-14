@@ -200,6 +200,30 @@ TEST(MapManager, ToroidalRoadAndRiverBrushConnectAcrossEdge)
 	}
 }
 
+TEST(MapManager, RedrawingRiverReplacesOnlyRiverRotationFlags)
+{
+	for(const bool toroidal : {false, true})
+	{
+		auto map = std::make_unique<CMap>(nullptr);
+		map->width = 20;
+		map->height = 20;
+		map->toroidal = toroidal;
+		map->initTerrain();
+		CRandomGenerator random;
+		auto * editor = map->getEditManager();
+		editor->clearTerrain(&random);
+		const int3 position = toroidal ? int3(0, 0, 0) : int3(10, 10, 0);
+		auto & tile = map->getTile(position);
+		// A previous river orientation and unrelated tile flags are all set.
+		tile.extTileFlags = 0b11111111;
+		editor->getTerrainSelection().select(position);
+		editor->drawRiver(RiverId::WATER_RIVER, &random);
+		// An isolated river uses the unflipped fallback sprite.
+		EXPECT_EQ(tile.riverDir, 9);
+		EXPECT_EQ(tile.extTileFlags, 0b11110011) << "toroidal=" << toroidal;
+	}
+}
+
 TEST(MapManager, DrawTerrain_View)
 {
 	try
