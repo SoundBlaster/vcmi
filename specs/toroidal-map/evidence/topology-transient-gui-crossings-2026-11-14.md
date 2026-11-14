@@ -89,3 +89,23 @@ were created in the local test profile and are not in the repository.
 
 These cases do not establish moving guards, changed fog, general stranded-hero
 recovery, remote multiplayer, or animation smoothness.
+
+## Insufficient movement and a positive control
+
+On the newer signed macOS client built from `cf4ca3b` with the diagnostic
+cursor fix, the vertical crossing fixture started with the hero at
+`(15,34,0)` and 1,560 movement points. After casting Water Walk, twelve
+ordinary east/west land steps reduced the balance to 360. A south shortcut
+did not move the hero. Two clicks on the visible opposite shore at `(15,2)`
+showed no route and left the hero at `(15,34)` with 360 points and 92 mana.
+The direct shortest route costs 400 points. This observation does not establish
+whether the server rejected a movement request: the client may have declined
+to issue one.
+
+As a positive control, the scenario was restarted, Water Walk was cast again,
+and the same visible shore was selected. The interface displayed the route,
+and a second click moved the hero `(15,34) → (15,35) → (15,0) → (15,1) →
+(15,2)` with 1,160 points remaining. The new client session appended records
+0–47 to `runtime/observation-command-test.jsonl` under the TB5 build root;
+the movement counts and mana are taken from those observations. This checks
+one GUI route and its positive control, not general recovery or fog safety.
