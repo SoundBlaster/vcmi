@@ -234,6 +234,7 @@ set(lib_MAIN_SRCS
 	pathfinder/NodeStorage.cpp
 	pathfinder/PathfinderCache.cpp
 	pathfinder/PathfinderOptions.cpp
+	pathfinder/TransientLanding.cpp
 	pathfinder/PathfindingRules.cpp
 	pathfinder/TurnInfo.cpp
 
@@ -727,6 +728,7 @@ set(lib_MAIN_HEADERS
 	pathfinder/NodeStorage.h
 	pathfinder/PathfinderCache.h
 	pathfinder/PathfinderOptions.h
+	pathfinder/TransientLanding.h
 	pathfinder/PathfinderUtil.h
 	pathfinder/PathfindingRules.h
 	pathfinder/TurnInfo.h
