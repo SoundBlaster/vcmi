@@ -26,6 +26,8 @@ The [implementation matrix](implementation-matrix.md) tracks requirements,
 scenario coverage, implementation, verification, and acceptance separately.
 Scenario definitions below are acceptance proposals; their existence is not a
 test run.
+The user-supplied historical context and a bounded source check are recorded in
+[history and related work](research/history-and-related-work.md).
 
 ## Boundary and composition
 
