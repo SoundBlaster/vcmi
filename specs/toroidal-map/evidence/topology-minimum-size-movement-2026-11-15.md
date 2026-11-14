@@ -11,7 +11,7 @@ pathfinder predicted. The level is preserved.
 The new test, the previous 3×3 corner case, and the larger-map road direction
 test passed three consecutive runs on macOS arm64. The setup relocations are
 not player actions. This checks clear terrain and movement only; multi-tile
-object footprints, guards, vehicles, save/load, AI and graphical rendering on 3×3
+object footprints, vehicles, save/load, AI and graphical rendering on 3×3
 maps remain unverified.
 
 `HeroMovementTest.MinimumToroidalMapCollectsResourcesAcrossEverySeam` adds a
@@ -22,3 +22,11 @@ hero remains at the source. A second request moves the hero onto the cleared
 tile. All three minimum-size tests passed three repeated runs. These are
 synthetic single-resource cases, not a general test of overlapping footprints
 or other object types.
+
+`HeroMovementTest.MinimumToroidalMapGuardCoversWrappedNeighborsWithoutCrossingLevels`
+places one hostile monster on the surface. The guard cache identifies it for
+each surface cell on the 3×3 torus and reports no guard on the underground
+level. A server movement request attacking through the opposite corner starts
+a battle with that monster at its canonical position. All four minimum-size
+tests passed three repeated runs. This does not test multiple guards, battle
+resolution, or guard visibility through fog on such a small map.

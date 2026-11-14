@@ -5663,6 +5663,44 @@ TEST_F(HeroMovementTest, MinimumToroidalMapCollectsResourcesAcrossEverySeam)
 			}
 }
 
+TEST_F(HeroMovementTest, MinimumToroidalMapGuardCoversWrappedNeighborsWithoutCrossingLevels)
+{
+	const PlayerColor player(0);
+	const int3 guardPosition(0, 0, 0);
+	const int3 origin(2, 2, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(3, true).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}}).monster(guardPosition, CreatureID(27), 1);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	auto * guard = findFirst<CGCreature>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(guard, nullptr);
+	guard->agression = 127;
+	guard->neverFlees = true;
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+	ASSERT_EQ(hero->visitablePos(), origin);
+	map()->calculateGuardingGreaturePositions();
+	for(int x = 0; x < 3; ++x)
+		for(int y = 0; y < 3; ++y)
+		{
+			const int3 surface(x, y, 0);
+			const int3 underground(x, y, 1);
+			EXPECT_EQ(map()->guardingCreaturePositions[surface], guardPosition) << surface.toString();
+			EXPECT_FALSE(map()->guardingCreaturePositions[underground].isValid()) << underground.toString();
+		}
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(guardPosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	const auto * battle = gameState()->getBattle(player);
+	ASSERT_NE(battle, nullptr);
+	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+	EXPECT_EQ(battle->getLocation(), guardPosition);
+}
+
 TEST_F(HeroMovementTest, HeroCanEmbarkAndDisembarkAcrossToroidalCorner)
 {
 	const PlayerColor player(0);
