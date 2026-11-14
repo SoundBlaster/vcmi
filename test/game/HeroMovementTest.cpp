@@ -364,7 +364,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	class LobbyPeer final : public INetworkClientListener
 	{
 	public:
-		explicit LobbyPeer(std::string name, bool offerTopology = true) : name(std::move(name)), offerTopology(offerTopology) {}
+		explicit LobbyPeer(std::string name, bool offerTopology = true, EStartMode mode = EStartMode::NEW_GAME)
+			: name(std::move(name)), offerTopology(offerTopology), mode(mode) {}
 		void onConnectionFailed(const std::string & error) override { failure = error; }
 		void onDisconnected(const std::shared_ptr<INetworkConnection> &, const std::string & error) override { failure = error; }
 		void onConnectionEstablished(const std::shared_ptr<INetworkConnection> & connection) override
@@ -374,7 +375,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 			LobbyClientConnected greeting;
 			greeting.uuid = name;
 			greeting.names = {name};
-			greeting.mode = EStartMode::NEW_GAME;
+			greeting.mode = mode;
 			greeting.version = offerTopology ? LobbyTopologyCapability::encode(ESerializationVersion::CURRENT) : ESerializationVersion::CURRENT;
 			codec->sendPack(greeting);
 		}
@@ -412,6 +413,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		std::string name;
 		std::string failure;
 		bool offerTopology;
+		EStartMode mode;
 		bool negotiated = false;
 		bool acceptedTopology = false;
 		ESerializationVersion acceptedVersion = ESerializationVersion::NONE;
@@ -1069,6 +1071,153 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(replica->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 		EXPECT_EQ(replica->movementPointsRemaining(), 0);
 		EXPECT_EQ(redVisibility(*peer->state), fogBeforeFallback);
+	}
+
+	// Save the live TCP game, then start a new lobby and reconnect two fresh
+	// peers through the normal LOAD_GAME path before continuing movement.
+	boost::filesystem::create_directories(directory / "Saves");
+	boost::filesystem::create_directories(directory / "config");
+	{
+		std::ofstream config((directory / "config/serverSettings.json").c_str());
+		config << "{}";
+	}
+	auto * local = dynamic_cast<CFilesystemList *>(CResourceHandler::get("local"));
+	ASSERT_NE(local, nullptr);
+	auto saveLoader = std::make_shared<CFilesystemLoader>("", directory, 4);
+	local->addLoader(saveLoader, true);
+	struct SaveOverlay
+	{
+		CFilesystemList * local;
+		ISimpleResourceLoader * loader;
+		~SaveOverlay() { local->removeLoader(loader); }
+	} saveOverlay{local, saveLoader.get()};
+	const std::string saveName = "Saves/" + directory.filename().string() + "-network";
+	const auto savePath = directory / (saveName + ".vsgm1");
+	ASSERT_TRUE(saveLoader->createResource(saveName + ".vsgm1"));
+	ASSERT_TRUE(local->createResource(saveName + ".vsgm1"));
+	const auto selectedPath = CResourceHandler::get()->getResourceName(ResourcePath(saveName, EResType::SAVEGAME));
+	ASSERT_TRUE(selectedPath.has_value());
+	ASSERT_TRUE(boost::filesystem::equivalent(*selectedPath, savePath));
+	const auto configPath = CResourceHandler::get()->getResourceName(JsonPath::builtin("config/serverSettings.json"));
+	ASSERT_TRUE(configPath.has_value());
+	ASSERT_TRUE(boost::filesystem::equivalent(*configPath, directory / "config/serverSettings.json"));
+	const auto redHeroID = hero->id;
+	const auto blueHeroID = blueHero->id;
+	const auto savedRedPosition = server.gh->gameState().getHero(redHeroID)->visitablePos();
+	const auto savedBluePosition = server.gh->gameState().getHero(blueHeroID)->visitablePos();
+	const auto savedRedPoints = server.gh->gameState().getHero(redHeroID)->movementPointsRemaining();
+	const auto savedBluePoints = server.gh->gameState().getHero(blueHeroID)->movementPointsRemaining();
+	const auto savedFog = visibility(server.gh->gameState());
+	ASSERT_EQ(visibility(*host.state), savedFog);
+	ASSERT_EQ(visibility(*guest.state), savedFog);
+	server.gh->save(saveName, PlayerColor::NEUTRAL, 0);
+	ASSERT_TRUE(boost::filesystem::exists(savePath));
+	CLoadFile saveFile(savePath);
+	auto savedHeader = std::make_unique<CMapHeader>();
+	StartInfo savedStart;
+	auto headerChunk = saveFile.openChunk(SaveFileFormat::CHUNK_HEADER, nullptr);
+	headerChunk->iser & *savedHeader;
+	headerChunk->iser & savedStart;
+	ASSERT_TRUE(headerChunk->isFullyRead());
+	ASSERT_TRUE(savedHeader->toroidal);
+
+	CVCMIServer reloadedServer(0, true);
+	const auto reloadPort = reloadedServer.prepare(false, true);
+	ASSERT_NE(reloadPort, 0);
+	auto reloadNetwork = INetworkHandler::createHandler();
+	LobbyPeer reloadHost("lobby-host", true, EStartMode::LOAD_GAME);
+	LobbyPeer reloadGuest("lobby-guest", true, EStartMode::LOAD_GAME);
+	const auto pumpReload = [&](const auto & ready)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+		while(!ready() && reloadHost.failure.empty() && reloadGuest.failure.empty() && std::chrono::steady_clock::now() < deadline)
+		{
+			reloadNetwork->getContext().restart();
+			reloadNetwork->getContext().poll();
+			reloadedServer.getNetworkHandler().getContext().restart();
+			reloadedServer.getNetworkHandler().getContext().poll();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+	};
+	reloadNetwork->connectToRemote(reloadHost, "127.0.0.1", reloadPort);
+	pumpReload([&] { return reloadHost.negotiated; });
+	ASSERT_TRUE(reloadHost.negotiated) << reloadHost.failure;
+	reloadNetwork->connectToRemote(reloadGuest, "127.0.0.1", reloadPort);
+	pumpReload([&] { return reloadGuest.negotiated; });
+	ASSERT_TRUE(reloadGuest.negotiated) << reloadGuest.failure;
+	ASSERT_TRUE(reloadHost.acceptedTopology);
+	ASSERT_TRUE(reloadGuest.acceptedTopology);
+	reloadedServer.si = std::make_shared<StartInfo>(savedStart);
+	reloadedServer.si->mode = EStartMode::LOAD_GAME;
+	reloadedServer.si->mapname = saveName;
+	reloadedServer.mi = std::make_shared<CMapInfo>();
+	reloadedServer.mi->fileURI = saveName;
+	reloadedServer.mi->mapHeader = std::move(savedHeader);
+	reloadedServer.mi->scenarioOptionsOfSave = std::make_unique<StartInfo>(savedStart);
+	for(const auto & [color, peerName] : {std::pair{red, reloadHost.name}, std::pair{blue, reloadGuest.name}})
+	{
+		auto & settings = reloadedServer.si->playerInfos.at(color);
+		settings.connectedPlayerIDs.clear();
+		for(const auto & [id, player] : reloadedServer.playerNames)
+			if(player.name == peerName)
+				settings.connectedPlayerIDs.insert(id);
+	}
+	ASSERT_TRUE(reloadedServer.hasPlayerAt(red, reloadHost.clientId));
+	ASSERT_TRUE(reloadedServer.hasPlayerAt(blue, reloadGuest.clientId));
+	LobbyStartGame reloadStart;
+	reloadHost.codec->sendPack(reloadStart);
+	pumpReload([&] { return reloadHost.state && reloadGuest.state; });
+	ASSERT_TRUE(reloadHost.state) << reloadHost.failure << testing::PrintToString(reloadHost.messages);
+	ASSERT_TRUE(reloadGuest.state) << reloadGuest.failure << testing::PrintToString(reloadGuest.messages);
+	ASSERT_NE(reloadedServer.gh, nullptr);
+	ASSERT_EQ(reloadedServer.getState(), EServerState::GAMEPLAY);
+	for(const LobbyPeer * peer : {&reloadHost, &reloadGuest})
+	{
+		EXPECT_TRUE(peer->state->getMap().toroidal);
+		EXPECT_EQ(peer->state->getHero(redHeroID)->visitablePos(), savedRedPosition);
+		EXPECT_EQ(peer->state->getHero(redHeroID)->movementPointsRemaining(), savedRedPoints);
+		EXPECT_EQ(peer->state->getHero(blueHeroID)->visitablePos(), savedBluePosition);
+		EXPECT_EQ(peer->state->getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
+		EXPECT_EQ(visibility(*peer->state), savedFog);
+	}
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(redHeroID)->visitablePos(), savedRedPosition);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(redHeroID)->movementPointsRemaining(), savedRedPoints);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(blueHeroID)->visitablePos(), savedBluePosition);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
+	ASSERT_EQ(visibility(reloadedServer.gh->gameState()), savedFog);
+	ASSERT_TRUE(reloadedServer.gh->gameState().actingPlayers.contains(blue));
+	if(const auto activity = reloadedServer.gh->activities->topActivity(blue))
+	{
+		QuestionAnswer resumeTurn(activity->getActiveQuestionID(), 0);
+		resumeTurn.player = blue;
+		resumeTurn.requestID = 41;
+		reloadGuest.codec->sendPack(resumeTurn);
+		pumpReload([&] { return reloadGuest.results.contains(41); });
+		ASSERT_TRUE(reloadGuest.results.contains(41)) << reloadGuest.failure;
+		ASSERT_TRUE(reloadGuest.results.at(41));
+	}
+	const auto * resumedHero = reloadedServer.gh->gameState().getHero(blueHeroID);
+	ASSERT_NE(resumedHero, nullptr);
+	ASSERT_EQ(resumedHero->visitablePos(), int3(35, 5, 0));
+	const int3 resumedDestination(0, 5, 0);
+	MoveHero resumeMove({resumedHero->convertFromVisitablePos(resumedDestination)}, EPathfindingLayer::LAND, blueHeroID, false);
+	resumeMove.player = blue;
+	resumeMove.requestID = 42;
+	reloadGuest.codec->sendPack(resumeMove);
+	pumpReload([&] {
+		return reloadGuest.results.contains(42)
+			&& reloadHost.state->getHero(blueHeroID)->visitablePos() == resumedDestination
+			&& reloadGuest.state->getHero(blueHeroID)->visitablePos() == resumedDestination;
+	});
+	ASSERT_TRUE(reloadGuest.results.contains(42)) << reloadGuest.failure;
+	ASSERT_TRUE(reloadGuest.results.at(42)) << testing::PrintToString(reloadGuest.systemMessages);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(blueHeroID)->visitablePos(), resumedDestination);
+	EXPECT_LT(reloadedServer.gh->gameState().getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
+	for(const LobbyPeer * peer : {&reloadHost, &reloadGuest})
+	{
+		EXPECT_EQ(peer->state->getHero(blueHeroID)->visitablePos(), resumedDestination);
+		EXPECT_EQ(peer->state->getHero(blueHeroID)->movementPointsRemaining(), reloadedServer.gh->gameState().getHero(blueHeroID)->movementPointsRemaining());
+		EXPECT_EQ(visibility(*peer->state), visibility(reloadedServer.gh->gameState()));
 	}
 }
 

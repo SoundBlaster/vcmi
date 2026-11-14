@@ -107,3 +107,33 @@ TB5 runtime directory. The untagged listener is a current-code test double, not 
 old binary, and all three listeners and server run in one process over TCP
 loopback. This does not resolve the disabled raw conflicting-layout test,
 prove mixed-version graphical interoperability, or authenticate capabilities.
+
+## Save and reload through a new TCP lobby
+
+The same live TCP scenario now writes a server save after the established
+movement and turn sequence. A second `CVCMIServer` and two new test listeners
+connect over loopback TCP with the toroidal capability. The test reads the
+saved header and start settings, assigns the new connections to the saved
+players, then sends `LobbyStartGame` with `LOAD_GAME`. Both clients receive
+the loaded toroidal state. The test compares both heroes' positions and
+movement points and all surface fog cells of both teams with the saved
+server state and with each other.
+
+After loading, the blue player sends a normal movement request from
+`(35,5,0)` to `(0,5,0)`. The server accepts it, spends movement points and
+broadcasts the result. Both test clients and the server agree on the new
+position, remaining points and both teams' surface fog. Temporary save and
+configuration resources use an isolated filesystem overlay. The test
+configures saved player slots directly and runs both server objects and all
+test listeners in one process; TCP is loopback. It is not a graphical lobby,
+remote-host session, network confidentiality test or evidence for all levels.
+
+On macOS arm64, this expanded TCP test, the two-level disk-save/replica test,
+and the enabled `GameConnectionTopologyTest` cases passed five consecutive
+repetitions on the TB5 build from `41e3ddb` plus the test changes. The log is
+`runtime/tcp-save-load-final-2026-11-14.log`. The raw conflicting-layout test
+remains disabled and is not counted among those passes.
+
+The full local suite subsequently passed 1,530 tests with no skips, including
+the optional older save, VMAP and Complete-map fixtures; four tests remain
+disabled. Its TB5 log is `runtime/full-suite-tcp-save-reload-2026-11-14.log`.
