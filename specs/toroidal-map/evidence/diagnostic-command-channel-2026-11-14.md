@@ -75,5 +75,28 @@ text widget.
 A development-signed test client was then launched, but remained in the OS
 `open` call while initializing its log on TB5 before it created a diagnostic
 socket. The stack does not establish why the call is waiting. GUI text
-delivery and the new backspace command remain unverified until that client
-reaches a suitable input field.
+delivery and the new backspace command were not verified in that attempt.
+
+On a macOS arm64 Release client built from `30a5dc1`, the main menu and Join
+TCP/IP game dialog were opened via the diagnostic socket. Its focused player
+name initially read `Игрок`; `text ProbeX` returned `accepted` and the game
+showed `ИгрокProbeX`. A subsequent `shortcut backspace` returned `accepted`
+and the game showed `ИгрокProbe`. These checks cover one text widget, not
+arbitrary inputs, network joining or text outside the channel's ASCII scope.
+
+The separate test application was signed with the authorized development
+identity and passed `codesign --verify --deep --strict`. After signing, the
+SHA-256 values were:
+
+```text
+8dee7941f25c556869b45704db3dc0a9498f573d92b3a9e50ffa84e9633d2f13  vcmiclient
+6669116c19940ae4ef3e5adc0f365c475d2d570dfb1032e3b186dca750c82f60  vcmiserver
+bd2eca3d50d0d8a3dd009825d243f1fa101371e90a87092566dbc5172ed30634  libvcmi.dylib
+```
+
+Launching this application through Launch Services with a local log started
+the client but left it waiting while opening its save directory. The stack
+does not establish why. Directly invoking the signed client with the same
+local log and diagnostic configuration loaded resources and opened the
+`1.8.0.30a5dc1` window. The result establishes this direct-launch path, not a
+general fix for macOS permissions or Launch Services startup.
