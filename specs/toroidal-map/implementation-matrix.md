@@ -98,6 +98,11 @@ request handler in a shared-state test fixture; this does not yet establish a
 full AI turn or a graphical multiplayer session. See the
 [AI route record](evidence/topology-ai-direct-route-2026-11-09.md).
 
+A generated legacy H3M defaults to bounded mode and rejects direct crossings
+in all eight directions on both levels; the same steps succeed after an
+explicit in-memory toroidal opt-in. See the
+[bounded seam regression](evidence/bounded-seam-regression-2026-11-14.md).
+
 ## Persistence, compatibility and supported profiles
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |

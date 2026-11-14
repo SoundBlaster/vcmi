@@ -2746,6 +2746,61 @@ TEST_F(HeroMovementTest, ImpassableTerrainBlocksEveryToroidalEdgeAndCorner)
 			}
 }
 
+TEST_F(HeroMovementTest, LegacyBoundedMapsRejectDirectSeamStepsOnBothLevels)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	ASSERT_FALSE(map()->toroidal);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+
+	for(int z = 0; z < 2; ++z)
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				if(dx == 0 && dy == 0)
+					continue;
+				SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
+				const int3 start(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+				const MapTopology wrapped(36, 36, 2, true);
+				const auto target = wrapped.canonicalize(start + int3(dx, dy, 0));
+				ASSERT_TRUE(target);
+				map()->toroidal = false;
+				map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
+				hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+				hero->setMovementPoints(3000);
+				CPathsInfo boundedPaths(gameState()->getMapSize(), hero);
+				auto boundedConfig = std::make_shared<SingleHeroPathfinderConfig>(boundedPaths, *gameState(), hero);
+				CPathfinder boundedPathfinder(*gameState(), boundedConfig);
+				boundedPathfinder.calculatePaths();
+				const auto * boundedNode = boundedPaths.getNode(*target, EPathfindingLayer::LAND);
+				if(boundedNode->reachable() && boundedNode->theNodeBefore)
+					EXPECT_NE(boundedNode->theNodeBefore->coord, start);
+				EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*target), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), start);
+				EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+
+				map()->toroidal = true;
+				CPathsInfo toroidalPaths(gameState()->getMapSize(), hero);
+				auto toroidalConfig = std::make_shared<SingleHeroPathfinderConfig>(toroidalPaths, *gameState(), hero);
+				CPathfinder toroidalPathfinder(*gameState(), toroidalConfig);
+				toroidalPathfinder.calculatePaths();
+				const auto * toroidalNode = toroidalPaths.getNode(*target, EPathfindingLayer::LAND);
+				ASSERT_TRUE(toroidalNode->reachable());
+				ASSERT_NE(toroidalNode->theNodeBefore, nullptr);
+				EXPECT_EQ(toroidalNode->theNodeBefore->coord, start);
+				const auto remaining = toroidalNode->moveRemains;
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*target), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), *target);
+				EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+			}
+}
+
 TEST_F(HeroMovementTest, MovementAcknowledgementReportsRejectedAndAcceptedRequests)
 {
 	const PlayerColor player(0), opponent(1);
