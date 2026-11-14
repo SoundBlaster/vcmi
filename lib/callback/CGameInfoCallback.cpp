@@ -876,7 +876,22 @@ void CGameInfoCallback::getTilesInRange(FowTilesType & tiles,
 		return;
 	}
 	if(radious == GameConstants::FULL_MAP_RANGE)
-		getAllTiles (tiles, player, -1, [](auto * tile){return true;});
+	{
+		// Match the finite-range visibility filter on every level without
+		// requesting terrain through a player callback for hidden tiles.
+		const auto & map = gameState().getMap();
+		const TeamState * team = player ? gameState().getPlayerTeam(*player) : nullptr;
+		for(int z = 0; z < map.levels(); ++z)
+			for(int x = 0; x < map.width; ++x)
+				for(int y = 0; y < map.height; ++y)
+				{
+					const int3 tile(x, y, z);
+					if(!player
+						|| (mode == ETileVisibility::HIDDEN && team->fogOfWarMap[tile] == 0)
+						|| (mode == ETileVisibility::REVEALED && team->fogOfWarMap[tile] == 1))
+						tiles.insert(tile);
+				}
+	}
 	else
 	{
 		const TeamState * team = !player ? nullptr : gameState().getPlayerTeam(*player);

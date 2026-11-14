@@ -1963,6 +1963,74 @@ void HeroMovementTest::checkToroidalSightRange(EMapFormat format)
 	EXPECT_FALSE(tiles.contains(int3(33, 0, 0)));
 }
 
+TEST_F(HeroMovementTest, FullMapRangeFiltersFogForBothLevelsAndTopologies)
+{
+	const PlayerColor player(0), other(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).playerActive(other)
+		.hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), other);
+	startWithMap(std::move(builder));
+	setMapVisibility(player, false);
+	setMapVisibility(other, false);
+	const std::set<int3> revealed{int3(0, 0, 0), int3(35, 35, 1)};
+	for(const auto & tile : revealed)
+		gameState()->getPlayerTeam(player)->fogOfWarMap[tile] = 1;
+	gameState()->getPlayerTeam(other)->fogOfWarMap[int3(2, 2, 0)] = 1;
+	const auto callback = makeCallback(player);
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
+		map()->toroidal = toroidal;
+		for(const auto * source : {static_cast<const CGameInfoCallback *>(gameState().get()), static_cast<const CGameInfoCallback *>(callback.get())})
+		{
+			FowTilesType visible, hidden, all;
+			ASSERT_NO_THROW(source->getTilesInRange(visible, int3(0, 0, 0), GameConstants::FULL_MAP_RANGE, ETileVisibility::REVEALED, player));
+			ASSERT_NO_THROW(source->getTilesInRange(hidden, int3(0, 0, 0), GameConstants::FULL_MAP_RANGE, ETileVisibility::HIDDEN, player));
+			ASSERT_NO_THROW(source->getTilesInRange(all, int3(0, 0, 0), GameConstants::FULL_MAP_RANGE, ETileVisibility::HIDDEN));
+			EXPECT_EQ(visible.size(), revealed.size());
+			EXPECT_EQ(hidden.size() + visible.size(), 36u * 36u * 2u);
+			EXPECT_EQ(all.size(), 36u * 36u * 2u);
+			for(const auto & tile : revealed)
+			{
+				EXPECT_TRUE(visible.contains(tile));
+				EXPECT_FALSE(hidden.contains(tile));
+			}
+			EXPECT_TRUE(hidden.contains(int3(2, 2, 0)));
+		}
+	}
+}
+
+TEST_F(HeroMovementTest, FullMapFogChangesKeepOwnedSightAndOtherTeamIsolation)
+{
+	const PlayerColor player(0), other(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).playerActive(other)
+		.hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), other);
+	startWithMap(std::move(builder));
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const int3 nearHero(0, 1, 0), remote(18, 18, 0), underground(18, 18, 1);
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
+		map()->toroidal = toroidal;
+		setMapVisibility(player, false);
+		setMapVisibility(other, false);
+		handler.changeFogOfWar(nearHero, GameConstants::FULL_MAP_RANGE, player, ETileVisibility::REVEALED);
+		EXPECT_TRUE(gameState()->isVisibleFor(nearHero, player));
+		EXPECT_TRUE(gameState()->isVisibleFor(remote, player));
+		EXPECT_TRUE(gameState()->isVisibleFor(underground, player));
+		EXPECT_FALSE(gameState()->isVisibleFor(remote, other));
+		handler.changeFogOfWar(nearHero, GameConstants::FULL_MAP_RANGE, player, ETileVisibility::HIDDEN);
+		EXPECT_TRUE(gameState()->isVisibleFor(nearHero, player));
+		EXPECT_FALSE(gameState()->isVisibleFor(remote, player));
+		EXPECT_FALSE(gameState()->isVisibleFor(underground, player));
+		EXPECT_FALSE(gameState()->isVisibleFor(remote, other));
+	}
+}
+
 TEST_F(HeroMovementTest, pathfinderAndServerCrossToroidalSeams)
 {
 	checkToroidalSeamMovement(EMapFormat::SOD);

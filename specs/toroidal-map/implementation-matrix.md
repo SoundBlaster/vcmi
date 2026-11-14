@@ -88,6 +88,11 @@ future opt-in design preserves it.
 | `minimap` | Visible area and map selection remain correct across one or both seams. | V5 | partial: split radar and shared logical raster and click mapping | partial: interval arithmetic across 37,500 size pairs, SDL3 software raster and texture, selected Metal integer-upscaling checks and GUI camera selection at all four corners on a 36×36 map | pending | [pixel alignment and GUI](evidence/topology-minimap-pixel-alignment-2026-11-14.md), [player GUI record](evidence/topology-gui-player-2026-11-09.md); fractional-scale GUI selection, SDL2 and other GPU backends unverified |
 | `minimap` | Object ownership updates use the correct cells across seams. | object-update case to specify | partial: owner-change refresh and editor minimap use wrapped footprint cells | partial: synthetic corner footprint mapping | pending | [object tile record](evidence/topology-object-tile-queries-2026-11-10.md); GUI update unverified |
 
+Full-map fog range filtering and server reveal/hide are also checked on
+bounded and toroidal maps with two levels and two teams. See the
+[full-map fog record](evidence/full-map-fog-range-2026-11-14.md) for the
+scope and the remaining multiplayer and rendering limitations.
+
 ## Persistence, compatibility and supported profiles
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
