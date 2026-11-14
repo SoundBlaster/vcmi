@@ -47,6 +47,19 @@ cover the indexed matches, not all callers or all possible coordinate logic.
 The draw-order candidates were also inspected; wrapped-layer tests cover
 selected cases, while general overlap behavior remains open.
 
+The indexed H3M and VMAP format matches were reviewed separately from world
+movement. An H3M is loaded as a bounded physical grid before an author opts
+into toroidal conversion; its location checks therefore describe legacy
+storage, not a request to cross a seam. VMAP row iteration likewise reads and
+writes each physical tile once, and its toroidal header checks restrict minimum
+dimensions and oversized object footprints. These observations do not prove
+every unusual legacy map converts without conflicts. The indexed pathfinder
+matches use canonical neighbors, including the two side tiles used to reject
+diagonal sailing through a coast; diagonal cost still compares whether both
+canonical coordinates changed. This is valid for supported dimensions of at
+least three, and the focused edge/corner tests cover selected road and boat
+cases rather than every movement rule.
+
 ## Initial triage
 
 | Area | Observation | State |

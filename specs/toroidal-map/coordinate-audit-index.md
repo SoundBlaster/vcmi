@@ -260,8 +260,8 @@ regenerating the index resets manually recorded statuses.
 | `lib/mapping/CMapOperation.cpp` | 36, 41, 265, 384, 385, 391, 394, 396, 405, 409, 413, 417, 436, 554, 607 | unreviewed |
 | `lib/mapping/MapEditUtils.cpp` | 26, 41, 42, 58, 68, 121, 127, 347, 351, 354 | unreviewed |
 | `lib/mapping/MapEditUtils.h` | 24 | unreviewed |
-| `lib/mapping/MapFormatH3M.cpp` | 214, 1067, 1069, 2217, 2248, 3132, 3152 | unreviewed |
-| `lib/mapping/MapFormatJson.cpp` | 306, 982, 983, 1010, 1045, 1050, 1064, 1082, 1087, 1102, 1109, 1114, 1136, 1139, 1143, 1146, 1457, 1458, 1504, 1506, 1510, 1512 | unreviewed |
+| `lib/mapping/MapFormatH3M.cpp` | 214, 1067, 1069, 2217, 2248, 3132, 3152 | reviewed indexed candidates: H3M loads a bounded map, reads its physical grid and validates object/main-town locations before any toroidal conversion; clipped objects and main towns have separate conversion tests |
+| `lib/mapping/MapFormatJson.cpp` | 306, 982, 983, 1010, 1045, 1050, 1064, 1082, 1087, 1102, 1109, 1114, 1136, 1139, 1143, 1146, 1457, 1458, 1504, 1506, 1510, 1512 | reviewed indexed candidates: header dimensions and rectangular terrain rows describe physical storage; oversized toroidal footprints and minimum dimensions are explicitly validated |
 | `lib/mapping/MapTilesStorage.h` | 25, 26, 44, 51, 72 | unreviewed |
 | `lib/mapping/MapTopology.h` | 24, 26, 37, 42, 52, 53, 68, 69, 70, 71, 76 | unreviewed |
 | `lib/mapping/ObstacleProxy.cpp` | 406, 408, 416, 485, 545, 547 | unreviewed |
@@ -270,7 +270,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/modding/ModManager.cpp` | 254, 625 | unreviewed |
 | `lib/networkPacks/PacksForClientBattle.h` | 531 | unreviewed |
 | `lib/pathfinder/CGPathNode.h` | 73 | unreviewed |
-| `lib/pathfinder/CPathfinder.cpp` | 54, 61, 107, 113, 162, 589, 606, 618, 619, 697, 705, 720 | unreviewed |
+| `lib/pathfinder/CPathfinder.cpp` | 54, 61, 107, 113, 162, 589, 606, 618, 619, 697, 705, 720 | reviewed indexed candidates: initial nodes use canonical storage coordinates, neighbor and coast checks canonicalize via topology, and diagonal/road cost uses the resulting source and destination tiles; broader movement and hidden-terrain policies remain partially tested |
 | `lib/pathfinder/CPathfinder.h` | 112, 115 | unreviewed |
 | `lib/pathfinder/INodeStorage.h` | 32 | unreviewed |
 | `lib/pathfinder/NodeStorage.cpp` | 75, 86 | unreviewed |
