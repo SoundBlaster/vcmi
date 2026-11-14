@@ -15,6 +15,17 @@ No response to that request was observed before the test process was
 terminated. This observation does not establish that the prompt was visible
 or predict the outcome of a later authorization.
 
+After the user reported granting some macOS permissions, a second Launch
+Services attempt of the same signed bundle also remained in filesystem
+initialization. A process sample showed the main thread blocked in an `open`
+call during recursive directory initialization, before the requested log was
+created. The available TCC log showed an All Files preflight, but did not
+establish a removable-volume prompt or the cause of this second wait. The
+process was terminated; the sample is retained as
+`runtime/gui-preview-496d90b/launchservices-permission-recheck-sample.txt`.
+This does not show which permission the user granted or whether it applies to
+this particular bundle.
+
 Launching the same signed executable directly from its `Contents/MacOS`
 directory, with a temporary local log and diagnostic socket, reached the game
 menu. A new single-player `Toroid Seam Laboratory` game opened on the 36×36
