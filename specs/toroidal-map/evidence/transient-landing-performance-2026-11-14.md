@@ -23,3 +23,39 @@ These are local wall times in one synthetic configuration; they do not measure
 frame pacing, server concurrency, other maps, or remote multiplayer. The
 results support investigating repeated shared-prefix work, not a claim that
 every game experiences a visible pause.
+
+## Shared-prefix cache
+
+The path graph now caches the landing status after each successfully checked
+prefix node, under the existing route-safety mutex. A new search, reuse or
+reconfiguration clears the cache. The current-turn and interactive-action
+boundaries still stop validation; an unsafe extension is checked and rejected
+even when its preceding prefix was accepted.
+
+The same local probe after the change produced these medians, in milliseconds:
+
+| Movement points | One landing search | First route, tiles | First route | Next shared-prefix route |
+| ---: | ---: | ---: | ---: | ---: |
+| 1,200 | 0.77 | 5 | 3.15 | 0.51 |
+| 3,000 | 2.86 | 10 | 20.36 | 1.34 |
+| 6,000 | 10.29 | 20 | 145.22 | 4.56 |
+
+The first route and individual landing search remain expensive in this stress
+fixture; this change reduces repeated validation only when paths share nodes
+in the same graph. It does not cache server searches across movement packets.
+The route-agreement test validates a safe prefix before eight concurrent
+readers request the unsafe extension, then recalculates with changed movement
+points. Twenty-nine related landing, fog and route tests passed three runs.
+An additional check compared 21 destination results from a populated cache
+with independently recalculated graphs, including accepted and rejected
+routes; the expanded route-agreement test passed three runs.
+These observations do not establish frame pacing or a general performance
+bound.
+
+With the three external fixtures configured, the complete local `vcmitest`
+run passed all 1,541 tests before the additional query-order assertions;
+four tests remained disabled. The TB5 log is
+`runtime/full-suite-route-prefix-cache-2026-11-14.log`. SpecPM validation
+reported no errors or warnings. The macOS arm64 client and server targets
+also built; the linker reported existing duplicate-library and missing-search-
+directory warnings. This does not verify a running client or server.

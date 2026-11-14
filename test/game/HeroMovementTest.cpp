@@ -7598,6 +7598,11 @@ TEST_F(HeroMovementTest, TransientClientServerRouteAgreement)
 	finder.calculatePaths();
 	CGPath route;
 	ASSERT_EQ(paths.getNode(destination, EPathfindingLayer::WATER)->turns, 0);
+	ASSERT_NE(paths.getNode(destination, EPathfindingLayer::WATER)->theNodeBefore, nullptr);
+	ASSERT_EQ(paths.getNode(destination, EPathfindingLayer::WATER)->theNodeBefore->coord, int3(24, 18, 0));
+	// Validate the safe prefix first; extending it must still reject the
+	// seventh step, including with concurrent readers.
+	ASSERT_TRUE(paths.getPath(route, int3(24, 18, 0), EPathfindingLayer::WATER));
 	std::array<bool, 8> concurrentResults{};
 	std::vector<std::thread> readers;
 	for(size_t i = 0; i < concurrentResults.size(); ++i)
@@ -7613,6 +7618,28 @@ TEST_F(HeroMovementTest, TransientClientServerRouteAgreement)
 	EXPECT_FALSE(paths.getPathInfo(destination, EPathfindingLayer::WATER)->reachable());
 	ASSERT_TRUE(paths.getPath(route, int3(24, 18, 0), EPathfindingLayer::WATER));
 	ASSERT_EQ(route.nodes.size(), 7u);
+	// A populated cache must agree with an independently calculated graph,
+	// regardless of which neighboring destination was queried first.
+	int accepted = 0, rejected = 0;
+	for(int x = 19; x <= 25; ++x)
+		for(int y = 17; y <= 19; ++y)
+		{
+			const int3 target(x, y, 0);
+			CPathsInfo freshPaths(gameState()->getMapSize(), hero);
+			auto freshConfig = std::make_shared<SingleHeroPathfinderConfig>(freshPaths, *gameState(), hero);
+			CPathfinder freshFinder(*gameState(), freshConfig);
+			freshFinder.calculatePaths();
+			CGPath freshRoute, cachedRoute;
+			const bool expected = freshPaths.getPath(freshRoute, target, EPathfindingLayer::WATER);
+			const bool actual = paths.getPath(cachedRoute, target, EPathfindingLayer::WATER);
+			EXPECT_EQ(actual, expected) << target.toString();
+			if(expected)
+				++accepted;
+			else
+				++rejected;
+		}
+	EXPECT_GT(accepted, 0);
+	EXPECT_GT(rejected, 0);
 	// Reusing a path cache after movement points change must discard the
 	// previous safety decision as well as the previous path graph.
 	hero->setMovementPoints(1500);

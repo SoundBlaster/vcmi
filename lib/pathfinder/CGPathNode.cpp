@@ -84,6 +84,7 @@ void CPathsInfo::prepareForReuse(const CGHeroInstance * hero_)
 	heroBonusTreeVersion = hero->getTreeVersion();
 	routeSafetyState = nullptr;
 	routeSafetyCache.clear();
+	routeSafetyPrefixLanding.clear();
 }
 
 void CPathsInfo::configureRouteSafety(const CGameState * state)
@@ -91,12 +92,14 @@ void CPathsInfo::configureRouteSafety(const CGameState * state)
 	std::lock_guard lock(routeSafetyMutex);
 	routeSafetyState = state;
 	routeSafetyCache.clear();
+	routeSafetyPrefixLanding.clear();
 }
 
 void CPathsInfo::beginSearch()
 {
 	std::lock_guard lock(routeSafetyMutex);
 	routeSafetyCache.clear();
+	routeSafetyPrefixLanding.clear();
 	++currentGeneration;
 	if(currentGeneration != 0)
 		return;
@@ -139,9 +142,16 @@ bool CPathsInfo::isKnownSafeRoute(const CGPathNode * destination) const
 		// fog. Validate the current uninterrupted movement prefix only.
 		if(step->turns != 0 || (index > 1 && previous->action != EPathNodeAction::NORMAL))
 			break;
+		const auto prefix = routeSafetyPrefixLanding.find(step);
+		if(prefix != routeSafetyPrefixLanding.end())
+		{
+			hadKnownLanding = prefix->second;
+			continue;
+		}
 		if(step->layer == ELayer::LAND)
 		{
 			hadKnownLanding = true;
+			routeSafetyPrefixLanding.emplace(step, hadKnownLanding);
 			continue;
 		}
 		if(step->layer != ELayer::AIR && step->layer != ELayer::WATER)
@@ -161,6 +171,7 @@ bool CPathsInfo::isKnownSafeRoute(const CGPathNode * destination) const
 			break;
 		}
 		hadKnownLanding = hasLanding;
+		routeSafetyPrefixLanding.emplace(step, hadKnownLanding);
 	}
 	routeSafetyCache.emplace(destination, safe);
 	return safe;

@@ -209,6 +209,8 @@ private:
 	const CGameState * routeSafetyState = nullptr;
 	mutable std::mutex routeSafetyMutex;
 	mutable std::map<const CGPathNode *, bool> routeSafetyCache;
+	/// Safe prefixes map to whether their last node has a known landing.
+	mutable std::map<const CGPathNode *, bool> routeSafetyPrefixLanding;
 
 	void beginSearch();
 	bool isKnownSafeRoute(const CGPathNode * destination) const;

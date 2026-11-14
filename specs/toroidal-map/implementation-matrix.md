@@ -103,6 +103,11 @@ in all eight directions on both levels; the same steps succeed after an
 explicit in-memory toroidal opt-in. See the
 [bounded seam regression](evidence/bounded-seam-regression-2026-11-14.md).
 
+Repeated client transit-route checks reuse validated prefixes within one path
+graph. The [timing record](evidence/transient-landing-performance-2026-11-14.md)
+measures one synthetic case; first-route and server costs remain unbounded by
+that result.
+
 ## Persistence, compatibility and supported profiles
 
 | Requirement ID | Trackable obligation | Planned scenarios | Implementation | Verification | Acceptance | Target evidence |
