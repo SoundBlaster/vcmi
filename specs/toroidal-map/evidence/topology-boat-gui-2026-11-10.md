@@ -98,3 +98,28 @@ SHA-256 `9b3e8179b88ec5598214dfaf4ef11b9e492428e1b26bc020504fe791baad1092`.
 A simultaneous screen-recording attempt produced no saved movie; the Mac's
 internal disk was nearly full during the attempt. No causal diagnosis or
 claim about movement smoothness follows from these still observations.
+
+## Current-client diagonal recording
+
+On 2026-11-14, a signed macOS arm64 client built from `8552be9` with the
+scenario-list event-coordinate fix later committed as `a56a719` loaded the
+same open-water fixture. The hero embarked `(30,30) → (31,30)` and, on the
+next day, sailed to `(35,35)`. Diagnostic shortcuts then produced
+`(35,35) → (0,0) → (35,35) → (0,35) → (35,0) → (0,35)`; the four diagonal
+steps cost 141 points each and the eastward step cost 100. The extracted
+observation records 48–86 are stored locally under the VCMI TB5 build root at
+`runtime/boat-corner-8552be9-observations-48-86.jsonl`, SHA-256
+`ac760ba7262771907279391618a3b7d2eebf256c29218c13c85316efebd228b2`.
+
+A separate 20.008-second screen recording during those commands has 1,119
+video frames at 3600×2338, approximately 55.9 fps average. It is stored at
+`runtime/boat-corner-fd44e5f-2026-11-14.mov` in the same TB5 build root,
+SHA-256 `e9d079edd54549c2ae444e35827622448d00d5df74a175e6d5a3cbf11b99c768`.
+The file name is a local label, not the client's Git version. A 1 fps sheet of
+the whole recording and four one-second crops resampled at 25 fps were
+inspected. The boat remains visible and changes direction in those samples.
+A system notification covered part of the viewport throughout; the camera
+follows the boat and the water has few stable landmarks. The recording includes
+the surrounding desktop and is not committed. These samples do not establish
+uninterrupted animation, exact synchronization between the recording and
+observation clocks, frame pacing, or continuity across the obscured region.
