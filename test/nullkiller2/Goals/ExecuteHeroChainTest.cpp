@@ -65,6 +65,11 @@ protected:
 		startWithMap(std::move(builder));
 	}
 };
+
+class ToroidalResourceVisitTest : public ExecuteHeroChainMovementTest,
+	public ::testing::WithParamInterface<int>
+{
+};
 }
 
 TEST_F(ExecuteHeroChainMovementTest, blockingVisitOnRouteStopsChainForReplanning)
@@ -98,12 +103,17 @@ TEST_F(ExecuteHeroChainMovementTest, blockingVisitOnRouteStopsChainForReplanning
 	EXPECT_EQ(client.movementRequests, 1) << "the chain must stop after the pickup instead of following the stale route";
 }
 
-TEST_F(ExecuteHeroChainMovementTest, plannedCornerResourceVisitUsesRealServer)
+TEST_P(ToroidalResourceVisitTest, plannedResourceVisitUsesRealServer)
 {
-	const int3 start(0, 0, 0), destination(35, 35, 0);
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions.at(GetParam() % directions.size());
+	const int z = GetParam() / directions.size();
+	const int3 start(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+	const int3 destination(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
-	builder.size(36, false).playerActive(PLAYER).playerActive(ENEMY)
-		.hero(int3(1, 0, 0), HeroTypeID(0), PLAYER)
+	builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
+		.hero(int3(19, 18, 0), HeroTypeID(0), PLAYER)
 		.heroGarrison({{CreatureID(0), 1}})
 		.hero(int3(20, 20, 0), HeroTypeID(1), ENEMY)
 		.resource(destination, GameResID::GOLD, 10);
@@ -114,6 +124,7 @@ TEST_F(ExecuteHeroChainMovementTest, plannedCornerResourceVisitUsesRealServer)
 	auto * resource = findFirst<CGResource>();
 	ASSERT_NE(hero, nullptr);
 	ASSERT_NE(resource, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
 	ASSERT_EQ(hero->visitablePos(), start);
 	ASSERT_EQ(resource->visitablePos(), destination);
 	const auto resourceID = resource->id;
@@ -139,6 +150,8 @@ TEST_F(ExecuteHeroChainMovementTest, plannedCornerResourceVisitUsesRealServer)
 	EXPECT_EQ(gameState()->players.at(PLAYER).resources[GameResID::GOLD], goldBefore + 1000);
 	EXPECT_EQ(hero->visitablePos(), start);
 }
+
+INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalResourceVisitTest, ::testing::Range(0, 16));
 
 TEST_F(ExecuteHeroChainMovementTest, repeatedIdleChainFailsForReplanning)
 {

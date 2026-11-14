@@ -53,3 +53,11 @@ This test and six related AI movement tests passed three consecutive runs on
 macOS arm64. Client and server share the fixture's game state in one process;
 the test does not exercise a real network connection, the full strategic
 turn loop, fog exploration, or other objects and corners.
+
+The server-backed resource-visit fixture was subsequently expanded to all
+four straight seams and four corner directions on both map levels. In each
+of the 16 configurations, Nullkiller2 planned a same-turn direct visit and
+the server handler removed the gold pile and credited the player after one
+movement request. All 16 cases passed three consecutive runs on macOS arm64.
+The game state remains shared in-process, the map is fully revealed, and the
+test does not establish a full AI turn or graphical multiplayer behavior.
