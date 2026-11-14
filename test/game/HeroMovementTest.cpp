@@ -4523,6 +4523,54 @@ TEST_F(HeroMovementTest, ExpiredTimerRelocatesStrandedHeroWhenOriginIsLost)
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 
+TEST_F(HeroMovementTest, ExpiredTimerRetriesEmergencyRelocationAfterLandIsRevealed)
+{
+	const PlayerColor player(0);
+	const int3 water(18, 18, 0), land(10, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != land && int3(x, y, 0) != water)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_FALSE(hero->inBoat());
+	map()->getTile(water).terrainType = TerrainId::WATER;
+	hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	hero->setMovementPoints(1);
+	auto * team = gameState()->getPlayerTeam(player);
+	ASSERT_NE(team, nullptr);
+	team->fogOfWarMap[land] = 0;
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	gameState()->players.at(player).human = true;
+	gameState()->players.at(player).status = EPlayerStatus::INGAME;
+	gameState()->actingPlayers.insert(player);
+	gameState()->getStartInfo()->turnTimerInfo.turnTimer = 1;
+	gameState()->getStartInfo()->turnTimerInfo.baseTimer = 0;
+	handler.turnTimerHandler->onGameplayStart(player);
+	handler.turnTimerHandler->onPlayerGetTurn(player);
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	EXPECT_EQ(hero->visitablePos(), water);
+	EXPECT_TRUE(handler.hasHeroInTransientMovement(player));
+	EXPECT_FALSE(team->fogOfWarMap[land]);
+
+	// When the known world changes, retry only after the configured interval.
+	team->fogOfWarMap[land] = 1;
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(1));
+	EXPECT_EQ(hero->visitablePos(), water);
+	ASSERT_NO_THROW(handler.turnTimerHandler->update(999));
+	EXPECT_EQ(hero->visitablePos(), land);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(hero->movementPointsRemaining(), 0);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
 TEST_F(HeroMovementTest, AutomaticLandingDoesNotTriggerAnEvent)
 {
 	const PlayerColor player(0);
