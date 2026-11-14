@@ -14,7 +14,12 @@ def create_fixture(source, output, seam):
     terrain = json.loads(files["surface_terrain.json"])
     if len(terrain) != 36 or any(len(row) != 36 for row in terrain):
         raise ValueError("expected the 36 by 36 route-safety source map")
-    rows, columns = (range(14, 19), (33, 34, 2, 3, 4)) if seam else (range(20, 23), range(13, 18))
+    if seam == "horizontal":
+        rows, columns = range(14, 19), (33, 34, 2, 3, 4)
+    elif seam == "vertical":
+        rows, columns = (33, 34, 2, 3, 4), range(13, 18)
+    else:
+        rows, columns = range(20, 23), range(13, 18)
     for y in rows:
         for x in columns:
             if not terrain[y][x].startswith("wt"):
@@ -27,11 +32,15 @@ def create_fixture(source, output, seam):
         heroes = [obj for obj in objects if obj.get("instanceName") == "hero_2"]
         if len(heroes) != 1 or (heroes[0]["x"], heroes[0]["y"]) != (16, 16):
             raise ValueError("expected the original route-safety hero")
-        heroes[0]["x"] = 35  # Object anchor; its visitable tile is (34, 16).
+        if seam == "horizontal":
+            heroes[0]["x"] = 35  # Object anchor; visitable tile (34, 16).
+        else:
+            heroes[0]["y"] = 34  # Visitable tile (15, 34).
         files["objects.json"] = json.dumps(objects).encode()
 
     texts = json.loads(files["russian.json"])
-    name = "Toroidal Water Seam Crossing Lab" if seam else "Toroidal Water Crossing Lab"
+    name = {"horizontal": "Toroidal Water Seam Crossing Lab",
+            "vertical": "Toroidal Water Vertical Crossing Lab"}.get(seam, "Toroidal Water Crossing Lab")
     texts["header.name"] = name
     texts["header.description"] = "Experimental wraparound map. AI support is not yet verified. Test map: two shores separated by water."
     files["russian.json"] = json.dumps(texts).encode()
@@ -45,8 +54,9 @@ def main():
     parser.add_argument("source", type=Path, help="local toroidal-route-safety-flight-waterwalk.vmap")
     parser.add_argument("output_dir", type=Path, help="existing directory for new maps")
     args = parser.parse_args()
-    for filename, seam in (("toroidal-water-crossing-lab.vmap", False),
-                           ("toroidal-water-seam-crossing-lab.vmap", True)):
+    for filename, seam in (("toroidal-water-crossing-lab.vmap", None),
+                           ("toroidal-water-seam-crossing-lab.vmap", "horizontal"),
+                           ("toroidal-water-vertical-crossing-lab.vmap", "vertical")):
         create_fixture(args.source, args.output_dir / filename, seam)
         print(args.output_dir / filename)
 
