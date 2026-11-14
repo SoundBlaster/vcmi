@@ -10,8 +10,9 @@ on the same tile when the tile contains no blocking or visitable object other
 than the hero and the adjacent visibility is known. The existing in-place
 movement packet preserves position, movement points and vehicle identity.
 Manual group settlement, group recovery and timer-driven settlement use the
-same check. Other vehicle layers and recovery above an unsuitable tile are not
-covered by this change.
+same check. A later [adjacent-landing change](topology-aviate-adjacent-landing-2026-11-14.md)
+adds a conditional ordinary step from an unsuitable tile. Other vehicle layers
+and general recovery remain open.
 
 `HeroMovementTest.AviationVehicleCanSettleInPlaceAfterAirTransit` creates a
 boat and changes its layer to `AVIATE` for the fixture. A hero embarks, crosses

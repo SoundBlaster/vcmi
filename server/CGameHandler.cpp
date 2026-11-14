@@ -620,6 +620,64 @@ std::optional<EPathfindingLayer> transientInPlaceLandingLayer(const CGameState &
 		return std::nullopt;
 	return EPathfindingLayer::AVIATE;
 }
+
+std::optional<int3> adjacentAviationLanding(const CGameState & state, const CGHeroInstance * hero)
+{
+	if(!hero->inBoat() || hero->getBoat()->layer != EPathfindingLayer::AVIATE
+		|| hero->getConfirmedMovementLayer() != EPathfindingLayer::AIR)
+		return std::nullopt;
+	const auto * team = state.getPlayerTeam(hero->getOwner());
+	if(!team)
+		return std::nullopt;
+	const auto source = hero->visitablePos();
+	const auto & sourceTile = state.getMap().getTile(source);
+	// Invisible events do not prevent a safe departure. The movement handler
+	// skips leave callbacks for aviation transit because no visit took place.
+	if(!std::all_of(sourceTile.visitableObjects.begin(), sourceTile.visitableObjects.end(),
+		[&state, hero](const ObjectInstanceID & id)
+		{
+			return id == hero->id || state.getObjInstance(id)->ID == Obj::EVENT;
+		}))
+		return std::nullopt;
+	CPathsInfo paths(state.getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, state, hero);
+	config->options.turnLimit = 0;
+	CPathfinder pathfinder(state, config);
+	pathfinder.calculatePaths();
+	const auto topology = state.getMap().getTopology();
+	const CGPathNode * best = nullptr;
+	for(const auto & direction : int3::getDirs())
+	{
+		const auto candidate = topology.canonicalize(source + direction);
+		if(!candidate || !team->fogOfWarMap[*candidate])
+			continue;
+		bool knownNeighborhood = true;
+		for(int dx = -1; dx <= 1 && knownNeighborhood; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				const auto neighbor = topology.canonicalize(*candidate + int3(dx, dy, 0));
+				if(!neighbor || !team->fogOfWarMap[*neighbor])
+				{
+					knownNeighborhood = false;
+					break;
+				}
+			}
+		const auto & tile = state.getMap().getTile(*candidate);
+		if(!knownNeighborhood || tile.blocked() || tile.visitable() || state.guardingCreaturePosition(*candidate).isValid())
+			continue;
+		FowTilesType hidden;
+		state.getTilesInRange(hidden, *candidate, hero->getSightRadius(), ETileVisibility::HIDDEN, hero->getOwner());
+		if(!hidden.empty())
+			continue;
+		const auto * node = paths.getNode(*candidate, EPathfindingLayer::AVIATE);
+		if(node->turns != 0 || node->action != EPathNodeAction::NORMAL || !node->theNodeBefore
+			|| node->theNodeBefore->coord != source || node->theNodeBefore->layer != EPathfindingLayer::AIR)
+			continue;
+		if(!best || node->getCost() < best->getCost())
+			best = node;
+	}
+	return best ? std::optional<int3>(best->coord) : std::nullopt;
+}
 }
 
 void CGameHandler::landTransientHeroInPlace(const CGHeroInstance * hero, EPathfindingLayer layer)
@@ -844,7 +902,11 @@ bool CGameHandler::tryAutoLandTransientHero(PlayerColor player)
 			return true;
 		}
 		if(hero->inBoat())
+		{
+			if(const auto landing = adjacentAviationLanding(gameState(), hero))
+				return moveHero(hero->id, hero->convertFromVisitablePos(*landing), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE);
 			continue;
+		}
 		std::vector<LandingStep> route;
 		if(findKnownTransientLanding(gameState(), hero, std::nullopt, &route) != KnownLanding::FOUND || route.empty())
 			continue;
@@ -1284,8 +1346,12 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 	// should be called if hero changes tile but before applying TryMoveHero package
 	auto leaveTile = [&]()
 	{
-		for(const auto & objID : gameState().getMap().getTile(h->visitablePos()).visitableObjects)
-			gameState().getObjInstance(objID)->onHeroLeave(*this, h);
+		const bool aviationTransit = gameState().getMap().toroidal && h->inBoat()
+			&& h->getBoat()->layer == EPathfindingLayer::AVIATE
+			&& h->getConfirmedMovementLayer() == EPathfindingLayer::AIR;
+		if(!aviationTransit)
+			for(const auto & objID : gameState().getMap().getTile(h->visitablePos()).visitableObjects)
+				gameState().getObjInstance(objID)->onHeroLeave(*this, h);
 
 		gameInfo().getTilesInRange(tmh.fowRevealed, h->getSightCenter()+(tmh.end-tmh.start), h->getSightRadius(), ETileVisibility::HIDDEN, h->tempOwner);
 	};
@@ -1460,7 +1526,9 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		// On toroidal maps the timer must be able to reach its transient-layer
 		// recovery path. That path still refuses to end the turn until every
 		// hero has landed; the legacy gate would prevent recovery from running.
-		const bool toroidalTransient = gameState().getMap().toroidal && transit && !h->inBoat()
+		const bool recoverableVehicleTransit = h->inBoat() && h->getBoat()->layer == EPathfindingLayer::AVIATE
+			&& layer == EPathfindingLayer::AIR;
+		const bool toroidalTransient = gameState().getMap().toroidal && transit && (!h->inBoat() || recoverableVehicleTransit)
 			&& (layer == EPathfindingLayer::AIR || layer == EPathfindingLayer::WATER);
 		turnTimerHandler->setEndTurnAllowed(h->getOwner(), toroidalTransient || (!movingOntoWater && !movingOntoObstacle));
 		doMove(TryMoveHero::SUCCESS, lookForGuards, visitDest, LEAVING_TILE);

@@ -5084,7 +5084,6 @@ TEST_F(HeroMovementTest, AviationVehicleCanSettleInPlaceAfterAirTransit)
 	map()->addNewObject(event);
 	map()->showObject(hero);
 	EXPECT_FALSE(handler.tryLandTransientHeroesInPlace(player));
-	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
 	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
 	map()->hideObject(hero);
 	map()->removeObject(event->id);
@@ -5094,7 +5093,6 @@ TEST_F(HeroMovementTest, AviationVehicleCanSettleInPlaceAfterAirTransit)
 	ASSERT_NE(team, nullptr);
 	team->fogOfWarMap[hiddenNeighbor] = 0;
 	EXPECT_FALSE(handler.tryLandTransientHeroesInPlace(player));
-	EXPECT_FALSE(handler.tryAutoLandTransientHero(player));
 	team->fogOfWarMap[hiddenNeighbor] = 1;
 	ASSERT_TRUE(handler.turnTimerHandler->isTimerEnabled(player));
 	ASSERT_TRUE(gameState()->isPlayerMakingTurn(player));
@@ -5159,6 +5157,114 @@ TEST_F(HeroMovementTest, GroupRecoveryPrevalidatesAviationVehicleAndStrandedHero
 	EXPECT_EQ(walker->visitablePos(), safeLand);
 	EXPECT_EQ(walker->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+}
+
+TEST_F(HeroMovementTest, ExpiredTimerMovesAviationVehicleOffBlockedTransitTile)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 start(0, 5, 0), vehiclePosition(35, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent)
+		.hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), opponent)
+		.terrain(vehiclePosition, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	gameState()->players.at(player).human = true;
+	gameState()->players.at(player).status = EPlayerStatus::INGAME;
+	gameState()->actingPlayers.insert(player);
+	gameState()->getStartInfo()->turnTimerInfo.turnTimer = 1;
+	gameState()->getStartInfo()->turnTimerInfo.baseTimer = 0;
+	handler.turnTimerHandler->onGameplayStart(player);
+	handler.turnTimerHandler->onPlayerGetTurn(player);
+	handler.createBoat(vehiclePosition, BoatId::CASTLE, player);
+	auto * vehicle = dynamic_cast<CGBoat *>(map()->getObject(map()->getTile(vehiclePosition).topVisitableObj()));
+	ASSERT_NE(vehicle, nullptr);
+	vehicle->layer = EPathfindingLayer::AVIATE;
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(vehiclePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "B" ] })";
+	JsonNode definition(text.data(), text.size(), "AviationTransitBlocker");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto obstacle = std::make_shared<CGObjectInstance>(gameState().get());
+	obstacle->pos = start;
+	obstacle->instanceName = "aviation_transit_blocker";
+	obstacle->appearance = appearance;
+	map()->addNewObject(obstacle);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(start), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_TRUE(gameState()->isPlayerMakingTurn(player));
+	ASSERT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	const int remaining = hero->movementPointsRemaining();
+	struct LeaveProbe : CGObjectInstance
+	{
+		using CGObjectInstance::CGObjectInstance;
+		mutable bool left = false;
+		void onHeroLeave(IGameEventCallback &, const CGHeroInstance *) const override { left = true; }
+	};
+	const std::string eventText = R"({ "animation": "test.def", "mask": [ "V" ] })";
+	JsonNode eventDefinition(eventText.data(), eventText.size(), "AviationTransitEvent");
+	auto eventAppearance = std::make_shared<ObjectTemplate>();
+	eventAppearance->id = Obj::EVENT;
+	eventAppearance->readJson(eventDefinition, resolver, false);
+	auto event = std::make_shared<LeaveProbe>(gameState().get());
+	event->ID = Obj::EVENT;
+	event->pos = start;
+	event->instanceName = "aviation_transit_event";
+	event->appearance = eventAppearance;
+	map()->hideObject(hero);
+	map()->addNewObject(event);
+	map()->showObject(hero);
+	auto * team = gameState()->getPlayerTeam(player);
+	ASSERT_NE(team, nullptr);
+	const auto topology = map()->getTopology();
+	for(const auto & direction : int3::getDirs())
+		team->fogOfWarMap[*topology.canonicalize(start + direction)] = 0;
+	handler.turnTimerHandler->update(1);
+	handler.turnTimerHandler->update(1);
+	EXPECT_EQ(hero->visitablePos(), start);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	EXPECT_FALSE(event->left);
+	for(const auto & direction : int3::getDirs())
+		team->fogOfWarMap[*topology.canonicalize(start + direction)] = 1;
+	hero->setMovementPoints(1);
+	handler.turnTimerHandler->update(1000);
+	EXPECT_EQ(hero->visitablePos(), start);
+	EXPECT_EQ(hero->movementPointsRemaining(), 1);
+	EXPECT_FALSE(event->left);
+	hero->setMovementPoints(remaining);
+	handler.turnTimerHandler->update(1000);
+	EXPECT_NE(hero->visitablePos(), start);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AVIATE);
+	EXPECT_LT(hero->movementPointsRemaining(), remaining);
+	EXPECT_EQ(hero->getBoat(), vehicle);
+	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
+	EXPECT_FALSE(event->left);
+
+	// Compare the same position and resources without the invisible event.
+	const auto withEvent = hero->visitablePos();
+	const auto afterMove = hero->movementPointsRemaining();
+	map()->removeObject(event->id);
+	TryMoveHero reset;
+	reset.id = hero->id;
+	reset.start = hero->anchorPos();
+	reset.end = hero->convertFromVisitablePos(start);
+	reset.result = TryMoveHero::TELEPORTATION;
+	reset.movePoints = remaining;
+	reset.movementLayer = EPathfindingLayer::AIR;
+	handler.sendAndApply(reset);
+	ASSERT_EQ(hero->visitablePos(), start);
+	ASSERT_TRUE(handler.tryAutoLandTransientHero(player));
+	EXPECT_EQ(hero->visitablePos(), withEvent);
+	EXPECT_EQ(hero->movementPointsRemaining(), afterMove);
+	EXPECT_EQ(hero->getBoat(), vehicle);
 }
 
 TEST_F(HeroMovementTest, SailingBoatCannotSwitchDirectlyToFlyingAcrossSeam)
