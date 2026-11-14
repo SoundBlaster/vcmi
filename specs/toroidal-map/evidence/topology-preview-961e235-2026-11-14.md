@@ -32,5 +32,13 @@ client window identified itself as `1.8.0.961e235`. The diagnostic channel
 selected and loaded `Toroid Open Water Corner` `Autosave-111`. Computer Use
 showed its adventure map, and the observation stream reported a 36×36
 toroidal map with the selected hero at `(31,30,0)` and zero movement points.
-This establishes startup and save loading on that build, not a new crossing,
-continuous animation or the later minimap pixel-alignment change.
+After ending the turn, diagnostic commands moved the boat through
+`(31,30) → (32,31) → (33,32) → (34,33) → (35,34) → (35,35) → (0,0) →
+(35,35)`. The observation stream reported 1500 movement points at the start
+of day two and 554 after the return crossing; each diagonal corner step cost
+141 points. Computer Use showed the boat and minimap at the final position.
+Sequences 0–24 were copied to TB5 as
+`runtime/observation-corner-961e235-2026-11-14.jsonl`, SHA-256
+`e7e4ced8b6a39b7540e6aa0bf7fb08b3fab94c4d3f25607ddb146ce75821053d`.
+Ending the turn updated the local test autosave. This check does not establish
+continuous animation, remote multiplayer or the later minimap pixel fix.

@@ -10,7 +10,9 @@ An instrumented test executable linked against the original VCMI engine at
   was rejected with `Unsupported map format version` when loading its header.
 - The tagged `Toroid Open Water Corner` save `Autosave-111.vsgm1`, SHA-256
   `0846265548445959b6c1604e0edede70626dd2535f7dd65e9340ce7b95231653`,
-  was rejected by `CLoadFile` with `SaveTooNewException`.
+  was rejected by `CLoadFile` with `SaveTooNewException`. The later GUI
+  crossing test ended a turn and updated that local test autosave; its current
+  contents have a different hash and are not the exact file used by this probe.
 - The original engine's existing `SaveGameTest.savedGameIsRestored` passed,
   as did loading a version-3 bounded map header. Both `test_terrain.vmap` and
   the corrected single-island copy described below were used as controls.
