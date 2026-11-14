@@ -136,7 +136,11 @@ result.
 
 River redraw also preserves unrelated terrain flags and replaces the previous
 river orientation on bounded and toroidal maps; see the
-[regression evidence](evidence/river-rotation-flags-2026-11-15.md).
+[regression evidence](evidence/river-rotation-flags-2026-11-15.md). The
+editor's dirt-road and water-river brushes select equivalent sprite groups
+and reflections for all 256 neighboring-cell combinations at each seam and
+corner on both levels; see the
+[neighborhood comparison](evidence/line-neighborhoods-2026-11-15.md).
 
 ## Specification evidence discipline
 
