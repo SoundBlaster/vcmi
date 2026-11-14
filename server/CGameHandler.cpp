@@ -114,6 +114,7 @@
 namespace
 {
 enum class KnownLanding { FOUND, NONE, UNKNOWN };
+enum class LandingKnowledge { PLAYER_ROUTE, SAFE_RECOVERY };
 using LandingStep = std::pair<int3, EPathfindingLayer>;
 
 bool canLandTransientHeroAt(const CGameState & gameState, const CGHeroInstance * hero, const int3 & position, EPathfindingLayer layer)
@@ -147,9 +148,9 @@ bool canLandTransientHeroInPlace(const CGameState & gameState, const CGHeroInsta
 	return canLandTransientHeroAt(gameState, hero, hero->visitablePos(), hero->getConfirmedMovementLayer());
 }
 
-// Only consider routes whose tiles and guard neighborhoods are already known
-// to the player. Unknown terrain cannot become a server-side information leak.
-KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHeroInstance * hero, const std::optional<PathfinderStart> & start, std::vector<LandingStep> * plainRoute = nullptr)
+// Movement validation may use a route over explored tiles with player-known
+// guards. Automatic recovery additionally requires known guard neighborhoods.
+KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHeroInstance * hero, const std::optional<PathfinderStart> & start, std::vector<LandingStep> * plainRoute = nullptr, LandingKnowledge knowledge = LandingKnowledge::SAFE_RECOVERY)
 {
 	const auto * team = gameState.getPlayerTeam(hero->getOwner());
 	if(!team)
@@ -175,10 +176,14 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 	{
 		for(const auto * step = node; step; step = step->theNodeBefore)
 		{
+			if(!team->fogOfWarMap[step->coord])
+				return false;
 			if((step->layer == EPathfindingLayer::AIR || step->layer == EPathfindingLayer::WATER) && step->moveRemains <= 0)
 				return false;
 			if(step != node && step->theNodeBefore && step->action != EPathNodeAction::NORMAL)
 				return false;
+			if(knowledge == LandingKnowledge::PLAYER_ROUTE)
+				continue;
 			for(int dx = -1; dx <= 1; ++dx)
 				for(int dy = -1; dy <= 1; ++dy)
 				{
@@ -1307,10 +1312,10 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 			hadKnownLanding = sourceTile->isLand() && !sourceTile->blocked();
 		}
 		else if(sourceLayer == EPathfindingLayer::AIR || sourceLayer == EPathfindingLayer::WATER)
-			hadKnownLanding = findKnownTransientLanding(gameState(), h, std::nullopt) == KnownLanding::FOUND;
+			hadKnownLanding = findKnownTransientLanding(gameState(), h, std::nullopt, nullptr, LandingKnowledge::PLAYER_ROUTE) == KnownLanding::FOUND;
 		// A fog frontier cannot be assumed to contain a safe landing. Require a
 		// known route instead of treating an unknown shore as a safe destination.
-		if(hadKnownLanding && findKnownTransientLanding(gameState(), h, PathfinderStart{hmpos, layer, h->movementPointsRemaining() - cost}) != KnownLanding::FOUND)
+		if(hadKnownLanding && findKnownTransientLanding(gameState(), h, PathfinderStart{hmpos, layer, h->movementPointsRemaining() - cost}, nullptr, LandingKnowledge::PLAYER_ROUTE) != KnownLanding::FOUND)
 			return complainRet("Cannot leave the known landing area while flying or walking on water!");
 	}
 

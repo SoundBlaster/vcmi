@@ -36,8 +36,10 @@ Candidate safeguards need to satisfy all of the following:
   saves without a reliable recorded origin. A route guard alone cannot prove
   those cases safe.
 
-Requiring a *known* landing is one possible implementation, but the search
-also requires every route tile's guard neighborhood to be revealed. Treating
-UNKNOWN as failure can therefore reject a route even if a landing exists
-beyond fog. The subsequent [guard change](topology-unknown-frontier-guard-2026-11-14.md)
-passes one visible-shore route near fog; broader route and GUI coverage remains open.
+The first known-landing guard required every route tile's guard neighborhood
+to be revealed and rejected a long route to an already visible shore. The
+subsequent [guard change](topology-unknown-frontier-guard-2026-11-14.md)
+uses explored route tiles and guards known to the player for normal movement,
+while retaining stricter checks for automatic recovery. It passes a 20-step
+visible-shore route and paired hidden-guard check. Hidden interruptions, other
+routes and GUI behavior remain open.

@@ -7,11 +7,12 @@ remaining movement points. A reachable unknown frontier is not by itself a
 landing. A failed step does not spend movement points. This is a change from
 the earlier guard, which rejected NONE but accepted UNKNOWN.
 
-The search considers the player's explored tiles and conservatively requires
-route and guard neighborhoods to be known. Thus it can reject a step even if
-an actual landing exists beyond fog or a partially unknown guard neighborhood.
-The intended result must not depend on hidden terrain; the paired test below
-checks one such case but is not a general confidentiality proof. An already
+For normal movement, the search uses explored route tiles and guards known to
+the player. Automatic recovery retains the stricter requirement that guard
+neighborhoods along its route are known. The movement guard can reject a step
+even if an actual landing exists beyond fog. The intended decision must not
+depend on hidden terrain or guards; the paired tests below check specific
+cases but are not a general confidentiality proof. An already
 stranded hero is still permitted to explore: this guard prevents loss of a
 known landing, and does not by itself repair old saves, interruptions, or
 world changes. Existing recovery remains necessary.
@@ -22,9 +23,17 @@ that direct transit steps are rejected before the hero loses its known return
 route. They then use ordinary automatic landing steps to return to the island.
 `UnknownShoreDoesNotChangeTransientMoveAcceptance` compares a hidden shore
 with hidden water and expects the same rejection. `VisibleShoreRemainsReachableNearFog`
-constructs one visible route through an otherwise partially hidden corridor;
-the pathfinder finds it and server movement reaches the shore. These are
-local game-handler tests, not interactive exploration.
+constructs a 20-step visible route through an otherwise partially hidden
+corridor; the pathfinder finds it and server movement reaches the shore.
+`HiddenGuardDoesNotChangeTransitSafetyDecision` compares acceptance with and
+without a hidden guard alongside such a route. These are local game-handler
+tests, not interactive exploration.
+
+The initial implementation required known guard neighborhoods even for
+normal movement. It rejected the 20-step visible route at an intermediate
+tile; the current distinction preserves that route. A guard revealed later
+can still invalidate a route, so this does not eliminate the need for
+interruption handling and recovery.
 
 The TCP lobby movement test passed, but does not exercise this exact unknown
 frontier rejection on two replicas. The current client and server do not yet
@@ -34,7 +43,7 @@ revealed layouts, path invalidation during movement, old saves and general
 recovery remain unverified.
 
 On the macOS arm64 TB5 build, client, server and test executable built. The
-movement suite and TCP lobby test passed 105 cases. The full suite ran 1,505
-tests: 1,502 passed and three optional external-fixture tests were skipped;
-four tests were disabled. The complete log is
-`full-suite-strict-known-landing-2026-11-14.log` in the TB5 runtime directory.
+full suite after the route-knowledge change ran 1,506 tests: 1,503 passed and
+three optional external-fixture tests were skipped; four tests were disabled.
+The complete log is `full-suite-known-route-scouting-2026-11-14.log` in the
+TB5 runtime directory.

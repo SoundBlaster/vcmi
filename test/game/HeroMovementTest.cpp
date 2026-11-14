@@ -5906,7 +5906,7 @@ TEST_F(HeroMovementTest, FlightStopsBeforeStrandingNearFog)
 TEST_F(HeroMovementTest, VisibleShoreRemainsReachableNearFog)
 {
 	const PlayerColor player(0);
-	const int3 origin(1, 18, 0), shore(11, 18, 0);
+	const int3 origin(1, 18, 0), shore(21, 18, 0);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
 	builder.size(36, false).playerActive(player).hero(int3(2, 18, 0), HeroTypeID(0), player);
 	for(int x = 0; x < 36; ++x)
@@ -5925,10 +5925,10 @@ TEST_F(HeroMovementTest, VisibleShoreRemainsReachableNearFog)
 	for(int x = 0; x <= 6; ++x)
 		for(int y = 13; y <= 23; ++y)
 			team->fogOfWarMap[int3(x, y, 0)] = 1;
-	for(int x = 1; x <= 11; ++x)
+	for(int x = 1; x <= 21; ++x)
 		team->fogOfWarMap[int3(x, 18, 0)] = 1;
 	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
-	hero->setMovementPoints(1200);
+	hero->setMovementPoints(2200);
 	CPathsInfo paths(gameState()->getMapSize(), hero);
 	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
 	CPathfinder finder(*gameState(), config);
@@ -5938,11 +5938,62 @@ TEST_F(HeroMovementTest, VisibleShoreRemainsReachableNearFog)
 	ASSERT_EQ(paths.getNode(shore, EPathfindingLayer::LAND)->turns, 0);
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
-	for(int x = 2; x <= 10; ++x)
+	for(int x = 2; x <= 20; ++x)
 	{
 		SCOPED_TRACE(x);
 		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(x, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER));
 	}
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	EXPECT_EQ(hero->visitablePos(), shore);
+}
+
+TEST_F(HeroMovementTest, HiddenGuardDoesNotChangeTransitSafetyDecision)
+{
+	const PlayerColor player(0);
+	const int3 origin(1, 18, 0), shore(21, 18, 0), guardPos(20, 19, 0);
+	const int3 start(12, 18, 0), next(13, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(2, 18, 0), HeroTypeID(0), player)
+		.monster(guardPos, CreatureID(0), 10);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != origin && int3(x, y, 0) != shore && int3(x, y, 0) != guardPos)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	auto * team = gameState()->getPlayerTeam(player);
+	ASSERT_NE(team, nullptr);
+	const auto setVisibleArea = [&]()
+	{
+		for(int x = 0; x < 36; ++x)
+			for(int y = 0; y < 36; ++y)
+				team->fogOfWarMap[int3(x, y, 0)] = 0;
+		for(int x = 1; x <= 21; ++x)
+			team->fogOfWarMap[int3(x, 18, 0)] = 1;
+		for(int x = 7; x <= 17; ++x)
+			for(int y = 13; y <= 23; ++y)
+				team->fogOfWarMap[int3(x, y, 0)] = 1;
+	};
+	setVisibleArea();
+	ASSERT_FALSE(team->fogOfWarMap[guardPos]);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(shore), guardPos);
+	const auto * guard = map()->getObject(map()->getTile(guardPos).topVisitableObj());
+	ASSERT_NE(guard, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
+	hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	hero->setMovementPoints(1000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const bool withGuard = handler.moveHero(hero->id, hero->convertFromVisitablePos(next), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER);
+	ASSERT_TRUE(handler.removeObject(guard, player));
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
+	hero->setConfirmedMovementLayer(EPathfindingLayer::WATER);
+	hero->setMovementPoints(1000);
+	setVisibleArea();
+	const bool withoutGuard = handler.moveHero(hero->id, hero->convertFromVisitablePos(next), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER);
+	EXPECT_EQ(withGuard, withoutGuard);
+	EXPECT_TRUE(withoutGuard);
 }
