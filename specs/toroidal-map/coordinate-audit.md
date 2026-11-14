@@ -37,6 +37,16 @@ CMake build did not emit `compile_commands.json`; no AST audit was performed.
 The index may be regenerated with `--markdown-index`, but doing so resets
 manual review statuses. Preserve or reconcile those statuses before replacing it.
 
+On 2026-11-15, a further manual pass classified the indexed
+`MapInfoCallback`, `CGHeroInstance`, `ObjectTemplate` and dwelling-constructor
+matches. `isInTheMap` still tests the physical storage rectangle; an operation
+that needs a wrapped neighbor must canonicalize it explicitly before that
+test. Hero anchor/visitable offsets and object-template mask coordinates are
+local geometry, not distances between world positions. These classifications
+cover the indexed matches, not all callers or all possible coordinate logic.
+The draw-order candidates were also inspected; wrapped-layer tests cover
+selected cases, while general overlap behavior remains open.
+
 ## Initial triage
 
 | Area | Observation | State |
