@@ -118,6 +118,10 @@ and the search does not prove that every relevant calculation has been found.
 
 ## Execution record
 
+The separate [`961e235` preview bundle](evidence/topology-preview-961e235-2026-11-14.md)
+was built and signed, but its client has not yet reached an observable game
+window; it is not current-build gameplay evidence.
+
 The [current full-suite record](evidence/topology-full-suite-2026-11-10.md)
 includes the three optional historical-format fixtures; four tests remain disabled.
 
