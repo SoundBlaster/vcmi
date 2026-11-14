@@ -398,7 +398,14 @@ TEST_F(Nullkiller2_AIGateway, rejectedTownPortalRequestDoesNotLeaveSelectedTown)
 	// acknowledgement would have stored before releasing a real waiting caller.
 	gateway->lastAdventureCastSucceeded = false;
 	ObjectInstanceID selectionDuringRequest;
-	requests->onSpellRequest = [&] { selectionDuringRequest = gateway->selectedObject; };
+	const QuestionID dialogQuestion(201);
+	requests->onSpellRequest = [&]
+	{
+		selectionDuringRequest = gateway->selectedObject;
+		gateway->showMapObjectSelectDialog(dialogQuestion, Component(), MetaString(), MetaString(), {town->id});
+		gateway->asyncTasks->wait();
+		gateway->status.removeQuestion(dialogQuestion);
+	};
 	NK2AI::Goals::AdventureSpellCast goal(hero, spell);
 	goal.town = town;
 	goal.settile(town->visitablePos());
@@ -406,6 +413,9 @@ TEST_F(Nullkiller2_AIGateway, rejectedTownPortalRequestDoesNotLeaveSelectedTown)
 	EXPECT_THROW(withGameStateReadLock([&] { goal.accept(gateway.get()); }), NK2AI::cannotFulfillGoalException);
 	EXPECT_EQ(requests->spellRequests, 1);
 	EXPECT_EQ(selectionDuringRequest, town->id);
+	ASSERT_EQ(requests->answers.size(), 1u);
+	EXPECT_EQ(requests->answers.front().questionID, dialogQuestion);
+	EXPECT_EQ(requests->answers.front().reply, town->id.getNum());
 	EXPECT_EQ(gateway->selectedObject, ObjectInstanceID());
 }
 

@@ -26,6 +26,14 @@ the action's dialogs. The test checks the request was actually sent and the
 ID is then cleared. It does not simulate packet transport or exercise an
 actual server rejection.
 
+The test was later extended with a scripted ordering in which the recording
+client opens an asynchronous object-selection dialog while the spell request
+is being sent, then reports the preset rejection state. The gateway's dialog
+task sends the intended town ID before the cast action clears its selection.
+The five focused Town Portal and dialog tests passed three repeated runs.
+This is an ordering probe using a test double, not a claim that the real server
+produces that particular sequence.
+
 On macOS arm64, `vcmitest` and Nullkiller2 rebuilt on TB5. The focused Town
 Portal and dialog tests passed three consecutive runs after the dialog check
 was added. A complete local run with the same implementation and the earlier
