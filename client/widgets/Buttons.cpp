@@ -49,7 +49,9 @@ void ButtonBase::update()
 		// hero movement speed buttons: only three frames: normal, pressed and blocked/highlighted
 		if (state == EButtonState::HIGHLIGHTED && image->size() < 4)
 			image->setFrame(image->size()-1);
-		else
+		// Keep the current image if a two-frame button has no mapped disabled frame.
+		else if (state != EButtonState::BLOCKED || image->size() != 2 ||
+		         stateToIndex[vstd::to_underlying(state)] < 2)
 			image->setFrame(stateToIndex[vstd::to_underlying(state)]);
 	}
 
