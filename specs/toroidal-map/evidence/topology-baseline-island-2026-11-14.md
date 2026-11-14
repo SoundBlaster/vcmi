@@ -34,6 +34,24 @@ path node is AIR or WATER. These are source observations, not a completed
 interactive gameplay test; other interruption paths must be evaluated
 separately.
 
+## Actual spells in the server-side test
+
+A second [test-only patch](baseline-single-island-spells-2026-11-14.patch)
+repeats the scenario after the baseline game handler actually casts each
+spell. The test gives the hero a spellbook, the respective spell, enough mana,
+and expert Wisdom, Air Magic and Water Magic. The cast spends mana and applies
+the expected bonus. Both tests passed:
+
+```text
+HeroMovementTest.BaselineCastWaterWalkProbe  PASS
+HeroMovementTest.BaselineCastFlightProbe     PASS
+```
+
+The default path still cannot end on the adjacent water tile, and eleven
+direct transit steps are still accepted, leaving 100 movement points. This
+again uses direct handler calls through a test server, not a GUI session or
+network request. Neither a turn transition nor spell expiration was tested.
+
 ## Interactive check pending
 
 A separate baseline app and a bounded VMAP with one connected island were
