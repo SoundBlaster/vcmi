@@ -109,3 +109,12 @@ and a second click moved the hero `(15,34) → (15,35) → (15,0) → (15,1) →
 0–47 to `runtime/observation-command-test.jsonl` under the TB5 build root;
 the movement counts and mana are taken from those observations. This checks
 one GUI route and its positive control, not general recovery or fog safety.
+
+The same comparison was repeated with Flight on the next local client build,
+`8552be9` plus the scenario-list coordinate fix. After twelve land steps,
+selecting the shore with 360 movement points produced no route and left the
+hero at `(15,34)` with 85 mana. After restarting and casting Flight with
+1,560 points, the same destination produced a route and the hero crossed
+`(15,34) → (15,35) → (15,0) → (15,1) → (15,2)`, ending with 1,160 points.
+The new appended observation session records this at sequences 0–45. The
+same limitations on attribution and generalization apply.
