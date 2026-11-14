@@ -39,6 +39,7 @@ set(vcmiclientcommon_SRCS
 
 	gui/CIntObject.cpp
 	gui/CursorHandler.cpp
+	gui/DiagnosticCommands.cpp
 	gui/EventDispatcher.cpp
 	gui/EventsReceiver.cpp
 	gui/InterfaceObjectConfigurable.cpp
@@ -249,6 +250,8 @@ set(vcmiclientcommon_HEADERS
 	battle/UnitActionPanel.h
 
 	gui/CIntObject.h
+	gui/DiagnosticCommandChannel.h
+	gui/DiagnosticCommands.h
 	gui/ControllerPromptFamily.h
 	gui/CursorHandler.h
 	gui/EventDispatcher.h

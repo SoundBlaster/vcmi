@@ -14,6 +14,7 @@
 
 #include "gui/CIntObject.h"
 #include "gui/CursorHandler.h"
+#include "gui/DiagnosticCommands.h"
 #include "gui/ShortcutHandler.h"
 #include "gui/FramerateManager.h"
 #include "gui/WindowHandler.h"
@@ -149,6 +150,8 @@ void GameEngine::updateFrame()
 	engineUser->onUpdate();
 
 	handleEvents();
+	if(!engineUser->capturedAllEvents())
+		pollDiagnosticCommands();
 
 	// before the redraw, so that a window that was only covered can reclaim its layer
 	screenHandlerInstance->clearReleasedLayers();
