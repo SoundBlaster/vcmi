@@ -43,3 +43,25 @@ that avoiding the log-file open alone is insufficient. The sample does not
 identify the filesystem operation or establish why it stalled. The probe was
 force-quit, the temporary source edit was reverted, and the ordinary editor
 target was rebuilt from the restored source.
+
+## Graphical seam selection and saved copy
+
+On 2026-11-15, a signed macOS arm64 editor built from `105f539` opened a
+separate copy of `toroid-seam-laboratory.vmap` with the user's Complete data.
+The source VMAP had SHA-256
+`3fbc0a2cbbdfa22068e7e6a099a7b51e803d39b5fc0d0b3fd95155cc6eeb232d`.
+Dragging the red town `town_0` toward the west edge produced visible parts
+on both horizontal edges of the map and minimap. While the town was selected,
+its white selection outline appeared over both visible parts. Deselecting it
+and clicking the opposite-edge part selected the same `town_0` in Inspector.
+Dragging that part one tile moved the town, and Undo restored the prior view.
+The modified copy was saved and reopened; both parts and the opposite-side
+outline appeared again. This is one town and one horizontal seam, not a
+continuous drag-preview, vertical/corner, multiplayer, or gameplay test.
+
+The copy at `runtime/editor-seam-check.roNFmO/seam-laboratory.vmap` under the
+TB5 build root was subsequently modified for an Inspector test described in
+[the separate record](editor-inspector-dirty-state-2026-11-15.md). It is a
+test artifact and is not the playable demo. The original VMAP remained
+unchanged. A different initial wrapped-town fixture had missing test-mod
+identifiers and did not produce a usable editor window in this attempt.
