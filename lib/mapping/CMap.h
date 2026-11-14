@@ -329,6 +329,12 @@ private:
 
 	/// holes are neither visitable nor blocking, so tiles do not know about them
 	std::unordered_set<int3> holePositions;
+	// Only raw positions outside the indexed map can alias another tile.
+	std::unordered_set<int3> outsideHolePositions;
+	int3 holeIndexDimensions = int3(-1, -1, -1);
+	bool holeIndexValid = true;
+	void addHolePosition(const int3 & position);
+	void removeHolePosition(const int3 & position);
 	/// Shown objects whose blocking and visitable cells are all outside the map.
 	std::unordered_set<const CGObjectInstance *> unindexedShownObjects;
 	void restoreUnindexedShownObjects(const std::vector<ObjectInstanceID> & ids);
@@ -379,10 +385,12 @@ public:
 		if(!h.saving)
 		{
 			holePositions.clear();
+			outsideHolePositions.clear();
+			holeIndexValid = true;
 			for(const auto & object : objects)
 			{
 				if(object && object->ID == Obj::HOLE)
-					holePositions.insert(object->anchorPos());
+					addHolePosition(object->anchorPos());
 			}
 		}
 

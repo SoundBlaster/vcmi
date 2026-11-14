@@ -260,6 +260,35 @@ CMap::~CMap()
 			artifact->detachFromAll();
 }
 
+void CMap::addHolePosition(const int3 & position)
+{
+	const int3 dimensions(width, height, levels());
+	if(holePositions.empty())
+	{
+		holeIndexDimensions = dimensions;
+		holeIndexValid = true;
+		outsideHolePositions.clear();
+	}
+	else if(holeIndexDimensions != dimensions)
+		holeIndexValid = false;
+	if(holePositions.insert(position).second && holeIndexValid && !isInTheMap(position))
+		outsideHolePositions.insert(position);
+}
+
+void CMap::removeHolePosition(const int3 & position)
+{
+	if(holeIndexDimensions != int3(width, height, levels()))
+		holeIndexValid = false;
+	holePositions.erase(position);
+	if(holeIndexValid)
+		outsideHolePositions.erase(position);
+	if(holePositions.empty())
+	{
+		outsideHolePositions.clear();
+		holeIndexValid = true;
+	}
+}
+
 bool CMap::isHoleAt(const int3 & pos) const
 {
 	if(!toroidal)
@@ -270,7 +299,12 @@ bool CMap::isHoleAt(const int3 & pos) const
 		return false;
 	if(holePositions.contains(*tile))
 		return true;
-	return std::ranges::any_of(holePositions, [&](const int3 & hole)
+	// Canonical in-bounds anchors were already checked by contains(). Only
+	// outside anchors can wrap onto another tile. If dimensions changed since
+	// indexing, use the original complete scan until the index is rebuilt.
+	const auto & candidates = holeIndexValid && holeIndexDimensions == int3(width, height, levels())
+		? outsideHolePositions : holePositions;
+	return std::ranges::any_of(candidates, [&](const int3 & hole)
 	{
 		return topology.canonicalize(hole) == tile;
 	});
@@ -370,7 +404,7 @@ void CMap::hideObject(CGObjectInstance * obj)
 {
 	unindexedShownObjects.erase(obj);
 	if(obj->ID == Obj::HOLE)
-		holePositions.erase(obj->anchorPos());
+		removeHolePosition(obj->anchorPos());
 
 	const int zVal = obj->anchorPos().z;
 	for(int fx = 0; fx < obj->getWidth(); ++fx)
@@ -393,7 +427,7 @@ void CMap::hideObject(CGObjectInstance * obj)
 void CMap::showObject(CGObjectInstance * obj)
 {
 	if(obj->ID == Obj::HOLE)
-		holePositions.insert(obj->anchorPos());
+		addHolePosition(obj->anchorPos());
 
 	bool hasOccupancy = false;
 	bool indexed = false;

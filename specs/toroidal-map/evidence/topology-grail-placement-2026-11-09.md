@@ -39,7 +39,8 @@ wrapped hole. Grail placement now canonicalizes hole positions before
 excluding them. On a toroidal map, hole lookup compares canonical positions;
 bounded lookup and the serialized raw positions remain unchanged. A direct
 canonical lookup is used first, followed by a scan of raw hole positions when
-needed; performance with unusually many holes has not been measured.
+needed; a later [review and measurement](topology-hole-index-review-2026-11-14.md)
+replaces the common-case full scan while preserving outside raw anchors.
 
 `GrailTopologyTest.WrappedHoleIsNotAnEligibleGrailLocation` verifies the
 exclusion, dig status, invalid-level isolation and in-memory game-state

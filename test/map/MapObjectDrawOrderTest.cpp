@@ -203,6 +203,44 @@ TEST_F(MapObjectDrawOrderTest, HoleLookupWrapsAndTracksHiddenObjects)
 	EXPECT_TRUE(map.isHoleAt(int3(-1, 5, 0)));
 }
 
+TEST_F(MapObjectDrawOrderTest, WrappedHoleLookupPreservesOverlappingRawAnchors)
+{
+	map.width = 10;
+	map.height = 10;
+	map.toroidal = true;
+	map.initTerrain();
+	auto * left = addObject('A', R"([ "V" ])", int3(-1, 5, 0), 0, Obj::HOLE);
+	auto * right = addObject('B', R"([ "V" ])", int3(19, 5, 0), 0, Obj::HOLE);
+	map.showObject(left);
+	map.showObject(right);
+	EXPECT_TRUE(map.isHoleAt(int3(9, 5, 0)));
+	map.hideObject(left);
+	EXPECT_TRUE(map.isHoleAt(int3(9, 5, 0)));
+	map.hideObject(right);
+	EXPECT_FALSE(map.isHoleAt(int3(9, 5, 0)));
+}
+
+TEST_F(MapObjectDrawOrderTest, WrappedHoleLookupSurvivesDimensionChanges)
+{
+	map.width = 10;
+	map.height = 10;
+	map.toroidal = true;
+	map.initTerrain();
+	auto * initial = addObject('A', R"([ "V" ])", int3(9, 5, 0), 0, Obj::HOLE);
+	map.showObject(initial);
+	map.width = 20;
+	map.initTerrain();
+	auto * addedAfterResize = addObject('B', R"([ "V" ])", int3(15, 5, 0), 0, Obj::HOLE);
+	map.showObject(addedAfterResize);
+	map.width = 10;
+	map.initTerrain();
+	EXPECT_TRUE(map.isHoleAt(int3(5, 5, 0)));
+	EXPECT_TRUE(map.isHoleAt(int3(9, 5, 0)));
+	map.hideObject(addedAfterResize);
+	EXPECT_FALSE(map.isHoleAt(int3(5, 5, 0)));
+	EXPECT_TRUE(map.isHoleAt(int3(9, 5, 0)));
+}
+
 TEST_F(MapObjectDrawOrderTest, ToroidalObjectFootprintOccupiesAndClearsWrappedTiles)
 {
 	map.width = 10;
