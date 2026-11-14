@@ -28,6 +28,8 @@ Scenario definitions below are acceptance proposals; their existence is not a
 test run.
 The user-supplied historical context and a bounded source check are recorded in
 [history and related work](research/history-and-related-work.md).
+A scoped assessment of the fork PR comments is in the
+[review assessment](review-assessment-2026-11-14.md).
 
 ## Boundary and composition
 

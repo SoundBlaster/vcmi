@@ -2330,10 +2330,12 @@ TEST_F(HeroMovementTest, blockedToroidalStepIsRejectedRoE)
 
 TEST_F(HeroMovementTest, MovementAcknowledgementReportsRejectedAndAcceptedRequests)
 {
-	const PlayerColor player(0);
+	const PlayerColor player(0), opponent(1);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
-	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
-		.terrain(int3(11, 10, 0), TerrainId::ROCK);
+	builder.size(36, false).playerActive(player).playerActive(opponent)
+		.hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.hero(int3(21, 20, 0), HeroTypeID(1), opponent)
+		.terrain(int3(11, 10, 0), TerrainId::ROCK).terrain(int3(8, 10, 0), TerrainId::ROCK);
 	startWithMap(std::move(builder));
 	ASSERT_FALSE(map()->toroidal);
 	gameState()->actingPlayers.insert(player);
@@ -2362,13 +2364,26 @@ TEST_F(HeroMovementTest, MovementAcknowledgementReportsRejectedAndAcceptedReques
 	EXPECT_FALSE(server.results.at(1));
 	EXPECT_EQ(hero->visitablePos(), int3(10, 10, 0));
 
-	MoveHero allowed({hero->convertFromVisitablePos(int3(9, 10, 0))}, EPathfindingLayer::LAND, hero->id, false);
+	// A rejected multi-step request is not transactional: an earlier legal
+	// step may already have changed the game state before the later failure.
+	const auto pointsBeforePartial = hero->movementPointsRemaining();
+	MoveHero partial({hero->convertFromVisitablePos(int3(9, 10, 0)), hero->convertFromVisitablePos(int3(8, 10, 0))},
+		EPathfindingLayer::LAND, hero->id, false);
+	partial.player = player;
+	partial.requestID = 3;
+	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, partial);
+	ASSERT_TRUE(server.results.contains(3));
+	EXPECT_FALSE(server.results.at(3));
+	EXPECT_EQ(hero->visitablePos(), int3(9, 10, 0));
+	EXPECT_LT(hero->movementPointsRemaining(), pointsBeforePartial);
+
+	MoveHero allowed({hero->convertFromVisitablePos(int3(10, 10, 0))}, EPathfindingLayer::LAND, hero->id, false);
 	allowed.player = player;
 	allowed.requestID = 2;
 	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, allowed);
 	ASSERT_TRUE(server.results.contains(2));
 	EXPECT_TRUE(server.results.at(2));
-	EXPECT_EQ(hero->visitablePos(), int3(9, 10, 0));
+	EXPECT_EQ(hero->visitablePos(), int3(10, 10, 0));
 }
 
 TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)

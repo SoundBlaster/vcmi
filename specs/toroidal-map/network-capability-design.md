@@ -44,3 +44,13 @@ an upstream allocation. This does not prove interoperability with arbitrary
 future forks. Packet-level tests,
 server preparation tests and real multi-peer sessions are separate evidence
 requirements.
+
+## Request acknowledgement is not a transaction receipt
+
+`PackageApplied.result` is a server handler result, not a guarantee that a
+multi-step request either fully committed or had no effects. A failed movement
+can have applied a legal prefix; an activity can also interrupt a path after
+an accepted prefix. See the [acknowledgement review](evidence/topology-acknowledgement-review-2026-11-14.md)
+for the tested scope and bounded-map compatibility implications. Any future
+agent interface must define its own action outcome and state-observation
+semantics rather than inferring atomicity from this boolean.

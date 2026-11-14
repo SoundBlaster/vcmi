@@ -71,7 +71,9 @@ struct DLL_LINKAGE PackageApplied : public CPackForClient
 	uint32_t requestID = 0;
 	/// type id of applied package
 	uint16_t packType = 0;
-	/// If false, then pack failed to apply, for example - illegal request
+	/// Server-reported handler result. A false result may follow partial effects
+	/// from a multi-step request; true can also mean an accepted prefix when an
+	/// activity interrupts movement. It is not a transaction receipt.
 	bool result = false;
 
 	template <typename Handler> void serialize(Handler & h)
