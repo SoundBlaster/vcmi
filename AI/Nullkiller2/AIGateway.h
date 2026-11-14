@@ -41,6 +41,8 @@ class AIStatus
 
 	BattleState battle;
 	std::map<QuestionID, std::string> remainingQuestions;
+	// Server-closed questions with answer requests still awaiting acknowledgement.
+	std::set<QuestionID> resolvedQuestions;
 	std::map<int, QuestionID> requestToQuestionID; //IDs of answer-requests sent to server => question ids (so we can match answer confirmation from server to the question)
 	std::vector<ObjectInstanceID> objectsBeingVisited;
 	std::map<ObjectInstanceID, TryMoveHero> lastMovementResults;
@@ -67,6 +69,7 @@ public:
 	bool waitForTurnEnd(std::chrono::milliseconds timeout);
 	void attemptedAnsweringQuestion(QuestionID questionID, int answerRequestID);
 	void receivedAnswerConfirmation(int answerRequestID, int result);
+	void questionResolved(QuestionID questionID);
 	void heroVisit(const CGObjectInstance * obj, bool started);
 	ObjectInstanceID getCurrentVisitedObject();
 	void clearLastMovementResult(ObjectInstanceID heroID);
@@ -148,6 +151,7 @@ public:
 	void advmapSpellCast(const CGHeroInstance * caster, SpellID spellID) override;
 	void showInfoDialog(EInfoWindowMode type, const std::string & text, const std::vector<Component> & components, int soundID) override;
 	void requestRealized(PackageApplied * pa) override;
+	void questionResolved(QuestionID questionID) override;
 	void receivedResource() override;
 	void objectRemoved(const CGObjectInstance * obj, const PlayerColor & initiator) override;
 	void showUniversityWindow(const IMarket * market, const CGHeroInstance * visitor, QuestionID questionID) override;

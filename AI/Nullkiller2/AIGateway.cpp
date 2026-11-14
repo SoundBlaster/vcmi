@@ -436,6 +436,11 @@ void AIGateway::requestRealized(PackageApplied * pa)
 	}
 }
 
+void AIGateway::questionResolved(QuestionID questionID)
+{
+	status.questionResolved(questionID);
+}
+
 void AIGateway::receivedResource()
 {
 	LOG_TRACE(logAi);
@@ -1687,6 +1692,7 @@ void AIStatus::removeQuestion(QuestionID ID)
 
 	std::string description = remainingQuestions[ID];
 	remainingQuestions.erase(ID);
+	resolvedQuestions.erase(ID);
 
 	cv.notify_all();
 	logAi->debug("Removing question %d - %s. Total questions count: %d", ID, description, remainingQuestions.size());
@@ -1737,29 +1743,58 @@ bool AIStatus::waitForTurnEnd(std::chrono::milliseconds timeout)
 void AIStatus::attemptedAnsweringQuestion(QuestionID questionID, int answerRequestID)
 {
 	std::unique_lock<std::mutex> lock(mx);
-	assert(vstd::contains(remainingQuestions, questionID));
-	std::string description = remainingQuestions[questionID];
-	logAi->debug("Attempted answering question %d - %s. Request id=%d. Waiting for results...", questionID, description, answerRequestID);
+	const auto question = remainingQuestions.find(questionID);
+	if(question != remainingQuestions.end())
+		logAi->debug("Attempted answering question %d - %s. Request id=%d. Waiting for results...", questionID, question->second, answerRequestID);
+	else
+		logAi->debug("Answer request %d was sent after question %d was resolved", answerRequestID, questionID);
 	requestToQuestionID[answerRequestID] = questionID;
 }
 
 void AIStatus::receivedAnswerConfirmation(int answerRequestID, int result)
 {
 	std::unique_lock<std::mutex> lock(mx);
-	assert(vstd::contains(requestToQuestionID, answerRequestID));
-	QuestionID question = requestToQuestionID[answerRequestID];
-	assert(vstd::contains(remainingQuestions, question));
-	requestToQuestionID.erase(answerRequestID);
+	const auto request = requestToQuestionID.find(answerRequestID);
+	if(request == requestToQuestionID.end())
+	{
+		logAi->warn("Received confirmation for unknown answer request %d", answerRequestID);
+		return;
+	}
+	const QuestionID question = request->second;
+	requestToQuestionID.erase(request);
+	if(!vstd::contains(remainingQuestions, question))
+		return; // The server resolved the question before this answer was sent.
 
 	if(result)
 	{
 		removeQuestion(question);
+	}
+	else if(vstd::contains(resolvedQuestions, question))
+	{
+		const bool awaitingAnotherAnswer = std::any_of(requestToQuestionID.begin(), requestToQuestionID.end(),
+			[question](const auto & pending) { return pending.second == question; });
+		if(!awaitingAnotherAnswer)
+			removeQuestion(question);
 	}
 	else
 	{
 		logAi->error("Something went really wrong, failed to answer question %d : %s", question.getNum(), remainingQuestions[question]);
 		//TODO safely retry
 	}
+}
+
+void AIStatus::questionResolved(QuestionID questionID)
+{
+	std::unique_lock<std::mutex> lock(mx);
+	if(!vstd::contains(remainingQuestions, questionID))
+		return; // Resolution is broadcast to all player interfaces.
+
+	const bool awaitingAnswer = std::any_of(requestToQuestionID.begin(), requestToQuestionID.end(),
+		[questionID](const auto & request) { return request.second == questionID; });
+	if(awaitingAnswer)
+		resolvedQuestions.insert(questionID); // Preserve ordering until the submitted answer is acknowledged.
+	else
+		removeQuestion(questionID);
 }
 
 void AIStatus::heroVisit(const CGObjectInstance * obj, bool started)

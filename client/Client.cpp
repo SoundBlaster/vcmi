@@ -514,9 +514,10 @@ int CClient::sendRequest(const CPackForServer & request, PlayerColor player, boo
 	waitingRequest.pushBack(requestID);
 	request.requestID = requestID;
 	request.player = player;
-	GAME->server().sendGamePack(request);
+	// Register the request before it can be answered on the network thread.
 	if(vstd::contains(playerint, player))
 		playerint[player]->requestSent(&request, requestID);
+	GAME->server().sendGamePack(request);
 
 	if(waitTillRealize)
 	{
