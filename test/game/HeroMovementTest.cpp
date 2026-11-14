@@ -3469,6 +3469,54 @@ TEST_F(HeroMovementTest, RoadMovementCostAppliesAcrossToroidalSeam)
 	EXPECT_EQ(hero->movementPointsRemaining(), 2950);
 }
 
+TEST_F(HeroMovementTest, RoadCostsAgreeAcrossEveryToroidalEdgeAndCorner)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(1, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	const auto topology = map()->getTopology();
+	for(int z = 0; z < 2; ++z)
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				if(dx == 0 && dy == 0)
+					continue;
+				SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
+				const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+				const auto destination = topology.canonicalize(origin + int3(dx, dy, 0));
+				ASSERT_TRUE(destination);
+				map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+				ASSERT_EQ(hero->visitablePos(), origin);
+				hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+				hero->setMovementPoints(3000);
+				map()->getTile(origin).roadType = RoadId::COBBLESTONE_ROAD;
+				map()->getTile(*destination).roadType = RoadId::COBBLESTONE_ROAD;
+				const int expectedCost = dx && dy ? 70 : 50;
+				CPathsInfo paths(gameState()->getMapSize(), hero);
+				auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+				CPathfinder pathfinder(*gameState(), config);
+				pathfinder.calculatePaths();
+				const auto * node = paths.getNode(*destination, EPathfindingLayer::LAND);
+				ASSERT_TRUE(node->reachable());
+				ASSERT_EQ(node->turns, 0);
+				ASSERT_NE(node->theNodeBefore, nullptr);
+				EXPECT_EQ(node->theNodeBefore->coord, origin);
+				EXPECT_EQ(node->moveRemains, 3000 - expectedCost);
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), *destination);
+				EXPECT_EQ(hero->movementPointsRemaining(), 3000 - expectedCost);
+				map()->getTile(origin).roadType = RoadId::NO_ROAD;
+				map()->getTile(*destination).roadType = RoadId::NO_ROAD;
+			}
+}
+
 TEST_F(HeroMovementTest, ObjectEntranceDirectionIsRespectedAcrossToroidalSeams)
 {
 	const PlayerColor player(0);
