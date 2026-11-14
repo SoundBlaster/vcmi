@@ -29,8 +29,17 @@ each side, and both players' game-state lookups identify the same battle.
 
 The 16 hero cases, 16 monster cases and guarded-mine test passed three
 consecutive runs on macOS arm64, built from `2ac006f` plus the hero test.
-This stops at battle creation; actual combat, result confirmation, remote
-clients and restricted player visibility were not tested in this fixture.
+That run stopped at battle creation.
+
+A later extension, built from `1695cb2` plus the test change, forces victory
+for the attacker in each of the 16 cases. Both players in this fixture have
+the same human/AI status, so the server confirms the battle result without
+a replay dialog. The test checks that the battle ends for both players, the
+defeated hero is removed, and a second move takes the surviving hero across
+the seam onto the vacated tile. The 16 hero cases, 16 monster cases and two
+AI dialog tests passed three consecutive runs. The victory is forced: actual
+combat, human-versus-AI result dialogs, defeat of the attacker, remote clients
+and restricted player visibility remain unverified here.
 
 A complete local `vcmitest` run with the old prototype VMAP and save, plus
 the Complete `Dead and Buried` H3M, passed 1,606 tests without skips; four

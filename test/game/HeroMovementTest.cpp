@@ -6612,6 +6612,15 @@ TEST_P(ToroidalHeroAttackTest, DirectAttackAcrossSeamUsesCorrectPlayers)
 	EXPECT_EQ(battle->getSidePlayer(BattleSide::DEFENDER), defender);
 	EXPECT_EQ(battle->getLocation(), destination);
 	EXPECT_EQ(gameState()->getBattle(defender), battle);
+	const auto defeatedHeroID = defenderHero->id;
+	handler.battles->cheatBattleVictory(attacker);
+	// In this fixture both sides have the same human/AI status, so the result is confirmed immediately.
+	EXPECT_EQ(gameState()->getBattle(attacker), nullptr);
+	EXPECT_EQ(gameState()->getBattle(defender), nullptr);
+	EXPECT_EQ(map()->getObject(defeatedHeroID), nullptr);
+	EXPECT_EQ(attackerHero->visitablePos(), origin);
+	ASSERT_TRUE(handler.moveHero(attackerHero->id, attackerHero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, attacker, EPathfindingLayer::LAND));
+	EXPECT_EQ(attackerHero->visitablePos(), destination);
 }
 
 INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalHeroAttackTest, ::testing::Range(0, 16));
