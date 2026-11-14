@@ -59,4 +59,5 @@ status text to the respective object without moving the selected hero. A
 negative x coordinate returned `error invalid_command`. The real socket
 transport tests are independent of the GUI dispatch and do not verify every
 hover receiver. Hovering an unseen tile retained the preceding object's status
-text on that build; the separate legacy UI correction addresses this.
+text on that build; the [separate legacy UI correction](statusbar-fog-hover-2026-11-14.md)
+addresses this.

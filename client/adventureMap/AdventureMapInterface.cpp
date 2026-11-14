@@ -758,6 +758,7 @@ void AdventureMapInterface::onTileHovered(const int3 &targetPosition)
 
 	if(!isTargetPositionVisible)
 	{
+		ENGINE->statusbar()->clear();
 		ENGINE->cursor().set(Cursor::Map::POINTER);
 		return;
 	}

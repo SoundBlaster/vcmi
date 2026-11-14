@@ -162,6 +162,7 @@ void MapViewActions::handleHover(const Point & cursorPosition)
 
 	if(!tile)
 	{
+		ENGINE->statusbar()->clear();
 		ENGINE->cursor().set(Cursor::Map::POINTER);
 		return;
 	}
