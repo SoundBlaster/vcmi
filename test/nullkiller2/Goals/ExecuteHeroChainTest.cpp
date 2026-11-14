@@ -66,9 +66,19 @@ protected:
 	}
 };
 
-class ToroidalResourceVisitTest : public ExecuteHeroChainMovementTest,
+class ToroidalHeroChainTest : public ExecuteHeroChainMovementTest,
 	public ::testing::WithParamInterface<int>
 {
+protected:
+	std::pair<int3, int3> seamPositions() const
+	{
+		static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+			{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+		const auto [dx, dy] = directions.at(GetParam() % directions.size());
+		const int z = GetParam() / directions.size();
+		return {int3(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z),
+			int3(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z)};
+	}
 };
 }
 
@@ -103,14 +113,9 @@ TEST_F(ExecuteHeroChainMovementTest, blockingVisitOnRouteStopsChainForReplanning
 	EXPECT_EQ(client.movementRequests, 1) << "the chain must stop after the pickup instead of following the stale route";
 }
 
-TEST_P(ToroidalResourceVisitTest, plannedResourceVisitUsesRealServer)
+TEST_P(ToroidalHeroChainTest, plannedResourceVisitUsesRealServer)
 {
-	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
-		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
-	const auto [dx, dy] = directions.at(GetParam() % directions.size());
-	const int z = GetParam() / directions.size();
-	const int3 start(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
-	const int3 destination(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z);
+	const auto [start, destination] = seamPositions();
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
 	builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
 		.hero(int3(19, 18, 0), HeroTypeID(0), PLAYER)
@@ -151,7 +156,42 @@ TEST_P(ToroidalResourceVisitTest, plannedResourceVisitUsesRealServer)
 	EXPECT_EQ(hero->visitablePos(), start);
 }
 
-INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalResourceVisitTest, ::testing::Range(0, 16));
+TEST_P(ToroidalHeroChainTest, plannedMovementUsesRealServer)
+{
+	const auto [start, destination] = seamPositions();
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
+		.hero(int3(19, 18, 0), HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID(0), 1}})
+		.hero(int3(20, 20, 0), HeroTypeID(1), ENEMY);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	auto * hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
+	ASSERT_EQ(hero->visitablePos(), start);
+	hero->setMovementPoints(2000);
+	MoveCountingClient client(gameState(), PLAYER);
+	auto gateway = makeGateway(PLAYER, &client);
+	const auto paths = withGameStateReadLock([&]
+	{
+		preparePlanning(*gateway);
+		return gateway->nullkiller->pathfinder->getPathInfo(destination);
+	});
+	const auto path = std::ranges::find_if(paths, [&](const auto & candidate)
+	{
+		return candidate.targetHero == hero && !candidate.nodes.empty() && candidate.turn() == 0
+			&& candidate.firstTileToGet() == destination;
+	});
+	ASSERT_NE(path, paths.end());
+	EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(*path).accept(gateway.get()); }));
+	EXPECT_EQ(client.movementRequests, 1);
+	EXPECT_EQ(hero->visitablePos(), destination);
+	EXPECT_LT(hero->movementPointsRemaining(), 2000);
+}
+
+INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalHeroChainTest, ::testing::Range(0, 16));
 
 TEST_F(ExecuteHeroChainMovementTest, repeatedIdleChainFailsForReplanning)
 {

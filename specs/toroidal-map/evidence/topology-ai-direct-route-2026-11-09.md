@@ -61,3 +61,10 @@ the server handler removed the gold pile and credited the player after one
 movement request. All 16 cases passed three consecutive runs on macOS arm64.
 The game state remains shared in-process, the map is fully revealed, and the
 test does not establish a full AI turn or graphical multiplayer behavior.
+
+A separate parameterized fixture uses the same 16 directions and levels with
+an empty destination. Nullkiller2 plans the direct step, `ExecuteHeroChain`
+sends one request to the real server handler, and the hero appears at the
+wrapped destination with movement points spent. Both parameterized fixtures
+passed all 32 cases in three consecutive runs. This checks actual movement,
+but still uses shared in-process game state and a fully revealed map.
