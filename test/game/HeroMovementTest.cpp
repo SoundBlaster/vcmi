@@ -8160,6 +8160,24 @@ TEST_F(HeroMovementTest, TransientClientServerRouteAgreement)
 	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
 	CPathfinder finder(*gameState(), config);
 	finder.calculatePaths();
+	// An interrupted search must clear all heap handles before its graph is reused.
+	CPathsInfo interruptedPaths(gameState()->getMapSize(), hero);
+	auto interruptedConfig = std::make_shared<SingleHeroPathfinderConfig>(interruptedPaths, *gameState(), hero);
+	CPathfinder interruptedFinder(*gameState(), interruptedConfig);
+	ASSERT_TRUE(interruptedFinder.calculatePathsUntil([](const CGPathNode & node)
+	{
+		return node.layer == EPathfindingLayer::WATER && node.theNodeBefore;
+	}));
+	for(const auto * node = interruptedPaths.nodes.data(); node != interruptedPaths.nodes.data() + interruptedPaths.nodes.num_elements(); ++node)
+		ASSERT_FALSE(node->inPQ());
+	interruptedPaths.prepareForReuse(hero);
+	auto reusedConfig = std::make_shared<SingleHeroPathfinderConfig>(interruptedPaths, *gameState(), hero);
+	CPathfinder reusedFinder(*gameState(), reusedConfig);
+	reusedFinder.calculatePaths();
+	EXPECT_EQ(interruptedPaths.getNode(destination, EPathfindingLayer::WATER)->turns,
+		paths.getNode(destination, EPathfindingLayer::WATER)->turns);
+	EXPECT_FLOAT_EQ(interruptedPaths.getNode(destination, EPathfindingLayer::WATER)->cost,
+		paths.getNode(destination, EPathfindingLayer::WATER)->cost);
 	CGPath route;
 	ASSERT_EQ(paths.getNode(destination, EPathfindingLayer::WATER)->turns, 0);
 	ASSERT_NE(paths.getNode(destination, EPathfindingLayer::WATER)->theNodeBefore, nullptr);
@@ -8215,9 +8233,24 @@ TEST_F(HeroMovementTest, TransientClientServerRouteAgreement)
 				const auto expected = findKnownTransientLanding(*gameState(), hero, candidate, nullptr, knowledge);
 				const auto actual = findKnownTransientLanding(*gameState(), hero, candidate, nullptr, knowledge, &landingScratch);
 				EXPECT_EQ(actual, expected) << candidate.position.toString() << " visible=" << revealNeighbor;
+				// The only island has no interactive object other than this hero, so
+				// a full search for a clear route is an independent oracle here.
+				std::vector<LandingStep> fullRoute;
+				const auto full = findKnownTransientLanding(*gameState(), hero, candidate, &fullRoute, knowledge);
+				EXPECT_EQ(actual, full) << candidate.position.toString() << " visible=" << revealNeighbor;
 			}
 	}
 	gameState()->getPlayerTeam(player)->fogOfWarMap[int3(22, 19, 0)] = 1;
+	for(const int x : {0, 1, 35})
+		for(const int points : {1200, 3000, 6000})
+			for(const auto knowledge : {LandingKnowledge::PLAYER_ROUTE, LandingKnowledge::SAFE_RECOVERY})
+			{
+				const PathfinderStart candidate{int3(x, 18, 0), EPathfindingLayer::WATER, points};
+				const auto actual = findKnownTransientLanding(*gameState(), hero, candidate, nullptr, knowledge, &landingScratch);
+				std::vector<LandingStep> fullRoute;
+				const auto full = findKnownTransientLanding(*gameState(), hero, candidate, &fullRoute, knowledge);
+				EXPECT_EQ(actual, full) << candidate.position.toString() << " points=" << points;
+			}
 	for(int x = 19; x <= 24; ++x)
 	{
 		const PathfinderStart candidate{int3(x, 18, 0), EPathfindingLayer::WATER, 1200 - 100 * (x - 18)};

@@ -77,8 +77,6 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 	config->options.useTeleportOneWay = false;
 	config->options.useTeleportOneWayRandom = false;
 	config->options.useTeleportWhirlpool = false;
-	CPathfinder pathfinder(gameState, config);
-	pathfinder.calculatePaths();
 	const auto topology = gameState.getMap().getTopology();
 	const auto pathIsKnown = [&](const CGPathNode * node)
 	{
@@ -103,6 +101,18 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 		return true;
 	};
 	const int z = start ? start->position.z : hero->visitablePos().z;
+	const auto isKnownLanding = [&](const CGPathNode * node)
+	{
+		return node->coord.z == z && node->layer == EPathfindingLayer::LAND
+			&& node->turns == 0 && node->theNodeBefore
+			&& (node->action == EPathNodeAction::NORMAL || node->action == EPathNodeAction::VISIT || node->action == EPathNodeAction::BATTLE)
+			&& pathIsKnown(node);
+	};
+	CPathfinder pathfinder(gameState, config);
+	if(plainRoute)
+		pathfinder.calculatePaths();
+	else if(pathfinder.calculatePathsUntil([&](const CGPathNode & node) { return isKnownLanding(&node); }))
+		return KnownLanding::FOUND;
 	bool unknownFrontier = !team->fogOfWarMap[start ? start->position : hero->visitablePos()];
 	const CGPathNode * bestPlainLanding = nullptr;
 	for(int x = 0; x < paths.sizes.x; ++x)
@@ -110,9 +120,7 @@ KnownLanding findKnownTransientLanding(const CGameState & gameState, const CGHer
 		{
 			const int3 tile(x, y, z);
 			const auto * node = paths.getNode(tile, EPathfindingLayer::LAND);
-			if(node->turns == 0 && node->theNodeBefore
-				&& (node->action == EPathNodeAction::NORMAL || node->action == EPathNodeAction::VISIT || node->action == EPathNodeAction::BATTLE)
-				&& pathIsKnown(node))
+			if(isKnownLanding(node))
 			{
 				if(!plainRoute)
 					return KnownLanding::FOUND;

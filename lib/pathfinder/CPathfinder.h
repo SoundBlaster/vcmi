@@ -12,6 +12,8 @@
 #include "CGPathNode.h"
 #include "PathfinderOptions.h"
 
+#include <functional>
+
 class IGameInfoCallback;
 class PathfinderConfig;
 class CGWhirlpool;
@@ -38,6 +40,8 @@ public:
 		std::shared_ptr<PathfinderConfig> config);
 
 	void calculatePaths(); //calculates possible paths for hero, uses current hero position and movement left; returns pointer to newly allocated CPath or nullptr if path does not exists
+	/// Stops when a settled node matches; the resulting path graph is incomplete on success.
+	bool calculatePathsUntil(const std::function<bool(const CGPathNode &)> & stopAtSettledNode);
 
 private:
 	const IGameInfoCallback & gameInfo;

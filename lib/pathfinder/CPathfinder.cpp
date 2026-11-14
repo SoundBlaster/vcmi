@@ -105,6 +105,11 @@ CGPathNode * CPathfinder::topAndPop()
 
 void CPathfinder::calculatePaths()
 {
+	calculatePathsUntil({});
+}
+
+bool CPathfinder::calculatePathsUntil(const std::function<bool(const CGPathNode &)> & stopAtSettledNode)
+{
 	//logGlobal->info("Calculating paths for hero %s (address  %d) of player %d", hero->name, hero , hero->tempOwner);
 
 	//initial tile - set cost on 0 and add to the queue
@@ -136,6 +141,14 @@ void CPathfinder::calculatePaths()
 
 		source.setNode(gameInfo, node, config->options.mapView.get());
 		source.node->locked = true;
+		if(stopAtSettledNode && stopAtSettledNode(*node))
+		{
+			// Nodes remain owned by the caller's graph. Clear every heap link before
+			// returning so an incomplete graph can be safely inspected or reused.
+			while(!pq.empty())
+				topAndPop();
+			return true;
+		}
 
 		int movement = source.node->moveRemains;
 		uint8_t turn = source.node->turns;
@@ -237,6 +250,7 @@ void CPathfinder::calculatePaths()
 	} //queue loop
 
 	logAi->trace("CPathfinder finished with %s iterations", std::to_string(counter));
+	return false;
 }
 
 TeleporterTilesVector CPathfinderHelper::getAllowedTeleportChannelExits(const TeleportChannelID & channelID) const
