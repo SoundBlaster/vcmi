@@ -6304,6 +6304,42 @@ TEST_F(HeroMovementTest, EmergencyRelocationAvoidsOccupiedLand)
 	EXPECT_EQ(hero->visitablePos(), safeLand);
 }
 
+// Reproducer: pathfinding currently offers this route, but the authoritative
+// server rejects its final step to preserve a known landing. Enable when both
+// sides use compatible route validation.
+TEST_F(HeroMovementTest, DISABLED_TransientClientServerRouteAgreement)
+{
+	const PlayerColor player(0);
+	const int3 island(18, 18, 0), destination(25, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(int3(x, y, 0) != island)
+				builder.terrain(int3(x, y, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(1200);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder finder(*gameState(), config);
+	finder.calculatePaths();
+	CGPath route;
+	ASSERT_TRUE(paths.getPath(route, destination, EPathfindingLayer::WATER));
+	ASSERT_EQ(paths.getNode(destination, EPathfindingLayer::WATER)->turns, 0);
+	ASSERT_EQ(route.nodes.size(), 8u);
+	for(int x = 18; x <= 25; ++x)
+		ASSERT_EQ(route.nodes[25 - x].coord, int3(x, 18, 0));
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	for(int x = 19; x <= 25; ++x)
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(x, 18, 0)), EMovementMode::STANDARD, true, player, EPathfindingLayer::WATER)) << x;
+}
+
 void HeroMovementTest::checkSingleIslandTransitStopsBeforeStranding(SpellID spell, BonusType bonus, EPathfindingLayer layer)
 {
 	const PlayerColor player(0);
