@@ -6792,6 +6792,51 @@ TEST_F(HeroMovementTest, HeroCanRevisitMineOnTheSameToroidalTile)
 	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
 }
 
+class PrisonerGuardRefreshTest : public HeroMovementTest, public ::testing::WithParamInterface<bool>
+{
+};
+
+TEST_P(PrisonerGuardRefreshTest, ReleasingPrisonerRefreshesGuard)
+{
+	const PlayerColor player(0);
+	const bool toroidal = GetParam();
+	const int3 prisonPos(toroidal ? 0 : 10, 5, 0), guardPos(toroidal ? 35 : 9, 5, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(prisonPos + int3(1, 0, 0), HeroTypeID(0), player)
+		.monster(guardPos, CreatureID(27), 1);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(toroidal);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	auto * owner = gameState()->getPlayerState(player);
+	owner->removeOwnedObject(hero);
+	hero->detachFrom(*owner);
+	hero->attachTo(gameState()->globalEffects);
+	hero->setOwner(PlayerColor::NEUTRAL);
+	map()->hideObject(hero);
+	hero->ID = Obj::PRISON;
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "RestrictedPrison");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	hero->appearance = appearance;
+	hero->setAnchorPos(prisonPos);
+	map()->showObject(hero);
+	ASSERT_EQ(hero->visitablePos(), prisonPos);
+	map()->calculateGuardingGreaturePositions();
+	ASSERT_EQ(gameState()->guardingCreaturePosition(prisonPos), int3(-1, -1, -1));
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.giveHero(hero->id, player);
+	handler.setObjPropertyID(hero->id, ObjProperty::ID, Obj(Obj::HERO));
+	ASSERT_EQ(hero->visitablePos(), prisonPos);
+	ASSERT_EQ(map()->guardingCreaturePosition(prisonPos), guardPos);
+	EXPECT_EQ(gameState()->guardingCreaturePosition(prisonPos), guardPos);
+}
+
+INSTANTIATE_TEST_SUITE_P(BoundedAndToroidal, PrisonerGuardRefreshTest, ::testing::Bool());
+
 TEST_F(HeroMovementTest, MonsterGuardAcrossSeamStartsBattle)
 {
 	const PlayerColor player(0);

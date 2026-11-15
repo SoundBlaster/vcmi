@@ -788,6 +788,8 @@ void GameStatePackVisitor::visitGiveHero(GiveHero & pack)
 	h->attachTo(*gs.getPlayerState(pack.player));
 
 	auto oldVisitablePos = h->visitablePos();
+	const int3 oldAnchor = h->anchorPos();
+	const int3 oldDimensions(h->getWidth(), h->getHeight(), 1);
 	gs.getMap().hideObject(h);
 	h->updateAppearance();
 
@@ -797,6 +799,12 @@ void GameStatePackVisitor::visitGiveHero(GiveHero & pack)
 	gs.getPlayerState(h->getOwner())->addOwnedObject(h);
 
 	gs.getMap().showObject(h);
+	const auto refreshGuards = [&](const int3 & anchor, const int3 & dimensions)
+	{
+		gs.getMap().calculateGuardingGreaturePositions(anchor - dimensions - int3(1, 1, 0), anchor + int3(1, 1, 0));
+	};
+	refreshGuards(oldAnchor, oldDimensions);
+	refreshGuards(h->anchorPos(), int3(h->getWidth(), h->getHeight(), 1));
 	h->setVisitedTown(nullptr, false);
 	h->updateSpecialTerrain(gs);
 }
