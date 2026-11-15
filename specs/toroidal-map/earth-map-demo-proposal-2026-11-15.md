@@ -530,3 +530,23 @@ move. The VMAP round trip passed and the four portal approaches still passed
 three runs with forced guard victories. The 35 focused Python tests passed.
 These tests do not establish complete routing or balance and do not play out
 the twenty mine battles.
+
+The same source-relative pattern also appeared at 24 other buildings and
+towns. The separate `--repair-other-guards` option applies the same checks to
+an explicit set of nine object types. It moved 19 guards and skipped five:
+four proposed destinations contain blocking decorations, and one contains a
+road. The latter guard also stood on a road in the source, but the tool does
+not yet verify preservation of road semantics and therefore leaves it alone.
+
+The resulting local `draft-stacked/earth-object-guards-diagnostic.vmap` has
+SHA-256 `beec069f1c872e2cfeb86de5e20d4117dd173f98f27885a7d332701ea54ae24f`.
+Only those 19 monsters' coordinates changed from the previous draft; header
+and terrain did not change. The comparison found no added blocking or
+interactive object pairs and 20 removed pairs of each kind. The estimate of
+new interaction occurrences is 169, down from 189. On three initialized
+game states, the engine recognized all 39 moved monsters as guarding their
+respective objects; all eight starting heroes made one move, and all four
+portal approaches passed with forced guard victories. Mod requirements and
+the VMAP round trip also passed. The five skipped guards and remaining object
+overlaps still need investigation; these tests do not establish complete
+playability or demonstrate the ordinary battles.
