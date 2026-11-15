@@ -6960,6 +6960,60 @@ TEST_F(HeroMovementTest, AviationVehicleCanSettleInPlaceAfterAirTransit)
 	EXPECT_FALSE(handler.hasHeroInTransientMovement(player));
 }
 
+TEST_F(HeroMovementTest, AviationInPlaceLandingRejectsGuardAndImpassableTerrain)
+{
+	const PlayerColor player(0), opponent(1);
+	const int3 landing(0, 5, 0), vehiclePosition(35, 5, 0), guardPosition(35, 4, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).playerActive(opponent).hero(int3(1, 5, 0), HeroTypeID(0), player)
+		.hero(int3(11, 10, 0), HeroTypeID(1), opponent)
+		.terrain(vehiclePosition, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(vehiclePosition, BoatId::CASTLE, player);
+	auto * vehicle = dynamic_cast<CGBoat *>(map()->getObject(map()->getTile(vehiclePosition).topVisitableObj()));
+	ASSERT_NE(vehicle, nullptr);
+	vehicle->layer = EPathfindingLayer::AVIATE;
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(vehiclePosition), EMovementMode::STANDARD, false, player, EPathfindingLayer::AVIATE));
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(landing), EMovementMode::STANDARD, true, player, EPathfindingLayer::AIR));
+	ASSERT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	const auto remaining = hero->movementPointsRemaining();
+
+	// A guard appears after the vehicle flew over the landing tile.
+	handler.createWanderingMonster(guardPosition, CreatureID(0), 10);
+	const auto guardId = map()->getTile(guardPosition).topVisitableObj();
+	ASSERT_TRUE(guardId.hasValue());
+	ASSERT_EQ(gameState()->guardingCreaturePosition(landing), guardPosition);
+	EXPECT_FALSE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	hero->setConfirmedMovementLayer(EPathfindingLayer::AIR);
+	EXPECT_FALSE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	ASSERT_TRUE(handler.removeObject(map()->getObject(guardId), player));
+
+	// A terrain change under the airborne vehicle must not allow it to
+	// settle on an impassable tile either.
+	map()->getTile(landing).terrainType = TerrainId::ROCK;
+	EXPECT_FALSE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	hero->setConfirmedMovementLayer(EPathfindingLayer::AIR);
+	EXPECT_FALSE(handler.tryRecoverTransientHeroes(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AIR);
+	map()->getTile(landing).terrainType = TerrainId::GRASS;
+	ASSERT_TRUE(handler.tryLandTransientHeroesInPlace(player));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::AVIATE);
+	EXPECT_EQ(hero->visitablePos(), landing);
+	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+	EXPECT_EQ(hero->getBoat(), vehicle);
+}
+
 TEST_F(HeroMovementTest, GroupRecoveryPrevalidatesAviationVehicleAndStrandedHero)
 {
 	const PlayerColor player(0), opponent(1);

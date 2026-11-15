@@ -620,7 +620,8 @@ std::optional<EPathfindingLayer> transientInPlaceLandingLayer(const CGameState &
 		}
 	const auto & tile = state.getMap().getTile(position);
 	const auto isHero = [hero](const ObjectInstanceID & id) { return id == hero->id; };
-	if(!std::all_of(tile.blockingObjects.begin(), tile.blockingObjects.end(), isHero)
+	if(!tile.getTerrain()->isPassable() || state.guardingCreaturePosition(position).isValid()
+		|| !std::all_of(tile.blockingObjects.begin(), tile.blockingObjects.end(), isHero)
 		|| !std::all_of(tile.visitableObjects.begin(), tile.visitableObjects.end(), isHero))
 		return std::nullopt;
 	return EPathfindingLayer::AVIATE;

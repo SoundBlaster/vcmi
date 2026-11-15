@@ -148,6 +148,11 @@ casts, crosses the west seam and collects the same visible resource. See the
 [AI transient record](evidence/nullkiller-transient-seam-2026-11-15.md) for
 the synthetic control and limits of this result.
 
+In-place settlement of an `AVIATE` vehicle now rejects impassable terrain and
+guarded tiles, matching the adjacent recovery search. The
+[aviation record](evidence/topology-aviate-in-place-2026-11-14.md) documents
+the synthetic changed-world tests and their limits.
+
 Nullkiller's danger-map path searches now use the AI player's fog for
 neighbors and known guards even when simulating an enemy hero. Synthetic
 threat checks cover all edges and corners on both levels with a bounded

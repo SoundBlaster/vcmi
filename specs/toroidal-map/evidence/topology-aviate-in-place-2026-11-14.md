@@ -41,3 +41,30 @@ the vehicle in `AVIATE` and moves the other hero to land. The vehicle identity
 is preserved. This and two related group and aviation tests passed on macOS
 arm64 using `af6b9c4` plus the added test. The visibility change and stranded
 state are synthetic; this does not establish packet ordering on remote clients.
+
+## Guard and terrain changes under the vehicle
+
+The in-place check previously accepted a vehicle over an impassable tile or
+a tile guarded by a creature, unlike the ordinary adjacent recovery search.
+`HeroMovementTest.AviationInPlaceLandingRejectsGuardAndImpassableTerrain`
+embarks in a synthetic `AVIATE` vehicle, flies across the seam, and then
+spawns a guard across that seam adjacent to the vehicle. Before the fix,
+in-place settlement incorrectly succeeded. The test also changes the tile
+under the airborne vehicle to rock and observed the same incorrect success.
+Both changes are synthetic ways to create changed-world states.
+
+In-place settlement now requires passable terrain and no guarding creature,
+in addition to the existing occupancy and revealed-neighborhood checks. The
+test verifies that both in-place settlement and group recovery leave the
+vehicle airborne while either hazard is present. After removing the hazard,
+settlement succeeds without moving the hero or changing points or vehicle.
+The guard placement uses the server object-creation API; the terrain change
+is a direct test-state mutation. This does not add an encounter or resolve
+recovery when no safe tile exists.
+
+On macOS arm64, `vcmiserver` and `vcmitest` built from `ef25941` plus the
+change. All 32 selected aviation, transient movement, landing, recovery and
+TCP-lobby tests passed; the report is
+`runtime/aviate-in-place-hazards-final-2026-11-15.xml` on the TB5 build root.
+The linker reported duplicate libraries and missing Conan search paths. The
+new hazard cases themselves are in-process, not GUI or remote multiplayer.
