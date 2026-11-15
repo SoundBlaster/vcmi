@@ -22,10 +22,11 @@ not seam direction alone, determine availability.
 An initial bounded-control experiment directly submitted the disallowed
 approaches and found that the bounded server accepted them even though its
 pathfinder does not offer them. The toroidal server rejects these requests.
-The final regression avoids issuing those bounded requests and instead checks
-the bounded pathfinder. The discrepancy is a separate legacy server behavior;
-it was not changed here. The initial observations are recorded in
+The initial observations are recorded in
 `runtime/guarded-mine-directions-2026-11-15.xml` on the TB5 build root.
+The initial passing regression in `b3c071f` avoided issuing those bounded
+requests; the subsequent [bounded direction fix](bounded-approach-direction-2026-11-15.md)
+extends the same assertions to them.
 
 On macOS arm64 the final run passed 67 tests, including 64 parameterized
 cases and three existing mine regressions. The test binary was built from

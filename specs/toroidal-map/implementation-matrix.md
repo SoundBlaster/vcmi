@@ -168,7 +168,8 @@ the server battle and forced-victory return with the boat left at sea.
 [Guarded-mine tests](evidence/guarded-mine-directions-2026-11-15.md)
 exercise legal seam approaches, refusal, forced victory and retreat on both
 levels, with bounded controls; some starting positions overlap the mine and
-are synthetic. They also record a bounded-server direction-check discrepancy.
+are synthetic. The uncovered bounded-server destination-direction discrepancy
+was fixed and covered by the [server check](evidence/bounded-approach-direction-2026-11-15.md).
 [Prisoner release](evidence/prison-release-guard-cache-2026-11-15.md)
 refreshes the guard cache for the old and new hero footprints; synthetic
 bounded and toroidal coverage checks the server and two serialized replicas.
