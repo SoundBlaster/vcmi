@@ -211,3 +211,12 @@ distortions and game-grid representation would need their own design and
 tests. The cited page identifies the depiction as a transverse aspect of the
 Peirce Quincuncial projection. Referencing this illustration does not select
 its geometry as an implementation or license its image for redistribution.
+
+The user also identified the [Gall stereographic projection](https://proj.org/en/stable/operations/projections/gall.html),
+as displayed in the projection-transition tool with a rotated globe, as a
+reference for placing the Arctic near the center and Antarctica around the
+edge. The pictured orientation is not captured by exact rotation parameters.
+It is a candidate for the visual arrangement, not an automatic conversion of
+the H3M. For the toroidal demo, manually align and check corresponding edges,
+including ocean and any Antarctic land crossings; the projection alone does
+not establish a continuous toroidal seam.
