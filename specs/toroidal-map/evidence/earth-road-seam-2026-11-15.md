@@ -165,3 +165,28 @@ local game resources and keeps its own configuration and saves.
 This prepares, but does not prove, the graphical seam view: neither the new
 launcher nor the fixture has been operated in a graphical session. The
 ordinary Earth demo profile remains pointed at the prior map.
+
+## Static view and local demo integration
+
+The isolated fixture was started on macOS arm64 with the `e1f2bce` client
+plus the deferred-redraw fix from `ecc117d`, seed 17 and a spectator interface.
+The diagnostic channel clicked the minimap without bringing the game window
+to the foreground. The recorded map view was toroidal, 252×576, at center
+approximately `(249,419)` in 32-pixel tiles, placing the new road at row 425
+across the horizontal seam in the viewport. A window-specific capture showed
+the short horizontal road visibly connected across the seam to the existing
+road. The full capture at `runtime/earth-seam-road-qa-profile/minimap-window.png`
+under TB5 has SHA-256
+`c7afcf31f834740caed7a123d8a586381660ae5e22f0a9c54abbbb3960ad436e`.
+The matching observation stream is `minimap-window-observe.jsonl` in that
+profile. The diagnostic click was accepted; the process was force-stopped
+after the screenshot. This is one static spectator view, not evidence of
+continuous scroll or animation, a normal approach to the road, or a full
+human-controlled game.
+
+After this check, the local `earth-demo-profile/Maps/toroid-earth-demo.vmap`
+symlink was switched to `earth-connected-seam-road-verified.vmap`, SHA-256
+`61f9f042612fb86aa611c64e57b2c2e6ee7a39409cf2b4eeb1fd74b8b00d40b7`.
+The prior `earth-water-portal-assembled.vmap` remains available for rollback.
+The source map and other profiles were not replaced. This integration changes
+local files only; neither the third-party map nor game assets are in git.
