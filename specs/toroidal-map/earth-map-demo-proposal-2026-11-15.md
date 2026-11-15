@@ -27,9 +27,24 @@ mirror a hero. Art and connectivity along both seams need deliberate review.
 
 The downloaded H3M is kept outside the repository on TB5 and has SHA-256
 `767e28f90b79fceb08be5a93d3e3c9c4d4bf7ab9e6dac9fd95c91806de387ff5`.
-Its header identifies HotA format version 7. Loading it in the existing
-external-map test with the current test environment raised an exception
-reported only as `vector`; the cause is not yet established. This is not a
-general conclusion about loading it in a configured VCMI installation.
+Its header identifies HotA format version 7. In the core+vcmi+vcmi-test
+environment, the original loader threw `vector` while reading the HotA
+predefined-hero extension: the table was larger than the installed hero pool.
+After handling default entries beyond that pool, loading proceeds further,
+but fails during water-content calculation because terrain index 10 is not
+available in that test environment. The test environment only enables a
+minimal HotA-format fixture, not the HotA content mod. The user's Complete
+installation on TB5 does contain original HotA resource files; their presence
+alone does not establish that the VCMI HotA port is installed or active.
+These observations do not establish whether a fully configured VCMI can
+load or play this particular map.
+
+The loader change is covered by synthetic HotA v5 maps: default hero entries
+past the installed pool load, custom entries for an unavailable hero report
+its index, and an available customised hero is still created. The local full
+suite passed 1,995 tests, skipped five optional tests and reported three
+disabled tests. Its XML and log are under
+`runtime/earth-map-research-2026-11-15/` on TB5. This suite uses the test
+fixture mod; it does not demonstrate a full HotA installation.
 The listing does not establish permission to redistribute the map or a
 derivative; investigate the author's terms before publishing either.
