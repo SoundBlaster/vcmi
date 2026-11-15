@@ -42,7 +42,9 @@ in gui thread (deadlock risk)!` when presenting end-turn, load and exit
 confirmations. Source inspection shows `showYesNoDialog` calls
 `waitWhileDialog`, which logs and returns instead of blocking on the GUI
 thread. Those confirmations were displayed and accepted in this session; this
-does not establish correct ordering for already-active or nested dialogs.
+does not establish correct ordering for already-active or nested dialogs. A
+later [focused check](gui-dialog-warning-2026-11-15.md) eliminated the warning
+when no dialog is active and retained it for a demonstrated busy case.
 
 The client log and player-filtered observation trace are in
 `runtime/gui-preview-eeb3540-2026-11-15/` on TB5. Screenshots were observed
