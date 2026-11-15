@@ -2613,6 +2613,8 @@ public:
 	int3 failedStart;
 	int3 failedEnd;
 	ui32 failedPoints = 0;
+	std::vector<std::string> movementReplyEvents;
+	std::optional<bool> lastReplyResult;
 	void applyPack(CPackForClient & pack) override
 	{
 		if(const auto * movement = dynamic_cast<const TryMoveHero *>(&pack); movement && movement->result == TryMoveHero::FAILED)
@@ -2622,8 +2624,18 @@ public:
 			failedStart = movement->start;
 			failedEnd = movement->end;
 			failedPoints = movement->movePoints;
+			movementReplyEvents.emplace_back("failed movement");
 		}
 		GameHandlerTestServer::applyPack(pack);
+	}
+	void sendPack(CPackForClient & pack, GameConnectionID connection) override
+	{
+		if(const auto * applied = dynamic_cast<const PackageApplied *>(&pack))
+		{
+			lastReplyResult = applied->result;
+			movementReplyEvents.emplace_back("reply applied");
+		}
+		GameHandlerTestServer::sendPack(pack, connection);
 	}
 };
 
@@ -2889,7 +2901,12 @@ TEST_P(MonolithExitTopologyTest, twoWayMonolithRejectsSelectedExitOccupiedByFrie
 	ASSERT_EQ(map()->getTile(occupied->visitablePos()).topVisitableObj(), blocker->id);
 	ASSERT_FALSE(CGTeleport::isExitPassable(*gameState(), hero, occupied.get()));
 	const auto pointsBeforeRejection = hero->movementPointsRemaining();
-	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, index), ReplyOutcome::Accepted);
+	QuestionAnswer answer(dialog->getActiveQuestionID(), static_cast<int32_t>(index));
+	answer.player = player;
+	answer.requestID = 71;
+	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, answer);
+	ASSERT_EQ(server.lastReplyResult, true);
+	EXPECT_EQ(server.movementReplyEvents, (std::vector<std::string>{"failed movement", "reply applied"}));
 	EXPECT_EQ(hero->visitablePos(), entrance->visitablePos());
 	EXPECT_EQ(blocker->visitablePos(), occupied->visitablePos());
 	EXPECT_EQ(handler.activities->topActivity(player), nullptr);
@@ -3013,7 +3030,11 @@ void SubterraneanGateTopologyTest::checkWhirlpoolTravel(TQuantity creatureCount,
 	if(occupyAfterDialog)
 		handler.createBoat(int3(35, 5, 0), BoatId::CASTLE, player);
 	const auto movement = hero->movementPointsRemaining();
-	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	QuestionAnswer answer(dialog->getActiveQuestionID(), 0);
+	answer.player = player;
+	answer.requestID = 72;
+	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, answer);
+	ASSERT_EQ(server.lastReplyResult, true);
 	const int3 expectedPosition = blockAllExits || occupyAfterDialog ? int3(12, 5, 0) : int3(35, 5, 0);
 	EXPECT_EQ(hero->visitablePos(), expectedPosition);
 	ASSERT_TRUE(hero->inBoat());
@@ -3027,6 +3048,7 @@ void SubterraneanGateTopologyTest::checkWhirlpoolTravel(TQuantity creatureCount,
 	if(blockAllExits || occupyAfterDialog)
 	{
 		EXPECT_EQ(server.failedMoves, 1);
+		EXPECT_EQ(server.movementReplyEvents, (std::vector<std::string>{"failed movement", "reply applied"}));
 		EXPECT_EQ(server.failedHero, hero->id);
 		EXPECT_EQ(server.failedStart, hero->anchorPos());
 		EXPECT_EQ(server.failedEnd, hero->anchorPos());

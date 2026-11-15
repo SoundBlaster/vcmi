@@ -187,7 +187,10 @@ void HeroMovementController::onTryMoveHero(const CGHeroInstance * hero, const Tr
 
 	if(details.stopMovement())
 	{
-		if(duringMovement)
+		// Other visible heroes can also produce stop packets while this player
+		// is moving during simultaneous turns. Do not stop our active hero for
+		// an unrelated hero's visit, failed move, or teleport rejection.
+		if(duringMovement && currentlyMovingHero == hero)
 			endMove(hero);
 		return;
 	}
