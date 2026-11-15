@@ -172,6 +172,11 @@ map and crossed its northwest corner. One static view showed both roads at
 the corner junction; live AI spell planning and visual smoothness remain
 unverified in this run.
 
+A [Finder preview](evidence/macos-finder-preview-2026-11-15.md) now starts
+with its own temporary client log, avoiding interference with a previously
+running client. Finder opened it to the main menu without launch arguments;
+gameplay in that separate Finder run remains unverified.
+
 A generated legacy H3M defaults to bounded mode and rejects direct crossings
 in all eight directions on both levels; the same steps succeed after an
 explicit in-memory toroidal opt-in. See the

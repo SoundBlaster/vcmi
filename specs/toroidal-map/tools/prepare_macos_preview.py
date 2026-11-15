@@ -37,6 +37,7 @@ def main() -> int:
     parser.add_argument("source", type=Path, help="existing local app bundle")
     parser.add_argument("destination", type=Path, help="new app bundle; must not exist")
     parser.add_argument("--identity", required=True, help="codesign identity or - for ad hoc")
+    parser.add_argument("--private-log", action="store_true", help="use a private per-launch log for Finder starts")
     args = parser.parse_args()
     source = args.source.resolve(strict=True)
     destination = args.destination.absolute()
@@ -51,6 +52,9 @@ def main() -> int:
     libraries = sorted(frameworks.glob("*.dylib"))
     if not libraries or any(not binary.is_file() for binary in binaries):
         parser.error("source must contain client, server and bundled libraries")
+    if args.private_log and ((contents / "MacOS" / "vcmi-preview-launcher").exists()
+                             or (contents / "MacOS" / "vcmi-preview-launcher").is_symlink()):
+        parser.error("source already contains vcmi-preview-launcher")
     for binary in binaries + libraries:
         for dependency in dependencies(binary):
             if dependency.startswith("@rpath/"):
@@ -81,7 +85,13 @@ def main() -> int:
         if len(command) > 1:
             run(*command, str(binary))
 
-    for item in new_libraries + [new_contents / "MacOS" / "vcmiserver", destination]:
+    signing_items = new_libraries + [new_contents / "MacOS" / "vcmiserver"]
+    if args.private_log:
+        launcher = new_contents / "MacOS" / "vcmi-preview-launcher"
+        run("cc", "-std=c11", "-Wall", "-Wextra", "-Werror", str(Path(__file__).with_name("macos_preview_launcher.c")), "-o", str(launcher))
+        run("plutil", "-replace", "CFBundleExecutable", "-string", launcher.name, str(new_contents / "Info.plist"))
+        signing_items.extend([new_contents / "MacOS" / "vcmiclient", launcher])
+    for item in signing_items + [destination]:
         run("codesign", "--force", "--sign", args.identity, str(item))
     run("codesign", "--verify", "--deep", "--strict", str(destination))
     print(f"Prepared and verified {destination}")
