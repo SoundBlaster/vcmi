@@ -475,6 +475,10 @@ describes its limits and a positive control.
 An [experimental road to a monolith](evidence/earth-portal-road-2026-11-15.md)
 reached the entrance in a staged graphical game, but the water-monolith exit
 was rejected for a land hero. The adaptation and road appearance remain open.
+The entry was originally on water and became land during the Africa rejoin;
+an opt-in [repair candidate](evidence/earth-portal-road-2026-11-15.md#source-comparison-and-water-portal-repair-candidate)
+passed one server-side boat teleport to another water exit. Integrating and
+validating the repair remains open.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

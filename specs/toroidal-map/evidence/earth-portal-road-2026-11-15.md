@@ -43,3 +43,37 @@ The strong-fixture observation and client log are local under TB5
 `3463b4d6bee196197668cf18fbedf830ba0d870a2aa66d83000073248374873f`.
 The isolated fixtures do not establish map balance, complete scenario
 compatibility, normal unassisted play or animation continuity.
+
+## Source comparison and water-portal repair candidate
+
+The converted two-level source places all four `hotaPortalWaterBlue` visitable
+cells on water. In particular, `monolithTwoWay_5267` is at visitable cell
+`(250,141,0)` on water. The initial stacked draft retained it on water at
+`(250,393,0)`; the east-Africa rejoin changed that cell to sand. The later
+polar transformation shifted the mismatched entry to `(250,429,0)`. Thus the
+land/water mismatch was introduced by the draft adaptation, rather than being
+present in this converted source.
+
+`MapFormat.PreparesEarthWaterPortalRepair`, committed as `eb1108f`, constructs
+a separate local map from `earth-reserved-guard-diagnostic.vmap`. It moves
+only that monolith's anchor from `(251,429,0)` to `(240,429,0)`, checking that
+its three active destination cells and a southern approach are unobstructed
+water. It saves and reloads the map and checks the visitable position and
+approach direction. The resulting local map SHA-256 is
+`53f6a9f039fd1370b33956bb5702d3ccaa804d1ff3ebff0d7479a101ed69be83`.
+
+An opt-in in-process server check in the same commit initialized that map,
+staged a hero at `(241,430,0)`, created a boat at `(240,430,0)` and embarked.
+After resetting movement points to simulate a later turn, the hero sailed to
+`(239,430,0)`, entered the repaired monolith, selected a *different* exit and
+arrived at water tile `(168,290,0)` in the same boat. The test also checked
+the existing two isolated converted gate pairs. Both the map generation and
+this server check passed on macOS arm64; the latter's TB5 XML at
+`runtime/earth-water-portal-game-qa.xml` has SHA-256
+`d77b150b5650f035d4ca82a8b20dd2380424113e83aca8f67f2eb818ac1bafad`.
+
+The repair is a candidate, not yet integrated into the assembler or ordinary
+demo profile. This checks one boat approach and one exit on the server; it
+does not establish all other portal exits, GUI animation, normal route to the
+boat, broader collision effects or source-equivalent balance. The failed
+land-road-to-water-portal experiment above remains a separate local fixture.
