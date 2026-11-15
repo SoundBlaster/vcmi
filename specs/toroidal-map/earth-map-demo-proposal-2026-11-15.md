@@ -373,3 +373,42 @@ coast artwork or actual passability. The draft has 1,302 estimated new
 blocking pairs and 250 visitable-cell overlap occurrences relative to the
 clipped source; gates, mod declarations, roads, object interactions, visual
 transitions and an actual playable session remain unresolved.
+
+### Same-level passage prototype
+
+The assembler can explicitly replace source gate pairs with two-way
+monoliths while keeping each object's instance name, position and original
+gate appearance and footprint. It verifies each requested pair against the
+source map's gate-pairing order and rejects an already-used monolith subtype.
+For this map, `subterraneanGate_5430` / `subterraneanGate_10528` use the
+previously unused `monolith2` subtype, while `subterraneanGate_5431` /
+`subterraneanGate_10533` use `monolith4`. This is a deliberate adaptation,
+not full preservation of gate behavior: for example, a subterranean gate
+can start an exchange with a friendly hero at the exit, while a two-way
+monolith cannot.
+
+Two mountain decorations obscuring portal visitable cells were relocated
+to the nearest candidate within 16 cells whose active footprint is on dry
+terrain, has no road or river and overlaps no other active footprint.
+`mountain_3335` moved from `(0,389)` to `(6,387)` and `mountain_7529` from
+`(2,417)` to `(245,426)`. No object was deleted. The estimate changed to
+1,293 new blocking pairs and 248 visitable-cell overlap occurrences versus
+the clipped source. Actual accessibility, road appearance and the effects of
+the new mountain locations are not established by these geometric checks.
+
+The local draft
+`runtime/earth-map-research-2026-11-15/draft-stacked/earth-portals-clear-diagnostic.vmap`
+has SHA-256
+`75aff0d02d2eb994a591a13d183da8b979d1faea7e9c9f67093065e7c4895d65`.
+The isolated HotA profile loaded and round-tripped it with 12,249 objects and
+48 towns. The `MapFormat.InitializesExternalToroidalMapAndChecksPortalPairs`
+opt-in test initialized an actual in-process game state, found exactly two
+isolated two-entrance/two-exit channels, and used the server activity handler
+to visit each portal in both directions. For those visits the test places a
+hero directly at each entrance and chooses the matching exit; it does not
+exercise ordinary approach, nearby guards, a network client or a full game.
+This test passed three times on macOS arm64, and 28 Python geometry and
+conversion tests passed. `MapFormat` normally passed 14 cases with four
+optional inspections skipped. The assembler change is `46cd49c` and the
+opt-in game-state inspection is `4d22789`; the tested executable was built
+from `0f0d2e0` with the inspection changes in the worktree.
