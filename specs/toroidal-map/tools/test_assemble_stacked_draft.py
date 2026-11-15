@@ -84,6 +84,58 @@ class StackedDraftTest(unittest.TestCase):
         self.assertEqual(pairs, {("a", "b")})
         self.assertEqual(interactions, [("a", "b")])
 
+    def test_stretches_polar_island_and_keeps_objects_upright(self):
+        header = {"mapLevels": {"surface": {"width": 6, "height": 6, "index": 0},
+                                "underground": {"width": 6, "height": 6, "index": 1}},
+                  "players": {"red": {"mainTown": {"x": 2, "y": 3, "l": 1}}}}
+        surface = [["wt0_"] * 6 for _ in range(6)]
+        underground = [["wt0_"] * 6 for _ in range(6)]
+        for y in (2, 3):
+            for x in (2, 3):
+                underground[y][x] = "sn0_"
+        objects = [obj("town", "town", 2, 3, 1, ["A"]),
+                   obj("elsewhere", "decoration", 1, 5, 0, ["B"])]
+        result_header, rows, converted, report = assemble(header, surface, underground, objects, polar_seed=(2, 2))
+        self.assertEqual(report["dimensions"], [6, 14])
+        self.assertEqual(report["polar_component"], {"source_snow_cells": 4, "north_band_rows": 1,
+                                                     "south_band_rows": 1, "objects_moved": 1,
+                                                     "objects_with_active_cells_on_water": []})
+        self.assertEqual((converted[0]["x"], converted[0]["y"], converted[0]["l"]), (4, 13, 0))
+        self.assertEqual(result_header["players"]["red"]["mainTown"], {"x": 4, "y": 13, "l": 0})
+        self.assertEqual((converted[1]["x"], converted[1]["y"]), (1, 12))
+        self.assertTrue(all(cell.startswith("sn") for cell in rows[0] + rows[-1]))
+        self.assertEqual(underground[2][2], "sn0_")
+
+    def test_polar_island_rejects_unhandled_road_or_river(self):
+        header = {"mapLevels": {"surface": {"width": 4, "height": 4, "index": 0},
+                                "underground": {"width": 4, "height": 4, "index": 1}}}
+        surface = [["wt0_"] * 4 for _ in range(4)]
+        underground = [["wt0_"] * 4 for _ in range(4)]
+        underground[2][2] = "sn0_pd1_"
+        with self.assertRaisesRegex(ValueError, "road or river overlays"):
+            assemble(header, surface, underground, [], polar_seed=(1, 1))
+
+    def test_oceanizing_rejects_blocking_part_of_interactive_object(self):
+        header = {"mapLevels": {"surface": {"width": 4, "height": 4, "index": 0},
+                                "underground": {"width": 4, "height": 4, "index": 1}}}
+        surface = [["wt0_"] * 4 for _ in range(4)]
+        surface[0][0] = "rc0_"
+        underground = [["wt0_"] * 4 for _ in range(4)]
+        town = obj("town", "town", 0, 0, 0, ["AB"])
+        with self.assertRaisesRegex(ValueError, "visitable objects"):
+            assemble(header, surface, underground, [town], oceanize=True)
+
+    def test_schematic_island_cannot_overwrite_object_footprints(self):
+        header = {"mapLevels": {"surface": {"width": 50, "height": 50, "index": 0},
+                                "underground": {"width": 50, "height": 50, "index": 1}}}
+        water = [["wt0_"] * 50 for _ in range(50)]
+        _, rows, _, report = assemble(header, water, water, [], snow_island=(25, 25))
+        self.assertEqual(report["illustrative_snow_island"]["objects"], 0)
+        self.assertEqual(rows[25][25], "sn0_")
+        blocking = obj("b", "decoration", 24, 24, 1, ["B"])
+        with self.assertRaisesRegex(ValueError, "overlaps objects"):
+            assemble(header, water, water, [blocking], snow_island=(25, 25))
+
 
 if __name__ == "__main__":
     unittest.main()

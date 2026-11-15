@@ -14,7 +14,9 @@ import re
 import zipfile
 
 from analyze_stacked_map import load_json, occupants
-from preview_stacked_terrain import east_land_fragment, rejoin_east_land_fragment
+from preview_stacked_terrain import (add_illustrative_snow_island, east_land_fragment,
+                                    oceanize_edge_rock, polarize_snow_island,
+                                    rejoin_east_land_fragment, snow_component)
 
 
 TAGGED_TOROIDAL_VERSION = 0x54520004
@@ -73,6 +75,48 @@ def fragment_object_names(objects, component):
     return result
 
 
+def polar_object_references(objects, component, width, height):
+    """Select one source footprint cell for placing each polar object upright."""
+    source = {(width - 1 - x, height - 1 - y) for x, y in component}
+    references = {}
+    for obj in objects:
+        if obj["l"] != 1:
+            continue
+        mask = obj["template"]["mask"]
+        candidates = []
+        for row, line in enumerate(mask):
+            for col, kind in enumerate(line):
+                dx, dy = len(line) - 1 - col, len(mask) - 1 - row
+                x, y = obj["x"] - dx, obj["y"] - dy
+                if kind in "BHAT" and (x, y) in source:
+                    candidates.append((x, y, dx, dy, kind))
+        if candidates:
+            # Prefer an entrance; otherwise use the active anchor when present.
+            references[obj["instanceName"]] = min(candidates, key=lambda c: (c[4] not in "AT", c[2] != 0 or c[3] != 0))
+    return references
+
+
+def place_polar_object(obj, reference, component, width, source_height, result_height):
+    """Map one selected cell to the stretched snow; never scale the sprite."""
+    sx, sy, dx, dy, _ = reference
+    rx, ry = width - 1 - sx, source_height - 1 - sy
+    min_x = min(x for x, _ in component)
+    max_x = max(x for x, _ in component)
+    min_y = min(y for _, y in component)
+    max_y = max(y for _, y in component)
+    island_width = max_x - min_x + 1
+    index = rx - min_x
+    # polarize_snow_island samples source x = min_x + dest_x * island_width // width.
+    left = (index * width + island_width - 1) // island_width
+    right = ((index + 1) * width + island_width - 1) // island_width - 1
+    dest_x = (left + right) // 2
+    south_depth = (max_y - min_y + 1) // 2
+    dest_y = (ry - min_y - south_depth) % result_height
+    result = copy.deepcopy(obj)
+    result.update(x=(dest_x + dx) % width, y=(dest_y + dy) % result_height, l=0)
+    return result
+
+
 def blocking_pairs(objects, width, height):
     cells = collections.defaultdict(list)
     for obj in objects:
@@ -96,6 +140,26 @@ def blocking_pairs(objects, width, height):
     return pairs, interactions
 
 
+def active_objects_on_cells(objects, cells, width, height):
+    """Return object names and the subset with affected visitable cells."""
+    touching, visitable = set(), set()
+    for obj in objects:
+        mask = obj["template"]["mask"]
+        for row, line in enumerate(mask):
+            for col, kind in enumerate(line):
+                position = ((obj["x"] - (len(line) - 1 - col)) % width,
+                            (obj["y"] - (len(mask) - 1 - row)) % height)
+                if kind in "BHAT" and position in cells:
+                    touching.add(obj["instanceName"])
+                    if kind in "AT":
+                        visitable.add(obj["instanceName"])
+    return touching, visitable
+
+
+def changed_cells(before, after):
+    return {(x, y) for y, row in enumerate(before) for x, cell in enumerate(row) if cell != after[y][x]}
+
+
 def nested_positions(value, path=()):
     if isinstance(value, dict):
         if {"x", "y", "l"} <= value.keys():
@@ -107,7 +171,8 @@ def nested_positions(value, path=()):
             yield from nested_positions(item, path + (index,))
 
 
-def assemble(header, surface, underground, objects, fragment_seed=None):
+def assemble(header, surface, underground, objects, fragment_seed=None, polar_seed=None,
+             oceanize=False, snow_island=None):
     levels = sorted(header["mapLevels"].values(), key=lambda level: level["index"])
     if len(levels) != 2 or [level["index"] for level in levels] != [0, 1]:
         raise ValueError("Expected exactly two indexed levels")
@@ -128,6 +193,61 @@ def assemble(header, surface, underground, objects, fragment_seed=None):
         moved = fragment_object_names(objects, component)
         surface, underground, fragment = rejoin_east_land_fragment(surface, underground, fragment_seed)
     converted = [place_object(obj, width, height, moved) for obj in objects]
+    rows = [[rotate_cell_art(cell) for cell in reversed(row)] for row in reversed(underground)]
+    rows += copy.deepcopy(surface)
+    polar = None
+    if polar_seed is not None:
+        component = snow_component(rows, polar_seed)
+        if any(y >= height for _, y in component):
+            raise ValueError("Polar component must lie within the rotated second level")
+        if any(len(list(CELL_PART.finditer(rows[y][x]))) != 1 for x, y in component):
+            raise ValueError("Polar component has road or river overlays requiring manual handling")
+        references = polar_object_references(objects, component, width, height)
+        if moved.intersection(references):
+            raise ValueError("An object intersects both the east fragment and polar component")
+        rows, north_depth, snow_cells = polarize_snow_island(rows, polar_seed)
+        for index, (source, result) in enumerate(zip(objects, converted)):
+            if source["instanceName"] in references:
+                converted[index] = place_polar_object(source, references[source["instanceName"]], component,
+                                                      width, height, len(rows))
+            else:
+                result["y"] = (result["y"] + north_depth) % len(rows)
+        polar = {"source_snow_cells": snow_cells, "north_band_rows": north_depth,
+                 "south_band_rows": len(rows) - 2 * height - north_depth,
+                 "objects_moved": len(references)}
+    rock = None
+    if oceanize:
+        ocean_rows, rock_count = oceanize_edge_rock(rows)
+        affected_cells = changed_cells(rows, ocean_rows)
+        if any(len(list(CELL_PART.finditer(rows[y][x]))) != 1 for x, y in affected_cells):
+            raise ValueError("Boundary rock has road or river overlays requiring manual handling")
+        affected_objects, _ = active_objects_on_cells(converted, affected_cells, width, len(rows))
+        interactive = {obj["instanceName"] for obj in converted if obj["instanceName"] in affected_objects
+                       and any(kind in "AT" for line in obj["template"]["mask"] for kind in line)}
+        if interactive:
+            raise ValueError("Boundary rock contains visitable objects requiring manual handling")
+        rock = {"cells": rock_count, "affected_nonvisitable_objects": sorted(affected_objects)}
+        rows = ocean_rows
+    greenland = None
+    if snow_island is not None:
+        island_rows, island_count = add_illustrative_snow_island(rows, snow_island)
+        affected_cells = changed_cells(rows, island_rows)
+        affected_objects, _ = active_objects_on_cells(converted, affected_cells, width, len(rows))
+        if affected_objects:
+            raise ValueError("Illustrative snow island overlaps objects requiring manual handling")
+        greenland = {"cells": island_count, "center": list(snow_island), "objects": 0}
+        rows = island_rows
+    if polar is not None:
+        for obj in converted:
+            reference = references.get(obj["instanceName"])
+            if reference is not None:
+                _, _, dx, dy, _ = reference
+                if rows[(obj["y"] - dy) % len(rows)][(obj["x"] - dx) % width][:2] != "sn":
+                    raise ValueError(f"Polar object reference is not on snow: {obj['instanceName']!r}")
+        water_cells = {(x, y) for y, row in enumerate(rows) for x, cell in enumerate(row) if cell[:2] == "wt"}
+        polar_objects = [obj for obj in converted if obj["instanceName"] in references]
+        polar_on_water, _ = active_objects_on_cells(polar_objects, water_cells, width, len(rows))
+        polar["objects_with_active_cells_on_water"] = sorted(polar_on_water)
     anchors = {}
     for old, new in zip(objects, converted):
         anchors.setdefault((old["x"], old["y"], old["l"]), []).append(new)
@@ -142,17 +262,15 @@ def assemble(header, surface, underground, objects, fragment_seed=None):
             raise ValueError(f"Main town does not uniquely identify a town: {path!r}")
         position.update({k: matches[0][k] for k in ("x", "y", "l")})
 
-    new_header["mapLevels"] = {"surface": {"height": 2 * height, "index": 0,
+    new_header["mapLevels"] = {"surface": {"height": len(rows), "index": 0,
                                            "layer": "core:surface", "width": width}}
     new_header["versionMajor"] = TAGGED_TOROIDAL_VERSION
     new_header["topology"] = "toroidal"
-    rows = [[rotate_cell_art(cell) for cell in reversed(row)] for row in reversed(underground)]
-    rows += copy.deepcopy(surface)
     original, _, clipped = occupants(objects, width, height, False)
-    assembled, interactions = blocking_pairs(converted, width, 2 * height)
+    assembled, interactions = blocking_pairs(converted, width, len(rows))
     new = assembled - original
     return new_header, rows, converted, {
-        "dimensions": [width, 2 * height], "objects": len(converted),
+        "dimensions": [width, len(rows)], "objects": len(converted),
         "source_outside_anchors": sum(not (0 <= obj["x"] < width and 0 <= obj["y"] < height)
                                       for obj in objects),
         "source_clipped_blocking_cells": clipped,
@@ -160,12 +278,19 @@ def assemble(header, surface, underground, objects, fragment_seed=None):
         "new_interaction_occurrences_estimate": sum(pair in new for pair in interactions),
         "east_fragment": fragment,
         "east_fragment_objects_moved": len(moved),
+        "polar_component": polar,
+        "oceanized_boundary_rock": rock,
+        "illustrative_snow_island": greenland,
         "subterranean_gates": sum(obj["type"] == "subterraneanGate" for obj in objects),
         "limitations": ["diagnostic draft only", "object and interaction overlaps unresolved",
                         "road artwork and movement costs unverified", "cross-level gates unpaired",
-                        "polar geography not adapted", "required mods not assessed"]
+                        "required mods not assessed"]
+                       + (["polar geography not adapted"] if polar is None
+                          else ["polar terrain artwork, object placement and collisions unverified"])
                        + (["east fragment not adapted"] if fragment is None
-                          else ["east fragment object placement and overlaps unverified"]),
+                          else ["east fragment object placement and overlaps unverified"])
+                       + (["oceanized rock and affected decorations unverified"] if rock is not None else [])
+                       + (["new snow island is schematic and has no objects"] if greenland is not None else []),
     }
 
 
@@ -175,6 +300,12 @@ def main():
     parser.add_argument("output", help="New draft VMAP; existing files are not overwritten")
     parser.add_argument("--rejoin-east-fragment", nargs=2, type=int, metavar=("X", "Y"),
                         help="Move one second-level east-edge land component and its objects to the surface")
+    parser.add_argument("--polar-seed", nargs=2, type=int, metavar=("X", "Y"),
+                        help="Move a snow component and its objects around new north/south bands")
+    parser.add_argument("--oceanize-edge-rock", action="store_true",
+                        help="Replace boundary-connected rock with ocean where no visitable objects are affected")
+    parser.add_argument("--illustrative-snow-island", nargs=2, type=int, metavar=("X", "Y"),
+                        help="Add a schematic unpopulated snow island in clear water")
     args = parser.parse_args()
     with zipfile.ZipFile(args.source) as archive:
         expected = {"header.json", "surface_terrain.json", "underground_terrain.json", "objects.json"}
@@ -184,7 +315,8 @@ def main():
         header, rows, objects, report = assemble(
             load_json(archive, "header.json"), load_json(archive, "surface_terrain.json"),
             load_json(archive, "underground_terrain.json"), load_json(archive, "objects.json"),
-            args.rejoin_east_fragment)
+            args.rejoin_east_fragment, args.polar_seed, args.oceanize_edge_rock,
+            args.illustrative_snow_island)
     with zipfile.ZipFile(args.output, "x", compression=zipfile.ZIP_DEFLATED) as output:
         for name, data in extras.items():
             output.writestr(name, data)
