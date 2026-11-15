@@ -606,3 +606,10 @@ an adjacent free, unguarded approach with a second free, unguarded cell to
 depart to; a mine guard is nearby. This does not prove the resource or hero
 is trapped: an ordinary route or battle may change the result. The case
 remains open rather than being automatically edited.
+
+The `earth-reserved-guard-diagnostic.vmap` terrain data contains no road
+tiles on any of its four outer edges. It therefore cannot demonstrate a road
+crossing a seam, even though it contains roads elsewhere. The separate
+[Toroid Crossroads visual record](evidence/topology-preview-f0f7f4a-2026-11-15.md)
+covers a different test fixture; it does not validate a seam road on this
+Earth draft or replace the user's planned continuity review.
