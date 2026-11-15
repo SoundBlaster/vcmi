@@ -1488,7 +1488,8 @@ void CPlayerInterface::waitWhileDialog()
 {
 	if (ENGINE->amIGuiThread())
 	{
-		logGlobal->warn("Cannot wait for dialogs in gui thread (deadlock risk)!");
+		if(showingDialog->isBusy())
+			logGlobal->warn("Cannot wait for dialogs in gui thread (deadlock risk)!");
 		return;
 	}
 
