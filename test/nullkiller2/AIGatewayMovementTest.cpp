@@ -418,6 +418,70 @@ TEST_F(Nullkiller2_AIGateway, plansUnskilledTownPortalToNearestTownAcrossSeam)
 	}
 }
 
+TEST_F(Nullkiller2_AIGateway, unskilledTownPortalDoesNotSkipOccupiedNearestTownAcrossSeam)
+{
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(PLAYER)
+		.hero({1, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.heroPrimary(0, 0, 20, 20)
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({SpellID(SpellID::decode("core:townPortal"))})
+		.hero({34, 10, 0}, HeroTypeID(1), PLAYER)
+		.town({9, 10, 0}, FactionID(0), PLAYER)
+		.town({35, 10, 0}, FactionID(0), PLAYER);
+	startWithMap(std::move(builder));
+	revealMap(PLAYER);
+	const auto heroes = findAll<CGHeroInstance>();
+	const auto caster = std::ranges::find_if(heroes, [](const auto * h) { return h->visitablePos() == int3(0, 10, 0); });
+	ASSERT_NE(caster, heroes.end());
+	hero = *caster;
+	hero->mana = 200;
+	hero->setMovementPoints(300);
+	const auto towns = findAll<CGTownInstance>();
+	const auto across = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().x == 35; });
+	const auto interior = std::ranges::find_if(towns, [](const auto * town) { return town->anchorPos().x == 9; });
+	ASSERT_NE(across, towns.end());
+	ASSERT_NE(interior, towns.end());
+	ASSERT_NE((*across)->getVisitingHero(), nullptr);
+	ASSERT_TRUE((*across)->setCreature(SlotID(0), CreatureID::ARCHER, 1));
+	ASSERT_EQ((*interior)->getVisitingHero(), nullptr);
+	GameHandlerTestServer server(gameState(), PLAYER);
+	CGameHandler handler(server, gameState());
+	const auto origin = hero->visitablePos();
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "toroidal" : "bounded");
+		map()->setToroidalAndRebuild(toroidal);
+		client = std::make_unique<ScriptedMovementClient>(gameState());
+		callback = makeCallback(PLAYER, client.get());
+		gateway = makeGateway(callback);
+		client->notify(*gateway);
+		const auto paths = withGameStateReadLock([&]
+		{
+			preparePlanning(*gateway);
+			return gateway->nullkiller->pathfinder->getPathInfo((*interior)->visitablePos());
+		});
+		const bool hasPortal = std::ranges::any_of(paths, [&](const auto & path)
+		{
+			return path.targetHero == hero && path.turn() == 0 && std::ranges::any_of(path.nodes, [](const auto & node)
+			{
+				return dynamic_cast<const NK2AI::AIPathfinding::TownPortalAction *>(node.specialAction.get()) != nullptr;
+			});
+		});
+		EXPECT_EQ(hasPortal, !toroidal);
+		handler.castSpell(hero, SpellID(SpellID::decode("core:townPortal")), int3(-1, -1, -1));
+		EXPECT_EQ(hero->visitablePos(), toroidal ? origin : (*interior)->visitablePos());
+		if(!toroidal)
+		{
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(origin), EMovementMode::MONOLITH, false, PlayerColor::NEUTRAL, EPathfindingLayer::LAND));
+			hero->setMovementPoints(300);
+			hero->mana = 200;
+		}
+	}
+}
+
 TEST_F(Nullkiller2_AIGateway, rejectedTownPortalDoesNotLeaveSelectedTownForAnotherDialog)
 {
 	const SpellID spell(SpellID::decode("core:townPortal"));
