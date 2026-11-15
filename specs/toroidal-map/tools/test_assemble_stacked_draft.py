@@ -12,6 +12,20 @@ def obj(name, kind, x, y, level, mask):
 
 
 class StackedDraftTest(unittest.TestCase):
+    def test_guard_can_return_to_same_road_type_but_not_different_overlay(self):
+        source = [obj("building", "arena", 5, 4, 1, ["BBB", "BAB"]),
+                  obj("guard", "monster", 5, 5, 1, ["AV"])]
+        source_rows = [["gr0_"] * 8 for _ in range(8)]
+        source_rows[5][4] = "gr0_pc1_"
+        for terrain, expected in (("gr0_pc2+", 1), ("gr0_pd2+", 0), ("gr0_rw2+", 0)):
+            converted = copy.deepcopy(source)
+            converted[0]["l"] = converted[1]["l"] = 0
+            converted[1]["y"] = 3
+            rows = [["gr0_"] * 8 for _ in range(8)]
+            rows[5][4] = terrain
+            result = repair_south_guards(source, converted, rows, 8, 8, {"arena"}, source_rows)
+            self.assertEqual(len(result["moves"]), expected, terrain)
+
     def test_guard_repair_is_limited_to_explicit_object_types(self):
         source = [obj("building", "arena", 5, 4, 1, ["BBB", "BAB"]),
                   obj("guard", "monster", 5, 5, 1, ["AV"])]

@@ -242,7 +242,7 @@ def repair_mountain_interactions(source, converted, rows, source_width, source_h
     return {"candidates": len(candidates), "moves": moved, "no_clear_placement": skipped}
 
 
-def repair_south_guards(source, converted, rows, source_width, source_height, target_types):
+def repair_south_guards(source, converted, rows, source_width, source_height, target_types, source_rows=None):
     """Restore guards placed inside an upright target after second-level rotation."""
     width, height = len(rows[0]), len(rows)
     original = {obj["instanceName"]: obj for obj in source}
@@ -296,7 +296,15 @@ def repair_south_guards(source, converted, rows, source_width, source_height, ta
             continue
         target = (mine_pos[0], (mine_pos[1] + 1) % height)
         terrain = rows[target[1]][target[0]]
-        if occupied[target] - {guard} or terrain[:2] in ("wt", "rc") or len(list(CELL_PART.finditer(terrain))) != 1:
+        parts = list(CELL_PART.finditer(terrain))
+        overlays_ok = len(parts) == 1
+        source_pos = entrance(original[guard], False)
+        if source_rows is not None and source_pos and 0 <= source_pos[0] < source_width and 0 <= source_pos[1] < source_height:
+            source_parts = list(CELL_PART.finditer(source_rows[source_pos[1]][source_pos[0]]))
+            overlays_ok = (len(parts) > 1 and len(parts) == len(source_parts)
+                           and all(part.group(1).startswith("p") for part in parts[1:])
+                           and [part.group(1) for part in parts] == [part.group(1) for part in source_parts]) or overlays_ok
+        if occupied[target] - {guard} or terrain[:2] in ("wt", "rc") or not overlays_ok:
             skipped.append(guard)
             continue
         before = entrance(g, True)
@@ -308,8 +316,8 @@ def repair_south_guards(source, converted, rows, source_width, source_height, ta
     return {"candidates": len(candidates), "moves": moves, "skipped": skipped}
 
 
-def repair_mine_guards(source, converted, rows, source_width, source_height):
-    return repair_south_guards(source, converted, rows, source_width, source_height, {"mine"})
+def repair_mine_guards(source, converted, rows, source_width, source_height, source_rows=None):
+    return repair_south_guards(source, converted, rows, source_width, source_height, {"mine"}, source_rows)
 
 
 def source_gate_pairs(objects, width, height, toroidal):
@@ -463,10 +471,10 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
     mountain_repair = (repair_mountain_interactions(objects, converted, rows, width, height,
                                                    references if polar else None)
                        if repair_mountains else None)
-    guard_repair = repair_mine_guards(objects, converted, rows, width, height) if repair_guards else None
+    guard_repair = repair_mine_guards(objects, converted, rows, width, height, underground) if repair_guards else None
     other_guards = (repair_south_guards(objects, converted, rows, width, height,
                     {"randomTown", "arena", "creatureGeneratorCommon", "university", "waterWheel",
-                     "libraryOfEnlightenment", "schoolOfWar", "colosseumOfTheMagi", "abandonedMine"})
+                     "libraryOfEnlightenment", "schoolOfWar", "colosseumOfTheMagi", "abandonedMine"}, underground)
                     if repair_other_guards else None)
     if polar is not None:
         for obj in converted:
