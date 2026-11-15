@@ -23,6 +23,7 @@
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGCreature.h"
+#include "../../lib/mapObjects/CGDwelling.h"
 #include "../../lib/mapObjects/CGResource.h"
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/entities/hero/CHero.h"
@@ -47,6 +48,7 @@
 #include "../../lib/serializer/ESerializationVersion.h"
 #include "../../lib/serializer/GameConnection.h"
 #include "../../lib/network/NetworkInterface.h"
+#include "../../lib/networkPacks/PacksForClientBattle.h"
 
 #include "../../lib/VCMIDirs.h"
 #include "../../server/CGameHandler.h"
@@ -59,6 +61,9 @@
 #include "../JsonComparer.h"
 #include "../mock/TinyH3MBuilder.h"
 #include "../mock/ToroidalDemoMap.h"
+
+#include <condition_variable>
+#include <thread>
 
 #ifdef ENABLE_NULLKILLER2_AI
 #include "../../AI/Nullkiller2/AIGateway.h"
@@ -673,11 +678,62 @@ public:
 
 	void applyPack(CPackForClient & pack) override
 	{
+		if(const auto * message = dynamic_cast<const SystemMessage *>(&pack))
+			messages.push_back(message->text.toString(LIBRARY->staticTexts()));
 		if(gateway)
 			if(const auto * removal = dynamic_cast<const RemoveObject *>(&pack))
 				if(const auto * object = state->getObjInstance(removal->objectID))
 					gateway->objectRemoved(object, removal->initiator);
 		GameHandlerTestServer::applyPack(pack);
+		if(gateway && stopAtBattle && dynamic_cast<const BattleStart *>(&pack))
+		{
+			++battleStarts;
+			gateway->nullkiller->makingTurnInterruption.interruptThread();
+		}
+		if(gateway && forwardDialogs)
+		{
+			if(const auto * visit = dynamic_cast<const HeroVisit *>(&pack); visit && visit->player == gateway->playerID)
+			{
+				const auto * hero = state->getHero(visit->heroId);
+				const auto * object = state->getObjInstance(visit->objId);
+				if(hero && (object || !visit->starting))
+				{
+					gateway->heroVisit(hero, object, visit->starting);
+					if(!visit->starting)
+						++completedVisits;
+				}
+			}
+			if(const auto * resolved = dynamic_cast<const QuestionResolved *>(&pack))
+				gateway->questionResolved(resolved->questionID);
+			if(const auto * dialog = dynamic_cast<const BlockingDialog *>(&pack); dialog && dialog->player == gateway->playerID)
+			{
+				++blockingDialogs;
+				gateway->showBlockingDialog(dialog->text.toString(LIBRARY->staticTexts()), dialog->components,
+				                            dialog->questionID, dialog->soundID, dialog->selection(),
+				                            dialog->cancel(), dialog->safeToAutoaccept());
+			}
+			if(const auto * window = dynamic_cast<const OpenWindow *>(&pack))
+			{
+				if(window->window == EOpenWindowMode::RECRUITMENT_FIRST || window->window == EOpenWindowMode::RECRUITMENT_ALL)
+				{
+					const auto * dwelling = dynamic_cast<const CGDwelling *>(state->getObjInstance(window->object));
+					const auto * visitor = dynamic_cast<const CArmedInstance *>(state->getObjInstance(window->visitor));
+					if(dwelling && visitor && visitor->getOwner() == gateway->playerID)
+					{
+						++recruitmentWindows;
+						gateway->showRecruitmentDialog(dwelling, visitor,
+							window->window == EOpenWindowMode::RECRUITMENT_FIRST ? 0 : -1, window->questionID);
+					}
+				}
+			}
+		}
+		if(gateway)
+			if(const auto * created = dynamic_cast<const NewObject *>(&pack))
+			{
+				gateway->invalidatePaths();
+				if(state->isVisibleFor(created->newObject.get(), gateway->playerID))
+					gateway->newObject(created->newObject.get());
+			}
 		if(gateway)
 			if(const auto * movement = dynamic_cast<const TryMoveHero *>(&pack))
 			{
@@ -695,6 +751,13 @@ public:
 
 	NK2AI::AIGateway * gateway = nullptr;
 	std::optional<PackageApplied> response;
+	std::vector<std::string> messages;
+	bool forwardDialogs = false;
+	bool stopAtBattle = false;
+	std::atomic<int> battleStarts{0};
+	int completedVisits = 0;
+	int blockingDialogs = 0;
+	int recruitmentWindows = 0;
 
 private:
 	std::shared_ptr<CGameState> state;
@@ -717,17 +780,37 @@ public:
 
 	int sendRequest(const CPackForServer & request, PlayerColor player, bool) override
 	{
+		std::lock_guard lock(requestMutex);
 		request.player = player;
 		request.requestID = ++requestID;
-		if(dynamic_cast<const MoveHero *>(&request))
+		++requests;
+		const auto * movement = dynamic_cast<const MoveHero *>(&request);
+		const auto * hero = movement ? handler.gameState().getHero(movement->hid) : nullptr;
+		const auto origin = hero ? hero->visitablePos() : int3(-1, -1, -1);
+		const auto intended = hero && !movement->path.empty()
+			? hero->convertToVisitablePos(movement->path.front()) : int3(-1, -1, -1);
+		if(movement)
 			++moves;
+		if(dynamic_cast<const QuestionAnswer *>(&request))
+			gateway->requestSent(&request, requestID);
 		server.response.reset();
+		server.messages.clear();
 		auto copy = CMemorySerializer::deepCopy(request);
 		handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, *copy);
 		if(!server.response || server.response->requestID != requestID)
 			throw std::runtime_error("External inspection AI request was not acknowledged");
-		if(dynamic_cast<const MoveHero *>(&request) && !server.response->result)
+		if(dynamic_cast<const QuestionAnswer *>(&request) && server.response->result)
+			++acceptedAnswers;
+		if(movement && !server.response->result)
+		{
 			++rejectedMoves;
+			std::cout << "Rejected AI movement from " << origin.toString() << ", target "
+			          << intended.toString()
+			          << ", messages=";
+			for(const auto & message : server.messages)
+				std::cout << " [" << message << "]";
+			std::cout << std::endl;
+		}
 		gateway->requestRealized(&*server.response);
 		return requestID;
 	}
@@ -736,16 +819,42 @@ public:
 	{
 		gateway = value;
 		server.gateway = value;
+		server.forwardDialogs = std::getenv("VCMI_INSPECT_AI_AUTONOMOUS") != nullptr;
+		server.stopAtBattle = server.forwardDialogs;
+	}
+
+	struct Result
+	{
+		int requests;
+		int moves;
+		int rejectedMoves;
+		int battles;
+		int completedVisits;
+		int blockingDialogs;
+		int recruitmentWindows;
+		int acceptedAnswers;
+		bool hasActivities;
+	};
+
+	Result result(PlayerColor player)
+	{
+		std::lock_guard lock(requestMutex);
+		return {requests, moves, rejectedMoves, server.battleStarts.load(), server.completedVisits,
+		        server.blockingDialogs, server.recruitmentWindows, acceptedAnswers,
+		        handler.activities->topActivity(player) != nullptr};
 	}
 
 	int moves = 0;
 	int rejectedMoves = 0;
+	int requests = 0;
+	int acceptedAnswers = 0;
 
 private:
 	ExternalInspectionAIServer server;
 	CGameHandler handler;
 	NK2AI::AIGateway * gateway = nullptr;
 	int requestID = 0;
+	std::recursive_mutex requestMutex;
 };
 #endif
 }
@@ -838,7 +947,7 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_TRUE(map.isInTheMap(position));
 		ASSERT_NE(state->getPlayerTeam(player)->fogOfWarMap[position], 0);
 		std::unique_ptr<ExternalInspectionAIClient> client;
-		if(std::getenv("VCMI_INSPECT_AI_EXECUTE"))
+		if(std::getenv("VCMI_INSPECT_AI_EXECUTE") || std::getenv("VCMI_INSPECT_AI_AUTONOMOUS"))
 			client = std::make_unique<ExternalInspectionAIClient>(state, player);
 		auto callback = std::make_shared<CCallback>(state, std::optional<PlayerColor>{player}, client.get());
 		auto gateway = std::make_unique<NK2AI::AIGateway>();
@@ -847,30 +956,74 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			client->notify(gateway.get());
 		std::shared_lock lock(CGameState::mutex);
 		auto & ai = *gateway->nullkiller;
-		ai.heroManager->update();
-		NK2AI::PathfinderSettings settings;
-		settings.useHeroChain = false;
-		settings.useDimensionDoor = false;
-		settings.mainTurnDistanceLimit = 1;
-		settings.scoutTurnDistanceLimit = 1;
-		ai.pathfinder->updatePaths(ai.getHeroesForPathfinding(), settings);
-		const auto paths = ai.pathfinder->getPathInfo(position);
-		const auto found = std::ranges::find_if(paths, [&](const auto & path)
+		if(std::getenv("VCMI_INSPECT_AI_AUTONOMOUS"))
 		{
-			return path.targetHero && path.targetHero->getOwner() == player && !path.nodes.empty() && path.turn() == 0;
-		});
-		ASSERT_NE(found, paths.end()) << values[1];
-		std::cout << "Nullkiller planned visible resource " << values[1] << " for player "
-		          << player.getNum() << ", path nodes=" << found->nodes.size() << std::endl;
-		if(client)
+			ASSERT_NE(client, nullptr);
+			std::atomic<bool> timedOut{false};
+			std::jthread watchdog([&](std::stop_token stop)
+			{
+				std::mutex mutex;
+				std::condition_variable_any wake;
+				std::unique_lock guard(mutex);
+				wake.wait_for(guard, stop, std::chrono::seconds(15), [] { return false; });
+				if(!stop.stop_requested())
+				{
+					timedOut = true;
+					ai.makingTurnInterruption.interruptThread();
+				}
+			});
+			bool interrupted = false;
+			try { ai.makeTurn(); }
+			catch(const InterruptionRequestedException &) { interrupted = true; }
+			watchdog.request_stop();
+			watchdog.join();
+			const auto result = client->result(player);
+			EXPECT_FALSE(timedOut) << "Autonomous AI did not finish or reach a battle within 15 seconds";
+			EXPECT_GT(result.moves, 0);
+			EXPECT_EQ(result.rejectedMoves, 0);
+			EXPECT_LE(result.battles, 1);
+			EXPECT_EQ(interrupted, result.battles == 1);
+			if(result.battles == 0)
+			{
+				EXPECT_FALSE(result.hasActivities);
+				EXPECT_EQ(gateway->status.getQuestionsCount(), 0);
+				EXPECT_EQ(gateway->status.getCurrentVisitedObject(), ObjectInstanceID::NONE);
+			}
+			std::cout << "Nullkiller autonomous planning: requests=" << result.requests
+			          << ", movement requests=" << result.moves << ", rejected=" << result.rejectedMoves
+			          << ", battles=" << result.battles << ", completed visits=" << result.completedVisits
+			          << ", blocking dialogs=" << result.blockingDialogs
+			          << ", recruitment windows=" << result.recruitmentWindows
+			          << ", accepted answers=" << result.acceptedAnswers << std::endl;
+			return;
+		}
+		else
 		{
-			ASSERT_GT(amount, 0u);
-			EXPECT_NO_THROW(NK2AI::Goals::ExecuteHeroChain(*found).accept(gateway.get()));
-			EXPECT_GT(client->moves, 0);
-			EXPECT_EQ(client->rejectedMoves, 0);
-			EXPECT_EQ(map.getObject(objectID), nullptr);
-			EXPECT_EQ(state->players.at(player).resources[resourceID], before + amount);
-			std::cout << "Nullkiller executed resource plan in " << client->moves << " movement requests" << std::endl;
+			ai.heroManager->update();
+			NK2AI::PathfinderSettings settings;
+			settings.useHeroChain = false;
+			settings.useDimensionDoor = false;
+			settings.mainTurnDistanceLimit = 1;
+			settings.scoutTurnDistanceLimit = 1;
+			ai.pathfinder->updatePaths(ai.getHeroesForPathfinding(), settings);
+			const auto paths = ai.pathfinder->getPathInfo(position);
+			const auto found = std::ranges::find_if(paths, [&](const auto & path)
+			{
+				return path.targetHero && path.targetHero->getOwner() == player && !path.nodes.empty() && path.turn() == 0;
+			});
+			ASSERT_NE(found, paths.end()) << values[1];
+			std::cout << "Nullkiller planned visible resource " << values[1] << " for player "
+			          << player.getNum() << ", path nodes=" << found->nodes.size() << std::endl;
+			if(client)
+			{
+				ASSERT_GT(amount, 0u);
+				EXPECT_NO_THROW(NK2AI::Goals::ExecuteHeroChain(*found).accept(gateway.get()));
+				EXPECT_GT(client->moves, 0);
+				EXPECT_EQ(client->rejectedMoves, 0);
+				EXPECT_EQ(map.getObject(objectID), nullptr);
+				EXPECT_EQ(state->players.at(player).resources[resourceID], before + amount);
+				std::cout << "Nullkiller executed resource plan in " << client->moves << " movement requests" << std::endl;
+			}
 		}
 	}
 #endif
