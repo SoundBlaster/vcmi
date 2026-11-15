@@ -110,6 +110,10 @@ The same server fixture now also exercises Nullkiller2 plans using active
 Water Walk and Flight bonuses across all seam directions and both levels,
 ending on land. See the [transient movement record](evidence/nullkiller-transient-seam-2026-11-15.md)
 for its limits; spell casting and autonomous route choice are not covered.
+After six test-driven server steps across a seam, the same record checks an
+unsafe seventh step is rejected and the AI gateway returns to the island for
+both abilities and levels. Its rejection of a water destination is not by
+itself a test of route-safety filtering.
 
 The later [preview run](evidence/topology-preview-eeb3540-2026-11-15.md)
 completed two Nullkiller2 turns with crossings on both axes, then reloaded an
