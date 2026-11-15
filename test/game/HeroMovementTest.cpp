@@ -333,7 +333,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 
 	const PlayerColor red(0), blue(1);
 	auto mapBuilder = TinyH3M::TinyH3MBuilder(EMapFormat::SOD)
-		.size(36, false).name("Toroid TCP Lobby")
+		.size(36, true).name("Toroid TCP Lobby")
 		.playerActive(red).playerActive(blue)
 		.playerMainTown(red, int3(8, 8, 0), false)
 		.playerMainTown(blue, int3(27, 27, 0), false)
@@ -341,6 +341,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		.town(int3(27, 27, 0), FactionID(0), blue)
 		.hero(int3(1, 0, 0), HeroTypeID(0), red)
 		.hero(int3(1, 5, 0), HeroTypeID(1), blue)
+		.hero(int3(1, 0, 1), HeroTypeID(2), blue)
 		.terrain(int3(35, 4, 0), TerrainId::ROCK)
 		.resource(int3(35, 35, 0), GameResID::GOLD, 10);
 	for(int x = 0; x <= 2; ++x)
@@ -530,6 +531,24 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(server.gh->gameState().actingPlayers.contains(red));
 	ASSERT_TRUE(host.state->actingPlayers.contains(red));
 	ASSERT_TRUE(guest.state->actingPlayers.contains(red));
+	// Keep distinct underground visibility for each team through movement,
+	// disk save, lobby reload and subsequent network packets.
+	const int3 redUnderground(10, 10, 1), blueUnderground(20, 20, 1);
+	ASSERT_FALSE(server.gh->gameState().isVisibleFor(redUnderground, red));
+	ASSERT_FALSE(server.gh->gameState().isVisibleFor(blueUnderground, blue));
+	server.gh->changeFogOfWar(FowTilesType{redUnderground}, red, ETileVisibility::REVEALED);
+	server.gh->changeFogOfWar(FowTilesType{blueUnderground}, blue, ETileVisibility::REVEALED);
+	pumpUntil([&] {
+		return host.state->isVisibleFor(redUnderground, red) && guest.state->isVisibleFor(redUnderground, red)
+			&& host.state->isVisibleFor(blueUnderground, blue) && guest.state->isVisibleFor(blueUnderground, blue);
+	});
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_TRUE(peer->state->isVisibleFor(redUnderground, red));
+		ASSERT_TRUE(peer->state->isVisibleFor(blueUnderground, blue));
+		EXPECT_FALSE(peer->state->isVisibleFor(blueUnderground, red));
+		EXPECT_FALSE(peer->state->isVisibleFor(redUnderground, blue));
+	}
 	const auto heroes = server.gh->gameState().getHeroes(red);
 	ASSERT_EQ(heroes.size(), 1);
 	const auto * hero = heroes.front();
@@ -774,17 +793,23 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(host.state->actingPlayers.contains(blue));
 	ASSERT_TRUE(guest.state->actingPlayers.contains(blue));
 	const auto blueHeroes = server.gh->gameState().getHeroes(blue);
-	ASSERT_EQ(blueHeroes.size(), 1);
-	const auto * blueHero = blueHeroes.front();
+	ASSERT_EQ(blueHeroes.size(), 2);
+	const auto surfaceBlue = std::ranges::find_if(blueHeroes, [](const auto * h) { return h->visitablePos() == int3(0, 5, 0); });
+	const auto undergroundBlue = std::ranges::find_if(blueHeroes, [](const auto * h) { return h->visitablePos() == int3(0, 0, 1); });
+	ASSERT_NE(surfaceBlue, blueHeroes.end());
+	ASSERT_NE(undergroundBlue, blueHeroes.end());
+	const auto * blueHero = *surfaceBlue;
+	const auto undergroundBlueID = (*undergroundBlue)->id;
 	ASSERT_EQ(blueHero->visitablePos(), int3(0, 5, 0));
 	const auto blueMovementBefore = blueHero->movementPointsRemaining();
 	const auto visibility = [&](const CGameState & state)
 	{
 		std::vector<bool> result;
 		for(const PlayerColor player : {red, blue})
-			for(int x = 0; x < 36; ++x)
-				for(int y = 0; y < 36; ++y)
-					result.push_back(state.isVisibleFor(int3(x, y, 0), player));
+			for(int z = 0; z < 2; ++z)
+				for(int x = 0; x < 36; ++x)
+					for(int y = 0; y < 36; ++y)
+						result.push_back(state.isVisibleFor(int3(x, y, z), player));
 		return result;
 	};
 	const auto serverFog = visibility(server.gh->gameState());
@@ -1116,6 +1141,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	const auto savedBluePosition = server.gh->gameState().getHero(blueHeroID)->visitablePos();
 	const auto savedRedPoints = server.gh->gameState().getHero(redHeroID)->movementPointsRemaining();
 	const auto savedBluePoints = server.gh->gameState().getHero(blueHeroID)->movementPointsRemaining();
+	const auto savedUndergroundPosition = server.gh->gameState().getHero(undergroundBlueID)->visitablePos();
+	const auto savedUndergroundPoints = server.gh->gameState().getHero(undergroundBlueID)->movementPointsRemaining();
 	const auto savedFog = visibility(server.gh->gameState());
 	ASSERT_EQ(visibility(*host.state), savedFog);
 	ASSERT_EQ(visibility(*guest.state), savedFog);
@@ -1187,12 +1214,16 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(redHeroID)->movementPointsRemaining(), savedRedPoints);
 		EXPECT_EQ(peer->state->getHero(blueHeroID)->visitablePos(), savedBluePosition);
 		EXPECT_EQ(peer->state->getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
+		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->visitablePos(), savedUndergroundPosition);
+		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->movementPointsRemaining(), savedUndergroundPoints);
 		EXPECT_EQ(visibility(*peer->state), savedFog);
 	}
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(redHeroID)->visitablePos(), savedRedPosition);
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(redHeroID)->movementPointsRemaining(), savedRedPoints);
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(blueHeroID)->visitablePos(), savedBluePosition);
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(undergroundBlueID)->visitablePos(), savedUndergroundPosition);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(undergroundBlueID)->movementPointsRemaining(), savedUndergroundPoints);
 	ASSERT_EQ(visibility(reloadedServer.gh->gameState()), savedFog);
 	ASSERT_TRUE(reloadedServer.gh->gameState().actingPlayers.contains(blue));
 	if(const auto activity = reloadedServer.gh->activities->topActivity(blue))
@@ -1226,6 +1257,36 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	{
 		EXPECT_EQ(peer->state->getHero(blueHeroID)->visitablePos(), resumedDestination);
 		EXPECT_EQ(peer->state->getHero(blueHeroID)->movementPointsRemaining(), reloadedServer.gh->gameState().getHero(blueHeroID)->movementPointsRemaining());
+		EXPECT_EQ(visibility(*peer->state), visibility(reloadedServer.gh->gameState()));
+	}
+	const auto * resumedUnderground = reloadedServer.gh->gameState().getHero(undergroundBlueID);
+	ASSERT_NE(resumedUnderground, nullptr);
+	ASSERT_EQ(resumedUnderground->visitablePos(), int3(0, 0, 1));
+	const auto fogBeforeUndergroundMove = visibility(reloadedServer.gh->gameState());
+	const int3 undergroundDestination(35, 35, 1);
+	MoveHero undergroundMove({resumedUnderground->convertFromVisitablePos(undergroundDestination)}, EPathfindingLayer::LAND, undergroundBlueID, false);
+	undergroundMove.player = blue;
+	undergroundMove.requestID = 43;
+	reloadGuest.codec->sendPack(undergroundMove);
+	pumpReload([&] {
+		return reloadGuest.results.contains(43)
+			&& reloadHost.state->getHero(undergroundBlueID)->visitablePos() == undergroundDestination
+			&& reloadGuest.state->getHero(undergroundBlueID)->visitablePos() == undergroundDestination;
+	});
+	ASSERT_TRUE(reloadGuest.results.contains(43)) << reloadGuest.failure;
+	ASSERT_TRUE(reloadGuest.results.at(43)) << testing::PrintToString(reloadGuest.systemMessages);
+	const auto * movedUnderground = reloadedServer.gh->gameState().getHero(undergroundBlueID);
+	ASSERT_NE(movedUnderground, nullptr);
+	ASSERT_EQ(movedUnderground->visitablePos(), undergroundDestination);
+	EXPECT_LT(movedUnderground->movementPointsRemaining(), savedUndergroundPoints);
+	const auto fogAfterUndergroundMove = visibility(reloadedServer.gh->gameState());
+	constexpr auto cellsPerLevel = 36 * 36;
+	// Red's two levels and blue's surface precede blue's underground cells.
+	EXPECT_TRUE(std::equal(fogBeforeUndergroundMove.begin(), fogBeforeUndergroundMove.begin() + 3 * cellsPerLevel, fogAfterUndergroundMove.begin()));
+	for(const LobbyPeer * peer : {&reloadHost, &reloadGuest})
+	{
+		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->visitablePos(), undergroundDestination);
+		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->movementPointsRemaining(), movedUnderground->movementPointsRemaining());
 		EXPECT_EQ(visibility(*peer->state), visibility(reloadedServer.gh->gameState()));
 	}
 }
