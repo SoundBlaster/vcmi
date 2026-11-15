@@ -107,3 +107,15 @@ The game refreshed the user's mod-validation checksums. Its original mod
 settings were reconstructed from the pre-load log, checked against the
 pre-run SHA-256, and restored after the process exited; the game settings
 file remained unchanged. The binary emitted the existing linker warnings.
+
+After the bounded rectangular Grail fix, the client and server were rebuilt
+from `85dcfb7` and the seed-3 Crossroads headless run repeated. Orrin again
+crossed the edge successfully and red won on day 60; the client and its
+in-process server exited normally. The shared engine library SHA-256 was
+`88118efff19c47f7f6853919d7573cb170176ddc066d7faf6a2e91ac9c285411`.
+The logs and summary are in
+`runtime/crossroads-current-85dcfb7-2026-11-15/` on TB5. The client
+refreshed mod-validation checksums; only those changes were restored from a
+pre-run backup after confirming the remaining settings had not changed. The
+game settings retained their prior hash. This run did not launch the separate
+server executable or establish graphical behavior.
