@@ -70,12 +70,8 @@ def seam_summary(rows, join_index=None):
     }
 
 
-def polarize_snow_island(rows, seed):
-    """Move one isolated snow component to new bands around the vertical seam.
-
-    This operates only on a terrain-color preview. It does not move objects,
-    roads, rivers, events or terrain artwork and is not an authoring operation.
-    """
+def snow_component(rows, seed):
+    """Find a planar, 4-connected snow component that stays inside the preview."""
     width, height = len(rows[0]), len(rows)
     sx, sy = seed
     if not (0 <= sx < width and 0 <= sy < height) or rows[sy][sx][:2] != "sn":
@@ -92,6 +88,17 @@ def polarize_snow_island(rows, seed):
                 todo.append((nx, ny))
     if any(x == 0 or y == 0 or x == width - 1 or y == height - 1 for x, y in component):
         raise ValueError("Polar snow component must not touch the preview boundary")
+    return component
+
+
+def polarize_snow_island(rows, seed):
+    """Move one isolated snow component to new bands around the vertical seam.
+
+    This operates only on a terrain-color preview. It does not move objects,
+    roads, rivers, events or terrain artwork and is not an authoring operation.
+    """
+    width = len(rows[0])
+    component = snow_component(rows, seed)
     min_x = min(x for x, _ in component)
     max_x = max(x for x, _ in component)
     min_y = min(y for _, y in component)
