@@ -181,3 +181,24 @@ assembled. The newly drawn Greenland has no objects. Replacing rock in the
 picture likewise does not establish that changing those terrain cells is safe
 for objects or gameplay. Fourteen Python geometry, preview and analysis tests
 passed; they check the tools, not in-game appearance or playability.
+
+## Projection reference
+
+The user identified [Jason Davies' Map Projection Transitions](https://www.jasondavies.com/maps/transition/)
+as a visual reference: a rotated equirectangular view can bring a geographic
+pole into the interior and arrange landmasses around it, resembling the
+proposed layout. The page animates between projections and orientations, so
+the user's screenshot is a reference to a particular appearance, not a
+record of exact rotation parameters. An oblique equirectangular projection
+is an established variant of the projection; see [NASA's projection list](https://www.giss.nasa.gov/tools/gprojector/help/projections/).
+
+This does not make Earth's spherical topology toroidal: in a full-sphere
+equirectangular representation, opposite ends of the projection's longitude
+axis identify a meridian, while the two other edges represent distinct
+projection poles. Joining those edges tile-for-tile is an intentional game
+world alteration and needs separately designed terrain and traversability.
+The candidate source map is hand-authored and split across two levels; it is
+not established to have geographic coordinates suitable for automatic
+reprojection. Transferring its objects, roads, events and references still
+requires map-aware transformations and validation. The current sketch is not
+calculated using the reference projection.
