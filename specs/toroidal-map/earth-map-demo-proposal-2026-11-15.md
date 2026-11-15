@@ -470,3 +470,34 @@ tile and moved there in each of three in-process runs on the map identified
 above. The observed number of reachable neighboring tiles was between two
 and seven. This checks one short move per player, not longer routes, fog
 behavior, player-facing controls, balance, or overall scenario playability.
+
+### Diagnostic mod requirements
+
+The initialized draft's object handlers came from `core` and twelve HotA
+scopes; terrain came from `core`, `hota.highlandsterrain` (7,291 tiles), and
+`hota.wastelandterrain` (986). A separate scan of serialized header and
+objects found references to `hota.heroes` and `hota.interference` as well.
+Together with the root `hota` scope, these form a candidate list of 15
+required mods. This is a conservative inventory of observed identifiers and
+handlers, not proof that every asset or indirect dependency has been found,
+nor that each listed mod is strictly necessary for every game configuration.
+
+The assembler accepts repeated `--require-mod MOD_ID` arguments and adds
+unversioned identifiers in the legacy-compatible `mods.allOf` form. It
+preserves existing requirements and rejects conversion of modern versioned
+metadata instead of silently discarding versions. The local
+`draft-stacked/earth-required-mods-diagnostic.vmap` has SHA-256
+`480972015e1de5df54547c743451b0b19ffa00f95eb550efa6fcb54932ce87f4`;
+its archive members match the preceding mountain-repair draft byte for byte,
+except for the header's `mods` field. It remains local pending source-map
+licensing and playability review.
+
+In the isolated HotA profile, VCMI's header compatibility check reported
+15 declared mods and none missing; full initialization and eight initial
+server moves also passed. With the regular test preset, which has no HotA,
+the same header check reported all 15 missing. A VMAP save/reload retained
+the mod identifiers and their unversioned status, as well as the checked
+object positions, terrain and artwork. The 33 focused Python tests passed.
+These checks exercise the engine API, not the graphical launcher's display.
+Because the requirements are unversioned, they do not enforce compatibility
+with a particular HotA release.
