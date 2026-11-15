@@ -2,7 +2,7 @@ import copy
 import unittest
 
 from assemble_stacked_draft import (assemble, blocking_pairs, place_object, relocate_decorations, replace_gate_pairs,
-                                    rotate_cell_art, source_gate_pairs)
+                                    repair_mountain_interactions, rotate_cell_art, source_gate_pairs)
 
 
 def obj(name, kind, x, y, level, mask):
@@ -180,6 +180,44 @@ class StackedDraftTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "No clear dry placement"):
             relocate_decorations([mountain], rows, ["isolated"], max_distance=2)
         self.assertEqual((mountain["x"], mountain["y"]), (1, 1))
+
+    def test_repair_moves_only_new_mountain_interactions(self):
+        source = [obj("mountain", "mountain", 1, 1, 0, ["B"]),
+                  obj("portal", "monolithTwoWay", 3, 3, 0, ["A"])]
+        converted = copy.deepcopy(source)
+        converted[0].update(x=3, y=3)
+        rows = [["gr0_"] * 7 for _ in range(14)]
+        report = repair_mountain_interactions(source, converted, rows, 7, 7)
+        self.assertEqual(report["candidates"], 1)
+        self.assertEqual(len(report["moves"]), 1)
+        self.assertEqual(report["no_clear_placement"], [])
+        self.assertFalse(blocking_pairs(converted, 7, 14)[0])
+        self.assertEqual((converted[1]["x"], converted[1]["y"]), (3, 3))
+        # Original gameplay overlaps are deliberately left alone.
+        source[0].update(x=3, y=3)
+        converted = copy.deepcopy(source)
+        report = repair_mountain_interactions(source, converted, rows, 7, 7)
+        self.assertEqual(report["candidates"], 0)
+        self.assertEqual((converted[0]["x"], converted[0]["y"]), (3, 3))
+
+    def test_repair_reports_when_no_safe_mountain_placement_exists(self):
+        source = [obj("mountain", "mountain", 1, 1, 0, ["B"]),
+                  obj("portal", "monolithTwoWay", 2, 2, 0, ["A"])]
+        converted = copy.deepcopy(source)
+        converted[0].update(x=2, y=2)
+        report = repair_mountain_interactions(source, converted, [["wt0_"] * 4 for _ in range(8)], 4, 4)
+        self.assertEqual(report["no_clear_placement"], ["mountain"])
+        self.assertEqual((converted[0]["x"], converted[0]["y"]), (2, 2))
+
+    def test_repair_detects_new_interactive_overlap_between_previously_touching_objects(self):
+        source = [obj("mountain", "mountain", 2, 2, 0, ["B"]),
+                  obj("portal", "monolithTwoWay", 2, 2, 0, ["AB"])]
+        converted = copy.deepcopy(source)
+        converted[0]["x"] = 1
+        report = repair_mountain_interactions(source, converted, [["gr0_"] * 6 for _ in range(12)], 6, 6)
+        self.assertEqual(report["candidates"], 1)
+        self.assertEqual(len(report["moves"]), 1)
+        self.assertFalse(blocking_pairs(converted, 6, 12)[0])
 
 
 if __name__ == "__main__":

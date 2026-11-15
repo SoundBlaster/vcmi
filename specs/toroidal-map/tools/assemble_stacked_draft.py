@@ -24,6 +24,10 @@ CELL_PART = re.compile(r"([A-Za-z0-9]{2})([0-9]+)([_+|\-])")
 ROTATED_FLIP = {"_": "+", "+": "_", "-": "|", "|": "-"}
 
 
+class NoClearPlacement(ValueError):
+    pass
+
+
 def rotate_cell_art(cell):
     """Rotate serialized tile artwork 180 degrees, including its overlays.
 
@@ -160,7 +164,7 @@ def changed_cells(before, after):
     return {(x, y) for y, row in enumerate(before) for x, cell in enumerate(row) if cell != after[y][x]}
 
 
-def relocate_decorations(objects, rows, names, max_distance=16):
+def relocate_decorations(objects, rows, names, max_distance=16, polar_references=None):
     """Move selected plain mountains to the nearest unoccupied dry cells."""
     width, height = len(rows[0]), len(rows)
     by_name = {obj["instanceName"]: obj for obj in objects}
@@ -200,10 +204,14 @@ def relocate_decorations(objects, rows, names, max_distance=16):
             if any(rows[cy][cx][:2] in ("wt", "rc") or len(list(CELL_PART.finditer(rows[cy][cx]))) != 1
                    for cx, cy in cells):
                 continue
+            if polar_references and name in polar_references:
+                _, _, ref_dx, ref_dy, _ = polar_references[name]
+                if rows[(y - ref_dy) % height][(x - ref_dx) % width][:2] != "sn":
+                    continue
             selected = x, y, cells
             break
         if selected is None:
-            raise ValueError(f"No clear dry placement for {name!r} within {max_distance} cells")
+            raise NoClearPlacement(f"No clear dry placement for {name!r} within {max_distance} cells")
         x, y, cells = selected
         for cell in footprint(obj, old_x, old_y):
             occupied[cell].discard(name)
@@ -212,6 +220,26 @@ def relocate_decorations(objects, rows, names, max_distance=16):
             occupied[cell].add(name)
         report.append({"object": name, "from": [old_x, old_y], "to": [x, y]})
     return report
+
+
+def repair_mountain_interactions(source, converted, rows, source_width, source_height, polar_references=None):
+    """Propose bounded mountain moves for new interactive footprint overlaps."""
+    _, old_interactions, _ = occupants(source, source_width, source_height, False)
+    old_interaction_pairs = {tuple(sorted((first[0], second[0]))) for _, first, second in old_interactions}
+    prior_interactive = {entry[0] for _, first, second in old_interactions for entry in (first, second)}
+    _, interactions = blocking_pairs(converted, len(rows[0]), len(rows))
+    by_name = {obj["instanceName"]: obj for obj in converted}
+    candidates = sorted({name for pair in interactions if pair not in old_interaction_pairs for name in pair
+                         if by_name[name]["type"] == "mountain" and name not in prior_interactive
+                         and not by_name[name].get("options")
+                         and not any(kind in "AT" for line in by_name[name]["template"]["mask"] for kind in line)})
+    moved, skipped = [], []
+    for name in candidates:
+        try:
+            moved.extend(relocate_decorations(converted, rows, [name], polar_references=polar_references))
+        except NoClearPlacement:
+            skipped.append(name)
+    return {"candidates": len(candidates), "moves": moved, "no_clear_placement": skipped}
 
 
 def source_gate_pairs(objects, width, height, toroidal):
@@ -293,7 +321,7 @@ def nested_positions(value, path=()):
 
 
 def assemble(header, surface, underground, objects, fragment_seed=None, polar_seed=None,
-             oceanize=False, snow_island=None, gate_pairs=(), relocate=()):
+             oceanize=False, snow_island=None, gate_pairs=(), relocate=(), repair_mountains=False):
     levels = sorted(header["mapLevels"].values(), key=lambda level: level["index"])
     if len(levels) != 2 or [level["index"] for level in levels] != [0, 1]:
         raise ValueError("Expected exactly two indexed levels")
@@ -360,7 +388,10 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
             raise ValueError("Illustrative snow island overlaps objects requiring manual handling")
         greenland = {"cells": island_count, "center": list(snow_island), "objects": 0}
         rows = island_rows
-    relocated = relocate_decorations(converted, rows, relocate)
+    relocated = relocate_decorations(converted, rows, relocate, polar_references=references if polar else None)
+    mountain_repair = (repair_mountain_interactions(objects, converted, rows, width, height,
+                                                   references if polar else None)
+                       if repair_mountains else None)
     if polar is not None:
         for obj in converted:
             reference = references.get(obj["instanceName"])
@@ -390,7 +421,9 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
                                            "layer": "core:surface", "width": width}}
     new_header["versionMajor"] = TAGGED_TOROIDAL_VERSION
     new_header["topology"] = "toroidal"
-    original, _, clipped = occupants(objects, width, height, False)
+    original, original_interactions, clipped = occupants(objects, width, height, False)
+    original_interaction_pairs = {tuple(sorted((first[0], second[0])))
+                                  for _, first, second in original_interactions}
     assembled, interactions = blocking_pairs(converted, width, len(rows))
     new = assembled - original
     return new_header, rows, converted, {
@@ -399,7 +432,7 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
                                       for obj in objects),
         "source_clipped_blocking_cells": clipped,
         "new_blocking_pairs_estimate": len(new),
-        "new_interaction_occurrences_estimate": sum(pair in new for pair in interactions),
+        "new_interaction_occurrences_estimate": sum(pair not in original_interaction_pairs for pair in interactions),
         "east_fragment": fragment,
         "east_fragment_objects_moved": len(moved),
         "polar_component": polar,
@@ -408,6 +441,7 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
         "subterranean_gates": sum(obj["type"] == "subterraneanGate" for obj in converted),
         "replacement_gate_pairs": replaced_gates,
         "relocated_decorations": relocated,
+        "automatic_mountain_repair": mountain_repair,
         "limitations": ["diagnostic draft only", "object and interaction overlaps unresolved",
                         "road artwork and movement costs unverified",
                         "required mods not assessed"]
@@ -419,7 +453,8 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
                        + (["new snow island is schematic and has no objects"] if greenland is not None else [])
                        + (["remaining subterranean gates are unpaired"]
                           if any(obj["type"] == "subterraneanGate" for obj in converted) else [])
-                       + (["replacement monolith behavior differs from subterranean gates"] if replaced_gates else []),
+                       + (["replacement monolith behavior differs from subterranean gates"] if replaced_gates else [])
+                       + (["automatic mountain moves may alter routes and need review"] if mountain_repair else []),
     }
 
 
@@ -439,6 +474,8 @@ def main():
                         help="Replace a verified original gate pair with an unused two-way monolith subtype")
     parser.add_argument("--relocate-mountain", action="append", default=[], metavar="INSTANCE",
                         help="Move a selected plain mountain to nearby unoccupied dry terrain")
+    parser.add_argument("--repair-mountain-interactions", action="store_true",
+                        help="Try to move mountains that newly overlap interactive cells")
     args = parser.parse_args()
     with zipfile.ZipFile(args.source) as archive:
         expected = {"header.json", "surface_terrain.json", "underground_terrain.json", "objects.json"}
@@ -449,7 +486,8 @@ def main():
             load_json(archive, "header.json"), load_json(archive, "surface_terrain.json"),
             load_json(archive, "underground_terrain.json"), load_json(archive, "objects.json"),
             args.rejoin_east_fragment, args.polar_seed, args.oceanize_edge_rock,
-            args.illustrative_snow_island, args.gate_pair or (), args.relocate_mountain)
+            args.illustrative_snow_island, args.gate_pair or (), args.relocate_mountain,
+            args.repair_mountain_interactions)
     with zipfile.ZipFile(args.output, "x", compression=zipfile.ZIP_DEFLATED) as output:
         for name, data in extras.items():
             output.writestr(name, data)
