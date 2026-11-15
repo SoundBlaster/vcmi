@@ -71,3 +71,28 @@ plus the tests committed in `9a94d67`. Reports are
 `runtime/ai-cast-transit-negative-2026-11-15.{log,xml}` under the TB5 build
 root. The run does not cover autonomous goal selection, other effects or
 obstacles, undiscovered landing tiles, interruptions, remote clients or GUI.
+
+## Autonomous planning turn for a visible resource
+
+`ToroidalAITransientSafetyTest.FullTurnCastsToCollectVisibleGoldAcrossSeam`
+runs `Nullkiller::makeTurn()` with a spell-equipped hero on a small island and
+a visible pile of gold on land across the west seam. A water tile separates
+the island from the opposite shore. The AI itself chooses its task, plans and
+casts Flight or Water Walk, crosses using the corresponding transient layer,
+and collects the gold. The test checks the server's acknowledgement, a
+successful seam movement, resource removal, the 1,000-gold increase and the
+hero's final LAND layer. It covers both spells on each of the two map levels.
+
+The in-process server applies real serialized requests to a shared game state.
+The adapter forwards movement and object-removal notifications to Nullkiller,
+and supplies the server's request acknowledgements. It does not reproduce
+every client callback or independent network replica. `Nullkiller::makeTurn()`
+is the AI planning and action loop; the test does not exercise the outer
+network turn handoff. All tiles are revealed, and no battle or GUI is involved.
+
+All four new scenarios passed alongside the earlier AI seam tests and related
+turn tests: 139 tests in four suites on macOS arm64. The binary was built from
+`1ebc19a` plus the test in `0462b36`; reports are
+`runtime/ai-full-turn-transit-related-2026-11-15.{log,xml}` under the TB5 build
+root. This result does not establish autonomous spell use in other directions,
+under fog, with an interrupted landing, or in a remote or graphical session.
