@@ -17,9 +17,11 @@
 
 #include "lib/gameState/CGameState.h"
 #include "lib/CPlayerState.h"
+#include "lib/bonuses/Bonus.h"
 #include "lib/mapObjects/CGHeroInstance.h"
 #include "lib/mapObjects/CGResource.h"
 #include "lib/mapObjects/MiscObjects.h"
+#include "lib/mapping/MapTopology.h"
 #include "lib/networkPacks/PacksForServer.h"
 
 namespace
@@ -38,13 +40,18 @@ public:
 
 	int sendRequest(const CPackForServer & request, PlayerColor player, bool waitTillRealize) override
 	{
-		if(dynamic_cast<const MoveHero *>(&request))
+		if(const auto * move = dynamic_cast<const MoveHero *>(&request))
+		{
 			++movementRequests;
+			for(const auto & destination : move->path)
+				moves.emplace_back(destination, move->layer);
+		}
 
 		return GameHandlerTestClient::sendRequest(request, player, waitTillRealize);
 	}
 
 	int movementRequests = 0;
+	std::vector<std::pair<int3, EPathfindingLayer>> moves;
 };
 
 class ExecuteHeroChainMovementTest : public NullkillerTest
@@ -78,6 +85,53 @@ protected:
 		const int z = GetParam() / directions.size();
 		return {int3(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z),
 			int3(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z)};
+	}
+
+	void executeTransitToShore(BonusType ability, EPathfindingLayer transitLayer)
+	{
+		const auto [start, water] = seamPositions();
+		const MapTopology topology(36, 36, 2, true);
+		const auto direction = topology.displacement(start, water);
+		const auto shore = *topology.canonicalize(water + direction);
+		TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+		builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
+			.hero(int3(19, 18, 0), HeroTypeID(0), PLAYER)
+			.heroGarrison({{CreatureID(0), 1}})
+			.hero(int3(20, 20, 0), HeroTypeID(1), ENEMY);
+		for(int x = 0; x < 36; ++x)
+			for(int y = 0; y < 36; ++y)
+			{
+				const int3 position(x, y, start.z);
+				if(position != start && position != shore && position != int3(18, 18, 0) && position != int3(19, 20, 0))
+					builder.terrain(position, TerrainId::WATER);
+			}
+		startWithMap(std::move(builder));
+		map()->setToroidalAndRebuild(true);
+		revealMap(PLAYER);
+		auto * hero = findHeroByOwner(PLAYER);
+		ASSERT_NE(hero, nullptr);
+		map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
+		ASSERT_EQ(hero->visitablePos(), start);
+		hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, ability, BonusSource::OTHER, 0, BonusSourceID()));
+		hero->setMovementPoints(2000);
+		MoveCountingClient client(gameState(), PLAYER);
+		auto gateway = makeGateway(PLAYER, &client);
+		const auto paths = withGameStateReadLock([&]
+		{
+			preparePlanning(*gateway);
+			return gateway->nullkiller->pathfinder->getPathInfo(shore);
+		});
+		const auto path = std::ranges::find_if(paths, [&](const auto & candidate)
+		{
+			return candidate.targetHero == hero && !candidate.nodes.empty() && candidate.turn() == 0;
+		});
+		ASSERT_NE(path, paths.end());
+		EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(*path).accept(gateway.get()); }));
+		EXPECT_EQ(hero->visitablePos(), shore);
+		EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+		EXPECT_GE(client.movementRequests, 2);
+		EXPECT_NE(std::ranges::find(client.moves, std::pair(hero->convertFromVisitablePos(water), transitLayer)), client.moves.end());
+		EXPECT_LT(hero->movementPointsRemaining(), 2000);
 	}
 };
 }
@@ -189,6 +243,16 @@ TEST_P(ToroidalHeroChainTest, plannedMovementUsesRealServer)
 	EXPECT_EQ(client.movementRequests, 1);
 	EXPECT_EQ(hero->visitablePos(), destination);
 	EXPECT_LT(hero->movementPointsRemaining(), 2000);
+}
+
+TEST_P(ToroidalHeroChainTest, plannedWaterWalkCrossesSeamAndLands)
+{
+	executeTransitToShore(BonusType::WATER_WALKING, EPathfindingLayer::WATER);
+}
+
+TEST_P(ToroidalHeroChainTest, plannedFlightCrossesSeamAndLands)
+{
+	executeTransitToShore(BonusType::FLYING_MOVEMENT, EPathfindingLayer::AIR);
 }
 
 INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalHeroChainTest, ::testing::Range(0, 16));
