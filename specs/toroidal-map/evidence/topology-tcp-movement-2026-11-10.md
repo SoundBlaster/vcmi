@@ -164,3 +164,27 @@ build root. The client listeners, lobby configuration and servers remain in
 one process communicating over loopback TCP. This is not a remote-host or
 graphical-client test, an audit of every state field, or evidence of packet
 confidentiality. The test build retained existing linker warnings.
+
+## Player-specific hero visibility after TCP fog packets
+
+The same lobby scenario now checks the player-specific `getHeroes` callback
+used by the minimap on both client replicas. The blue underground hero starts
+at `(0,0,1)` and is hidden from red. The test asks the server to reveal that
+tile for red and waits for ordinary fog packets on both peers; the hero then
+appears in both replicas' red-player views. After the server hides the tile
+and both replicas receive the update, the hero disappears from those views.
+The blue-player view retains its own hero throughout. Existing checkpoints still
+compare both teams' fog on both levels and exercise subsequent movement and
+save/reload.
+
+On macOS arm64, `vcmitest` built from `94e5130` plus this test, with existing
+duplicate-library and missing Conan search-path linker warnings. The expanded
+TCP test and `HeroMovementTest.MinimapHeroListRespectsFogAtToroidalCorners`
+passed once and then three consecutive repetitions. Reports are
+`runtime/tcp-hero-fog-2026-11-15.xml` and
+`runtime/tcp-hero-fog-repeat-2026-11-15.{log,xml}` under the TB5 build root.
+The server explicitly changes fog for the test rather than moving a sight
+source, and the two test listeners share a process over loopback. This does
+not test actual graphical minimap rendering, a remote host, or confidentiality
+of network payloads; each replica contains a game state and the visibility
+claims here concern the player-specific callbacks.

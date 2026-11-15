@@ -549,6 +549,48 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_FALSE(peer->state->isVisibleFor(blueUnderground, red));
 		EXPECT_FALSE(peer->state->isVisibleFor(redUnderground, blue));
 	}
+	// The minimap obtains heroes via a player-specific callback. Exercise it
+	// after real FoW packets on both replicas, not just the fog array itself.
+	const int3 hiddenEnemyPosition(0, 0, 1);
+	const auto initialBlueHeroes = server.gh->gameState().getHeroes(blue);
+	const auto undergroundEnemy = std::ranges::find_if(initialBlueHeroes, [&](const auto * candidate)
+	{
+		return candidate->visitablePos() == hiddenEnemyPosition;
+	});
+	ASSERT_NE(undergroundEnemy, initialBlueHeroes.end());
+	const auto enemyId = (*undergroundEnemy)->id;
+	const auto hasEnemyInView = [&](const LobbyPeer & peer, PlayerColor player)
+	{
+		CCallback callback(peer.state, player, nullptr);
+		const auto visible = callback.getHeroes(blue);
+		return std::ranges::any_of(visible, [&](const auto * candidate) { return candidate->id == enemyId; });
+	};
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_FALSE(peer->state->isVisibleFor(hiddenEnemyPosition, red));
+		EXPECT_FALSE(hasEnemyInView(*peer, red));
+		EXPECT_TRUE(hasEnemyInView(*peer, blue));
+	}
+	server.gh->changeFogOfWar(FowTilesType{hiddenEnemyPosition}, red, ETileVisibility::REVEALED);
+	pumpUntil([&] {
+		return host.state->isVisibleFor(hiddenEnemyPosition, red) && guest.state->isVisibleFor(hiddenEnemyPosition, red);
+	});
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_TRUE(peer->state->isVisibleFor(hiddenEnemyPosition, red));
+		EXPECT_TRUE(hasEnemyInView(*peer, red));
+		EXPECT_TRUE(hasEnemyInView(*peer, blue));
+	}
+	server.gh->changeFogOfWar(FowTilesType{hiddenEnemyPosition}, red, ETileVisibility::HIDDEN);
+	pumpUntil([&] {
+		return !host.state->isVisibleFor(hiddenEnemyPosition, red) && !guest.state->isVisibleFor(hiddenEnemyPosition, red);
+	});
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_FALSE(peer->state->isVisibleFor(hiddenEnemyPosition, red));
+		EXPECT_FALSE(hasEnemyInView(*peer, red));
+		EXPECT_TRUE(hasEnemyInView(*peer, blue));
+	}
 	const auto heroes = server.gh->gameState().getHeroes(red);
 	ASSERT_EQ(heroes.size(), 1);
 	const auto * hero = heroes.front();
