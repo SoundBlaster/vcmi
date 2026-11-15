@@ -12,6 +12,8 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+#include <cstdlib>
+
 #include <QFileDialog>
 #include <QFile>
 #include <QMessageBox>
@@ -319,7 +321,10 @@ EditorMainWindow::EditorMainWindow(QWidget* parent) :
 	parseCommandLine(extractionOptions);
 
 	//configure logging
-	const boost::filesystem::path logPath = VCMIDirs::get().userLogsPath() / "VCMI_Editor_log.txt";
+	const char * logOverride = std::getenv("VCMI_EDITOR_LOG_PATH");
+	const boost::filesystem::path logPath = logOverride && *logOverride
+		? boost::filesystem::path(logOverride)
+		: VCMIDirs::get().userLogsPath() / "VCMI_Editor_log.txt";
 #ifndef VCMI_MOBILE
 	console = std::make_unique<CConsoleHandler>();
 	logConfig = std::make_unique<CBasicLogConfigurator>(logPath, console.get());

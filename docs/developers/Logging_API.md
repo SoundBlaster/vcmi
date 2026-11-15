@@ -84,6 +84,15 @@ Format: %d %l %n \[%t\] - %m
 
 global -\> info
 
+### Isolating map editor logs
+
+The map editor normally writes `VCMI_Editor_log.txt` in the user log directory.
+For a separate diagnostic run, set `VCMI_EDITOR_LOG_PATH` to an absolute file
+path in an existing directory before starting the editor. The editor writes to
+that file instead; use a distinct filename for each concurrent process. An
+unset or empty variable preserves the default path. This changes only the
+editor log location, not its settings or game data directories.
+
 ### How to get a logger
 
 There exist only one logger object per domain. A logger object cannot be copied. You can get access to a logger object by using the globally defined ones like `logGlobal` or `logAi`, etc... or by getting one manually:

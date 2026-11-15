@@ -31,3 +31,20 @@ mouse events or rendered selection. Neither a live editor gesture nor a
 saved map painted using this new gesture has been verified. The linker
 reported duplicate libraries and absent Conan search paths, but the build
 completed successfully.
+
+## Attempted graphical check
+
+A separately signed test editor was built from `11fc869` plus the editor log
+override, and launched with a copy of `toroid-crossroads.vmap`. The log shows
+the copy loading, and a process sample placed the main thread in the Qt event
+loop. Computer Use could access the editor's File menu but reported an empty
+window without the map or controls, including after a raise and zoom attempt.
+The cause was not established. No brush gesture was performed and no GUI
+behavior is claimed. The application quit normally. Source and copy both
+retained SHA-256 `dc22f9087595505366d7e6c6ff585df4e9b265436a18a2c7d6d539493848735f`.
+
+The process wrote its log to the explicitly supplied
+`runtime/editor-brush-11fc869/editor.log`, not the normal shared editor log.
+This did not isolate editor preferences: opening the copy updated the recent
+files list, and the window zoom attempt may have changed the saved window
+geometry. The original preferences were not captured before the run.
