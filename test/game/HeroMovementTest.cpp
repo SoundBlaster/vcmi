@@ -3290,6 +3290,61 @@ TEST_P(MovedGuardCacheTest, MovingMonsterRefreshesOldAndNewNeighborhoods)
 
 INSTANTIATE_TEST_SUITE_P(MapTopologies, MovedGuardCacheTest, ::testing::Range(0, 4));
 
+TEST_P(MovedGuardCacheTest, HeroMovementRefreshesGuardCacheForDirectionalAppearance)
+{
+	const PlayerColor player(0);
+	const bool toroidal = GetParam() % 2 != 0;
+	const int level = GetParam() / 2;
+	const int3 guard = toroidal ? int3(35, 35, level) : int3(15, 14, level);
+	const int3 target = toroidal ? int3(35, 0, level) : int3(15, 15, level);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(21, 20, 0), HeroTypeID(0), player)
+		.monster(guard, CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(toroidal);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	const int3 origin = hero->visitablePos();
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["---", "---", "---"], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "DirectionalHero");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	map()->hideObject(hero);
+	hero->appearance = appearance;
+	hero->setAnchorPos(hero->convertFromVisitablePos(origin));
+	map()->showObject(hero);
+	map()->calculateGuardingGreaturePositions();
+	ASSERT_EQ(gameState()->guardingCreaturePosition(target), guard);
+
+	TryMoveHero movement;
+	movement.id = hero->id;
+	movement.start = hero->anchorPos();
+	movement.end = hero->convertFromVisitablePos(target);
+	movement.result = TryMoveHero::TELEPORTATION;
+	movement.movePoints = hero->movementPointsRemaining();
+	gameState()->apply(movement);
+	ASSERT_EQ(hero->visitablePos(), target);
+	EXPECT_EQ(map()->guardingCreaturePosition(target), int3(-1, -1, -1));
+	EXPECT_EQ(gameState()->guardingCreaturePosition(target), int3(-1, -1, -1));
+
+	movement.start = hero->anchorPos();
+	movement.end = hero->convertFromVisitablePos(origin);
+	gameState()->apply(movement);
+	ASSERT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(map()->guardingCreaturePosition(target), guard);
+	EXPECT_EQ(gameState()->guardingCreaturePosition(target), guard);
+
+	movement.start = hero->anchorPos();
+	movement.end = hero->convertFromVisitablePos(target);
+	gameState()->apply(movement);
+	ASSERT_EQ(gameState()->guardingCreaturePosition(target), int3(-1, -1, -1));
+	RemoveObject removal(hero->id, player);
+	gameState()->apply(removal);
+	EXPECT_EQ(map()->guardingCreaturePosition(target), guard);
+	EXPECT_EQ(gameState()->guardingCreaturePosition(target), guard);
+}
+
 TEST_F(HeroMovementTest, MovingBlockingObjectUpdatesAdjacentGuardCache)
 {
 	const PlayerColor player(0);

@@ -493,6 +493,9 @@ void GameStatePackVisitor::visitRemoveObject(RemoveObject & pack)
 
 		auto beatenHero = dynamic_cast<CGHeroInstance*>(obj);
 		assert(beatenHero);
+		const int3 heroAnchor = beatenHero->anchorPos();
+		const int3 heroExtent(beatenHero->getWidth() - 1, beatenHero->getHeight() - 1, 0);
+		std::optional<std::pair<int3, int3>> boatFootprint;
 
 		vstd::erase_if(beatenHero->artifactsInBackpack, [](const ArtSlotInfo& asi)
 		{
@@ -513,6 +516,7 @@ void GameStatePackVisitor::visitRemoveObject(RemoveObject & pack)
 		if(beatenHero->inBoat())
 		{
 			auto boat = beatenHero->getBoat();
+			boatFootprint = std::make_pair(boat->anchorPos(), int3(boat->getWidth() - 1, boat->getHeight() - 1, 0));
 			beatenHero->setBoat(nullptr);
 			gs.getMap().eraseObject(boat->id);
 		}
@@ -520,6 +524,9 @@ void GameStatePackVisitor::visitRemoveObject(RemoveObject & pack)
 		beatenHero->detachFromBonusSystem(gs);
 		beatenHero->tempOwner = PlayerColor::NEUTRAL; //no one owns beaten hero
 		auto beatenObject = gs.getMap().eraseObject(obj->id);
+		gs.getMap().calculateGuardingGreaturePositions(heroAnchor - heroExtent, heroAnchor);
+		if(boatFootprint)
+			gs.getMap().calculateGuardingGreaturePositions(boatFootprint->first - boatFootprint->second, boatFootprint->first);
 
 		//return hero to the pool, so he may reappear in tavern
 		gs.heroesPool->addHeroToPool(beatenHero->getHeroTypeID());
@@ -609,6 +616,11 @@ void GameStatePackVisitor::visitTryMoveHero(TryMoveHero & pack)
 
 	const TerrainTile & fromTile = gs.getMap().getTile(h->convertToVisitablePos(pack.start));
 	const TerrainTile & destTile = gs.getMap().getTile(h->convertToVisitablePos(pack.end));
+	const int3 oldHeroAnchor = h->anchorPos();
+	CGBoat * changedBoat = h->getBoat();
+	std::optional<int3> oldBoatAnchor;
+	if(changedBoat)
+		oldBoatAnchor = changedBoat->anchorPos();
 
 	h->setMovementPoints(pack.movePoints);
 
@@ -633,6 +645,8 @@ void GameStatePackVisitor::visitTryMoveHero(TryMoveHero & pack)
 		assert(tt.visitableObjects.size() >= 1 && topObject->ID == Obj::BOAT); //the only visitable object at destination is Boat
 		auto * boat = dynamic_cast<CGBoat *>(topObject);
 		assert(boat);
+		changedBoat = boat;
+		oldBoatAnchor = boat->anchorPos();
 
 		gs.getMap().hideObject(boat); //hero blockvis mask will be used, we don't need to duplicate it with boat
 		h->setBoat(boat);
@@ -653,6 +667,20 @@ void GameStatePackVisitor::visitTryMoveHero(TryMoveHero & pack)
 		if(auto * b = h->getBoat())
 			b->setAnchorPos(pack.end);
 		gs.getMap().showObject(h);
+		// Only the cells occupied by the hero or its boat can change whether
+		// an adjacent monster may enter them; neither object is a monster.
+		const auto refreshFootprint = [&](const CGObjectInstance & object, const int3 & anchor)
+		{
+			const int3 extent(object.getWidth() - 1, object.getHeight() - 1, 0);
+			gs.getMap().calculateGuardingGreaturePositions(anchor - extent, anchor);
+		};
+		refreshFootprint(*h, oldHeroAnchor);
+		refreshFootprint(*h, h->anchorPos());
+		if(changedBoat && oldBoatAnchor)
+		{
+			refreshFootprint(*changedBoat, *oldBoatAnchor);
+			refreshFootprint(*changedBoat, changedBoat->anchorPos());
+		}
 		h->updateSpecialTerrain(gs);
 		if(gs.getMap().toroidal)
 			h->setConfirmedMovementLayer(pack.movementLayer);
