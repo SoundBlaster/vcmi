@@ -47,8 +47,8 @@ struct PathfinderStart
 struct DLL_LINKAGE PathfinderOptions
 {
 	std::shared_ptr<const PathfinderMapView> mapView;
-	/// Observer for toroidal neighbor and guard visibility; node storage must
-	/// use the same perspective. Defaults to the moving hero's owner.
+	/// Observer for teleport visibility and toroidal neighbor/guard visibility;
+	/// node storage must use the same perspective. Defaults to the hero's owner.
 	std::optional<PlayerColor> knowledgePlayer;
 	bool useFlying;
 	bool useWaterWalking;

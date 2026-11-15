@@ -257,7 +257,7 @@ TeleporterTilesVector CPathfinderHelper::getAllowedTeleportChannelExits(const Te
 {
 	TeleporterTilesVector allowedExits;
 
-	for(const auto & objId : gameInfo.getTeleportChannelExits(channelID, hero->tempOwner))
+	for(const auto & objId : gameInfo.getTeleportChannelExits(channelID, options.knowledgePlayer.value_or(hero->tempOwner)))
 	{
 		const auto * obj = gameInfo.tryGetObj(objId);
 		if(dynamic_cast<const CGWhirlpool *>(obj))
@@ -449,7 +449,7 @@ bool CPathfinderHelper::canMoveBetween(const int3 & a, const int3 & b) const
 
 bool CPathfinderHelper::isAllowedTeleportEntrance(const CGTeleport * obj) const
 {
-	if(!obj || !gameInfo.isTeleportEntrancePassable(obj, hero->tempOwner))
+	if(!obj || !gameInfo.isTeleportEntrancePassable(obj, options.knowledgePlayer.value_or(hero->tempOwner)))
 		return false;
 
 	const auto * whirlpool = dynamic_cast<const CGWhirlpool *>(obj);
@@ -466,14 +466,15 @@ bool CPathfinderHelper::isAllowedTeleportEntrance(const CGTeleport * obj) const
 
 bool CPathfinderHelper::addTeleportTwoWay(const CGTeleport * obj) const
 {
-	return options.useTeleportTwoWay && gameInfo.isTeleportChannelBidirectional(obj->channel, hero->tempOwner);
+	return options.useTeleportTwoWay && gameInfo.isTeleportChannelBidirectional(obj->channel, options.knowledgePlayer.value_or(hero->tempOwner));
 }
 
 bool CPathfinderHelper::addTeleportOneWay(const CGTeleport * obj) const
 {
-	if(options.useTeleportOneWay && gameInfo.isTeleportChannelUnidirectional(obj->channel, hero->tempOwner))
+	const auto observer = options.knowledgePlayer.value_or(hero->tempOwner);
+	if(options.useTeleportOneWay && gameInfo.isTeleportChannelUnidirectional(obj->channel, observer))
 	{
-		auto passableExits = CGTeleport::getPassableExits(gameInfo, hero, gameInfo.getTeleportChannelExits(obj->channel, hero->tempOwner));
+		auto passableExits = CGTeleport::getPassableExits(gameInfo, hero, gameInfo.getTeleportChannelExits(obj->channel, observer));
 		if(passableExits.size() == 1)
 			return true;
 	}
@@ -482,9 +483,10 @@ bool CPathfinderHelper::addTeleportOneWay(const CGTeleport * obj) const
 
 bool CPathfinderHelper::addTeleportOneWayRandom(const CGTeleport * obj) const
 {
-	if(options.useTeleportOneWayRandom && gameInfo.isTeleportChannelUnidirectional(obj->channel, hero->tempOwner))
+	const auto observer = options.knowledgePlayer.value_or(hero->tempOwner);
+	if(options.useTeleportOneWayRandom && gameInfo.isTeleportChannelUnidirectional(obj->channel, observer))
 	{
-		auto passableExits = CGTeleport::getPassableExits(gameInfo, hero, gameInfo.getTeleportChannelExits(obj->channel, hero->tempOwner));
+		auto passableExits = CGTeleport::getPassableExits(gameInfo, hero, gameInfo.getTeleportChannelExits(obj->channel, observer));
 		if(passableExits.size() > 1)
 			return true;
 	}
