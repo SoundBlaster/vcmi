@@ -158,3 +158,26 @@ have a visitable mask cell on the island. They include 10 mines, 25 monsters,
 estimate on the original placement, not proof of reachability or a decision
 about which objects should move. Ten combined Python geometry and preview
 checks passed after adding the object analysis.
+
+## Revised illustration: Africa and Greenland
+
+The user pointed out that a piece of Africa appears on the opposite side of
+the original map and asked for Greenland to be placed on the right. A further
+terrain-only illustration rejoins the second-level east-edge land component
+seeded at `(251,130)` to the surface in its original orientation. Of its 714
+cells, 677 replace water and 37 overlap existing surface land, which is kept.
+It then replaces 6,682 boundary-connected rock cells with ocean, moves the
+Antarctic snow component into polar bands, and draws a new schematic snow
+island at `(220,275)` for Greenland. The latter is an approximation made for
+the illustration, not a verified transfer of original Greenland terrain.
+The resulting 252×576 illustration is kept outside the repository as
+`runtime/earth-map-research-2026-11-15/stacked-africa-polar-ocean-greenland.png`
+on TB5. None of these operations edits or creates a playable scenario.
+
+The fragment analysis finds 219 second-level object footprints intersecting
+the source component, including 53 with visitable cells. These objects have
+not been moved; overlaps and references need review when an actual map is
+assembled. The newly drawn Greenland has no objects. Replacing rock in the
+picture likewise does not establish that changing those terrain cells is safe
+for objects or gameplay. Fourteen Python geometry, preview and analysis tests
+passed; they check the tools, not in-game appearance or playability.
