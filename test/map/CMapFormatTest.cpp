@@ -389,7 +389,20 @@ TEST(MapFormat, LoadsExternalLegacyMapForInspection)
 	ASSERT_NE(map, nullptr);
 	callback.setMap(map.get());
 	std::cout << "External map: " << map->width << "x" << map->height << ", levels=" << static_cast<int>(map->levels())
-		<< ", objects=" << map->objects.size() << ", towns=" << map->getAllTowns().size() << std::endl;
+		<< ", objects=" << map->objects.size() << ", towns=" << map->getAllTowns().size()
+		<< ", toroidal=" << map->toroidal << std::endl;
+	if(std::getenv("VCMI_INSPECT_EXPECT_TOROIDAL"))
+	{
+		ASSERT_TRUE(map->toroidal);
+		const auto towns = map->getAllTowns();
+		for(const auto & player : map->players)
+			if(player.hasMainTown)
+				EXPECT_TRUE(std::ranges::any_of(towns, [&](const auto & id)
+				{
+					const auto * town = map->getObject(id);
+					return town && town->anchorPos() == player.posOfMainTown;
+				})) << "Missing main town at " << player.posOfMainTown.toString();
+	}
 	for(int z = 0; z < map->levels(); ++z)
 	{
 		size_t objects = 0, water = 0, road = 0, river = 0;
