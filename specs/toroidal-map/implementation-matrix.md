@@ -304,8 +304,11 @@ in-process repetitions: three reached a battle after a dwelling visit and
 two returned from planning without combat. Each of the other seven starts
 also passed one bounded autonomous run. Those runs drove human-configured
 slots; a subsequent run for each of the eight starts explicitly configured
-the tested slot as AI and also passed. The fixture stops before combat;
-complete autonomous server turns remain unverified. The engine
+the tested slot as AI and also passed. In a separate server-driven red-player
+check, the AI completed and handed off its turn without combat for three
+initialization seeds; two other seeds reached battle, where the fixture stops.
+Human turns were ended by the test; combat and multi-day autonomous play remain
+unverified on this draft. The engine
 recognized 44 repositioned guards. Artificially positioned heroes crossed
 each axis of the actual draft in both directions on land and with a test boat;
 diagonal disembarkation also crossed both axes at the corners. An in-process

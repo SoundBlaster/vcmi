@@ -789,3 +789,31 @@ recruitment window completed with two accepted answers. Logs are
 `ai-configured-player-0.log` through `ai-configured-player-7.log` in the TB5
 research runtime. This check still directly invokes Nullkiller's planning
 loop and does not exercise the actual turn-start event, `EndTurn`, or combat.
+
+### Server-driven AI turn and handoff
+
+The opt-in test client in `bd2c5dd` can also run a server-driven turn using
+`VCMI_INSPECT_AI_SLOT=0`, `VCMI_INSPECT_AI_SERVER_TURN=1` and an optional
+`VCMI_INSPECT_AI_SEED`. It adds all eight players to the real turn-order
+processor, sets the simultaneous-turn duration overrides to zero and ends
+the seven preceding human turns directly through that processor without
+moving their heroes. The server then sends `PlayerStartsTurn` for the red AI;
+the fixture forwards it to `AIGateway::yourTurn` and allows the gateway to
+make its own requests. In the no-battle outcome the test requires the server
+to accept `EndTurn`, verifies the AI is no longer acting and another player
+is acting, and checks that no AI movement request was rejected. If battle
+starts, the test interrupts before combat and checks that the AI is still
+the acting player. The test provides a 15-second wait for either outcome;
+run the process under an external timeout as well.
+
+Five fresh-process runs with initialization seeds 1–5 all passed: seeds 1,
+2 and 4 completed the AI server turn and transferred play; seeds 3 and 5
+started a battle. The AI sent 10–20 movement requests with no rejection.
+Three repetitions with seed 1 each completed the turn and three with seed 3
+each reached battle; repetitions for a seed share one process. Logs
+`ai-server-turn-seed-<n>.log` and `ai-server-turn-seed-<n>-repeat3.log`
+are in the TB5 Earth-map research runtime. The build was based on `5cb3bb1`
+plus the source changes committed as `bd2c5dd`. The regular
+`MapFormat.*:*AIGateway*` run passed 42 tests and skipped five optional map
+inputs. This in-process check does not establish remote network play,
+movement through a seam, combat execution, or an unassisted multi-day game.
