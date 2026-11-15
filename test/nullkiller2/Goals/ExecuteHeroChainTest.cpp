@@ -60,13 +60,31 @@ public:
 class AcknowledgingServer : public GameHandlerTestServer
 {
 public:
-	using GameHandlerTestServer::GameHandlerTestServer;
+	AcknowledgingServer(const std::shared_ptr<CGameState> & state, PlayerColor player)
+		: GameHandlerTestServer(state, player), state(state) {}
+	void applyPack(CPackForClient & pack) override
+	{
+		if(gateway)
+			if(const auto * removal = dynamic_cast<const RemoveObject *>(&pack))
+				if(const auto * object = state->getObjInstance(removal->objectID))
+					gateway->objectRemoved(object, removal->initiator);
+		GameHandlerTestServer::applyPack(pack);
+		if(gateway)
+			if(const auto * move = dynamic_cast<const TryMoveHero *>(&pack))
+			{
+				gateway->invalidatePaths();
+				gateway->heroMoved(*move, false);
+			}
+	}
 	void sendPack(CPackForClient & pack, GameConnectionID) override
 	{
 		if(const auto * applied = dynamic_cast<const PackageApplied *>(&pack))
 			response = *applied;
 	}
 	std::optional<PackageApplied> response;
+	NK2AI::AIGateway * gateway = nullptr;
+private:
+	std::shared_ptr<CGameState> state;
 };
 
 class SpellAndMoveClient : public IClient
@@ -108,6 +126,7 @@ public:
 	int moves = 0;
 	std::vector<std::tuple<int3, int3, EPathfindingLayer>> appliedMoves;
 	std::function<void()> beforeCast;
+	void enableNotifications() { server.gateway = gateway; }
 private:
 	AcknowledgingServer server;
 	CGameHandler handler;
@@ -470,6 +489,59 @@ TEST_P(ToroidalAITransientSafetyTest, ReturnsToIslandAfterServerBackedTransit)
 	EXPECT_EQ(hero->visitablePos(), island);
 	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 	EXPECT_GT(client.movementRequests, requestsBefore);
+}
+
+TEST_P(ToroidalAITransientSafetyTest, FullTurnCastsToCollectVisibleGoldAcrossSeam)
+{
+	const int z = GetParam() / 2;
+	const bool flight = GetParam() % 2;
+	const SpellID spell(SpellID::decode(flight ? "core:fly" : "core:waterWalk"));
+	const int3 island(0, 18, z), shore(34, 18, z), gold(33, 18, z);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
+		.hero(int3(19, 18, 0), HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID(0), 1}})
+		.heroPrimary(1, 1, 10, 10)
+		.heroSecondarySkills({{SecondarySkill::WISDOM, 3}, {SecondarySkill::AIR_MAGIC, 3}, {SecondarySkill::WATER_MAGIC, 3}})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({spell})
+		.hero(int3(20, 20, 0), HeroTypeID(1), ENEMY)
+		.resource(gold, GameResID::GOLD, 10);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+		{
+			const int3 position(x, y, z);
+			if(position != island && position != shore && position != gold && position != int3(18, 18, 0) && position != int3(19, 20, 0))
+				builder.terrain(position, TerrainId::WATER);
+		}
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	auto * hero = findHeroByOwner(PLAYER);
+	auto * resource = findFirst<CGResource>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(resource, nullptr);
+	const auto resourceId = resource->id;
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(island));
+	hero->mana = 100;
+	hero->setMovementPoints(2000);
+	const auto goldBefore = gameState()->players.at(PLAYER).resources[GameResID::GOLD];
+	SpellAndMoveClient client(gameState(), PLAYER);
+	auto gateway = makeGateway(PLAYER, &client);
+	client.gateway = gateway.get();
+	client.enableNotifications();
+	withGameStateReadLock([&] { gateway->nullkiller->makeTurn(); });
+	EXPECT_EQ(client.casts, 1);
+	EXPECT_TRUE(gateway->lastAdventureCastSucceeded.load());
+	EXPECT_EQ(gameState()->getObjInstance(resourceId), nullptr);
+	EXPECT_EQ(gameState()->players.at(PLAYER).resources[GameResID::GOLD], goldBefore + 1000);
+	EXPECT_TRUE(std::ranges::any_of(client.appliedMoves, [flight](const auto & move)
+	{
+		const auto & [from, to, layer] = move;
+		return (std::abs(from.x - to.x) > 1 || std::abs(from.y - to.y) > 1)
+			&& layer == (flight ? EPathfindingLayer::AIR : EPathfindingLayer::WATER);
+	}));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 }
 
 INSTANTIATE_TEST_SUITE_P(AbilitiesAndLevels, ToroidalAITransientSafetyTest, ::testing::Range(0, 4));
