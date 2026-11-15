@@ -2493,7 +2493,55 @@ TEST(MapFormat, PreparesExternalToroidalSeamRoad)
 	callback.setMap(map.get());
 	ASSERT_TRUE(map->toroidal);
 	ASSERT_GE(map->width, 6);
+	const bool connectRoad = std::getenv("VCMI_EARTH_CONNECT_ROAD") != nullptr;
+	const auto findConnection = [&](const int3 & start) -> std::vector<int3>
+	{
+		const int width = map->width;
+		const int height = map->height;
+		const int startIndex = start.y * width + start.x;
+		std::vector<int> parent(width * height, -1);
+		std::vector<int> queue{startIndex};
+		parent[startIndex] = startIndex;
+		int target = -1;
+		for(size_t next = 0; next < queue.size() && target < 0; ++next)
+		{
+			const int current = queue[next];
+			const int x = current % width;
+			const int y = current / width;
+			for(const auto & [dx, dy] : std::array<std::pair<int, int>, 8>{{{-1, 0}, {1, 0}, {0, -1}, {0, 1},
+				{-1, -1}, {-1, 1}, {1, -1}, {1, 1}}})
+			{
+				const int nx = x + dx, ny = y + dy;
+				if(nx < 0 || nx >= width || ny < 0 || ny >= height)
+					continue;
+				const int index = ny * width + nx;
+				if(parent[index] != -1)
+					continue;
+				const auto & tile = map->getTile(int3(nx, ny, 0));
+				if(!tile.isLand() || tile.blocked() || tile.visitable() || tile.getRiverID() != RiverId::NO_RIVER
+				   || !map->canMoveBetween(int3(x, y, 0), int3(nx, ny, 0)))
+					continue;
+				parent[index] = current;
+				if(tile.getRoadID() == RoadId::DIRT_ROAD)
+				{
+					target = index;
+					break;
+				}
+				if(tile.getRoadID() == RoadId::NO_ROAD)
+					queue.push_back(index);
+			}
+		}
+		std::vector<int3> result;
+		if(target < 0)
+			return result;
+		for(int current = parent[target]; current != startIndex; current = parent[current])
+			result.emplace_back(current % width, current / width, 0);
+		result.emplace_back(target % width, target / width, 0);
+		return result;
+	};
+	std::vector<int3> rightEdgeConnection, leftEdgeConnection;
 	std::vector<int3> road;
+	int candidates = 0, rightEdgeReachable = 0, leftEdgeReachable = 0;
 	for(int sideLength = 3; sideLength >= 1 && road.empty(); --sideLength)
 	{
 		for(int y = 0; y < map->height && road.empty(); ++y)
@@ -2509,11 +2557,40 @@ TEST(MapFormat, PreparesExternalToroidalSeamRoad)
 					break;
 				candidate.push_back(pos);
 			}
-			if(candidate.size() == static_cast<size_t>(2 * sideLength))
-				road = std::move(candidate);
+			if(candidate.size() != static_cast<size_t>(2 * sideLength))
+				continue;
+			++candidates;
+			if(connectRoad)
+			{
+				rightEdgeConnection = findConnection(candidate.front());
+				leftEdgeConnection = findConnection(candidate.back());
+				rightEdgeReachable += !rightEdgeConnection.empty();
+				leftEdgeReachable += !leftEdgeConnection.empty();
+				if(rightEdgeConnection.empty() || leftEdgeConnection.empty())
+					continue;
+			}
+			road = std::move(candidate);
 		}
 	}
-	ASSERT_GE(road.size(), 2u) << "No clear seam road site found";
+	if(std::getenv("VCMI_EARTH_EXPECT_NO_CONNECTION"))
+	{
+		ASSERT_TRUE(connectRoad);
+		EXPECT_GT(candidates, 0);
+		EXPECT_TRUE(road.empty());
+		std::cout << "Road site candidates=" << candidates << ", right edge connected=" << rightEdgeReachable
+		          << ", left edge connected=" << leftEdgeReachable << std::endl;
+		return;
+	}
+	ASSERT_GE(road.size(), 2u) << "No eligible seam road; candidates=" << candidates
+		<< ", right edge connected=" << rightEdgeReachable << ", left edge connected=" << leftEdgeReachable;
+	if(connectRoad)
+	{
+		std::cout << "Road connection lengths=" << rightEdgeConnection.size() << "," << leftEdgeConnection.size() << std::endl;
+		for(const auto * connection : {&rightEdgeConnection, &leftEdgeConnection})
+			for(const auto & pos : *connection)
+				if(map->getTile(pos).getRoadID() == RoadId::NO_ROAD && !vstd::contains(road, pos))
+					road.push_back(pos);
+	}
 	CRandomGenerator random(12345);
 	auto * editor = map->getEditManager();
 	editor->getTerrainSelection().setSelection(road);
