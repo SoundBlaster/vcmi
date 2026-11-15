@@ -708,3 +708,22 @@ movement request; hero positions, movement points and fog were not altered
 before planning. The test chose the target and invoked the plan: it does not
 establish autonomous goal selection, a complete AI turn, combat, TCP or GUI
 behavior on this map.
+
+A subsequent diagnostic attempted a complete autonomous Nullkiller turn on
+the same draft. This was an exploratory, uncommitted extension of the test
+client based on `3b366d1`, rather than a passing acceptance test. Nullkiller
+visited `creatureGeneratorCommon_6252` (a wineyard) and received a blocking
+dialog. Once the experimental client forwarded the dialog and registered its
+answer request, the server acknowledged that answer successfully. The server
+had zero active battles immediately after that acknowledgement, but the
+test did not complete within 12 seconds. A successful acknowledgement alone
+does not show that the associated activity has finished: replies can be
+accepted for later resolution. The fake client's event and activity handling
+is incomplete, so this observation does not establish a game defect or a
+completed AI turn. Full autonomous turns remain unverified.
+
+The diagnostic patch and log are kept on TB5 under the Earth-map research
+runtime directory as `ai-full-turn-experiment.patch` and
+`ai-dialog-battle-run.log`; the patch SHA-256 is
+`5a1140d01a21d18cdda93a6631acfe09be7c6d677070d8cbcb299c04cdf152a0`.
+This time-limited experiment is not enabled in the committed test suite.
