@@ -116,3 +116,15 @@ edges; wrapped cells can also contribute to differences. These counts are
 candidate conflicts for engine/editor validation, not proven gameplay bugs.
 Three small geometry tests cover rotation, clipping, wrapping and visitable
 placement. No transformed map has been saved by this analysis.
+
+## Terrain-only layout preview
+
+[`tools/preview_stacked_terrain.py`](tools/preview_stacked_terrain.py) draws
+the rotated underground above the unchanged surface using terrain minimap
+colors. It writes a new SVG and refuses to overwrite a file. Its generated
+preview is `runtime/earth-map-research-2026-11-15/stacked-terrain-draft.png`
+on TB5. Inspection shows the Americas above Eurasia with Arctic regions near
+the join, but also the underground's black rock areas and Antarctica as a
+separate island near the top. The planned polar and seam edits have not been
+performed. The picture omits objects, tile art, roads and rivers; it is not
+an editor rendering, a playable map or evidence of seamless transitions.
