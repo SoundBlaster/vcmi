@@ -159,6 +159,9 @@ AI corner crossing and the return to the player on a clean demo map.
 [Guarded-shore tests](evidence/topology-guarded-disembark-2026-11-15.md)
 exercise disembarkation across an edge and a corner on both levels, including
 the server battle and forced-victory return with the boat left at sea.
+[Prisoner release](evidence/prison-release-guard-cache-2026-11-15.md)
+refreshes the guard cache for the old and new hero footprints; the direct
+server packet has synthetic bounded and toroidal coverage.
 
 ## Specification evidence discipline
 
