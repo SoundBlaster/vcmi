@@ -468,13 +468,19 @@ A separate Earth copy with four prepared land corners passed all four
 diagonal crossings in the graphical game; see [the corner record](evidence/earth-gui-corners-2026-11-15.md).
 An [exploratory road fixture](evidence/earth-road-seam-2026-11-15.md) crossed
 the horizontal seam with road movement cost in a graphical game. Its two
-tiles are isolated from the existing road network, so the Earth road demo
-remains incomplete. A constrained search for clear connections to existing
-dirt roads on both sides found none; the [road record](evidence/earth-road-seam-2026-11-15.md)
-describes its limits and a positive control.
+tiles were initially isolated. A later [integrated extension](evidence/earth-road-seam-2026-11-15.md#static-view-and-local-demo-integration)
+connects the seam to an existing road on one side; its other end is not
+connected to another road network. A static screenshot shows the seam, but
+does not verify continuous animation. A constrained search for clear
+connections on both sides found none under its stated constraints.
+On the later local draft, the [server route from the starting hero](evidence/earth-start-connectivity-2026-11-15.md#prepared-access-to-the-seam-road)
+reaches and crosses this road after two decorative obstacles are removed. It
+uses a boat, forced victories, extra movement and fully revealed fog; ordinary
+balance, unassisted access and visual continuity remain unverified.
 An [experimental road to a monolith](evidence/earth-portal-road-2026-11-15.md)
 reached the entrance in a staged graphical game, but the water-monolith exit
-was rejected for a land hero. The adaptation and road appearance remain open.
+was rejected for a land hero. That earlier road fixture is not the integrated
+road extension described above.
 The entry was originally on water and became land during the Africa rejoin;
 an [integrated repair](evidence/earth-portal-road-2026-11-15.md#reproducible-assembly-and-local-demo-profile)
 passed server-side boat teleports to all three other exits. A staged graphical
