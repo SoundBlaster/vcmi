@@ -956,6 +956,92 @@ TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 	}
 }
 
+TEST(MapFormat, ToroidalMixedRoadTurnsRoundTrip)
+{
+	auto bytes = makeToroidalDemoMap().build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("ToroidMixedRoads", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	removeTestModEntitiesFromDemo(*map);
+	map->setToroidalAndRebuild(true);
+	map->name = MetaString::createFromRawString("Toroid Mixed Road Turns");
+
+	// Each seam shape has an identical interior control, including road types.
+	const std::vector<int3> dirt = {
+		int3(34, 4, 0), int3(35, 4, 0), int3(14, 4, 0), int3(15, 4, 0)};
+	const std::vector<int3> gravel = {
+		int3(0, 4, 0), int3(1, 4, 0), int3(16, 4, 0), int3(17, 4, 0),
+		int3(10, 34, 0), int3(10, 35, 0), int3(25, 14, 0), int3(25, 15, 0)};
+	const std::vector<int3> cobblestone = {
+		int3(10, 0, 0), int3(10, 1, 0), int3(25, 16, 0), int3(25, 17, 0),
+		int3(0, 35, 0), int3(0, 0, 0), int3(1, 0, 0),
+		int3(20, 19, 0), int3(20, 20, 0), int3(21, 20, 0)};
+	CRandomGenerator random(12345);
+	auto * editor = map->getEditManager();
+	for(const auto & [positions, type] : {
+		std::pair{&dirt, RoadId::DIRT_ROAD},
+		std::pair{&gravel, RoadId::GRAVEL_ROAD},
+		std::pair{&cobblestone, RoadId::COBBLESTONE_ROAD}})
+	{
+		editor->getTerrainSelection().setSelection(*positions);
+		editor->drawRoad(type, &random);
+	}
+
+	const auto compareShape = [&](const CMap & checked, int3 seam, int3 interior, int minDir, int maxDir)
+	{
+		const auto & actual = checked.getTile(seam);
+		const auto & expected = checked.getTile(interior);
+		EXPECT_EQ(actual.getRoadID(), expected.getRoadID());
+		EXPECT_GE(actual.roadDir, minDir);
+		EXPECT_LE(actual.roadDir, maxDir);
+		EXPECT_GE(expected.roadDir, minDir);
+		EXPECT_LE(expected.roadDir, maxDir);
+		EXPECT_EQ(actual.extTileFlags & 0b00110000, expected.extTileFlags & 0b00110000);
+	};
+	compareShape(*map, int3(35, 4, 0), int3(15, 4, 0), 12, 13);
+	compareShape(*map, int3(10, 35, 0), int3(25, 15, 0), 10, 11);
+	compareShape(*map, int3(0, 0, 0), int3(20, 20, 0), 0, 1);
+
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	expectDemoHasNoTestModReferences(output);
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&output);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	ASSERT_TRUE(reopened->toroidal);
+	for(const auto * positions : {&dirt, &gravel, &cobblestone})
+		for(const auto & pos : *positions)
+		{
+			const auto & before = map->getTile(pos);
+			const auto & after = reopened->getTile(pos);
+			EXPECT_EQ(after.getRoadID(), before.getRoadID()) << pos.toString();
+			EXPECT_EQ(after.roadDir, before.roadDir) << pos.toString();
+			EXPECT_EQ(after.extTileFlags, before.extTileFlags) << pos.toString();
+		}
+	compareShape(*reopened, int3(35, 4, 0), int3(15, 4, 0), 12, 13);
+	compareShape(*reopened, int3(10, 35, 0), int3(25, 15, 0), 10, 11);
+	compareShape(*reopened, int3(0, 0, 0), int3(20, 20, 0), 0, 1);
+
+	if(const char * outputPath = std::getenv("VCMI_TOROID_MIXED_ROAD_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream file(outputPath, std::ios::binary);
+		ASSERT_TRUE(file);
+		file.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+		file.close();
+		ASSERT_TRUE(file);
+	}
+}
+
 TEST(MapFormat, ToroidalVisualWrappedTownFixtureRoundTrips)
 {
 	auto bytes = makeToroidalDemoMap().build();
