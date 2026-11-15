@@ -69,6 +69,37 @@ TEST(MapTopology, EditorRoadAndRedrawCrossToroidalSeams)
 	}
 }
 
+TEST(MapTopology, EditorSquareBrushWrapsOnlyOnToroidalMaps)
+{
+	for(int level = 0; level < 2; ++level)
+		for(const auto & center : std::vector<int3>{{0, 0, level}, {6, 0, level}, {0, 4, level}, {6, 4, level}, {3, 2, level}})
+			for(const auto & [first, size] : {std::pair{0, 2}, std::pair{-1, 4}})
+			{
+				const MapTopology wrapped(7, 5, 2, true), bounded(7, 5, 2, false);
+				std::set<int3> expectedWrapped, expectedBounded;
+				for(int dx = first; dx < first + size; ++dx)
+					for(int dy = first; dy < first + size; ++dy)
+					{
+						const int x = center.x + dx, y = center.y + dy;
+						expectedWrapped.insert({(x + 7) % 7, (y + 5) % 5, level});
+						if(x >= 0 && x < 7 && y >= 0 && y < 5)
+							expectedBounded.insert({x, y, level});
+					}
+				const auto toroidalTiles = TerrainViewTopology::brushSelection(wrapped, center, first, size, true);
+				const auto boundedTiles = TerrainViewTopology::brushSelection(bounded, center, first, size, false);
+				EXPECT_EQ(std::set<int3>(toroidalTiles.begin(), toroidalTiles.end()), expectedWrapped);
+				EXPECT_EQ(std::set<int3>(boundedTiles.begin(), boundedTiles.end()), expectedBounded);
+				EXPECT_EQ(toroidalTiles.size(), expectedWrapped.size());
+			}
+	const MapTopology small(3, 3, 1, true), bounded(7, 5, 1, false);
+	EXPECT_EQ(TerrainViewTopology::brushSelection(small, {0, 0, 0}, -1, 4, true).size(), 9u);
+	EXPECT_TRUE(TerrainViewTopology::brushSelection(small, {-1, 0, 0}, -1, 4, true).empty());
+	EXPECT_TRUE(TerrainViewTopology::brushSelection(small, {0, 0, 1}, -1, 4, true).empty());
+	// Bounded brushes retain their prior behavior when their pointer is just outside.
+	const auto outside = TerrainViewTopology::brushSelection(bounded, {-1, 0, 0}, -1, 4, false);
+	EXPECT_EQ(std::set<int3>(outside.begin(), outside.end()), (std::set<int3>{{0, 0, 0}, {0, 1, 0}, {0, 2, 0}, {1, 0, 0}, {1, 1, 0}, {1, 2, 0}}));
+}
+
 TEST(MapTopology, EditorFloodSelectionRespectsTopologyAndBarriers)
 {
 	for(int level = 0; level < 2; ++level)

@@ -26,6 +26,20 @@ inline std::optional<int3> roadSourceAbove(const MapTopology & topology, const i
 	return topology.canonicalize(tile + int3(0, -1, 0));
 }
 
+/// Map a square brush to physical tiles; toroidal callers reject an outside pointer.
+inline std::vector<int3> brushSelection(const MapTopology & topology, const int3 & center, int firstOffset, int size, bool toroidal)
+{
+	const auto canonicalCenter = topology.canonicalize(center);
+	if(size <= 0 || (toroidal && (!canonicalCenter || *canonicalCenter != center)))
+		return {};
+	std::set<int3> tiles;
+	for(int dx = firstOffset; dx < firstOffset + size; ++dx)
+		for(int dy = firstOffset; dy < firstOffset + size; ++dy)
+			if(const auto tile = topology.canonicalize(center + int3(dx, dy, 0)))
+				tiles.insert(*tile);
+	return {tiles.begin(), tiles.end()};
+}
+
 /// Flood the four-connected selection using canonical map neighbors.
 template<typename CanTraverse>
 std::set<int3> floodSelection(const MapTopology & topology, const int3 & start, CanTraverse canTraverse)

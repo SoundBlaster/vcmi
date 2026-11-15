@@ -20,6 +20,7 @@
 #include "../../lib/CRandomGenerator.h"
 #include "../../lib/GameLibrary.h"
 #include "../../lib/callback/EditorCallback.h"
+#include "../../mapeditor/TerrainViewTopology.h"
 
 
 TEST(MapManager, DrawTerrain_Type)
@@ -197,6 +198,33 @@ TEST(MapManager, ToroidalRoadAndRiverBrushConnectAcrossEdge)
 			EXPECT_LE(corner.roadDir, 1);
 		else
 			EXPECT_LE(corner.riverDir, 3);
+	}
+}
+
+TEST(MapManager, SquareBrushSelectionPaintsAndUndoesRoadAcrossCorner)
+{
+	for(const bool toroidal : {false, true})
+	{
+		auto map = std::make_unique<CMap>(nullptr);
+		map->width = 20;
+		map->height = 20;
+		map->toroidal = toroidal;
+		map->initTerrain();
+		CRandomGenerator random;
+		auto * editor = map->getEditManager();
+		editor->clearTerrain(&random);
+		const auto selection = TerrainViewTopology::brushSelection(map->getTopology(), {19, 19, 0}, 0, 2, toroidal);
+		editor->getTerrainSelection().setSelection(selection);
+		editor->drawRoad(RoadId::DIRT_ROAD, &random);
+		const std::vector<int3> corners{{19, 19, 0}, {0, 19, 0}, {19, 0, 0}, {0, 0, 0}};
+		for(size_t i = 0; i < corners.size(); ++i)
+			EXPECT_EQ(map->getTile(corners[i]).roadType == RoadId::DIRT_ROAD, toroidal || i == 0);
+		editor->getUndoManager().undo();
+		for(const auto & corner : corners)
+			EXPECT_NE(map->getTile(corner).roadType, RoadId::DIRT_ROAD);
+		editor->getUndoManager().redo();
+		for(size_t i = 0; i < corners.size(); ++i)
+			EXPECT_EQ(map->getTile(corners[i]).roadType == RoadId::DIRT_ROAD, toroidal || i == 0);
 	}
 }
 

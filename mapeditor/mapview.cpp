@@ -129,12 +129,7 @@ void MapView::mouseMoveEvent(QMouseEvent *mouseEvent)
 
 	case MapView::SelectionTool::Brush2:
 		{
-			std::array<int3, 4> extra{ int3{0, 0, 0}, int3{1, 0, 0}, int3{0, 1, 0}, int3{1, 1, 0} };
-			std::vector<int3> tiles;
-			for(auto & e : extra)
-			{
-				tiles.push_back(tile + e);
-			}
+			const auto tiles = TerrainViewTopology::brushSelection(controller->map()->getTopology(), tile, 0, 2, controller->map()->toroidal);
 			if(mouseEvent->buttons() & Qt::RightButton)
 				sc->selectionTerrainView.erase(tiles);
 			else if(mouseEvent->buttons() == Qt::LeftButton)
@@ -144,17 +139,7 @@ void MapView::mouseMoveEvent(QMouseEvent *mouseEvent)
 
 	case MapView::SelectionTool::Brush4:
 	{
-		std::array<int3, 16> extra{
-			int3{-1, -1, 0}, int3{0, -1, 0}, int3{1, -1, 0}, int3{2, -1, 0},
-			int3{-1, 0, 0}, int3{0, 0, 0}, int3{1, 0, 0}, int3{2, 0, 0},
-			int3{-1, 1, 0}, int3{0, 1, 0}, int3{1, 1, 0}, int3{2, 1, 0},
-			int3{-1, 2, 0}, int3{0, 2, 0}, int3{1, 2, 0}, int3{2, 2, 0}
-		};
-		std::vector<int3> tiles;
-		for(auto & e : extra)
-		{
-			tiles.push_back(tile + e);
-		}
+		const auto tiles = TerrainViewTopology::brushSelection(controller->map()->getTopology(), tile, -1, 4, controller->map()->toroidal);
 		if(mouseEvent->buttons() & Qt::RightButton)
 			sc->selectionTerrainView.erase(tiles);
 		else if(mouseEvent->buttons() == Qt::LeftButton)
@@ -241,7 +226,7 @@ void MapView::mouseMoveEvent(QMouseEvent *mouseEvent)
 						temporaryTiles.insert(ts);
 					erasedTiles.push_back(ts);
 				}
-				sc->selectionTerrainView.erase(selectedTiles);
+				sc->selectionTerrainView.erase(erasedTiles);
 			}
 			break;
 		}
@@ -330,12 +315,7 @@ void MapView::mousePressEvent(QMouseEvent *event)
 	case MapView::SelectionTool::Brush2:
 		sc->selectionObjectsView.clear();
 	{
-		std::array<int3, 4> extra{ int3{0, 0, 0}, int3{1, 0, 0}, int3{0, 1, 0}, int3{1, 1, 0} };
-		std::vector<int3> tiles;
-		for(auto & e : extra)
-		{
-			tiles.push_back(tileStart + e);
-		}
+		const auto tiles = TerrainViewTopology::brushSelection(controller->map()->getTopology(), tileStart, 0, 2, controller->map()->toroidal);
 		if(event->buttons() & Qt::RightButton)
 			sc->selectionTerrainView.erase(tiles);
 		else if(event->buttons() == Qt::LeftButton)
@@ -346,17 +326,7 @@ void MapView::mousePressEvent(QMouseEvent *event)
 	case MapView::SelectionTool::Brush4:
 		sc->selectionObjectsView.clear();
 	{
-		std::array<int3, 16> extra{
-			int3{-1, -1, 0}, int3{0, -1, 0}, int3{1, -1, 0}, int3{2, -1, 0},
-			int3{-1, 0, 0}, int3{0, 0, 0}, int3{1, 0, 0}, int3{2, 0, 0},
-			int3{-1, 1, 0}, int3{0, 1, 0}, int3{1, 1, 0}, int3{2, 1, 0},
-			int3{-1, 2, 0}, int3{0, 2, 0}, int3{1, 2, 0}, int3{2, 2, 0}
-		};
-		std::vector<int3> tiles;
-		for(auto & e : extra)
-		{
-			tiles.push_back(tileStart + e);
-		}
+		const auto tiles = TerrainViewTopology::brushSelection(controller->map()->getTopology(), tileStart, -1, 4, controller->map()->toroidal);
 		if(event->buttons() & Qt::RightButton)
 			sc->selectionTerrainView.erase(tiles);
 		else if(event->buttons() == Qt::LeftButton)
