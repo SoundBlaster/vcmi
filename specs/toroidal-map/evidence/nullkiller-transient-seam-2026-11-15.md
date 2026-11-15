@@ -16,10 +16,10 @@ binary built from `210e6f7` plus the tests committed in `2043e46`; results are
 root. The build reported duplicate-library and missing Conan search-path
 warnings.
 
-This is a shared-state server fixture, not a remote multiplayer or graphical
-session. It does not test the AI casting the spells, undiscovered landing
-tiles, multi-turn transit, interactions that interrupt landing, or autonomous
-choice of this route during a full AI turn.
+This initial run used a shared-state server fixture, not a remote multiplayer
+or graphical session. It did not test the AI casting the spells, undiscovered
+landing tiles, multi-turn transit, interactions that interrupt landing, or
+autonomous choice of this route during a full AI turn.
 
 ## Return after server-driven transit
 
@@ -43,3 +43,31 @@ macOS arm64. The binary was built from `56a83d9` plus the test committed in
 `c11185d`. Reports are `runtime/ai-transit-return-final-2026-11-15.{log,xml}`
 under the TB5 build root. This does not cover automatic spell casting, dynamic
 fog, a full autonomous AI turn, a remote server or graphical play.
+
+## Planned spell casts and rejection
+
+The subsequent `ToroidalHeroChainTest` cases give the hero a spellbook with
+Flight or Water Walk, adequate spell skills and mana, and place the destination
+on the far shore with water between it and the start. Nullkiller2's pathfinder
+must produce a same-turn route containing an adventure-spell cast action. The
+test explicitly selects and executes that planned route through
+`ExecuteHeroChain`; it does not ask the AI to choose its overall turn goal.
+An in-process server receives serialized requests and returns actual request
+acknowledgements to the gateway. For each ability and all eight seam and
+corner directions on both levels, the cast succeeds, mana decreases, a
+server-accepted AIR or WATER movement crosses the seam, and the hero reaches
+land. This covers 32 scenarios.
+
+For another 32 scenarios, the test sets the hero's mana to zero immediately
+before the server receives the cast, simulating a change after planning and
+local checks. The server rejects the cast, the gateway observes the failed
+acknowledgement, and the hero remains at the start with no movement request or
+new movement bonus. The mana change itself is injected by the fixture; no
+actual gameplay event causing it is exercised.
+
+All 64 new cases passed alongside the 68 earlier AI seam and return tests:
+132 tests in two suites on macOS arm64. The binary was built from `db9a590`
+plus the tests committed in `9a94d67`. Reports are
+`runtime/ai-cast-transit-negative-2026-11-15.{log,xml}` under the TB5 build
+root. The run does not cover autonomous goal selection, other effects or
+obstacles, undiscovered landing tiles, interruptions, remote clients or GUI.
