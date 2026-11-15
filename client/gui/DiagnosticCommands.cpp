@@ -47,6 +47,7 @@ bool dispatchDiagnosticCommand(const std::string & command)
 		return false;
 	static const std::map<std::string, EShortcut> shortcuts = {
 		{"cast", EShortcut::ADVENTURE_CAST_SPELL}, {"return", EShortcut::GLOBAL_RETURN}, {"backspace", EShortcut::GLOBAL_BACKSPACE},
+		{"quick-save", EShortcut::ADVENTURE_QUICK_SAVE}, {"quick-load", EShortcut::ADVENTURE_QUICK_LOAD},
 		{"accept", EShortcut::GLOBAL_ACCEPT}, {"north", EShortcut::ADVENTURE_MOVE_HERO_NN},
 		{"south", EShortcut::ADVENTURE_MOVE_HERO_SS}, {"east", EShortcut::ADVENTURE_MOVE_HERO_EE},
 		{"west", EShortcut::ADVENTURE_MOVE_HERO_WW}, {"northeast", EShortcut::ADVENTURE_MOVE_HERO_NE},
