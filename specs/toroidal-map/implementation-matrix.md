@@ -298,10 +298,12 @@ The [candidate Earth map](earth-map-demo-proposal-2026-11-15.md) has a local
 profile reports them missing. The draft initializes and round-trips, all
 eight initial heroes made a short server move, and the engine recognized 44
 repositioned guards. Artificially positioned heroes crossed each axis of the
-actual draft in both directions on land. Four replacement portal approaches
-were tested with forced battle victories. The map still has an estimated 164
-new interactive overlap occurrences, unreviewed terrain and object moves, incomplete mod
-dependency assessment and unknown distribution rights. It is not evidence
+actual draft in both directions on land and with a test boat; diagonal
+disembarkation also crossed both axes at the corners. Four replacement portal
+approaches were tested with forced battle victories. The map still has an
+estimated 164 new interactive overlap occurrences, unreviewed terrain and
+object moves, incomplete mod dependency assessment and unknown distribution
+rights. It is not evidence
 of a fully playable or accepted demo.
 
 The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)

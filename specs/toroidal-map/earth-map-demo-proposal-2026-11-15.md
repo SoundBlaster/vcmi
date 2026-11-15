@@ -628,3 +628,19 @@ not available on this particular draft. The visible footprint of
 and object artwork were left unchanged pending a deliberate map edit and
 visual review; the synthetic toroidal corner tests remain separate evidence
 for the engine.
+
+The same initialized Earth draft also passed bounded sailing tests in both
+directions across each axis. The test artificially placed a hero on clear
+shore, created a boat in adjacent clear water and gave the hero movement
+points; the server then handled boarding, sailing across the seam and back,
+and disembarking. The checked water pairs were `(0,1)` ↔ `(251,1)` and
+`(152,0)` ↔ `(152,575)`.
+
+For the literal corners the test boarded across the horizontal seam and then
+disembarked diagonally across both axes: `(0,575)` → `(251,575)` → `(0,0)`,
+and `(0,0)` → `(251,0)` → `(0,575)`. Each sailing and corner scenario passed
+three in-process runs. These are actual server commands on the loaded draft,
+with artificial hero and boat setup; they do not establish an ordinary route
+to those positions, a complete boat journey, GUI behavior or visual seams.
+The normal `MapFormat.*` suite passed 14 tests and skipped five optional
+external-fixture tests without their environment variables.
