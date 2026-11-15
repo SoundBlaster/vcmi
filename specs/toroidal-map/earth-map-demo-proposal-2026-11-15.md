@@ -327,3 +327,49 @@ Python geometry and preview tests passed. Neither this load nor the object
 comparison starts a game or verifies event behavior, road appearance,
 Antarctica, Greenland, gate pairing or the intended final map size. The
 transfer tool change was committed as `0bab1e4`.
+
+### Polar layout and schematic Greenland in the draft
+
+The diagnostic assembler now optionally moves the selected 2,304-cell snow
+component around new 36-row bands at both ends of the map, stretching terrain
+to the 252-cell width. It moves 319 objects whose blocking or visitable mask
+cells touch the source component, including all 117 with visitable cells on
+it. The earlier count of 330 included objects whose *visible* mask alone
+touches the component; those 11 are not automatically moved. Each relocated
+object remains upright and at its original sprite size, with one selected
+active cell mapped to snow. The tool checks all 319 selected cells against
+the resulting terrain and reports seven mountains with active footprint cells
+on water; those cells and surrounding approaches require review. It rejects a
+polar component containing road or river overlays rather than multiplying
+them during the stretch.
+
+The diagnostic composition also changes 6,682 boundary-connected rock cells
+to water. Six nonvisitable objects have active cells on changed terrain;
+their appearance and passability are unverified. The tool rejects this
+operation when a changed cell intersects the active footprint of an
+interactive object, or when the rock carries a road or river. It adds the
+391-cell schematic Greenland island at `(220,275)` only in clear water; the
+new island has no objects. These edits preserve source instance names and
+non-position object JSON fields in a direct comparison, but do not prove
+that objects remain reachable or scenario references work during play.
+
+The local composed file is
+`runtime/earth-map-research-2026-11-15/draft-stacked/earth-composed-diagnostic-v2.vmap`
+on TB5, SHA-256
+`694c076791e953a8c36e3b28dfeda927139e2b8f483bda3811c32b89438d6302`.
+A terrain-color rendering of the actual file is adjacent as
+`earth-composed-diagnostic-v2.png`; it is not an in-game screenshot. The
+loader opened it as a single 252×576 toroidal level with 12,249 objects and
+48 towns; the tested VMAP round trip preserved named object types and
+positions and terrain, road and river types and artwork flags. All 25 Python
+geometry and preview tests passed. The generated file was reproduced in
+memory using the committed `c5a65c4` assembler. The file is local and is not
+part of the repository.
+
+The paired terrain categories at the north/south seam are 183 land/land and
+69 water/water; at the west/east seam they are 69 land/land, 36 land/water,
+7 water/land and 464 water/water. These counts say nothing about matching
+coast artwork or actual passability. The draft has 1,302 estimated new
+blocking pairs and 250 visitable-cell overlap occurrences relative to the
+clipped source; gates, mod declarations, roads, object interactions, visual
+transitions and an actual playable session remain unresolved.
