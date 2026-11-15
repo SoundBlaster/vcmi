@@ -136,7 +136,10 @@ void WindowHandler::processPendingRedraws()
 	Canvas target = ENGINE->screenHandler().getScreenCanvas();
 
 	for(CIntObject * object : pending)
-		object->showAll(target);
+		// A window may have been popped after requesting the redraw, but is
+		// retained until the frame ends. Match CIntObject::redraw's active check.
+		if(object->isActive())
+			object->showAll(target);
 }
 
 void WindowHandler::totalRedrawImpl()
