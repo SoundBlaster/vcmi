@@ -303,6 +303,8 @@ disembarkation also crossed both axes at the corners. An in-process game-state
 save/load retained hero position and all eight players' team fog views after a
 previously hidden destination was revealed on each land seam; a separate
 game-state load retained the boat and allowed sailing back and disembarking.
+Two in-process replicas decoded server packets and matched hero, boat and
+player fog across the tested land and sea seams; no TCP transport was used.
 Four replacement portal approaches were tested with forced battle victories.
 The map still has an estimated 164 new interactive overlap occurrences,
 unreviewed terrain and object moves, incomplete mod dependency assessment and

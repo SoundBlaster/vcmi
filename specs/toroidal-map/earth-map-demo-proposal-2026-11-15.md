@@ -670,3 +670,16 @@ values after loading. Both axes passed three runs for each movement mode,
 and the checks passed once more with explicit team-identity validation.
 Players sharing a team contribute repeated views to that total; this is a
 game-state comparison, not proof of fog delivery to network clients.
+
+The seam fixtures were also run with two independently loaded game-state
+replicas. Server client-packets were encoded through `GameConnection` and
+decoded separately against each replica before application; no socket was
+used. For land movement, both replicas matched the server's hero position,
+movement points and all eight players' team fog views after crossing and
+returning on both axes. For sailing, they also matched the boarding state,
+boat identity, disembarkation and the location of the boat left at sea.
+The fixture set the same movement-point allowance on the replicas when it
+reset the server hero's allowance after boarding. Each land and boat scenario
+passed three runs; an additional run verified the left-behind boat position.
+This checks packet serialization and application with an in-process capture,
+not TCP transport, a real lobby or remote graphical clients.
