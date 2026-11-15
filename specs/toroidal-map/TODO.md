@@ -11,9 +11,9 @@ coverage already and does not imply that all of its cases are unimplemented.
 - [x] Check human-controlled north/south crossings in both directions in the
   graphical Earth game, including continuation after save and reload:
   [staged Earth fixture](evidence/earth-gui-vertical-save-2026-11-15.md).
-- [ ] Check all four corner crossings and their reverse directions in the
-  graphical Earth game. Use separately identified staged fixtures if needed.
-- [ ] Record map, build, commands, observed hero state and remaining gaps.
+- [x] Check all four corner crossings and their reverse directions in the
+  graphical Earth game: [staged land corners](evidence/earth-gui-corners-2026-11-15.md).
+- [x] Record map, build, commands, observed hero state and remaining gaps.
   A staged horizontal land crossing, save and reload are already documented
   in [the seam record](evidence/earth-gui-seam-save-2026-11-15.md).
 
