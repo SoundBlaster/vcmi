@@ -290,3 +290,40 @@ suite passed 14 cases with three opt-in cases skipped. The tool and inspection
 changes were subsequently committed as `c805b47`; the test executable was
 built from `2b53c74` with those inspection changes in the worktree. No adapted
 map data has been added to the repository.
+
+### Rejoining the eastern African fragment
+
+The next diagnostic draft uses `--rejoin-east-fragment 251 130`. It moves
+the 714-cell source land component in its original orientation onto the
+surface portion before stacking: 677 cells replace water and 37 overlap
+surface land, which is retained. All 219 second-level objects with blocking
+or visitable footprint cells on the component are moved as whole objects,
+including a random town, three shipyards, two subterranean gates and 53
+objects with visitable cells on the component. The rule includes objects
+whose original anchors lie outside the source rectangle. Instance names and
+all object JSON fields except the position were unchanged in a direct
+comparison of all 12,249 objects; the 219 chosen positions matched the
+intended translation. References beyond the checked main-town anchors and
+the gameplay effects of these positions have not been validated.
+
+The result remains an unfinished diagnostic map at
+`runtime/earth-map-research-2026-11-15/draft-stacked/earth-africa-diagnostic.vmap`
+on TB5, SHA-256
+`c0e71a1ce10b532c4317f809bae80ac64d78234758557436eab82bfe7ef0a6db`.
+Compared with the original map's clipped footprints, the approximate
+analyzer reports 1,341 new pairs of blocking objects and 249 occurrences
+involving visitable cells. Compared with the earlier stacked draft, 130 new
+pairs appeared and 63 disappeared; 128 of the new pairs combine a moved
+fragment object and an original surface object. Twenty-five of those 128
+pairs involve visitable cells. These are candidates for review, not proof
+that every blocking overlap is a gameplay defect. The tool does not remove or
+relocate conflicting objects automatically.
+
+With the isolated HotA profile, VCMI loaded the new draft as one 252×504
+toroidal level with all 12,249 objects and 48 towns and resolved the declared
+main-town anchors. Its in-memory VMAP round trip preserved the tested object
+anchors and types, terrain, road and river types and artwork flags. Twenty-one
+Python geometry and preview tests passed. Neither this load nor the object
+comparison starts a game or verifies event behavior, road appearance,
+Antarctica, Greenland, gate pairing or the intended final map size. The
+transfer tool change was committed as `0bab1e4`.
