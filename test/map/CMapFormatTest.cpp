@@ -658,6 +658,125 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			          << " <-> " << crossing->second.toString() << std::endl;
 		}
 	}
+	if(std::getenv("VCMI_INSPECT_SEAM_BOAT_STEPS"))
+	{
+		CGHeroInstance * hero = nullptr;
+		for(const auto & id : map.getHeroesOnMap())
+			if(auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id)); candidate
+			   && candidate->getOwner().isValidPlayer() && !candidate->isGarrisoned() && !candidate->inBoat())
+			{
+				hero = candidate;
+				break;
+			}
+		ASSERT_NE(hero, nullptr);
+		const auto player = hero->getOwner();
+		state->actingPlayers.insert(player);
+		for(const bool horizontal : {true, false})
+		{
+			std::optional<int3> source, destination, shore;
+			const int limit = horizontal ? map.height : map.width;
+			for(int index = 0; index < limit && !source; ++index)
+			{
+				const int3 first = horizontal ? int3(0, index, 0) : int3(index, 0, 0);
+				const int3 second = horizontal ? int3(map.width - 1, index, 0) : int3(index, map.height - 1, 0);
+				const auto clearWater = [&](const int3 & position)
+				{
+					const auto & tile = map.getTile(position);
+					return tile.isWater() && !tile.blocked() && !tile.visitable()
+						&& !state->guardingCreaturePosition(position).isValid();
+				};
+				if(!clearWater(first) || !clearWater(second) || !map.canMoveBetween(first, second))
+					continue;
+				for(const auto & direction : {int3(0, -1, 0), int3(0, 1, 0), int3(-1, 0, 0), int3(1, 0, 0)})
+				{
+					const auto candidate = map.getTopology().canonicalize(first + direction);
+					if(candidate && map.getTile(*candidate).isLand() && !map.getTile(*candidate).blocked()
+					   && !map.getTile(*candidate).visitable() && !state->guardingCreaturePosition(*candidate).isValid()
+					   && map.canMoveBetween(*candidate, first))
+					{
+						source = first;
+						destination = second;
+						shore = *candidate;
+						break;
+					}
+				}
+			}
+			ASSERT_TRUE(source && destination && shore) << (horizontal ? "east/west" : "north/south");
+			ChangeObjPos place;
+			place.objid = hero->id;
+			place.nPos = *shore;
+			state->apply(place);
+			GameHandlerTestServer server(state, player);
+			CGameHandler handler(server, state);
+			handler.createBoat(*source, BoatId::CASTLE, player);
+			hero->setMovementPoints(3000);
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*source),
+			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+			ASSERT_TRUE(hero->inBoat());
+			hero->setMovementPoints(3000);
+			for(const auto & target : {*destination, *source})
+			{
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(target),
+				                             EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+				ASSERT_EQ(hero->visitablePos(), target);
+			}
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*shore),
+			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+			ASSERT_FALSE(hero->inBoat());
+			ASSERT_EQ(hero->visitablePos(), *shore);
+			std::cout << "Embarked at " << shore->toString() << ", sailed " << source->toString()
+			          << " <-> " << destination->toString() << " and disembarked" << std::endl;
+		}
+	}
+	if(std::getenv("VCMI_INSPECT_CORNER_BOAT_LANDING"))
+	{
+		CGHeroInstance * hero = nullptr;
+		for(const auto & id : map.getHeroesOnMap())
+			if(auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id)); candidate
+			   && candidate->getOwner().isValidPlayer() && !candidate->isGarrisoned() && !candidate->inBoat())
+			{
+				hero = candidate;
+				break;
+			}
+		ASSERT_NE(hero, nullptr);
+		const auto player = hero->getOwner();
+		state->actingPlayers.insert(player);
+		for(const int y : {map.height - 1, 0})
+		{
+			const int3 shore(0, y, 0);
+			const int3 water(map.width - 1, y, 0);
+			const int3 landing(0, y == 0 ? map.height - 1 : 0, 0);
+			ASSERT_TRUE(map.getTile(shore).isLand());
+			ASSERT_TRUE(map.getTile(landing).isLand());
+			ASSERT_TRUE(map.getTile(water).isWater());
+			for(const auto & position : {shore, water, landing})
+			{
+				const auto & tile = map.getTile(position);
+				const auto isHero = [&](const ObjectInstanceID & id) { return id == hero->id; };
+				ASSERT_TRUE(std::ranges::all_of(tile.blockingObjects, isHero)) << position.toString();
+				ASSERT_TRUE(std::ranges::all_of(tile.visitableObjects, isHero)) << position.toString();
+				ASSERT_FALSE(state->guardingCreaturePosition(position).isValid()) << position.toString();
+			}
+			ChangeObjPos place;
+			place.objid = hero->id;
+			place.nPos = shore;
+			state->apply(place);
+			GameHandlerTestServer server(state, player);
+			CGameHandler handler(server, state);
+			handler.createBoat(water, BoatId::CASTLE, player);
+			hero->setMovementPoints(3000);
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water),
+			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+			ASSERT_TRUE(hero->inBoat());
+			hero->setMovementPoints(3000);
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(landing),
+			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+			ASSERT_FALSE(hero->inBoat());
+			ASSERT_EQ(hero->visitablePos(), landing);
+			std::cout << "Corner disembark: " << shore.toString() << " -> " << water.toString()
+			          << " -> " << landing.toString() << std::endl;
+		}
+	}
 	if(const char * overlap = std::getenv("VCMI_INSPECT_OVERLAP_RESOURCE"); overlap && *overlap)
 	{
 		std::vector<std::string> names;
