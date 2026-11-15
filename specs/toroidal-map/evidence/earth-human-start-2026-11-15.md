@@ -19,3 +19,21 @@ one initial movement on the current demo. It does not verify a route to the
 seam, a complete turn, combat, long-term balance or animation continuity.
 The run used an isolated copy of the launcher's settings, not Finder execution
 of the launcher itself. The original map and game assets remain outside Git.
+
+## Prepared seam-access draft
+
+On 2026-11-16, the same `7744dbd` macOS SDL3/Metal client started an isolated
+profile linked to the demo profile's updated map, SHA-256
+`67640eefaa91e9efcf04315bef66197d834e662652bd25bd10f234391c43e5a8`. The
+normal New Game → Single Scenario interface displayed the 252×576 Earth map
+after filtering for `2.0`. The observation stream reported a toroidal map and
+red hero 7305 at `(164,353,0)` with 1,560 movement points and 20 mana. An
+east shortcut moved the hero to `(165,353,0)` with 1,510 points and 20 mana.
+
+The profile linked game data, mods and the demo map, but had separate copied
+settings and separate saves. Its local observation and screenshots are under
+TB5 `runtime/earth-current-human-2026-11-16/`. The test client was forcibly
+stopped after the observation, not cleanly shut down through the game UI.
+This establishes the updated map's ordinary scenario-list startup and first
+human-controlled move, not the complete route to the seam, graphical animation
+or Finder execution of the launcher.
