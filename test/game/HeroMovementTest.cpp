@@ -7050,6 +7050,121 @@ TEST_F(HeroMovementTest, HeroCanRevisitMineOnTheSameToroidalTile)
 	EXPECT_EQ(hero->movementPointsRemaining(), remaining);
 }
 
+class ToroidalGuardedMineTest : public HeroMovementTest, public ::testing::WithParamInterface<int>
+{
+protected:
+	void visitMine(bool retreat)
+	{
+		static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+			{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+		const auto [dx, dy] = directions.at(GetParam() % directions.size());
+		const int z = (GetParam() / directions.size()) % 2;
+		const bool toroidal = GetParam() < 16;
+		const int3 destination = toroidal
+			? int3(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z)
+			: int3(17, 17, z);
+		const int3 origin = toroidal
+			? int3(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z)
+			: destination - int3(dx, dy, 0);
+		const PlayerColor player(0);
+		TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+		builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+			.heroGarrison({{CreatureID::ARCHER, 100}});
+		startWithMap(std::move(builder));
+		map()->setToroidalAndRebuild(toroidal);
+		revealMap(player);
+		auto * hero = findHeroByOwner(player);
+		ASSERT_NE(hero, nullptr);
+		map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+		const auto heroId = hero->id;
+		hero->setMovementPoints(3000);
+		GameHandlerTestServer server(gameState(), player);
+		CGameHandler handler(server, gameState());
+		auto object = handler.createNewObject(destination, Obj::MINE, MapObjectSubID(0));
+		auto * mine = dynamic_cast<CGMine *>(object.get());
+		ASSERT_NE(mine, nullptr);
+		mine->setOwner(PlayerColor::NEUTRAL);
+		ASSERT_TRUE(mine->setCreature(SlotID(0), CreatureID(0), 1));
+		handler.newObject(object, player);
+		ASSERT_EQ(mine->visitablePos(), destination);
+		RecordProperty("origin_blocked_by_mine", vstd::contains(map()->getTile(origin).blockingObjects, mine->id) ? "true" : "false");
+		CPathsInfo paths(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+		CPathfinder finder(*gameState(), config);
+		finder.calculatePaths();
+		const auto * node = paths.getNode(destination, EPathfindingLayer::LAND);
+		const bool directRoute = node->reachable() && node->theNodeBefore && node->theNodeBefore->coord == origin;
+		EXPECT_EQ(directRoute, dy <= 0);
+		// Bounded servers historically accept direct requests that their own
+		// pathfinder would not offer. The seam server rejects those requests.
+		if(dy > 0 && !toroidal)
+			return;
+		const auto remaining = hero->movementPointsRemaining();
+		const bool moved = handler.moveHero(heroId, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND);
+		if(dy > 0)
+		{
+			EXPECT_FALSE(moved);
+			EXPECT_EQ(hero->visitablePos(), origin);
+			EXPECT_EQ(hero->movementPointsRemaining(), remaining);
+			EXPECT_EQ(mine->getOwner(), PlayerColor::NEUTRAL);
+			EXPECT_EQ(handler.activities->findVisit(mine->id), nullptr);
+			return;
+		}
+		ASSERT_TRUE(moved);
+		ASSERT_EQ(hero->visitablePos(), destination);
+		EXPECT_EQ(hero->movementPointsRemaining(), node->moveRemains);
+		auto dialog = handler.activities->topActivity(player);
+		ASSERT_NE(dialog, nullptr);
+		ASSERT_EQ(dialog->getType(), ActivityType::BlockingDialog);
+		ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+		EXPECT_EQ(mine->getOwner(), PlayerColor::NEUTRAL);
+		EXPECT_EQ(handler.activities->findVisit(mine->id), nullptr);
+		ASSERT_TRUE(handler.moveHero(heroId, hero->anchorPos(), EMovementMode::STANDARD, false, player, EPathfindingLayer::AUTO));
+		dialog = handler.activities->topActivity(player);
+		ASSERT_NE(dialog, nullptr);
+		ASSERT_EQ(dialog->getType(), ActivityType::BlockingDialog);
+		ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 1), ReplyOutcome::Accepted);
+		const auto * observedBattle = gameState()->getBattle(player);
+		ASSERT_NE(observedBattle, nullptr);
+		ASSERT_EQ(observedBattle->getSideArmy(BattleSide::DEFENDER), mine);
+		if(retreat)
+		{
+			const auto battleId = observedBattle->getBattleID();
+			auto * battle = gameState()->getBattle(battleId);
+			const auto stacks = battle->battleGetAllStacks(true);
+			const auto attacker = std::ranges::find_if(stacks, [](const auto * stack) { return stack->unitSide() == BattleSide::ATTACKER; });
+			ASSERT_NE(attacker, stacks.end());
+			battle->activeStack = (*attacker)->unitId();
+			ASSERT_TRUE(handler.battles->makePlayerBattleAction(battleId, player, BattleAction::makeRetreat(BattleSide::ATTACKER)));
+		}
+		else
+			handler.battles->cheatBattleVictory(player);
+		auto result = handler.activities->topActivity(player);
+		ASSERT_NE(result, nullptr);
+		ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
+		ASSERT_EQ(handler.activities->submitReply(result->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+		EXPECT_EQ(gameState()->getBattle(player), nullptr);
+		EXPECT_EQ(mine->getOwner(), retreat ? PlayerColor::NEUTRAL : player);
+		EXPECT_EQ(handler.activities->findVisit(mine->id), nullptr);
+		if(retreat)
+			EXPECT_EQ(map()->getObject(heroId), nullptr);
+		else
+			EXPECT_EQ(hero->visitablePos(), destination);
+	}
+};
+
+TEST_P(ToroidalGuardedMineTest, RefusalAndVictory)
+{
+	visitMine(false);
+}
+
+TEST_P(ToroidalGuardedMineTest, RefusalAndRetreat)
+{
+	visitMine(true);
+}
+
+INSTANTIATE_TEST_SUITE_P(EdgesAndBoundedControls, ToroidalGuardedMineTest, ::testing::Range(0, 32));
+
 class PrisonerGuardRefreshTest : public HeroMovementTest, public ::testing::WithParamInterface<bool>
 {
 };
