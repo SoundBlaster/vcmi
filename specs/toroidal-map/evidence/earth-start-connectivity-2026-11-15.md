@@ -54,3 +54,29 @@ adjacency. These are geometric estimates: they ignore occupancy, approach
 directions, guards, navigation rules, the availability and cost of boats,
 and whether any particular landing is permitted. Thus they identify a
 potential sea connection but do not establish a usable gameplay route.
+
+## One shipyard and nearby guards
+
+For `shipyard_5987`, the real engine reports visitable position `(180,376,0)`.
+Several surrounding land tiles are free and allow approach, but none is
+reachable by the initial pathfinder. The inspection in `142b525` finds a
+33-step geometric route from the initial hero to a permitted adjacent tile,
+using the engine's map occupancy and movement-direction checks but ignoring
+guard battles. The first tile along that particular route that the actual
+pathfinder cannot reach is `(177,358,0)`, guarded from `(178,357,0)` by
+`randomMonsterLevel2_5933`. After the test removes that particular creature
+through the server in memory, the pathfinder reports the shipyard reachable
+from the original hero position. The source and saved map are not modified.
+
+A second initialization followed the geometric route through ordinary server
+movement requests with 30,000 test-only movement points, full surface vision,
+and a forced battle victory. A different battle started earlier, leaving the
+hero at `(170,356,0)` and the identified `randomMonsterLevel2_5933` still
+present. The pathfinder still reported the shipyard unreachable afterwards.
+This confirms that the first actual encounter on that route is not necessarily
+the guard found at the first unreachable node. It does not establish that the
+hero can win normally, identify all battles, visit the shipyard, buy a boat or
+sail to the seam. Both diagnostic runs passed on macOS arm64 using `9daf069`
+plus the inspection change. XML files are local on TB5 at
+`runtime/earth-shipyard-removal-final.xml` and
+`runtime/earth-shipyard-battle-final.xml`.
