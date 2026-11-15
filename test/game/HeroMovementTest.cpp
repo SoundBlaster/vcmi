@@ -6820,19 +6820,85 @@ TEST_P(PrisonerGuardRefreshTest, ReleasingPrisonerRefreshesGuard)
 	auto appearance = std::make_shared<ObjectTemplate>();
 	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
 	appearance->readJson(definition, resolver, false);
+	appearance->id = Obj::PRISON;
+	appearance->subid = MapObjectSubID(0);
 	hero->appearance = appearance;
 	hero->setAnchorPos(prisonPos);
 	map()->showObject(hero);
 	ASSERT_EQ(hero->visitablePos(), prisonPos);
 	map()->calculateGuardingGreaturePositions();
 	ASSERT_EQ(gameState()->guardingCreaturePosition(prisonPos), int3(-1, -1, -1));
-	GameHandlerTestServer server(gameState(), player);
+	const auto snapshot = gameState()->saveToMemory();
+	std::vector<std::shared_ptr<CGameState>> replicas;
+	for(int i = 0; i < 2; ++i)
+	{
+		auto replica = std::make_shared<CGameState>();
+		replica->preInit(LIBRARY);
+		replica->loadFromMemory(snapshot);
+		replicas.push_back(std::move(replica));
+	}
+	class Capture final : public INetworkConnection
+	{
+	public:
+		void sendPacket(const std::vector<std::byte> & packet) override { bytes = packet; }
+		void setAsyncWritesEnabled(bool) override {}
+		void close() override {}
+		std::vector<std::byte> bytes;
+	};
+	class MirrorServer final : public GameHandlerTestServer
+	{
+	public:
+		MirrorServer(const std::shared_ptr<CGameState> & state, PlayerColor player, const std::vector<std::shared_ptr<CGameState>> & replicas)
+			: GameHandlerTestServer(state, player), replicas(replicas), transport(std::make_shared<Capture>()), sender(transport), receiver(transport)
+		{
+			sender.setSerializationVersion(ESerializationVersion::CURRENT);
+			receiver.setSerializationVersion(ESerializationVersion::CURRENT);
+		}
+		void applyPack(CPackForClient & pack) override
+		{
+			if(dynamic_cast<GiveHero *>(&pack) || dynamic_cast<SetObjectProperty *>(&pack))
+			{
+				sender.sendPack(pack);
+				for(const auto & replica : replicas)
+				{
+					receiver.setCallback(*replica);
+					auto decoded = receiver.retrievePack(transport->bytes);
+					auto * clientPack = dynamic_cast<CPackForClient *>(decoded.get());
+					if(clientPack)
+					{
+						replica->apply(*clientPack);
+						++delivered;
+					}
+					else
+						ADD_FAILURE() << "Expected a client packet after network decoding";
+				}
+			}
+			GameHandlerTestServer::applyPack(pack);
+		}
+		int delivered = 0;
+	private:
+		std::vector<std::shared_ptr<CGameState>> replicas;
+		std::shared_ptr<Capture> transport;
+		GameConnection sender;
+		GameConnection receiver;
+	} server(gameState(), player, replicas);
 	CGameHandler handler(server, gameState());
 	handler.giveHero(hero->id, player);
 	handler.setObjPropertyID(hero->id, ObjProperty::ID, Obj(Obj::HERO));
 	ASSERT_EQ(hero->visitablePos(), prisonPos);
 	ASSERT_EQ(map()->guardingCreaturePosition(prisonPos), guardPos);
 	EXPECT_EQ(gameState()->guardingCreaturePosition(prisonPos), guardPos);
+	ASSERT_EQ(server.delivered, 4);
+	for(const auto & replica : replicas)
+	{
+		const auto * released = replica->getHero(hero->id);
+		ASSERT_NE(released, nullptr);
+		EXPECT_EQ(released->getOwner(), player);
+		EXPECT_EQ(released->ID, Obj::HERO);
+		EXPECT_EQ(released->visitablePos(), prisonPos);
+		EXPECT_EQ(replica->getMap().guardingCreaturePosition(prisonPos), guardPos);
+		EXPECT_EQ(replica->guardingCreaturePosition(prisonPos), guardPos);
+	}
 }
 
 INSTANTIATE_TEST_SUITE_P(BoundedAndToroidal, PrisonerGuardRefreshTest, ::testing::Bool());
