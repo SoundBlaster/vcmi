@@ -26,7 +26,7 @@ server-resolved language, not their individual client languages.
 The baseline client SHA-256 was
 `1edf3d0eaad617e04e4c45e93fcdfa61fdab4f7f3a57d4bddfa4dc7bfb5b0247`.
 The second signed host client SHA-256 was
-`d99acdb408d3b44e8b0c1294cf3a97009161cf9555979f4e7aeec98def4bc67e7`.
+`d99acdb408d3b44e8b0c1294cf3a97009161cf9555979f4e7ae7b44f317257e7`.
 Both runs used the clean demo map with SHA-256
 `b451f983719e345fed98cc13f6ac5bd5472a6b3b943a4bfd60c68c291213bc74`.
 Logs from both clients and runs are under `runtime/gui-old-peer-2026-11-15/`
