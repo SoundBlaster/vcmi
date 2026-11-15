@@ -77,3 +77,44 @@ demo profile. This checks one boat approach and one exit on the server; it
 does not establish all other portal exits, GUI animation, normal route to the
 boat, broader collision effects or source-equivalent balance. The failed
 land-road-to-water-portal experiment above remains a separate local fixture.
+
+## Reproducible assembly and local demo profile
+
+Commit `b4930b4` adds explicit `--relocate-water-monolith INSTANCE X Y`
+support to the diagnostic assembler. It checks the source water entrance,
+object type and subtype, destination water footprint and occupancy, and at
+least one permitted clear water approach. These are geometric checks, not a
+complete gameplay guarantee. The separate `tools/prepare_earth_demo.sh`
+recipe applies the recorded Earth options, including this relocation, to the
+specific converted-source SHA-256
+`69e1f1aff0398a7042e7b158b1ac638ae3237b23d0a5a8927f0afcb7ef0c4023`.
+It rejects a different input and does not overwrite an existing output. Invoke
+it with `sh prepare_earth_demo.sh SOURCE_VMAP NEW_OUTPUT_VMAP`; the map and
+game assets are not supplied by this repository.
+
+On macOS arm64 the full recipe produced a local 252×576 VMAP at
+`runtime/earth-map-research-2026-11-15/draft-stacked/earth-water-portal-assembled.vmap`
+under TB5, SHA-256
+`97f5222ab48e5987b58c12643be985e450524488bf042a9f6ae27ab9f03ea1f3`.
+Compared with the prior `earth-reserved-guard-diagnostic.vmap`, the decoded
+header and terrain match, the object count remains 12,249, and the sole
+changed object is `monolithTwoWay_5267` at the intended new anchor. A second
+run through the committed shell recipe produced identical ZIP member contents;
+the ZIP file hash differed. A wrong-input check rejected the previous draft.
+
+Forty-one focused Python geometry/conversion tests passed. The assembled map
+also passed the server boat-portal check above, and a separate in-process run
+checked one starting move for each of eight players plus four converted-gate
+approaches with forced guard victories. Their TB5 XML outputs are
+`runtime/earth-water-portal-assembled-game.xml` and
+`runtime/earth-water-portal-assembled-regression.xml` respectively.
+
+The isolated `earth-demo-profile/Maps/toroid-earth-demo.vmap` symlink now
+points to the assembled map. The previous target remains locally available as
+`earth-reserved-guard-diagnostic.vmap` in the same draft directory. The SDL3
+client build `32936c5` with the diagnostic shortcuts started the selected map
+through the normal scenario list; a human hero moved from `(164,353,0)` to
+`(165,353,0)` and the client exited with code 0. The observation stream is
+`runtime/earth-map-research-2026-11-15/assembled-portal-gui-observation.jsonl`.
+The relocated portal itself has not yet been traversed in the graphical client;
+these checks do not establish full scenario playability or visual acceptance.
