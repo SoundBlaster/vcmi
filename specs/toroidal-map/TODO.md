@@ -8,8 +8,9 @@ coverage already and does not imply that all of its cases are unimplemented.
 
 ## 1. Earth seam playthroughs
 
-- [ ] Check human-controlled north/south crossings in both directions in the
-  graphical Earth game, including continuation after save and reload.
+- [x] Check human-controlled north/south crossings in both directions in the
+  graphical Earth game, including continuation after save and reload:
+  [staged Earth fixture](evidence/earth-gui-vertical-save-2026-11-15.md).
 - [ ] Check all four corner crossings and their reverse directions in the
   graphical Earth game. Use separately identified staged fixtures if needed.
 - [ ] Record map, build, commands, observed hero state and remaining gaps.

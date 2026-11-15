@@ -451,6 +451,9 @@ that graphical run did not cross a seam.
 On a separately staged Earth copy, a human player crossed the horizontal
 seam in both directions, saved on its far side and crossed again after reload;
 see [the graphical seam and save record](evidence/earth-gui-seam-save-2026-11-15.md).
+Another staged Earth copy crossed the vertical seam in both directions and
+repeated a crossing after reload; a subsequent corner shortcut did not move
+the hero, for an undetermined reason. See [the vertical seam record](evidence/earth-gui-vertical-save-2026-11-15.md).
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
