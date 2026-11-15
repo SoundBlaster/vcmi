@@ -24,3 +24,26 @@ This is software-canvas and geometry evidence. It does not establish actual
 GUI appearance, fog interactions, other rendering backends, or scrolling and
 animation continuity. The tests use synthetic icon pixels and do not compare
 the original game artwork.
+
+## Player visibility at corners
+
+`HeroMovementTest.MinimapHeroListRespectsFogAtToroidalCorners` uses a live
+two-player, two-level game state. It moves an enemy hero's map object to each
+corner and queries the same player-specific `getHeroes` callback consumed by
+the minimap. On each level, the enemy is absent while hidden, remains absent
+when only the other level and the enemy player's fog are revealed, appears
+when its own tile is revealed, and disappears when that tile is hidden again.
+The enemy's owner still receives their own hero when their fog is artificially
+closed. The test changes fog and object positions directly; it does not model
+normal movement or fog packets.
+
+On macOS arm64, `vcmitest` built from `ed2e4d7` plus this test. This test,
+the wrapped object-visibility test and minimap icon-coordinate test passed.
+The existing SDL3 software-canvas corner-icon test also passed separately.
+Reports are `runtime/minimap-hero-fog-2026-11-15.xml` and
+`runtime/minimap-hero-sprite-2026-11-15.xml` under the TB5 build root; linker
+warnings about duplicate libraries and missing Conan paths persisted.
+The callback and compositing checks are separate: no real `CMinimap` was
+rendered under fog, and no client-to-client visibility or actual icon artwork
+was inspected in this run. An existing visible icon may cover neighboring black
+pixels; this test does not establish a per-pixel fog mask.

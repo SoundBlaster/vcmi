@@ -3432,6 +3432,47 @@ TEST_F(HeroMovementTest, ObjectVisibilityUsesWrappedFootprintTiles)
 	EXPECT_FALSE(object.isVisibleFor(player));
 }
 
+TEST_F(HeroMovementTest, MinimapHeroListRespectsFogAtToroidalCorners)
+{
+	const PlayerColor red(0), blue(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(red).playerActive(blue)
+		.hero(int3(12, 10, 0), HeroTypeID(0), red)
+		.hero(int3(21, 20, 0), HeroTypeID(1), blue);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	auto * enemy = findHeroByOwner(blue);
+	ASSERT_NE(enemy, nullptr);
+	const auto redCallback = makeCallback(red);
+	const auto blueCallback = makeCallback(blue);
+	ASSERT_EQ(redCallback->getPlayerStatus(red), EPlayerStatus::INGAME);
+	ASSERT_EQ(redCallback->getPlayerStatus(blue), EPlayerStatus::INGAME);
+	for(int level : {0, 1})
+	for(const int3 corner : {int3(0, 0, level), int3(35, 0, level), int3(0, 35, level), int3(35, 35, level)})
+	{
+		SCOPED_TRACE(corner.toString());
+		map()->moveObject(enemy->id, enemy->convertFromVisitablePos(corner));
+		ASSERT_EQ(enemy->visitablePos(), corner);
+		setMapVisibility(red, false);
+		setMapVisibility(blue, false);
+		ASSERT_EQ(blueCallback->getHeroes(blue).size(), 1); // Own hero remains known.
+		// The same coordinates on the other level and the opponent's own fog
+		// must not reveal this enemy to the red player's minimap.
+		gameState()->getPlayerTeam(red)->fogOfWarMap[int3(corner.x, corner.y, 1 - level)] = 1;
+		gameState()->getPlayerTeam(blue)->fogOfWarMap[corner] = 1;
+		EXPECT_TRUE(redCallback->getHeroes(blue).empty());
+		EXPECT_EQ(redCallback->tryGetObj(enemy->id), nullptr);
+		ASSERT_EQ(blueCallback->getHeroes(blue).size(), 1);
+		gameState()->getPlayerTeam(red)->fogOfWarMap[corner] = 1;
+		const auto revealed = redCallback->getHeroes(blue);
+		ASSERT_EQ(revealed.size(), 1);
+		EXPECT_EQ(revealed.front()->id, enemy->id);
+		EXPECT_EQ(redCallback->tryGetObj(enemy->id), enemy);
+		gameState()->getPlayerTeam(red)->fogOfWarMap[corner] = 0;
+		EXPECT_TRUE(redCallback->getHeroes(blue).empty());
+	}
+}
+
 TEST_F(HeroMovementTest, SpecialTerrainCoversOppositeCornerOnToroidalMap)
 {
 	const PlayerColor player(0);
