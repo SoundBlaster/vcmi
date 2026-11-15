@@ -212,8 +212,10 @@ unverified in this run.
 
 A [Finder preview](evidence/macos-finder-preview-2026-11-15.md) now starts
 with its own temporary client log, avoiding interference with a previously
-running client. Finder opened it to the main menu without launch arguments;
-gameplay in that separate Finder run remains unverified.
+running client. A later Finder double-click launched the `9f20a0b` bundle without arguments;
+keyboard navigation started Crossroads and crossed one corner. This was not
+a continuity check, and an accidentally launched older bundle truncated a
+shared log as described in the evidence record.
 
 A generated legacy H3M defaults to bounded mode and rejects direct crossings
 in all eight directions on both levels; the same steps succeed after an

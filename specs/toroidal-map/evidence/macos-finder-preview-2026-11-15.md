@@ -31,3 +31,36 @@ No new map was played in this run. The preceding
 same source revision in the earlier bundle. Finder's actual double-click
 gesture, macOS access retention after reboot and visual smoothness remain
 unverified. This is not a notarized or portable release.
+
+## Current build: Finder double-click and gameplay
+
+On macOS arm64, Finder double-clicked the separate signed
+`runtime/VCMI Toroid Preview 9f20a0b Finder.app` without launch arguments.
+The resulting process used its private temporary log and its window showed
+`1.8.0.9f20a0b`. After the intro was dismissed, ordinary keyboard commands
+opened the scenario list, selected `Toroid Crossroads`, and started a game.
+The installed VMAP SHA-256 was
+`dc22f9087595505366d7e6c6ff585df4e9b265436a18a2c7d6d539493848735f`,
+matching the versioned map. The map started with the human player in control.
+Two northwest key presses collected 1,000 gold and crossed both seams: the
+server logged raw hero anchors `(1,0,0)` to `(36,35,0)` and 1,278 remaining
+movement points. A static view after the crossing showed the road junction.
+The client exited through the in-game confirmation and the local server closed
+correctly. No manual save was made; a new scenario save directory was created.
+
+The copied client log is
+`runtime/gui-finder-9f20a0b-2026-11-15/client.log` under the TB5 build root,
+SHA-256 `26efb49d3eea90825600e7d4a71b7d5dcfb8719ad09278ce0367409ad63fc121`.
+This verifies one local startup and game path, not startup after reboot, a
+portable release, or continuous animation and scrolling. The static views
+were observed but not retained. Computer Use mouse and text-injection attempts
+did not focus the map filter in this run; keyboard list navigation worked.
+This does not establish whether a physical mouse or keyboard is affected.
+
+While selecting an app by its shared display name, Computer Use additionally
+started the old `f0f7f4a` bundle without its private-log launcher. It was
+closed immediately, but its startup truncated the common client log also held
+open by a pre-existing baseline process. The log now starts with the old
+preview launch; no copy of its immediately preceding contents was found in
+the log directory. The pre-existing baseline process was not stopped. The
+current Finder preview's separate log was not affected.
