@@ -105,6 +105,12 @@ TEST_F(SaveFileTest, boundedSaveUsesPreviousUnmarkedVersion)
 	EXPECT_EQ(loader.readChunk(SaveFileFormat::CHUNK_GAMESTATE), gameState);
 }
 
+TEST_F(SaveFileTest, NetworkFramingDoesNotChangeSavedGameVersions)
+{
+	EXPECT_EQ(SaveFileFormat::versionForTopology(false), ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	EXPECT_EQ(SaveFileFormat::versionForTopology(true), ESerializationVersion::TOROIDAL_TRANSIENT_RETURN);
+}
+
 TEST_F(SaveFileTest, taggedVersionBelowTopologyIsRejected)
 {
 	setRawVersion(SaveFileFormat::TOROIDAL_VERSION_TAG | static_cast<uint32_t>(ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER));

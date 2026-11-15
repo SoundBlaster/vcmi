@@ -391,6 +391,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 				acceptedVersion = accepted.version;
 				clientId = greeting->clientId;
 				codec->setSerializationVersion(accepted.version);
+				if(accepted.toroidal && accepted.version >= ESerializationVersion::TOROIDAL_FRAMED_PACKETS)
+					codec->enableFramedPackets();
 			}
 			if(const auto * message = dynamic_cast<const LobbyShowMessage *>(packet.get()))
 				messages.push_back(message->message.toString(LIBRARY->staticTexts()));
@@ -1438,7 +1440,7 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 			EXPECT_EQ(noOriginHero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 			EXPECT_EQ(noOriginHero->movementPointsRemaining(), 0);
 		}
-		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::CURRENT;
+		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::TOROIDAL_TRANSIENT_RETURN;
 		EXPECT_EQ(CLoadFile::readVersion(path), expectedVersion);
 		std::ifstream file(path.c_str(), std::ios::binary);
 		std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
@@ -2535,6 +2537,8 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 				const auto accepted = LobbyTopologyCapability::decode(greeting->version);
 				negotiated = accepted.toroidal && accepted.version == ESerializationVersion::CURRENT;
 				codec->setSerializationVersion(accepted.version);
+				if(accepted.toroidal && accepted.version >= ESerializationVersion::TOROIDAL_FRAMED_PACKETS)
+					codec->enableFramedPackets();
 			}
 			if(auto * movement = dynamic_cast<TryMoveHero *>(packet.get()); movement && state)
 			{

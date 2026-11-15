@@ -147,7 +147,17 @@ void CVCMIServer::onPacketReceived(const std::shared_ptr<INetworkConnection> & c
 	if (c == nullptr)
 		throw std::out_of_range("Unknown connection received in CVCMIServer::findConnection");
 
-	auto pack = c->retrievePack(message);
+	std::unique_ptr<CPack> pack;
+	try
+	{
+		pack = c->retrievePack(message);
+	}
+	catch(const std::exception & error)
+	{
+		logNetwork->error("Rejecting invalid packet: %s", error.what());
+		onDisconnected(connection, error.what());
+		return;
+	}
 	CVCMIServerPackVisitor visitor(*this, this->gh, c);
 	pack->visit(visitor);
 }
@@ -267,7 +277,7 @@ bool CVCMIServer::supportsMapTopology(const CMapHeader & header) const
 {
 	return !header.toroidal || std::ranges::all_of(activeConnections, [](const auto & connection)
 	{
-		return connection->supportsToroidalTopology() && connection->getSerializationVersion() >= ESerializationVersion::TOROIDAL_REPLICATED_MOVEMENT_LAYER;
+		return connection->supportsToroidalTopology() && connection->getSerializationVersion() >= ESerializationVersion::TOROIDAL_FRAMED_PACKETS;
 	});
 }
 
@@ -461,6 +471,13 @@ void CVCMIServer::announcePack(CPackForLobby & pack)
 		//	continue;
 		activeConnection->sendPack(pack);
 	}
+	// The new peer reads its own acknowledgement in the legacy layout; other
+	// peers may already be framed. Switch this connection before the next pack.
+	if(const auto * greeting = dynamic_cast<const LobbyClientConnected *>(&pack))
+		for(const auto & connection : activeConnections)
+			if(connection->connectionID == greeting->clientId && connection->supportsToroidalTopology()
+				&& connection->getSerializationVersion() >= ESerializationVersion::TOROIDAL_FRAMED_PACKETS)
+				connection->enableFramedPackets();
 
 	ApplyOnServerAfterAnnounceNetPackVisitor applier(*this);
 	pack.visit(applier);

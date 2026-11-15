@@ -36,6 +36,7 @@ class DLL_LINKAGE GameConnection final : boost::noncopyable
 
 	std::mutex writeMutex;
 	bool toroidalTopologySupported = false;
+	bool framedPackets = false;
 
 public:
 	bool isMyConnection(const std::shared_ptr<INetworkConnection> & otherConnection) const;
@@ -56,4 +57,5 @@ public:
 	ESerializationVersion getSerializationVersion() const;
 	bool supportsToroidalTopology() const { return toroidalTopologySupported; }
 	void setToroidalTopologySupported(bool supported) { toroidalTopologySupported = supported; }
+	void enableFramedPackets();
 };

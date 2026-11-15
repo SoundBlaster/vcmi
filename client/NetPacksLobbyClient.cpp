@@ -83,6 +83,8 @@ void ApplyOnLobbyHandlerNetPackVisitor::visitLobbyClientConnected(LobbyClientCon
 			handler.sendClientDisconnecting();
 			return;
 		}
+		if(greeting.toroidal)
+			handler.logicConnection->enableFramedPackets();
 
 		if(handler.scenarioToStart)
 		{

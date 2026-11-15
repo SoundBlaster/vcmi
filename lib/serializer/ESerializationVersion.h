@@ -84,13 +84,14 @@ enum class ESerializationVersion : int32_t
 	TOROIDAL_MOVEMENT_SOURCE_LAYER, // server tracks each hero's last confirmed movement layer
 	TOROIDAL_REPLICATED_MOVEMENT_LAYER, // clients receive and persist the confirmed movement layer
 	TOROIDAL_TRANSIENT_RETURN, // server preserves the land tile where transit started
+	TOROIDAL_FRAMED_PACKETS, // negotiated toroidal packets identify their wire layout
 
 	RELEASE_170 = HOTA_MAP_STACK_COUNT,
 	RELEASE_174 = CUSTOM_GARRISON_TITLE,
 
 	MINIMAL = RELEASE_170,
 	MINIMAL_LOBBY = LOBBY_SCENARIO_LIST, // client and server of lobby reject each other below this version
-	CURRENT = TOROIDAL_TRANSIENT_RETURN,
+	CURRENT = TOROIDAL_FRAMED_PACKETS,
 };
 
 static_assert(ESerializationVersion::MINIMAL <= ESerializationVersion::CURRENT, "Invalid serialization version definition!");

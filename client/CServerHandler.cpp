@@ -982,7 +982,7 @@ public:
 	}
 };
 
-void CServerHandler::onPacketReceived(const std::shared_ptr<INetworkConnection> &, const std::vector<std::byte> & message)
+void CServerHandler::onPacketReceived(const std::shared_ptr<INetworkConnection> & connection, const std::vector<std::byte> & message)
 {
 	std::unique_lock<std::mutex> interfaceLock;
 	if(ENGINE)
@@ -991,7 +991,20 @@ void CServerHandler::onPacketReceived(const std::shared_ptr<INetworkConnection> 
 	if(getState() == EClientState::DISCONNECTING)
 		return;
 
-	auto pack = logicConnection->retrievePack(message);
+	std::unique_ptr<CPack> pack;
+	try
+	{
+		pack = logicConnection->retrievePack(message);
+	}
+	catch(const std::exception & error)
+	{
+		logNetwork->error("Rejecting invalid packet: %s", error.what());
+		connection->close();
+		if(interfaceLock.owns_lock())
+			interfaceLock.unlock();
+		onDisconnected(connection, error.what());
+		return;
+	}
 	ServerHandlerCPackVisitor visitor(*this);
 	pack->visit(visitor);
 }

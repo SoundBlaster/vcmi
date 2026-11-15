@@ -12,10 +12,19 @@
 
 #include "BinaryDeserializer.h"
 #include "BinarySerializer.h"
+#include "ESerializationVersion.h"
 
 #include "../gameState/CGameState.h"
 #include "../networkPacks/NetPacksBase.h"
 #include "../network/NetworkInterface.h"
+
+namespace
+{
+constexpr std::array<std::byte, 4> PACKET_FRAME_MAGIC = {
+	std::byte{1}, std::byte{'T'}, std::byte{'R'}, std::byte{'F'}
+};
+constexpr size_t PACKET_FRAME_SIZE = 8;
+}
 
 class GameConnectionPackWriter final : public IBinaryWriter
 {
@@ -80,6 +89,13 @@ void GameConnection::sendPack(const CPack & pack)
 		throw std::runtime_error("Attempt to send packet on a closed connection!");
 
 	packWriter->buffer.clear();
+	if(framedPackets)
+	{
+		packWriter->buffer.insert(packWriter->buffer.end(), PACKET_FRAME_MAGIC.begin(), PACKET_FRAME_MAGIC.end());
+		const auto version = static_cast<uint32_t>(serializer->version);
+		for(unsigned shift = 0; shift < 32; shift += 8)
+			packWriter->buffer.push_back(static_cast<std::byte>((version >> shift) & 0xff));
+	}
 	*serializer & &pack;
 
 	logNetwork->trace("Sending a pack of type %s", typeid(pack).name());
@@ -95,6 +111,17 @@ std::unique_ptr<CPack> GameConnection::retrievePack(const std::vector<std::byte>
 
 	packReader->buffer = &data;
 	packReader->position = 0;
+	if(framedPackets)
+	{
+		if(data.size() < PACKET_FRAME_SIZE || !std::equal(PACKET_FRAME_MAGIC.begin(), PACKET_FRAME_MAGIC.end(), data.begin()))
+			throw std::runtime_error("Missing or invalid network packet layout header!");
+		uint32_t version = 0;
+		for(unsigned index = 0; index < 4; ++index)
+			version |= std::to_integer<uint32_t>(data[4 + index]) << (8 * index);
+		if(version != static_cast<uint32_t>(deserializer->version))
+			throw std::runtime_error("Network packet layout version mismatch!");
+		packReader->position = PACKET_FRAME_SIZE;
+	}
 
 	*deserializer & result;
 
@@ -135,4 +162,11 @@ void GameConnection::setSerializationVersion(ESerializationVersion version)
 {
 	deserializer->version = version;
 	serializer->version = version;
+}
+
+void GameConnection::enableFramedPackets()
+{
+	if(getSerializationVersion() < ESerializationVersion::TOROIDAL_FRAMED_PACKETS)
+		throw std::runtime_error("Framed packets require a newer negotiated version!");
+	framedPackets = true;
 }

@@ -43,6 +43,7 @@ public:
 		codec = std::make_unique<GameConnection>(transport);
 		LobbyClientConnected greeting;
 		greeting.uuid = uuid;
+		greeting.names = {uuid};
 		greeting.mode = EStartMode::NEW_GAME;
 		greeting.version = offered;
 		codec->sendPack(greeting);
@@ -50,17 +51,28 @@ public:
 	void onPacketReceived(const std::shared_ptr<INetworkConnection> &, const std::vector<std::byte> & bytes) override
 	{
 		auto packet = codec->retrievePack(bytes);
+		if(!ack && !dynamic_cast<LobbyClientConnected *>(packet.get()))
+			++packetsBeforeOwnAcknowledgement;
+		if(ack && dynamic_cast<LobbyClientConnected *>(packet.get()))
+			++otherAcknowledgements;
+		if(dynamic_cast<LobbyChatMessage *>(packet.get()))
+			++receivedChats;
 		const auto * connected = dynamic_cast<const LobbyClientConnected *>(packet.get());
 		if(connected && connected->uuid == uuid)
 		{
 			ack = LobbyTopologyCapability::decode(connected->version);
 			codec->setSerializationVersion(ack->version);
+			if(ack->toroidal && ack->version >= ESerializationVersion::TOROIDAL_FRAMED_PACKETS)
+				codec->enableFramedPackets();
 		}
 	}
 	std::string uuid;
 	ESerializationVersion offered;
 	std::string failure;
 	std::optional<LobbyTopologyCapability::Greeting> ack;
+	int packetsBeforeOwnAcknowledgement = 0;
+	int otherAcknowledgements = 0;
+	int receivedChats = 0;
 	std::shared_ptr<INetworkConnection> transport;
 	std::unique_ptr<GameConnection> codec;
 };
@@ -72,6 +84,10 @@ bool topologyAfterPacketRoundTrip(ESerializationVersion senderVersion, ESerializ
 	GameConnection receiver(transport);
 	sender.setSerializationVersion(senderVersion);
 	receiver.setSerializationVersion(receiverVersion);
+	if(senderVersion >= ESerializationVersion::TOROIDAL_FRAMED_PACKETS)
+		sender.enableFramedPackets();
+	if(receiverVersion >= ESerializationVersion::TOROIDAL_FRAMED_PACKETS)
+		receiver.enableFramedPackets();
 	LobbyUpdateMapInfo outgoing;
 	outgoing.mapInfo = std::make_shared<CMapInfo>();
 	outgoing.mapInfo->mapHeader = std::make_unique<CMapHeader>();
@@ -106,6 +122,25 @@ TEST(GameConnectionTopologyTest, PreviousTaggedToroidalPeerNegotiatesItsOwnVersi
 	auto transport = std::make_shared<PacketCapture>();
 	auto connection = std::make_shared<GameConnection>(transport);
 	connection->setSerializationVersion(prior);
+	connection->setToroidalTopologySupported(true);
+	CVCMIServer server(0, true);
+	server.activeConnections.push_back(connection);
+	CMapHeader map;
+	map.toroidal = true;
+	EXPECT_FALSE(server.supportsMapTopology(map));
+	map.toroidal = false;
+	EXPECT_TRUE(server.supportsMapTopology(map));
+}
+
+TEST(GameConnectionTopologyTest, PreFramingToroidalPeerCannotStartToroidalGame)
+{
+	const auto old = ESerializationVersion::TOROIDAL_TRANSIENT_RETURN;
+	const auto greeting = LobbyTopologyCapability::negotiateClient(LobbyTopologyCapability::encode(old));
+	EXPECT_TRUE(greeting.toroidal);
+	EXPECT_FALSE(LobbyTopologyCapability::isSafeServerGreeting(greeting));
+	auto transport = std::make_shared<PacketCapture>();
+	auto connection = std::make_shared<GameConnection>(transport);
+	connection->setSerializationVersion(old);
 	connection->setToroidalTopologySupported(true);
 	CVCMIServer server(0, true);
 	server.activeConnections.push_back(connection);
@@ -253,6 +288,7 @@ TEST(GameConnectionTopologyTest, InternalConnectionsNegotiateBeforeToroidalStart
 	pump();
 	ASSERT_TRUE(tagged.failure.empty()) << tagged.failure;
 	ASSERT_TRUE(tagged.ack.has_value());
+	EXPECT_GT(tagged.packetsBeforeOwnAcknowledgement, 0);
 	EXPECT_TRUE(tagged.ack->toroidal);
 	EXPECT_EQ(tagged.ack->version, ESerializationVersion::CURRENT);
 	CMapHeader map;
@@ -262,6 +298,8 @@ TEST(GameConnectionTopologyTest, InternalConnectionsNegotiateBeforeToroidalStart
 	pump();
 	ASSERT_TRUE(untagged.failure.empty()) << untagged.failure;
 	ASSERT_TRUE(untagged.ack.has_value());
+	EXPECT_GT(untagged.packetsBeforeOwnAcknowledgement, 0);
+	EXPECT_GT(tagged.otherAcknowledgements, 0);
 	EXPECT_FALSE(untagged.ack->toroidal);
 	EXPECT_EQ(untagged.ack->version, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
 	EXPECT_FALSE(server.supportsMapTopology(map));
@@ -309,9 +347,7 @@ TEST(GameConnectionTopologyTest, TcpConnectionsNegotiateBeforeToroidalStartGuard
 	EXPECT_TRUE(server.supportsMapTopology(map));
 }
 
-// The raw codec still relies on correct negotiation; keep the desired
-// fail-closed behavior visible as a separate defense-in-depth regression.
-TEST(GameConnectionTopologyTest, DISABLED_RejectsConflictingTopologyWireLayouts)
+TEST(GameConnectionTopologyTest, RejectsConflictingTopologyWireLayouts)
 {
 	const auto old = ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
 	EXPECT_THROW(topologyAfterPacketRoundTrip(old, ESerializationVersion::CURRENT), std::runtime_error);
@@ -319,4 +355,117 @@ TEST(GameConnectionTopologyTest, DISABLED_RejectsConflictingTopologyWireLayouts)
 		const bool decoded = topologyAfterPacketRoundTrip(ESerializationVersion::CURRENT, old);
 		ADD_FAILURE() << "Conflicting layout accepted with toroidal=" << decoded;
 	}, std::runtime_error);
+}
+
+TEST(GameConnectionTopologyTest, RejectsDamagedOrWrongVersionFrame)
+{
+	auto transport = std::make_shared<PacketCapture>();
+	GameConnection sender(transport);
+	sender.setSerializationVersion(ESerializationVersion::CURRENT);
+	sender.enableFramedPackets();
+	LobbyUpdateMapInfo outgoing;
+	outgoing.mapInfo = std::make_shared<CMapInfo>();
+	outgoing.mapInfo->mapHeader = std::make_unique<CMapHeader>();
+	outgoing.mapInfo->mapHeader->toroidal = true;
+	sender.sendPack(outgoing);
+	ASSERT_GT(transport->bytes.size(), 8u);
+	const auto original = transport->bytes;
+	for(int corruption = 0; corruption < 3; ++corruption)
+	{
+		auto bytes = original;
+		if(corruption == 0)
+			bytes.resize(7);
+		else if(corruption == 1)
+			bytes[1] ^= std::byte{1};
+		else
+			bytes[4] ^= std::byte{1};
+		GameConnection receiver(transport);
+		receiver.setSerializationVersion(ESerializationVersion::CURRENT);
+		receiver.enableFramedPackets();
+		EXPECT_THROW(receiver.retrievePack(bytes), std::runtime_error) << "corruption=" << corruption;
+	}
+}
+
+TEST(GameConnectionTopologyTest, InvalidFramedPeerIsDisconnectedWithoutDroppingHost)
+{
+	CVCMIServer server(0, true);
+	server.prepare(false, false);
+	const auto connect = [&](const std::string & uuid)
+	{
+		auto transport = std::make_shared<PacketCapture>();
+		server.onNewConnection(transport);
+		auto connection = server.activeConnections.back();
+		LobbyClientConnected greeting;
+		greeting.uuid = uuid;
+		greeting.mode = EStartMode::NEW_GAME;
+		greeting.version = LobbyTopologyCapability::encode(ESerializationVersion::CURRENT);
+		ApplyOnServerNetPackVisitor visitor(server, connection);
+		visitor.visitLobbyClientConnected(greeting);
+		EXPECT_TRUE(visitor.getResult());
+		server.announcePack(greeting);
+		return transport;
+	};
+	const auto host = connect("valid-host");
+	const auto badPeer = connect("invalid-peer");
+	ASSERT_EQ(server.activeConnections.size(), 2u);
+	const std::vector<std::byte> wrongVersion = {
+		std::byte{1}, std::byte{'T'}, std::byte{'R'}, std::byte{'F'},
+		std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0}
+	};
+	EXPECT_NO_THROW(server.onPacketReceived(badPeer, wrongVersion));
+	EXPECT_TRUE(badPeer->closed);
+	ASSERT_EQ(server.activeConnections.size(), 1u);
+	EXPECT_FALSE(host->closed);
+	GameConnection client(host);
+	client.setSerializationVersion(ESerializationVersion::CURRENT);
+	client.enableFramedPackets();
+	LobbyChatMessage chat;
+	chat.playerName = "valid-host";
+	chat.message.appendRawString("still connected");
+	client.sendPack(chat);
+	const auto request = host->bytes;
+	EXPECT_NO_THROW(server.onPacketReceived(host, request));
+	EXPECT_FALSE(host->closed);
+	EXPECT_EQ(server.activeConnections.size(), 1u);
+}
+
+TEST(GameConnectionTopologyTest, TcpInvalidFramedPeerDoesNotInterruptHost)
+{
+	CVCMIServer server(0, true);
+	const auto port = server.prepare(false, true);
+	ASSERT_NE(port, 0);
+	auto network = INetworkHandler::createHandler();
+	LobbyProbe host("tcp-host", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	LobbyProbe badPeer("tcp-bad", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	const auto pumpUntil = [&](const auto & predicate)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+		while(!predicate() && std::chrono::steady_clock::now() < deadline)
+		{
+			network->getContext().restart();
+			network->getContext().poll();
+			server.getNetworkHandler().getContext().restart();
+			server.getNetworkHandler().getContext().poll();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		return predicate();
+	};
+	network->connectToRemote(host, "127.0.0.1", port);
+	ASSERT_TRUE(pumpUntil([&] { return host.ack.has_value() || !host.failure.empty(); }));
+	ASSERT_TRUE(host.failure.empty()) << host.failure;
+	network->connectToRemote(badPeer, "127.0.0.1", port);
+	ASSERT_TRUE(pumpUntil([&] { return badPeer.ack.has_value() || !badPeer.failure.empty(); }));
+	ASSERT_TRUE(badPeer.failure.empty()) << badPeer.failure;
+	ASSERT_EQ(server.activeConnections.size(), 2u);
+	badPeer.transport->sendPacket({std::byte{1}, std::byte{'T'}, std::byte{'R'}, std::byte{'F'},
+		std::byte{0}, std::byte{0}, std::byte{0}, std::byte{0}});
+	ASSERT_TRUE(pumpUntil([&] { return server.activeConnections.size() == 1; }));
+	ASSERT_TRUE(host.failure.empty()) << host.failure;
+	LobbyChatMessage chat;
+	chat.playerName = "tcp-host";
+	chat.message.appendRawString("still connected");
+	host.codec->sendPack(chat);
+	EXPECT_TRUE(pumpUntil([&] { return host.receivedChats > 0 || !host.failure.empty(); }));
+	EXPECT_TRUE(host.failure.empty()) << host.failure;
+	EXPECT_GT(host.receivedChats, 0);
 }
