@@ -4792,6 +4792,72 @@ TEST_P(ToroidalGuardedDisembarkTest, RetreatFromGuardedShoreLeavesTheBoatAtSea)
 	EXPECT_EQ(boat->visitablePos(), water);
 }
 
+TEST_P(ToroidalGuardedDisembarkTest, VisitableShoreBlocksDisembarkation)
+{
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions[GetParam() % directions.size()];
+	const int z = GetParam() / directions.size();
+	const MapTopology topology(36, 36, 2, true);
+	const int3 water(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+	const int3 direction(dx, dy, 0);
+	const auto shore = *topology.canonicalize(water + direction);
+	const auto embarkShore = *topology.canonicalize(water - direction);
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.terrain(water, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(embarkShore));
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(water, BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	const auto boatId = hero->getBoat()->id;
+	const std::string text = R"({ "animation": "test.def", "mask": [ "V" ] })";
+	JsonNode definition(text.data(), text.size(), "NonblockingShoreEvent");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	appearance->id = Obj::EVENT;
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	auto event = std::make_shared<CGEvent>(gameState().get());
+	event->ID = Obj::EVENT;
+	event->subID = MapObjectSubID(0);
+	event->pos = shore;
+	event->appearance = appearance;
+	event->instanceName = "nonblocking_shore_event";
+	map()->addNewObject(event);
+	ASSERT_TRUE(map()->getTile(shore).visitable());
+	ASSERT_FALSE(map()->getTile(shore).blocked());
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder pathfinder(*gameState(), config);
+	pathfinder.calculatePaths();
+	const auto * node = paths.getNode(shore, EPathfindingLayer::LAND);
+	if(node->reachable() && node->theNodeBefore)
+		EXPECT_NE(node->theNodeBefore->coord, water);
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), water);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	ASSERT_TRUE(hero->inBoat());
+	EXPECT_EQ(hero->getBoat()->id, boatId);
+	EXPECT_NE(map()->getObject(event->id), nullptr);
+	map()->hideObject(event.get());
+	ASSERT_FALSE(map()->getTile(shore).visitable());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), shore);
+	EXPECT_FALSE(hero->inBoat());
+	ASSERT_NE(map()->getObject(boatId), nullptr);
+	EXPECT_EQ(map()->getObject(boatId)->visitablePos(), water);
+}
+
 INSTANTIATE_TEST_SUITE_P(EdgeAndCornerOnBothLevels, ToroidalGuardedDisembarkTest, ::testing::Range(0, 16));
 
 TEST_F(HeroMovementTest, BoatCannotDisembarkOntoNonblockingEventAcrossSeam)
