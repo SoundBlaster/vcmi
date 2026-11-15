@@ -406,9 +406,21 @@ opt-in test initialized an actual in-process game state, found exactly two
 isolated two-entrance/two-exit channels, and used the server activity handler
 to visit each portal in both directions. For those visits the test places a
 hero directly at each entrance and chooses the matching exit; it does not
-exercise ordinary approach, nearby guards, a network client or a full game.
-This test passed three times on macOS arm64, and 28 Python geometry and
+exercise ordinary approach or nearby guards. This test passed three times on
+macOS arm64, and 28 Python geometry and
 conversion tests passed. `MapFormat` normally passed 14 cases with four
 optional inspections skipped. The assembler change is `46cd49c` and the
 opt-in game-state inspection is `4d22789`; the tested executable was built
 from `0f0d2e0` with the inspection changes in the worktree.
+
+The opt-in inspection also supports `VCMI_INSPECT_APPROACH_PORTALS`. For the
+same candidate, it placed a hero on a free adjacent cell, made a normal server
+movement to each of the four entrances, and selected the corresponding exit.
+All four approaches started guard battles; the test set the guards not to
+flee or join, forced victory using the server's battle test hook, answered
+level-up prompts, and checked arrival at the paired exit. With
+`VCMI_INSPECT_REQUIRE_ALL_GUARDS`, the four battles and traversals passed in
+three consecutive runs. This is stronger than direct visits, but still does
+not prove an approach from a starting town, normal battle play, graphics,
+remote networking, or the rest of the scenario. The test change is
+`0cbde2c`; it was built from `505ef7f` with that change in the worktree.
