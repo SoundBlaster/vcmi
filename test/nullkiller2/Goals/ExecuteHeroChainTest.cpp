@@ -622,6 +622,73 @@ TEST_P(ToroidalAITransientSafetyTest, FullTurnCrossesWithFogRevealedByMovement)
 	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 }
 
+TEST_P(ToroidalAITransientSafetyTest, FullTurnDoesNotStrandHeroOnDistantIslandRoute)
+{
+	const int z = GetParam() / 2;
+	const bool flight = GetParam() % 2;
+	const SpellID spell(SpellID::decode(flight ? "core:fly" : "core:waterWalk"));
+	const int3 island(0, 18, z), shore(23, 18, z), gold(22, 18, z);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
+		.hero(int3(19, 18, 0), HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID(0), 1}})
+		.heroPrimary(1, 1, 10, 10)
+		.heroSecondarySkills({{SecondarySkill::WISDOM, 3}, {SecondarySkill::AIR_MAGIC, 3}, {SecondarySkill::WATER_MAGIC, 3}})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({spell})
+		.hero(int3(20, 20, 0), HeroTypeID(1), ENEMY)
+		.resource(gold, GameResID::GOLD, 10);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+		{
+			const int3 position(x, y, z);
+			if(position != island && position != shore && position != gold && position != int3(18, 18, 0) && position != int3(19, 20, 0))
+				builder.terrain(position, TerrainId::WATER);
+		}
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	auto * hero = findHeroByOwner(PLAYER);
+	auto * resource = findFirst<CGResource>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(resource, nullptr);
+	const auto resourceId = resource->id;
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(island));
+	hero->mana = 100;
+	hero->setMovementPoints(1200);
+	ASSERT_TRUE(hero->canCastThisSpell(spell.toSpell()));
+	ASSERT_TRUE(gameState()->isVisibleFor(gold, PLAYER));
+	SpellAndMoveClient client(gameState(), PLAYER);
+	auto gateway = makeGateway(PLAYER, &client);
+	client.gateway = gateway.get();
+	client.enableNotifications();
+	withGameStateReadLock([&] { gateway->nullkiller->makeTurn(); });
+	EXPECT_EQ(client.rejectedMoves, 0);
+	EXPECT_EQ(client.casts, 0);
+	EXPECT_EQ(client.moves, 0);
+	EXPECT_EQ(hero->visitablePos(), island);
+	EXPECT_EQ(hero->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+	EXPECT_NE(gameState()->getObjInstance(resourceId), nullptr);
+
+	// The same target must become actionable with enough movement points.
+	// Recreate the AI to avoid carrying turn-local locks into this control.
+	hero->setMovementPoints(2000);
+	gateway = makeGateway(PLAYER, &client);
+	client.gateway = gateway.get();
+	client.enableNotifications();
+	withGameStateReadLock([&] { gateway->nullkiller->makeTurn(); });
+	EXPECT_EQ(client.casts, 1);
+	EXPECT_EQ(client.rejectedMoves, 0);
+	EXPECT_EQ(gameState()->getObjInstance(resourceId), nullptr);
+	EXPECT_TRUE(std::ranges::any_of(client.appliedMoves, [flight, z](const auto & move)
+	{
+		const auto & [from, to, layer] = move;
+		return from.x == 0 && to.x == 35 && from.z == z && to.z == z
+			&& layer == (flight ? EPathfindingLayer::AIR : EPathfindingLayer::WATER);
+	}));
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+}
+
 INSTANTIATE_TEST_SUITE_P(AbilitiesAndLevels, ToroidalAITransientSafetyTest, ::testing::Range(0, 4));
 
 using EscapeSeam = std::pair<int3, int3>;

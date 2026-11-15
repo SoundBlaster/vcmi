@@ -142,6 +142,11 @@ After six test-driven server steps across a seam, the same record checks an
 unsafe seventh step is rejected and the AI gateway returns to the island for
 both abilities and levels. Its rejection of a water destination is not by
 itself a test of route-safety filtering.
+For a fully revealed distant island, an autonomous AI turn sends no cast or
+movement when 1,200 points cannot reach land; with 2,000 points a fresh AI
+casts, crosses the west seam and collects the same visible resource. See the
+[AI transient record](evidence/nullkiller-transient-seam-2026-11-15.md) for
+the synthetic control and limits of this result.
 
 Nullkiller's danger-map path searches now use the AI player's fog for
 neighbors and known guards even when simulating an enemy hero. Synthetic

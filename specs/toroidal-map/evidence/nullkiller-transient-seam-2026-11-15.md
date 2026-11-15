@@ -124,3 +124,28 @@ cases passed again after adding the other-level fog assertion. Reports are
 `runtime/ai-transient-fog-related-2026-11-15.xml` and
 `runtime/ai-transient-fog-final-2026-11-15.xml` under the TB5 build root.
 The linker retained duplicate-library and missing Conan search-path warnings.
+
+## Distant visible island with insufficient movement
+
+`ToroidalAITransientSafetyTest.FullTurnDoesNotStrandHeroOnDistantIslandRoute`
+places a visible gold pile on a shore 13 cardinal steps across the west seam
+from a one-tile island. The fully revealed synthetic map has water between
+the two islands. With 1,200 movement points and an available Flight or Water
+Walk spell, `Nullkiller::makeTurn()` sends no spell or movement request, keeps
+the hero on the starting island and leaves the gold in place. The test then
+sets 2,000 points, creates a fresh AI instance against the same game state and
+runs its turn loop again: it casts the spell, crosses `(0,18) → (35,18)`,
+collects the gold and ends on LAND without a rejected movement request.
+Both spells and both levels are covered.
+
+The AI and server share one in-process state through the test adapter, and
+the movement-point increase and fresh AI are a positive control, not an actual
+next-day transition. This confirms the outcome for this layout; it does not
+prove that the AI specifically rejected the target because of the landing
+rule, nor does it cover hidden targets, other obstacles, an interrupted route,
+network clients or a complete multiplayer turn handoff.
+
+The new four cases and the related AI seam suites passed all 144 tests on a
+macOS arm64 `vcmitest` build from `3972a93` plus the test change. The report
+is `runtime/ai-distant-island-related-2026-11-15.xml` on TB5. Linker warnings
+about duplicate libraries and missing Conan search paths remained.
