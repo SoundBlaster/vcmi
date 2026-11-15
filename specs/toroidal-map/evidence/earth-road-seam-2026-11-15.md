@@ -190,3 +190,26 @@ symlink was switched to `earth-connected-seam-road-verified.vmap`, SHA-256
 The prior `earth-water-portal-assembled.vmap` remains available for rollback.
 The source map and other profiles were not replaced. This integration changes
 local files only; neither the third-party map nor game assets are in git.
+
+## Reproducing the integrated map
+
+`tools/prepare_earth_demo_with_road.py` in `1b65739` combines the existing
+source-checked Earth assembly with `MapFormat.PreparesEarthConnectedSeamRoad`.
+It takes four paths: the converted two-level source VMAP, a new output VMAP,
+the branch's `vcmitest` executable and an isolated VCMI profile containing
+the required mods. It runs the assembler and engine road generator in a
+temporary directory alongside the destination, then publishes the result
+without overwriting an existing file. The tool requires a working `vcmitest`
+build and local game assets; it does not distribute either.
+
+On macOS arm64 the complete recipe succeeded against source SHA-256
+`69e1f1aff0398a7042e7b158b1ac638ae3237b23d0a5a8927f0afcb7ef0c4023`
+using the isolated Earth profile and the existing TB5 test binary. The result
+at `runtime/earth-map-research-2026-11-15/draft-stacked/earth-complete-recipe-check.vmap`
+has SHA-256
+`763283f630d0a2012db3fe995ac9c296d08cb30962ba248a46e269fed7f0043a`;
+all ZIP member contents match the integrated road draft, despite a different
+archive hash. A wrong source was rejected without producing output, and an
+existing output was rejected with its contents intact. This establishes the
+local recipe and its input/output guards, not independent portability or
+complete playability of the resulting map.
