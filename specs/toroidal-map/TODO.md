@@ -87,8 +87,10 @@ demo preparation reviewable as separate changes where practical.
   are deferred unless a defect or a demo requirement warrants them.
 - [x] Prepare a road that crosses a seam and verify its logical and static
   visual continuity: [Earth road extension](evidence/earth-road-seam-2026-11-15.md#static-view-and-local-demo-integration).
-  Its far end is not connected to another existing road network; continuous
-  animation and normal access from the starting position remain unverified.
+  Its far end is not connected to another existing road network. A
+  [diagnostic route from the start](evidence/earth-start-connectivity-2026-11-15.md#prepared-access-to-the-seam-road)
+  reaches and crosses it after two decoration removals and forced battles;
+  continuous animation and an unassisted playthrough remain unverified.
 - [ ] Make the demo convenient to launch and play with an isolated profile;
   keep third-party map and game assets outside the repository unless their
   distribution rights have been established. The [current draft starts

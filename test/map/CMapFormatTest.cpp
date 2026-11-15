@@ -28,6 +28,7 @@
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/entities/hero/CHero.h"
 #include "../../lib/gameState/CGameState.h"
+#include "../../lib/battle/BattleInfo.h"
 #include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/StartInfo.h"
 #include "../../lib/spells/CSpell.h"
@@ -1273,6 +1274,121 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 								}
 							std::cout << "Closest reachable " << (layer == EPathfindingLayer::SAIL ? "water" : "land")
 							          << " to road=" << closest.toString() << " distanceSquared=" << closestDistance << std::endl;
+						}
+						for(int y = 425; y <= 431; ++y)
+							for(int x : {251, 0, 1, 2})
+							{
+								const int3 pos(x, y, 0);
+								const auto & tile = map.getTile(pos);
+								const auto guard = state->guardingCreaturePosition(pos);
+								std::cout << "Road vicinity=" << pos.toString() << " land=" << tile.isLand()
+								          << " blocked=" << tile.blocked() << " visitable=" << tile.visitable()
+								          << " reachable=" << seamPaths.getPathInfo(pos, EPathfindingLayer::LAND)->reachable()
+								          << " guard=" << guard.toString();
+								for(const auto & id : tile.blockingObjects)
+									if(const auto * object = map.getObject(id))
+										std::cout << " blocker=" << object->instanceName;
+								if(map.isInTheMap(guard))
+									for(const auto & id : map.getTile(guard).visitableObjects)
+										if(const auto * creature = dynamic_cast<const CGCreature *>(map.getObject(id)))
+											std::cout << " creature=" << creature->instanceName;
+								std::cout << std::endl;
+							}
+						if(std::getenv("VCMI_INSPECT_EARTH_ROAD_GUARD_REMOVAL"))
+						{
+							for(const char * name : {"mountain_7569", "yuccaTrees_7568"})
+							{
+								const auto object = map.instanceNames.find(name);
+								if(std::getenv("VCMI_INSPECT_EARTH_ROAD_PREPARED"))
+									ASSERT_EQ(object, map.instanceNames.end()) << name;
+								else
+								{
+									ASSERT_NE(object, map.instanceNames.end()) << name;
+									ASSERT_TRUE(routeHandler.removeObject(object->second.get(), hero->getOwner()));
+								}
+							}
+							CPathsInfo afterDecorations(state->getMapSize(), hero);
+							auto decorationConfig = std::make_shared<SingleHeroPathfinderConfig>(afterDecorations, *state, hero);
+							CPathfinder(*state, decorationConfig).calculatePaths();
+							std::cout << "Road reachable after test decoration removal="
+							          << afterDecorations.getPathInfo(road, EPathfindingLayer::LAND)->reachable() << std::endl;
+							const auto entry = map.instanceNames.find("randomMonsterLevel3_6689");
+							ASSERT_NE(entry, map.instanceNames.end());
+							CGPath guardRoute;
+							const bool guardReachable = afterDecorations.getPath(guardRoute, entry->second->visitablePos(), EPathfindingLayer::LAND);
+							std::cout << "Road guard reachable after decoration removal=" << guardReachable
+							          << " nodes=" << guardRoute.nodes.size() << std::endl;
+							if(std::getenv("VCMI_INSPECT_EARTH_ROAD_GUARD_ROUTE"))
+							{
+								ASSERT_TRUE(guardReachable);
+								ASSERT_GE(guardRoute.nodes.size(), 2u);
+								bool reachedRoad = false;
+								for(size_t index = guardRoute.nodes.size() - 1; index > 0; --index)
+								{
+									const auto & step = guardRoute.nodes[index - 1];
+									hero->setMovementPoints(30000);
+									const bool accepted = routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(step.coord), EMovementMode::STANDARD, false, hero->getOwner(), step.layer);
+									if(!accepted || state->getBattle(hero->getOwner()) || routeHandler.activities->topActivity(hero->getOwner()))
+									{
+										std::cout << "Guard route stopped at=" << hero->visitablePos().toString()
+										          << " requested=" << step.coord.toString() << " accepted=" << accepted
+										          << " battle=" << (state->getBattle(hero->getOwner()) != nullptr)
+										          << " activity=" << (routeHandler.activities->topActivity(hero->getOwner()) != nullptr)
+										          << " remaining nodes=" << index << std::endl;
+										const auto * battle = state->getBattle(hero->getOwner());
+										ASSERT_NE(battle, nullptr);
+										const auto * guard = dynamic_cast<const CGCreature *>(entry->second.get());
+										ASSERT_NE(guard, nullptr);
+										const auto guardID = guard->id;
+										ASSERT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+										routeHandler.battles->cheatBattleVictory(hero->getOwner());
+										const auto result = routeHandler.activities->topActivity(hero->getOwner());
+										ASSERT_NE(result, nullptr);
+										ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
+										ASSERT_EQ(routeHandler.activities->submitReply(result->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+										for(int limit = 0; limit < 16; ++limit)
+										{
+											const auto prompt = routeHandler.activities->topActivity(hero->getOwner());
+											if(!prompt || (prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+												break;
+											ASSERT_EQ(routeHandler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+										}
+										ASSERT_EQ(map.getObject(guardID), nullptr);
+										hero->setMovementPoints(30000);
+										CPathsInfo toRoad(state->getMapSize(), hero);
+										auto config = std::make_shared<SingleHeroPathfinderConfig>(toRoad, *state, hero);
+										CPathfinder(*state, config).calculatePaths();
+										CGPath finalRoute;
+										ASSERT_TRUE(toRoad.getPath(finalRoute, road, EPathfindingLayer::LAND));
+										ASSERT_GE(finalRoute.nodes.size(), 2u);
+										for(size_t last = finalRoute.nodes.size() - 1; last > 0; --last)
+										{
+											const auto & next = finalRoute.nodes[last - 1];
+											ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(next.coord), EMovementMode::STANDARD, false, hero->getOwner(), next.layer));
+											ASSERT_EQ(hero->visitablePos(), next.coord);
+										}
+										ASSERT_EQ(hero->visitablePos(), road);
+										const int3 across(251, 425, 0);
+										ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(across), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
+										ASSERT_EQ(hero->visitablePos(), across);
+										ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(road), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
+										ASSERT_EQ(hero->visitablePos(), road);
+										reachedRoad = true;
+										std::cout << "Reached and crossed seam road in both directions=" << road.toString() << std::endl;
+										break;
+									}
+								}
+								ASSERT_TRUE(reachedRoad);
+							}
+							else
+							{
+								ASSERT_TRUE(routeHandler.removeObject(entry->second.get(), hero->getOwner()));
+								CPathsInfo after(state->getMapSize(), hero);
+								auto config = std::make_shared<SingleHeroPathfinderConfig>(after, *state, hero);
+								CPathfinder(*state, config).calculatePaths();
+								std::cout << "Road reachable after test decoration and guard removal="
+								          << after.getPathInfo(road, EPathfindingLayer::LAND)->reachable() << std::endl;
+							}
 						}
 					}
 				}
@@ -3106,6 +3222,15 @@ TEST(MapFormat, PreparesEarthConnectedSeamRoad)
 	ASSERT_FALSE(cactus->second->isVisitable());
 	ASSERT_TRUE(vstd::contains(map->getTile(int3(250, 425, 0)).blockingObjects, cactus->second->id));
 	map->removeObject(cactus->second->id);
+	for(const auto & [name, anchor] : std::array{
+		std::pair{"yuccaTrees_7568", int3(251, 430, 0)}, std::pair{"mountain_7569", int3(1, 431, 0)}})
+	{
+		const auto decoration = map->instanceNames.find(name);
+		ASSERT_NE(decoration, map->instanceNames.end()) << name;
+		ASSERT_FALSE(decoration->second->isVisitable());
+		ASSERT_EQ(decoration->second->anchorPos(), anchor);
+		map->removeObject(decoration->second->id);
+	}
 	const std::vector<int3> road = {{250, 425, 0}, {251, 425, 0}, {0, 425, 0}, {1, 425, 0}};
 	for(const auto & pos : road)
 	{
@@ -3141,6 +3266,9 @@ TEST(MapFormat, PreparesEarthConnectedSeamRoad)
 	for(const auto & pos : road)
 		ASSERT_EQ(reopened->getTile(pos).getRoadID(), RoadId::DIRT_ROAD) << pos.toString();
 	ASSERT_EQ(reopened->instanceNames.count("cactus_7575"), 0u);
+	ASSERT_EQ(reopened->instanceNames.count("yuccaTrees_7568"), 0u);
+	ASSERT_EQ(reopened->instanceNames.count("mountain_7569"), 0u);
+	ASSERT_EQ(reopened->instanceNames.count("randomMonsterLevel3_6689"), 1u);
 	std::ofstream out(outputPath, std::ios::binary);
 	ASSERT_TRUE(out);
 	out.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());

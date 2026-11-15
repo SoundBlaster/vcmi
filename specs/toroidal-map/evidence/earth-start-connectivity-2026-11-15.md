@@ -107,3 +107,36 @@ server calls exercise movement, visits, boat construction and boarding, but
 the forced wins, adjusted creature behavior, extra movement and revealed fog
 mean this is not a normal playthrough or evidence of battle balance. The map
 and its original source were not modified.
+
+## Prepared access to the seam road
+
+The closest reachable shore near `(1,431,0)` was hemmed in by active cells of
+`mountain_7569` and `yuccaTrees_7568`, with `randomMonsterLevel3_6689`
+guarding the route farther north. Removing only the guard in test memory did
+not make the road reachable. Removing only the two decorations made the
+guard reachable but not the road; removing all three made the road reachable.
+
+The demo preparation test `MapFormat.PreparesEarthConnectedSeamRoad` now
+removes those two specifically identified nonvisitable decorations, checking
+their original anchors and preserving the guard. The full local recipe
+produced `earth-accessible-seam-2026-11-16.vmap`, SHA-256
+`67640eefaa91e9efcf04315bef66197d834e662652bd25bd10f234391c43e5a8`.
+Compared to the previous integrated demo, decoded objects differ only by
+removal of those two decorations; header, terrain and translation archive
+members match byte for byte. The original source remains unchanged.
+
+Using the saved map, the `VCMI_INSPECT_EARTH_ROAD_PREPARED` and
+`VCMI_INSPECT_EARTH_ROAD_GUARD_ROUTE` diagnostic follows the earlier route
+from the original hero start to the shipyard, constructs and boards a boat,
+then follows the path to the guard. The server starts a battle at `(1,430,0)`
+and the test checks that the defender is `randomMonsterLevel3_6689`. After a
+forced victory the hero reaches `(0,425,0)`, crosses to `(251,425,0)` and
+returns to `(0,425,0)`. The test passed on macOS arm64 using the test changes
+on `9c82fa6`; XML is `runtime/earth-accessible-seam-crossing-2026-11-16.xml`
+on TB5. It reveals all fog, changes creature aggression and no-flee flags,
+forces three victories, and repeatedly replenishes movement; it does not prove
+the battles are winnable normally, the length of a real game, or visuals.
+
+The local demo profile's map symlink now points to this saved copy. The
+previous `earth-connected-seam-road-verified.vmap` remains on TB5 as the
+rollback target. No map or third-party assets are committed.
