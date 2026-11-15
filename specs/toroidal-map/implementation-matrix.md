@@ -466,6 +466,10 @@ repeated a crossing after reload; a subsequent corner shortcut did not move
 the hero; its destination was later found to be water. See [the vertical seam record](evidence/earth-gui-vertical-save-2026-11-15.md).
 A separate Earth copy with four prepared land corners passed all four
 diagonal crossings in the graphical game; see [the corner record](evidence/earth-gui-corners-2026-11-15.md).
+An [exploratory road fixture](evidence/earth-road-seam-2026-11-15.md) crossed
+the horizontal seam with road movement cost in a graphical game. Its two
+tiles are isolated from the existing road network, so the Earth road demo
+remains incomplete.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
