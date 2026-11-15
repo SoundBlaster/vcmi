@@ -47,3 +47,21 @@ This confirms a specific local game-state transition, not smooth animation,
 an interactive Terminal launch, Finder launch, remote multiplayer, or full AI
 support. A direct launch from the testing environment does not establish which
 other applications have macOS access to the external volume.
+
+## Launch Services after access was granted
+
+On a later attempt the same signed bundle again waited at the Saves directory;
+a process sample showed `open` during the recursive directory iterator. The
+TCC log recorded an All Files preflight and a response, but no new
+removable-volume request in the inspected interval. The preflight alone does
+not establish the cause of the wait. The test process was terminated.
+
+After the user reported granting TB5 read access, Launch Services started the
+same bundle with a fresh temporary log. It passed filesystem initialization,
+played the game intro and displayed the main menu; Computer Use observed the
+window and menu. The test client then exited through the in-game confirmation.
+The client log and earlier sample are saved as
+`runtime/preview-ab35306-2026-11-15/launch-services-after-grant.log` and
+`launch-services-pregrant-sample.txt` on TB5. This establishes one successful
+Launch Services startup, not a direct Finder double-click, persistence after
+reboot, a different signed bundle, or gameplay in this particular run.
