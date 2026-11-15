@@ -2985,6 +2985,8 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 		.twoWayPortal(int3(10, 25, 0), 0)
 		.twoWayPortal(int3(0, 10, 0), 0)
 		.twoWayPortal(int3(20, 25, 0), 0)
+		.terrain(int3(35, 15, 0), TerrainId::WATER)
+		.terrain(int3(35, 16, 0), TerrainId::WATER)
 		.terrain(int3(34, 35, 0), TerrainId::ROCK);
 	startWithMap(std::move(builder));
 	map()->setToroidalAndRebuild(true);
@@ -3014,7 +3016,16 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 	ASSERT_EQ(otherHero->visitablePos(), int3(0, 5, 0));
 	hero->setMovementPoints(3000);
 	otherHero->setMovementPoints(3000);
+	blocker->setMovementPoints(3000);
 	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::FLYING_MOVEMENT, BonusSource::OTHER, 0, BonusSourceID()));
+	const int3 boatStart(35, 15, 0);
+	{
+		GameHandlerTestServer setupServer(gameState(), player);
+		CGameHandler setupHandler(setupServer, gameState());
+		setupHandler.createBoat(boatStart, BoatId::CASTLE, player);
+	}
+	const auto boatId = map()->getTile(boatStart).topVisitableObj();
+	ASSERT_NE(dynamic_cast<CGBoat *>(map()->getObject(boatId)), nullptr);
 	const auto snapshot = gameState()->saveToMemory();
 
 	class Peer final : public INetworkClientListener
@@ -3054,6 +3065,8 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 			}
 			if(auto * movedObject = dynamic_cast<ChangeObjPos *>(packet.get()); movedObject && state)
 				state->apply(*movedObject);
+			if(auto * movementPoints = dynamic_cast<SetMovePoints *>(packet.get()); movementPoints && state)
+				state->apply(*movementPoints);
 			if(const auto * teleport = dynamic_cast<const TeleportDialog *>(packet.get()))
 				dialog = *teleport;
 			if(const auto * applied = dynamic_cast<const PackageApplied *>(packet.get()))
@@ -3214,6 +3227,68 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 	ASSERT_TRUE(first.results.at(6));
 	for(const Peer * peer : {&first, &second})
 		EXPECT_EQ(peer->state->getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+
+	// Embark and disembark across the seam, with an intervening sailing step,
+	// using a second hero and the same two TCP replicas.
+	const int3 embarkShore(0, 15, 0), sailedWater(35, 16, 0), landingShore(0, 16, 0);
+	ChangeObjPos stageSailor;
+	stageSailor.objid = blocker->id;
+	stageSailor.nPos = embarkShore;
+	server.gh->sendAndApply(stageSailor);
+	pumpUntil([&] { return first.state->getHero(blocker->id)->visitablePos() == embarkShore
+		&& second.state->getHero(blocker->id)->visitablePos() == embarkShore; });
+	ASSERT_EQ(first.state->getHero(blocker->id)->visitablePos(), embarkShore);
+	ASSERT_EQ(second.state->getHero(blocker->id)->visitablePos(), embarkShore);
+	const auto moveSailor = [&](const int3 & destination, EPathfindingLayer layer, uint32_t requestId)
+	{
+		MoveHero move({blocker->convertFromVisitablePos(destination)}, layer, blocker->id, false);
+		move.player = player;
+		move.requestID = requestId;
+		first.codec->sendPack(move);
+		pumpUntil([&] { return first.results.contains(requestId)
+			&& first.state->getHero(blocker->id)->visitablePos() == destination
+			&& second.state->getHero(blocker->id)->visitablePos() == destination; });
+		ASSERT_TRUE(first.results.contains(requestId)) << first.failure;
+		ASSERT_TRUE(first.results.at(requestId));
+		ASSERT_EQ(blocker->visitablePos(), destination);
+		for(const Peer * peer : {&first, &second})
+		{
+			const auto * replica = peer->state->getHero(blocker->id);
+			EXPECT_EQ(replica->visitablePos(), destination);
+			EXPECT_EQ(replica->inBoat(), blocker->inBoat());
+			EXPECT_EQ(replica->getPathfindingStartLayer(), blocker->getPathfindingStartLayer());
+			EXPECT_EQ(replica->movementPointsRemaining(), blocker->movementPointsRemaining());
+			if(blocker->inBoat())
+			{
+				ASSERT_TRUE(replica->inBoat());
+				EXPECT_EQ(replica->getBoat()->id, boatId);
+			}
+		}
+	};
+	const auto replenishSailor = [&]
+	{
+		server.gh->setMovePoints(blocker->id, 3000);
+		pumpUntil([&] { return first.state->getHero(blocker->id)->movementPointsRemaining() == 3000
+			&& second.state->getHero(blocker->id)->movementPointsRemaining() == 3000; });
+		ASSERT_EQ(first.state->getHero(blocker->id)->movementPointsRemaining(), 3000);
+		ASSERT_EQ(second.state->getHero(blocker->id)->movementPointsRemaining(), 3000);
+	};
+	ASSERT_NO_FATAL_FAILURE(moveSailor(boatStart, EPathfindingLayer::SAIL, 9));
+	ASSERT_TRUE(blocker->inBoat());
+	ASSERT_NO_FATAL_FAILURE(replenishSailor());
+	ASSERT_NO_FATAL_FAILURE(moveSailor(sailedWater, EPathfindingLayer::SAIL, 10));
+	ASSERT_TRUE(blocker->inBoat());
+	ASSERT_NO_FATAL_FAILURE(replenishSailor());
+	ASSERT_NO_FATAL_FAILURE(moveSailor(landingShore, EPathfindingLayer::LAND, 11));
+	ASSERT_FALSE(blocker->inBoat());
+	ASSERT_NE(map()->getObject(boatId), nullptr);
+	EXPECT_EQ(map()->getObject(boatId)->visitablePos(), sailedWater);
+	for(const Peer * peer : {&first, &second})
+	{
+		const auto * boat = peer->state->getMap().getObject(boatId);
+		ASSERT_NE(boat, nullptr);
+		EXPECT_EQ(boat->visitablePos(), sailedWater);
+	}
 
 	// Stage a normal teleport request, then change exit occupancy while its
 	// question is outstanding. Both replicas receive the setup packet via TCP.
