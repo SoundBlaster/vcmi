@@ -227,3 +227,23 @@ source, and the two test listeners share a process over loopback. This does
 not test actual graphical minimap rendering, a remote host, or confidentiality
 of network payloads; each replica contains a game state and the visibility
 claims here concern the player-specific callbacks.
+
+## Boat embarkation and disembarkation over TCP
+
+`HeroMovementTest.TcpPeersReceiveAuthoritativeCornerMovement` now also
+exercises a second hero and a boat on the surface of the synthetic toroidal
+map. The hero is staged on shore by a server packet. The owning peer requests
+embarkation from `(0,15)` to `(35,15)`, sailing to `(35,16)`, then
+disembarkation to `(0,16)`. The test replenishes movement points through a
+server packet between steps; it is not a multi-day game simulation.
+
+For each accepted request the authoritative hero and both TCP replicas agree
+on position, movement points, pathfinding layer and boat association. On
+disembarkation, the server and both replicas retain the same boat at
+`(35,16)`. The scenario's later checkpoint also compares both teams' fog on
+both levels. The extended TCP test and two existing boat tests passed three
+consecutive runs on macOS arm64; the XML report is
+`runtime/tcp-boat-crossing-2026-11-15.xml` under the TB5 build root. The
+server and test listeners are in one process over loopback TCP; graphical
+clients, corner sailing, boat persistence in this scenario and remote hosts
+remain unverified. Existing linker warnings were present.

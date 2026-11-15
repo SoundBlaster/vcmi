@@ -289,6 +289,10 @@ with an isolated HotA test profile and passes a two-level toroidal footprint
 round trip. This does not satisfy the single-level authoring goal: mask
 analysis identifies potential collisions after the proposed rearrangement,
 and the source's required-mod metadata and gameplay still require work.
+
+The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)
+also covers boat embarkation and disembarkation across one edge with two
+replicas. This is a staged loopback test, not a remote graphical game.
 [Guarded-mine tests](evidence/guarded-mine-directions-2026-11-15.md)
 exercise legal seam approaches, refusal, forced victory and retreat on both
 levels, with bounded controls; some starting positions overlap the mine and
