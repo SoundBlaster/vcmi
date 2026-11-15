@@ -2604,6 +2604,29 @@ class TownPortalTest : public TinyMapGameTest
 {
 };
 
+class TeleportMovementTestServer : public GameHandlerTestServer
+{
+public:
+	using GameHandlerTestServer::GameHandlerTestServer;
+	int failedMoves = 0;
+	ObjectInstanceID failedHero;
+	int3 failedStart;
+	int3 failedEnd;
+	ui32 failedPoints = 0;
+	void applyPack(CPackForClient & pack) override
+	{
+		if(const auto * movement = dynamic_cast<const TryMoveHero *>(&pack); movement && movement->result == TryMoveHero::FAILED)
+		{
+			++failedMoves;
+			failedHero = movement->id;
+			failedStart = movement->start;
+			failedEnd = movement->end;
+			failedPoints = movement->movePoints;
+		}
+		GameHandlerTestServer::applyPack(pack);
+	}
+};
+
 class SummonBoatTopologyTest : public TinyMapGameTest
 {
 };
@@ -2612,7 +2635,11 @@ class SubterraneanGateTopologyTest : public TinyMapGameTest
 {
 protected:
 	const Services * gameServices() override { return LIBRARY; }
-	void checkWhirlpoolTravel(TQuantity creatureCount, bool blockAllExits = false);
+	void checkWhirlpoolTravel(TQuantity creatureCount, bool blockAllExits = false, bool occupyAfterDialog = false);
+};
+
+class MonolithExitTopologyTest : public SubterraneanGateTopologyTest, public ::testing::WithParamInterface<bool>
+{
 };
 }
 
@@ -2620,7 +2647,8 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGatePairedAcrossToroidalSeam)
 {
 	const PlayerColor player(0);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
-	builder.size(36, true).playerActive(player).hero(int3(2, 5, 0), HeroTypeID(0), player);
+	builder.size(36, true).playerActive(player).hero(int3(2, 5, 0), HeroTypeID(0), player)
+		.hero(int3(6, 10, 0), HeroTypeID(1), player);
 	startWithMap(std::move(builder));
 	map()->toroidal = true;
 	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ "A" ] })";
@@ -2668,6 +2696,29 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGatePairedAcrossToroidalSeam)
 	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
 	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
 	EXPECT_EQ(hero->visitablePos(), surface->visitablePos());
+
+	// Unlike monoliths, subterranean gates allow exchange with a friendly hero
+	// on the other side. Revalidate without suppressing that interaction.
+	auto * friendly = findHeroAt({6, 10, 0});
+	ASSERT_NE(friendly, nullptr);
+	ChangeObjPos placeFriendly;
+	placeFriendly.objid = friendly->id;
+	placeFriendly.nPos = across->visitablePos();
+	gameState()->apply(placeFriendly);
+	ASSERT_EQ(map()->getTile(across->visitablePos()).topVisitableObj(), friendly->id);
+	ASSERT_TRUE(CGTeleport::isExitPassable(*gameState(), hero, across.get()));
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(1, 5, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(surface->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	const auto exchange = handler.activities->topActivity(player);
+	ASSERT_NE(exchange, nullptr);
+	EXPECT_EQ(exchange->getType(), ActivityType::GarrisonDialog);
+	EXPECT_EQ(hero->visitablePos(), surface->visitablePos());
+	EXPECT_EQ(friendly->visitablePos(), across->visitablePos());
 }
 
 TEST_F(SubterraneanGateTopologyTest, heroUsesGateWithVisitableTileAcrossSeam)
@@ -2771,6 +2822,100 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesOneWayMonolithWithExitAcrossSeam)
 	EXPECT_EQ(hero->visitablePos(), int3(35, 5, 0));
 }
 
+TEST_P(MonolithExitTopologyTest, twoWayMonolithRejectsSelectedExitOccupiedByFriendlyHero)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player)
+		.hero(int3(GetParam() ? 35 : 2, 5, 0), HeroTypeID(0), player)
+		.hero(int3(1, 10, 0), HeroTypeID(1), player);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(GetParam());
+	GameRandomizer randomizer(*gameState());
+	const auto addMonolith = [&](const int3 & pos, const std::string & name, const std::string & mask)
+	{
+		const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ ")" + mask + R"(" ] })";
+		JsonNode definition(text.data(), text.size(), "OccupiedMonolithExitTest");
+		auto appearance = std::make_shared<ObjectTemplate>();
+		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+		appearance->readJson(definition, resolver, false);
+		auto monolith = std::make_shared<CGMonolith>(gameState().get());
+		monolith->ID = Obj::MONOLITH_TWO_WAY;
+		monolith->subID = MapObjectSubID(0);
+		monolith->pos = pos;
+		monolith->instanceName = name;
+		monolith->appearance = appearance;
+		static_cast<CGObjectInstance *>(monolith.get())->initObj(randomizer);
+		map()->addNewObject(monolith);
+		monolith->assignTeleportChannel();
+		return monolith;
+	};
+	const auto entrance = addMonolith({0, 5, 0}, "two_way_entrance", GetParam() ? "A0" : "A");
+	const auto occupied = addMonolith({0, 10, 0}, "two_way_occupied", GetParam() ? "A0" : "A");
+	const auto free = addMonolith({10, 10, 0}, "two_way_free", "A");
+	ASSERT_EQ(occupied->visitablePos(), int3(GetParam() ? 35 : 0, 10, 0));
+	ASSERT_EQ(entrance->channel, occupied->channel);
+	ASSERT_EQ(entrance->channel, free->channel);
+	auto * hero = findHeroAt({GetParam() ? 35 : 2, 5, 0});
+	auto * blocker = findHeroAt({1, 10, 0});
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(blocker, nullptr);
+	// Start with the exit free; occupy it after the dialog captured its choices.
+	ChangeObjPos moveBlocker;
+	moveBlocker.objid = blocker->id;
+	moveBlocker.nPos = int3(4, 10, 0);
+	gameState()->apply(moveBlocker);
+	ASSERT_TRUE(CGTeleport::isExitPassable(*gameState(), hero, occupied.get()));
+	ASSERT_TRUE(CGTeleport::isExitPassable(*gameState(), hero, free.get()));
+	hero->setMovementPoints(3000);
+	TeleportMovementTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(entrance->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	auto dialog = std::dynamic_pointer_cast<TeleportDialogActivity>(handler.activities->topActivity(player));
+	ASSERT_NE(dialog, nullptr);
+	if(GetParam())
+	{
+		// Legacy-style seam placement can store anchor x=0 for visitable x=35.
+		map()->moveObject(hero->id, int3(0, 5, 0));
+		ASSERT_EQ(hero->anchorPos(), int3(0, 5, 0));
+		ASSERT_EQ(hero->visitablePos(), entrance->visitablePos());
+	}
+	const auto selected = std::ranges::find_if(dialog->td.exits, [&](const auto & exit) { return exit.first == occupied->id; });
+	ASSERT_NE(selected, dialog->td.exits.end());
+	const auto index = std::distance(dialog->td.exits.begin(), selected);
+	moveBlocker.nPos = occupied->visitablePos();
+	gameState()->apply(moveBlocker);
+	ASSERT_EQ(blocker->visitablePos(), occupied->visitablePos());
+	ASSERT_EQ(map()->getTile(occupied->visitablePos()).topVisitableObj(), blocker->id);
+	ASSERT_FALSE(CGTeleport::isExitPassable(*gameState(), hero, occupied.get()));
+	const auto pointsBeforeRejection = hero->movementPointsRemaining();
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, index), ReplyOutcome::Accepted);
+	EXPECT_EQ(hero->visitablePos(), entrance->visitablePos());
+	EXPECT_EQ(blocker->visitablePos(), occupied->visitablePos());
+	EXPECT_EQ(handler.activities->topActivity(player), nullptr);
+	EXPECT_EQ(server.failedMoves, 1);
+	EXPECT_EQ(server.failedHero, hero->id);
+	EXPECT_EQ(server.failedStart, hero->convertFromVisitablePos(hero->visitablePos()));
+	EXPECT_EQ(server.failedEnd, server.failedStart);
+	EXPECT_EQ(server.failedPoints, pointsBeforeRejection);
+
+	// A different, unoccupied destination remains usable through the same dialog.
+	if(GetParam())
+		map()->moveObject(hero->id, hero->convertFromVisitablePos(hero->visitablePos()));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(GetParam() ? 0 : 1, 5, 0)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(entrance->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	dialog = std::dynamic_pointer_cast<TeleportDialogActivity>(handler.activities->topActivity(player));
+	ASSERT_NE(dialog, nullptr);
+	const auto freeExit = std::ranges::find_if(dialog->td.exits, [&](const auto & exit) { return exit.first == free->id; });
+	ASSERT_NE(freeExit, dialog->td.exits.end());
+	const auto freeIndex = std::distance(dialog->td.exits.begin(), freeExit);
+	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, freeIndex), ReplyOutcome::Accepted);
+	EXPECT_EQ(hero->visitablePos(), free->visitablePos());
+	EXPECT_EQ(blocker->visitablePos(), occupied->visitablePos());
+}
+
+INSTANTIATE_TEST_SUITE_P(BoundedAndToroidal, MonolithExitTopologyTest, ::testing::Values(false, true));
+
 TEST_F(SubterraneanGateTopologyTest, whirlpoolListsPassableExitTilesAcrossSeam)
 {
 	const PlayerColor player(0);
@@ -2799,7 +2944,7 @@ TEST_F(SubterraneanGateTopologyTest, whirlpoolListsPassableExitTilesAcrossSeam)
 	EXPECT_EQ(boundedExits.front().second, int3(0, 5, 0));
 }
 
-void SubterraneanGateTopologyTest::checkWhirlpoolTravel(TQuantity creatureCount, bool blockAllExits)
+void SubterraneanGateTopologyTest::checkWhirlpoolTravel(TQuantity creatureCount, bool blockAllExits, bool occupyAfterDialog)
 {
 	const PlayerColor player(0);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
@@ -2840,7 +2985,7 @@ void SubterraneanGateTopologyTest::checkWhirlpoolTravel(TQuantity creatureCount,
 	ASSERT_EQ(hero->visitablePos(), int3(10, 5, 0));
 	ASSERT_EQ(hero->stacksCount(), 1u);
 	ASSERT_EQ(hero->Slots().begin()->second->getCount(), creatureCount);
-	GameHandlerTestServer server(gameState(), player);
+	TeleportMovementTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
 	handler.createBoat(int3(11, 5, 0), BoatId::CASTLE, player);
 	handler.createBoat(int3(0, 5, 0), BoatId::CASTLE, player);
@@ -2865,18 +3010,28 @@ void SubterraneanGateTopologyTest::checkWhirlpoolTravel(TQuantity creatureCount,
 	auto dialog = handler.activities->topActivity(player);
 	ASSERT_NE(dialog, nullptr);
 	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	if(occupyAfterDialog)
+		handler.createBoat(int3(35, 5, 0), BoatId::CASTLE, player);
 	const auto movement = hero->movementPointsRemaining();
 	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
-	const int3 expectedPosition = blockAllExits ? int3(12, 5, 0) : int3(35, 5, 0);
+	const int3 expectedPosition = blockAllExits || occupyAfterDialog ? int3(12, 5, 0) : int3(35, 5, 0);
 	EXPECT_EQ(hero->visitablePos(), expectedPosition);
 	ASSERT_TRUE(hero->inBoat());
 	ASSERT_NE(hero->getBoat(), nullptr);
 	EXPECT_EQ(hero->getBoat()->id, boatID);
 	EXPECT_EQ(hero->getBoat()->visitablePos(), expectedPosition);
 	EXPECT_EQ(map()->getTile(expectedPosition).topVisitableObj(), hero->id);
-	if(!blockAllExits)
+	if(!blockAllExits && !occupyAfterDialog)
 		EXPECT_NE(map()->getTile(int3(12, 5, 0)).topVisitableObj(), hero->id);
 	EXPECT_EQ(hero->movementPointsRemaining(), movement);
+	if(blockAllExits || occupyAfterDialog)
+	{
+		EXPECT_EQ(server.failedMoves, 1);
+		EXPECT_EQ(server.failedHero, hero->id);
+		EXPECT_EQ(server.failedStart, hero->anchorPos());
+		EXPECT_EQ(server.failedEnd, hero->anchorPos());
+		EXPECT_EQ(server.failedPoints, movement);
+	}
 }
 
 TEST_F(SubterraneanGateTopologyTest, protectedBoatUsesUnoccupiedWhirlpoolExitAcrossSeam)
@@ -2892,6 +3047,11 @@ TEST_F(SubterraneanGateTopologyTest, unprotectedBoatUsesUnoccupiedWhirlpoolExitA
 TEST_F(SubterraneanGateTopologyTest, protectedBoatStaysWhenAllWhirlpoolExitsAreOccupied)
 {
 	checkWhirlpoolTravel(1, true);
+}
+
+TEST_F(SubterraneanGateTopologyTest, protectedBoatStaysWhenChosenWhirlpoolExitBecomesOccupied)
+{
+	checkWhirlpoolTravel(1, false, true);
 }
 
 TEST_F(SummonBoatTopologyTest, choosesNearestBoatAccordingToMapTopology)

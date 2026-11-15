@@ -362,6 +362,21 @@ static int3 teleportVisitableTile(const IGameInfoCallback & gameInfo, const CGOb
 	return position;
 }
 
+static void stopFailedTeleportMovement(IGameEventCallback & gameEvents, const CGHeroInstance & hero)
+{
+	// The client may be following a path through the teleport. Without a failed
+	// movement packet it would retry the stale teleport node after the reply.
+	TryMoveHero failed;
+	failed.id = hero.id;
+	// The anchor of a hero loaded at the seam can itself be a wrapped image.
+	// Movement packet consumers access the corresponding canonical tile.
+	failed.start = hero.convertFromVisitablePos(hero.visitablePos());
+	failed.end = failed.start;
+	failed.movePoints = hero.movementPointsRemaining();
+	failed.result = TryMoveHero::FAILED;
+	gameEvents.sendAndApply(failed);
+}
+
 bool CGTeleport::isExitPassable(const IGameInfoCallback & gameInfo, const CGHeroInstance * h, const CGObjectInstance * obj)
 {
 	// a template with no visitable tile, used by maps as decoration, has no tile to leave it from
@@ -495,10 +510,25 @@ void CGMonolith::teleportDialogAnswered(IGameEventCallback & gameEvents, const C
 		|| (exits.empty() && realExits.empty()) // Do nothing if there no exits on this channel
 		|| ObjectInstanceID() == randomExit) // Do nothing if all exits are blocked by friendly hero and it's not subterranean gate
 	{
+		if(isEntrance())
+			stopFailedTeleportMovement(gameEvents, *hero);
 		return;
 	}
 	else if(vstd::isValidIndex(exits, answer))
-		dPos = exits[answer].second;
+	{
+		const auto & selected = exits[answer];
+		const auto * selectedObject = cb->gameState().tryGetObj(selected.first);
+		// The dialog is a snapshot: another hero may have occupied an exit,
+		// or the destination may have changed, before the answer is applied.
+		if(!selectedObject || !vstd::contains(realExits, selected.first)
+			|| selected.second != teleportVisitableTile(cb->gameState(), *selectedObject)
+			|| !isExitPassable(cb->gameState(), hero, selectedObject))
+		{
+			stopFailedTeleportMovement(gameEvents, *hero);
+			return;
+		}
+		dPos = selected.second;
+	}
 	else
 		dPos = teleportVisitableTile(*cb, *cb->getObj(randomExit));
 
@@ -704,15 +734,30 @@ void CGWhirlpool::teleportDialogAnswered(IGameEventCallback & gameEvents, const 
 	int3 dPos;
 	auto realExits = getAllExits();
 	if(exits.empty() && realExits.empty())
+	{
+		stopFailedTeleportMovement(gameEvents, *hero);
 		return;
+	}
 	else if(vstd::isValidIndex(exits, answer))
+	{
+		const auto passableTiles = getPassableExitTiles(*cb, getAllExits(true));
+		// The chosen exit may have become occupied after the dialog was sent.
+		if(!vstd::contains(passableTiles, exits[answer]))
+		{
+			stopFailedTeleportMovement(gameEvents, *hero);
+			return;
+		}
 		dPos = exits[answer].second;
+	}
 	else
 	{
 		auto passableTiles = getPassableExitTiles(*cb, getAllExits(true));
 
 		if(passableTiles.empty())
+		{
+			stopFailedTeleportMovement(gameEvents, *hero);
 			return;
+		}
 
 		dPos = RandomGeneratorUtil::nextItem(passableTiles, gameEvents.getRandomGenerator())->second;
 	}
