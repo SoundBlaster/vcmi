@@ -607,6 +607,57 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	state->init(&service, &start, randomizer, progress, false);
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_SEAM_LAND_STEPS"))
+	{
+		CGHeroInstance * hero = nullptr;
+		for(const auto & id : map.getHeroesOnMap())
+			if(auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id)); candidate
+			   && candidate->getOwner().isValidPlayer() && !candidate->isGarrisoned() && !candidate->inBoat())
+			{
+				hero = candidate;
+				break;
+			}
+		ASSERT_NE(hero, nullptr);
+		const auto player = hero->getOwner();
+		state->actingPlayers.insert(player);
+		for(const bool horizontal : {true, false})
+		{
+			std::optional<std::pair<int3, int3>> crossing;
+			const int limit = horizontal ? map.height : map.width;
+			for(int index = 0; index < limit; ++index)
+			{
+				const int3 first = horizontal ? int3(0, index, 0) : int3(index, 0, 0);
+				const int3 second = horizontal ? int3(map.width - 1, index, 0) : int3(index, map.height - 1, 0);
+				const auto clear = [&](const int3 & position)
+				{
+					const auto & tile = map.getTile(position);
+					return tile.isLand() && !tile.blocked() && !tile.visitable()
+						&& !state->guardingCreaturePosition(position).isValid();
+				};
+				if(clear(first) && clear(second) && map.canMoveBetween(first, second))
+				{
+					crossing = std::pair(first, second);
+					break;
+				}
+			}
+			ASSERT_TRUE(crossing) << (horizontal ? "east/west" : "north/south");
+			ChangeObjPos place;
+			place.objid = hero->id;
+			place.nPos = crossing->first;
+			state->apply(place);
+			hero->setMovementPoints(3000);
+			GameHandlerTestServer server(state, player);
+			CGameHandler handler(server, state);
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(crossing->second),
+			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+			ASSERT_EQ(hero->visitablePos(), crossing->second);
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(crossing->first),
+			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+			ASSERT_EQ(hero->visitablePos(), crossing->first);
+			std::cout << "Land seam crossing in both directions: " << crossing->first.toString()
+			          << " <-> " << crossing->second.toString() << std::endl;
+		}
+	}
 	if(const char * overlap = std::getenv("VCMI_INSPECT_OVERLAP_RESOURCE"); overlap && *overlap)
 	{
 		std::vector<std::string> names;
