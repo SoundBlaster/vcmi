@@ -34,11 +34,22 @@ demo preparation reviewable as separate changes where practical.
 
 ## 2. Movement and interactions
 
-- [ ] Review existing evidence for representative seam scenarios involving
+- [x] Review existing evidence for representative seam scenarios involving
   impassable terrain, roads, guards, interactive objects, boats, embarkation
-  and disembarkation; fill consequential gaps on either level as needed.
-- [ ] Review representative Flight and Water Walk seam routes and relevant
-  movement effects; reproduce observed failures with focused regression tests.
+  and disembarkation: [blocked terrain](evidence/topology-blocked-directions-2026-11-14.md),
+  [road costs](evidence/topology-road-directions-2026-11-14.md),
+  [resource visits](evidence/topology-minimum-size-movement-2026-11-15.md),
+  [embarking](evidence/topology-embark-directions-2026-11-14.md) and
+  [guarded disembarking](evidence/topology-guarded-disembark-2026-11-15.md).
+  A [focused repeat](evidence/representative-seam-review-2026-11-15.md)
+  passed 54 tests. These are representative synthetic scenarios, not all
+  objects and rules.
+- [x] Review representative Flight and Water Walk seam routes and relevant
+  movement effects; reproduce observed failures with focused regression tests:
+  [interactive crossings](evidence/topology-transient-gui-crossings-2026-11-14.md),
+  [layer switches](evidence/topology-transient-switches-2026-11-10.md) and
+  [route agreement regression](evidence/topology-transient-route-parity-gap-2026-11-14.md).
+  Recovery without a known landing and hidden-event recovery remain excluded.
 - [x] Record the user's decision to leave the rare case with no known suitable
   safe landing unresolved under current rules. This does not resolve the case;
   general recovery and the hidden-event case remain outside the agreed scope.
@@ -53,8 +64,11 @@ demo preparation reviewable as separate changes where practical.
   [framed graphical loopback](evidence/network-framed-packets-2026-11-15.md#two-graphical-clients-and-reload-with-framing).
   Both clients were on the same Mac; remote hosts and full replica-state
   comparison remain unverified.
-- [ ] Check that incompatible peers and save formats are rejected explicitly
-  where required, without breaking supported bounded games.
+- [x] Check representative incompatible peers and save formats are rejected
+  explicitly and a mixed-version bounded game still starts and moves:
+  [original network peer](evidence/topology-old-network-peer-2026-11-15.md)
+  and [original format reader](evidence/topology-old-reader-2026-11-14.md).
+  This does not cover every version, remote host or mixed-version save reload.
 
 ## 4. Earth demo and authoring
 
