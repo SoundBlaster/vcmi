@@ -80,6 +80,11 @@ under `runtime/earth-map-research-2026-11-15/converted-source/` on TB5 has
 SHA-256 `69e1f1aff0398a7042e7b158b1ac638ae3237b23d0a5a8927f0afcb7ef0c4023`.
 It is a two-level conversion of the source, not the proposed demo; the bit-6
 difference above applies.
+Inspection also found that this raw VMAP's header has `mods: null`, although
+its content references HotA entities. Before treating a derivative as a
+distributable scenario, determine and declare its actual required mods and
+verify missing-mod diagnostics. The editor has an object-mod assessment path,
+but its source explicitly leaves terrain assessment as a TODO.
 The ordinary VCMI mod and game settings retained their earlier SHA-256 values; ordinary
 test runs updated the validation checksums in the separate test preset.
 
@@ -92,3 +97,22 @@ disabled tests. Its XML and log are under
 fixture mod; it does not demonstrate a full HotA installation.
 The listing does not establish permission to redistribute the map or a
 derivative; investigate the author's terms before publishing either.
+
+## Candidate placement analysis
+
+The read-only [`tools/analyze_stacked_map.py`](tools/analyze_stacked_map.py)
+estimates object-mask overlaps after placing the rotated second level above
+the surface on a torus. It interprets the serialized template masks and does
+not simulate pathfinding, event order, terrain suitability or gameplay.
+
+With the original anchor rotated, it finds 1,525 new pairs of blocking
+objects compared with the clipped two-level source, including 349 occurrences
+where a new pair overlaps a visitable cell. Keeping the first visitable cell
+at its rotated position reduces these estimates to 1,274 new blocking pairs
+and 245 such occurrences. Some objects have multiple visitable cells, so
+preserving the first cannot preserve the whole interaction geometry. The
+baseline contains 267 blocking footprint cells clipped by the original map
+edges; wrapped cells can also contribute to differences. These counts are
+candidate conflicts for engine/editor validation, not proven gameplay bugs.
+Three small geometry tests cover rotation, clipping, wrapping and visitable
+placement. No transformed map has been saved by this analysis.
