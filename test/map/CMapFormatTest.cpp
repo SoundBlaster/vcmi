@@ -35,6 +35,8 @@
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/mapping/TerrainTile.h"
 #include "../../lib/modding/IdentifierResolver.h"
+#include "../../lib/pathfinder/CPathfinder.h"
+#include "../../lib/pathfinder/PathfinderOptions.h"
 
 #include "../../lib/VCMIDirs.h"
 #include "../../server/CGameHandler.h"
@@ -568,6 +570,61 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	state->init(&service, &start, randomizer, progress, false);
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_START_ROUTES"))
+	{
+		std::set<PlayerColor> examined;
+		int moved = 0;
+		for(const auto & id : map.getHeroesOnMap())
+		{
+			auto * hero = dynamic_cast<CGHeroInstance *>(map.getObject(id));
+			if(!hero || !hero->getOwner().isValidPlayer() || hero->isGarrisoned() || hero->inBoat()
+			   || !examined.insert(hero->getOwner()).second)
+				continue;
+			const auto player = hero->getOwner();
+			const auto origin = hero->visitablePos();
+			CPathsInfo paths(state->getMapSize(), hero);
+			auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
+			config->options.turnLimit = 1;
+			CPathfinder(*state, config).calculatePaths();
+			std::optional<int3> destination;
+			int reachableNeighbors = 0;
+			for(const auto & direction : int3::getDirs())
+			{
+				const auto candidate = map.getTopology().canonicalize(origin + direction);
+				if(!candidate)
+					continue;
+				const auto * node = paths.getNode(*candidate, EPathfindingLayer::LAND);
+				if(!node->reachable() || node->turns != 0 || node->theNodeBefore == nullptr || node->theNodeBefore->coord != origin)
+					continue;
+				++reachableNeighbors;
+				const auto & tile = map.getTile(*candidate);
+				if(!destination && tile.isLand() && !tile.blocked() && !tile.visitable()
+				   && !map.isInTheMap(state->guardingCreaturePosition(*candidate)))
+					destination = *candidate;
+			}
+			std::cout << "Starting hero " << hero->instanceName << " owner=" << player.getNum()
+			          << " at=" << origin.toString() << " reachable-neighbors=" << reachableNeighbors
+			          << " empty-unguarded=" << (destination ? destination->toString() : "none") << std::endl;
+			if(destination)
+			{
+				state->actingPlayers.insert(player);
+				GameHandlerTestServer server(state, player);
+				CGameHandler handler(server, state);
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination),
+				                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				ASSERT_EQ(hero->visitablePos(), *destination);
+				++moved;
+			}
+		}
+		std::cout << "Starting heroes examined=" << examined.size() << " moved=" << moved << std::endl;
+		ASSERT_GT(moved, 0);
+		if(const char * required = std::getenv("VCMI_INSPECT_REQUIRE_START_MOVES"))
+		{
+			const auto expected = std::stoi(required);
+			ASSERT_EQ(examined.size(), static_cast<size_t>(expected));
+			ASSERT_EQ(moved, expected);
+		}
+	}
 	std::vector<std::string> groups;
 	boost::split(groups, pairList, boost::is_any_of(";"));
 	std::set<TeleportChannelID> channels;
