@@ -3,6 +3,7 @@
 This is a local tracking companion to the draft
 [BoundarySpec](../toroidal-map.spec.yaml) and its
 [scenario definitions](review.md#scenarios-for-implementation-and-acceptance).
+The [remaining-work checklist](TODO.md) records the agreed execution plan.
 It does not change the SpecPM schema or prove implementation, acceptance, or
 runtime behavior. Baseline: VCMI commit
 `30e9207276f137658da5132705c05644bfe33aee`, inspected source clean before
