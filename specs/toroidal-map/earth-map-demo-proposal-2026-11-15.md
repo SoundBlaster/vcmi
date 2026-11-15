@@ -613,3 +613,18 @@ crossing a seam, even though it contains roads elsewhere. The separate
 [Toroid Crossroads visual record](evidence/topology-preview-f0f7f4a-2026-11-15.md)
 covers a different test fixture; it does not validate a seam road on this
 Earth draft or replace the user's planned continuity review.
+
+An in-process server test selected unobstructed land tiles on this draft and
+made ordinary hero steps in both directions across each axis: `(0,425)` ↔
+`(251,425)` and `(0,0)` ↔ `(0,575)`. It passed three runs after placing the
+hero artificially at each edge and granting movement points. It does not
+show a route from a starting town, diagonal corner movement, GUI response or
+visual continuity.
+
+At the four literal corners, the two `x=0` cells are snow and the two
+`x=251` cells are water, so an ordinary on-foot diagonal corner crossing is
+not available on this particular draft. The visible footprint of
+`warehouses_11184` also touches the two southern corner cells. The terrain
+and object artwork were left unchanged pending a deliberate map edit and
+visual review; the synthetic toroidal corner tests remain separate evidence
+for the engine.
