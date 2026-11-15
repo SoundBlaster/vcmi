@@ -16,8 +16,10 @@ Pathfinder options now allow a knowledge observer, defaulting to the hero's
 owner. Nullkiller sets it to its own player ID; the hero's actual owner is
 still retained for movement and diplomacy. Toroidal neighbor and known-guard
 lookups use that observer. The existing node storage already uses the same AI
-player's fog. This does not prove that every AI subsystem or teleport channel
-obeys the same information boundary.
+player's fog. A subsequent change applies that perspective to teleport
+channel visibility; its scope is recorded in the
+[teleport observer evidence](nullkiller-teleport-observer-2026-11-15.md).
+These checks do not prove every AI subsystem obeys the same boundary.
 
 `Nullkiller2_DangerAcrossSeam` uses a revealed AI map and a remembered visible
 enemy with deliberately restricted enemy fog. It checks both directions of

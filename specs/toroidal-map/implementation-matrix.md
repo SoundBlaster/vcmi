@@ -129,6 +129,9 @@ AI planning turn reaches that plan's destination through an in-process
 server across all edges and corners on both levels. See the
 [escape record](evidence/nullkiller-escape-seams-2026-11-15.md). Live enemy
 discovery, graphical defence and other defensive responses remain unverified.
+Known teleport channel endpoints in enemy threat planning now also use the
+AI's perspective, with bounded and toroidal danger-map checks; see the
+[teleport observer record](evidence/nullkiller-teleport-observer-2026-11-15.md).
 
 The later [preview run](evidence/topology-preview-eeb3540-2026-11-15.md)
 completed two Nullkiller2 turns with crossings on both axes, then reloaded an
