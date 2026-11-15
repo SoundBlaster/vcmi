@@ -1856,6 +1856,56 @@ TEST(ToroidalDemoVmapTest, DecodesOriginalBoundedSaveAndMovesHero)
 	EXPECT_LT(hero->movementPointsRemaining(), points);
 }
 
+TEST(ToroidalDemoVmapTest, LoadsOriginalBoundedSaveThroughServer)
+{
+	const char * suppliedPath = std::getenv("VCMI_ORIGINAL_BOUNDED_SAVE");
+	if(!suppliedPath || !*suppliedPath)
+		GTEST_SKIP() << "Set VCMI_ORIGINAL_BOUNDED_SAVE to the documented original-server save";
+	const boost::filesystem::path path(suppliedPath);
+	ASSERT_TRUE(boost::filesystem::is_regular_file(path));
+	auto * local = dynamic_cast<CFilesystemList *>(CResourceHandler::get("local"));
+	ASSERT_NE(local, nullptr);
+	auto loader = std::make_shared<CFilesystemLoader>("SAVES/ORIGINAL-BOUNDED-PROBE/", path.parent_path(), 0);
+	local->addLoader(loader, false);
+	struct RemoveLoader
+	{
+		CFilesystemList * local;
+		ISimpleResourceLoader * loader;
+		~RemoveLoader() { local->removeLoader(loader); }
+	} removeLoader{local, loader.get()};
+	CLoadFile saved(path);
+	CMapHeader header;
+	StartInfo info;
+	auto headerChunk = saved.openChunk(SaveFileFormat::CHUNK_HEADER, nullptr);
+	headerChunk->iser & header;
+	headerChunk->iser & info;
+	ASSERT_TRUE(headerChunk->isFullyRead());
+	info.mapname = "Saves/Original-Bounded-Probe/" + path.stem().string();
+	const auto resolved = CResourceHandler::get()->getResourceName(ResourcePath(info.mapname, EResType::SAVEGAME));
+	ASSERT_TRUE(resolved.has_value());
+	ASSERT_TRUE(boost::filesystem::equivalent(*resolved, path));
+	GameHandlerTestServer loaderServer;
+	CGameHandler loaderHandler(loaderServer, std::make_shared<CGameState>());
+	ASSERT_NO_THROW(loaderHandler.load(info));
+	auto state = loaderHandler.gs;
+	ASSERT_NE(state, nullptr);
+	ASSERT_FALSE(state->getMap().toroidal);
+	ASSERT_EQ(state->getMap().width, 36);
+	ASSERT_EQ(state->getMap().height, 36);
+	CGHeroInstance * hero = nullptr;
+	for(const auto & object : state->getMap().objects)
+		if(auto * candidate = dynamic_cast<CGHeroInstance *>(object.get()); candidate && candidate->getOwner() == PlayerColor(1))
+			hero = candidate;
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(19, 18, 0));
+	const auto points = hero->movementPointsRemaining();
+	GameHandlerTestServer movementServer(state, PlayerColor(1));
+	CGameHandler movementHandler(movementServer, state);
+	ASSERT_TRUE(movementHandler.moveHero(hero->id, hero->convertFromVisitablePos(int3(20, 18, 0)), EMovementMode::STANDARD, false, PlayerColor(1), EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(20, 18, 0));
+	EXPECT_LT(hero->movementPointsRemaining(), points);
+}
+
 TEST_F(ToroidalDemoGameTest, CrossroadsMinesAreReachableByBothPlayers)
 {
 	startWithMap(makeToroidalPlaygroundMap());
