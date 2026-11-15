@@ -13,9 +13,7 @@ of both the old and new appearance after reindexing. The regression checks
 the synthetic release across the seam and an equivalent interior arrangement
 on a bounded map. This is an actual server `GiveHero` application, but the
 fixture constructs the prisoner by changing an initialized hero rather than
-visiting a real prison; it does not simulate a remote replica or GUI play.
-The normal packet visitor is shared by game-state replicas, but their behavior
-for this specific packet was not separately observed.
+visiting a real prison; it does not exercise GUI play.
 
 On macOS arm64, `vcmitest`, `vcmiclient`, and `vcmiserver` built; 49 focused
 release, guard-cache, movement, disembarkation and activity tests passed.
@@ -33,3 +31,17 @@ VMAP and save and the Complete `Dead and Buried` map as optional compatibility
 inputs. Their SHA-256 values matched before and after the run. Full log:
 `runtime/full-suite-prison-guard-2026-11-15.log` on TB5. This local suite does
 not replace an interactive prison visit or multiplayer verification.
+
+## Serialized replica check
+
+The fixture was then extended to snapshot the pre-release state into two
+in-process replicas. It serializes the server's `GiveHero` and subsequent
+`SetObjectProperty` through `GameConnection`, decodes each packet separately
+for each replica, and applies them. On both bounded and toroidal maps, the
+server and both replicas agree on hero owner, type and visitable position,
+as well as direct and cached guardian positions. The two parameterized cases
+and four moved-guard replica cases passed on macOS arm64. Logs are
+`runtime/prison-replica-final-build-2026-11-15.log` and
+`runtime/prison-replica-final-test-2026-11-15.log` on TB5. The test forwards
+only the two named packets, not the fog updates; it does not use TCP, actual
+clients, or a real prison visit.

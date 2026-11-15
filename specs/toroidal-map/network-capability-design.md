@@ -45,6 +45,31 @@ future forks. Packet-level tests,
 server preparation tests and real multi-peer sessions are separate evidence
 requirements.
 
+## Open wire-layout hardening
+
+The existing packet reader detects truncated input and unread trailing bytes,
+but these checks do not identify every mismatched layout. On 2026-11-15 the
+disabled `GameConnectionTopologyTest.DISABLED_RejectsConflictingTopologyWireLayouts`
+was run explicitly: a current-format toroidal lobby map packet was decoded
+with the previous layout and returned `toroidal=false` without an exception.
+The reverse mismatch did throw in this particular test. This does not by itself
+show a normally negotiated session starting with mixed layouts; the existing
+capability guard rejects the tested untagged peer before toroidal start.
+
+A per-packet layout discriminator could provide an additional fail-closed
+check, but changing the raw packet layout under an existing version would
+break compatible peers. Any implementation needs a new negotiated capability
+or version, explicit rejection of peers that lack it for toroidal sessions,
+and bounded-session compatibility tests. The switch must account for the
+current ordering: the server's `clientConnected` can announce player-join
+messages before it announces the new client's own `LobbyClientConnected`
+acknowledgement. A receiver cannot assume it has seen that acknowledgement
+when decoding those earlier messages. Multiple existing clients also receive
+the new client's acknowledgement. A transition design must specify exactly
+which packets remain in the original framing for each connection and test
+two or more peers, reconnect, legacy peers, malformed headers and actual TCP.
+No packet envelope or change to negotiation is implemented by this note.
+
 ## Request acknowledgement is not a transaction receipt
 
 `PackageApplied.result` is a server handler result, not a guarantee that a
