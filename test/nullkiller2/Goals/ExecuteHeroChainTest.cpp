@@ -9,6 +9,9 @@
 #include "StdInc.h"
 
 #include "AI/Nullkiller2/AIGateway.h"
+#include "AI/Nullkiller2/Analyzers/DangerHitMapAnalyzer.h"
+#include "AI/Nullkiller2/Behaviors/EscapeBehavior.h"
+#include "AI/Nullkiller2/Engine/AIMemory.h"
 #include "AI/Nullkiller2/Goals/ExecuteHeroChain.h"
 #include "AI/Nullkiller2/Pathfinding/Actions/AdventureSpellCastMovementActions.h"
 
@@ -545,6 +548,93 @@ TEST_P(ToroidalAITransientSafetyTest, FullTurnCastsToCollectVisibleGoldAcrossSea
 }
 
 INSTANTIATE_TEST_SUITE_P(AbilitiesAndLevels, ToroidalAITransientSafetyTest, ::testing::Range(0, 4));
+
+using EscapeSeam = std::pair<int3, int3>;
+class ToroidalAIEscapeTest : public NullkillerTest,
+	public ::testing::WithParamInterface<std::tuple<EscapeSeam, int>> {};
+
+TEST_P(ToroidalAIEscapeTest, FullTurnEscapesEnemyAcrossSeam)
+{
+	const auto & [seam, z] = GetParam();
+	const int3 start(seam.first.x, seam.first.y, z), direction = seam.second;
+	const MapTopology topology(36, 36, 2, true);
+	const auto position = [&](int distance) { return *topology.canonicalize(start + direction * distance); };
+	const auto enemyPosition = position(-1);
+	std::set<int3> corridor;
+	for(int distance = -1; distance <= 20; ++distance)
+		corridor.insert(position(distance));
+	if(z == 0)
+	{
+		// The H3M loader needs valid starting positions before heroes are moved.
+		corridor.insert(int3(5, 5, 0));
+		corridor.insert(int3(7, 5, 0));
+	}
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
+		.hero(int3(6, 5, 0), HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.hero(int3(8, 5, 0), HeroTypeID(1), ENEMY)
+		.heroGarrison({{CreatureID::ARCHER, 100}});
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			if(!corridor.contains(int3(x, y, z)))
+				builder.terrain(int3(x, y, z), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	revealMap(ENEMY);
+	auto * hero = findHeroByOwner(PLAYER);
+	auto * enemy = findHeroByOwner(ENEMY);
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(enemy, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
+	map()->moveObject(enemy->id, enemy->convertFromVisitablePos(enemyPosition));
+	ASSERT_EQ(hero->visitablePos(), start);
+	ASSERT_EQ(enemy->visitablePos(), enemyPosition);
+	hero->setMovementPoints(3000);
+	enemy->setMovementPoints(100);
+	SpellAndMoveClient client(gameState(), PLAYER);
+	auto gateway = makeGateway(PLAYER, &client);
+	client.gateway = gateway.get();
+	client.enableNotifications();
+	NK2AI::AIGateway::memorizeVisitableObjs(gateway->nullkiller->memory,
+		gateway->nullkiller->dangerHitMap, PLAYER, gateway->cc);
+	ASSERT_TRUE(gateway->nullkiller->memory->visitableObjs.contains(enemy->id));
+	withGameStateReadLock([&] { NK2AI::NullkillerTestAccess::prepareState(*gateway->nullkiller); });
+	const auto initialThreat = gateway->nullkiller->dangerHitMap->getTileThreat(start).fastestDanger;
+	const auto refugeThreat = gateway->nullkiller->dangerHitMap->getTileThreat(position(20)).fastestDanger;
+	ASSERT_EQ(initialThreat.turn, 0);
+	ASSERT_GT(initialThreat.danger, hero->estimateHeroCombatValue());
+	ASSERT_NE(refugeThreat.turn, 0);
+	const auto escapeGoals = NK2AI::Goals::EscapeBehavior().decompose(gateway->nullkiller.get());
+	ASSERT_EQ(escapeGoals.size(), 1u);
+	const auto * escapeChain = dynamic_cast<const NK2AI::Goals::ExecuteHeroChain *>(escapeGoals.front().get());
+	ASSERT_NE(escapeChain, nullptr);
+	ASSERT_EQ(escapeChain->getHero(), hero);
+	const auto escapeDestination = escapeChain->getPath().targetTile();
+	ASSERT_NE(gateway->nullkiller->dangerHitMap->getTileThreat(escapeDestination).fastestDanger.turn, 0);
+	withGameStateReadLock([&] { gateway->nullkiller->makeTurn(); });
+	EXPECT_TRUE(std::ranges::any_of(client.appliedMoves, [&](const auto & move)
+	{
+		const auto & [from, to, layer] = move;
+		return from == start && to == position(1) && layer == EPathfindingLayer::LAND;
+	}));
+	EXPECT_TRUE(std::ranges::any_of(client.appliedMoves, [&](const auto & move)
+	{
+		return std::get<1>(move) == escapeDestination;
+	})) << "the server should apply the destination chosen by escape planning";
+	EXPECT_NE(hero->visitablePos(), start);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_EQ(enemy->visitablePos(), enemyPosition);
+}
+
+INSTANTIATE_TEST_SUITE_P(EdgesCornersAndLevels, ToroidalAIEscapeTest,
+	::testing::Combine(::testing::Values(
+		EscapeSeam{{0, 18, 0}, {-1, 0, 0}}, EscapeSeam{{35, 18, 0}, {1, 0, 0}},
+		EscapeSeam{{18, 0, 0}, {0, -1, 0}}, EscapeSeam{{18, 35, 0}, {0, 1, 0}},
+		EscapeSeam{{0, 0, 0}, {-1, -1, 0}}, EscapeSeam{{35, 35, 0}, {1, 1, 0}},
+		EscapeSeam{{0, 35, 0}, {-1, 1, 0}}, EscapeSeam{{35, 0, 0}, {1, -1, 0}}),
+		::testing::Values(0, 1)));
 
 TEST_F(ExecuteHeroChainMovementTest, repeatedIdleChainFailsForReplanning)
 {
