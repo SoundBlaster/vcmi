@@ -2472,6 +2472,81 @@ TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 	}
 }
 
+TEST(MapFormat, PreparesExternalToroidalSeamRoad)
+{
+	const char * inputPath = std::getenv("VCMI_INSPECT_START_VMAP");
+	const char * outputPath = std::getenv("VCMI_EARTH_ROAD_OUTPUT");
+	if(!inputPath || !*inputPath || !outputPath || !*outputPath)
+		GTEST_SKIP() << "Set VCMI_INSPECT_START_VMAP and VCMI_EARTH_ROAD_OUTPUT";
+	ASSERT_FALSE(boost::filesystem::exists(outputPath));
+	std::ifstream file(inputPath, std::ios::binary);
+	ASSERT_TRUE(file);
+	std::vector<ui8> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderJson reader(&input);
+	auto map = reader.loadMap(&callback);
+	ASSERT_NE(map, nullptr);
+	callback.setMap(map.get());
+	ASSERT_TRUE(map->toroidal);
+	ASSERT_GE(map->width, 6);
+	std::vector<int3> road;
+	for(int sideLength = 3; sideLength >= 1 && road.empty(); --sideLength)
+	{
+		for(int y = 0; y < map->height && road.empty(); ++y)
+		{
+			std::vector<int3> candidate;
+			for(int offset = -sideLength; offset < sideLength; ++offset)
+			{
+				const int x = offset < 0 ? map->width + offset : offset;
+				const int3 pos(x, y, 0);
+				const auto & tile = map->getTile(pos);
+				if(!tile.isLand() || tile.blocked() || tile.visitable()
+				   || tile.getRoadID() != RoadId::NO_ROAD || tile.getRiverID() != RiverId::NO_RIVER)
+					break;
+				candidate.push_back(pos);
+			}
+			if(candidate.size() == static_cast<size_t>(2 * sideLength))
+				road = std::move(candidate);
+		}
+	}
+	ASSERT_GE(road.size(), 2u) << "No clear seam road site found";
+	CRandomGenerator random(12345);
+	auto * editor = map->getEditManager();
+	editor->getTerrainSelection().setSelection(road);
+	editor->drawRoad(RoadId::DIRT_ROAD, &random);
+	for(const auto & pos : road)
+		ASSERT_EQ(map->getTile(pos).getRoadID(), RoadId::DIRT_ROAD);
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reopenedReader(&output);
+	auto reopened = reopenedReader.loadMap(&reopenedCallback);
+	ASSERT_NE(reopened, nullptr);
+	ASSERT_TRUE(reopened->toroidal);
+	for(const auto & pos : road)
+	{
+		const auto & before = map->getTile(pos);
+		const auto & after = reopened->getTile(pos);
+		EXPECT_EQ(after.getRoadID(), RoadId::DIRT_ROAD);
+		EXPECT_EQ(after.roadDir, before.roadDir);
+		EXPECT_EQ(after.extTileFlags, before.extTileFlags);
+	}
+	std::ofstream out(outputPath, std::ios::binary);
+	ASSERT_TRUE(out);
+	out.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+	out.close();
+	ASSERT_TRUE(out);
+	std::cout << "Seam road row=" << road.front().y << " tiles=" << road.size() << std::endl;
+}
+
 TEST(MapFormat, ToroidalMixedRoadTurnsRoundTrip)
 {
 	auto bytes = makeToroidalDemoMap().build();
