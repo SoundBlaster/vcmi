@@ -39,6 +39,9 @@ namespace AIPathfinding
 	AIPathfinderConfig::AIPathfinderConfig(Nullkiller * aiNk, std::shared_ptr<AINodeStorage> nodeStorage, bool allowBypassObjects, bool useDimensionDoor)
 		: PathfinderConfig(nodeStorage, *aiNk->cc, makeRuleset(aiNk->cc.get(), aiNk, nodeStorage, allowBypassObjects)), aiNodeStorage(nodeStorage)
 	{
+		// Threat planning also searches paths for enemy heroes; use the AI's
+		// knowledge rather than reading the enemy team's private fog state.
+		options.knowledgePlayer = aiNk->playerID;
 		options.canUseCast = true;
 		options.useDimensionDoor = useDimensionDoor;
 		options.allowLayerTransitioningAfterBattle = true;

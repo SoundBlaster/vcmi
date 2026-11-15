@@ -521,7 +521,7 @@ int CPathfinderHelper::getGuardiansCount(int3 tile) const
 {
 	if(gameInfo.getMapHeader()->toroidal)
 	{
-		const auto * team = gameInfo.getPlayerTeam(owner);
+		const auto * team = gameInfo.getPlayerTeam(options.knowledgePlayer.value_or(owner));
 		return team ? PathfinderUtil::knownGuardians(tile, team->fogOfWarMap, gameInfo).size() : 0;
 	}
 	return gameInfo.getGuardingCreatures(tile).size();
@@ -531,7 +531,7 @@ int3 CPathfinderHelper::getKnownGuardingCreaturePosition(int3 tile) const
 {
 	if(!gameInfo.getMapHeader()->toroidal)
 		return gameInfo.guardingCreaturePosition(tile);
-	const auto * team = gameInfo.getPlayerTeam(owner);
+	const auto * team = gameInfo.getPlayerTeam(options.knowledgePlayer.value_or(owner));
 	return team ? PathfinderUtil::knownGuardingCreaturePosition(tile, team->fogOfWarMap, gameInfo) : int3(-1, -1, -1);
 }
 
@@ -633,7 +633,7 @@ void CPathfinderHelper::getNeighbours(
 	const auto * mapHeader = gameInfo.getMapHeader();
 	const auto topology = mapHeader->getTopology();
 	const bool checkVisibility = requireKnownTiles && mapHeader->toroidal;
-	const auto * team = checkVisibility ? gameInfo.getPlayerTeam(hero->tempOwner) : nullptr;
+	const auto * team = checkVisibility ? gameInfo.getPlayerTeam(options.knowledgePlayer.value_or(owner)) : nullptr;
 	const auto isKnown = [&](const int3 & tile)
 	{
 		return !checkVisibility || (team && team->fogOfWarMap[tile]);
