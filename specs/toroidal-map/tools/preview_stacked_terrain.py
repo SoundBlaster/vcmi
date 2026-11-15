@@ -31,6 +31,60 @@ def stack_levels(surface, underground):
     return [list(reversed(row)) for row in reversed(underground)] + surface
 
 
+def east_land_fragment(underground, seed):
+    """Find a planar land component touching only the second level's east edge."""
+    if not underground or not underground[0] or any(len(row) != len(underground[0]) for row in underground):
+        raise ValueError("Expected a nonempty rectangular second level")
+    height, width = len(underground), len(underground[0])
+    sx, sy = seed
+
+    def is_land(x, y):
+        code = underground[y][x][:2]
+        if code not in PALETTE:
+            raise ValueError(f"Unknown terrain code {code!r}")
+        return code not in ("wt", "rc")
+
+    if not (0 <= sx < width and 0 <= sy < height) or not is_land(sx, sy):
+        raise ValueError("Fragment seed must identify a land tile on the second level")
+    component, todo = {(sx, sy)}, [(sx, sy)]
+    while todo:
+        x, y = todo.pop()
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < width and 0 <= ny < height and (nx, ny) not in component and is_land(nx, ny):
+                component.add((nx, ny))
+                todo.append((nx, ny))
+    if not any(x == width - 1 for x, _ in component):
+        raise ValueError("Fragment must touch the second level's east edge")
+    if any(x == 0 or y == 0 or y == height - 1 for x, y in component):
+        raise ValueError("Fragment must not touch other second-level boundaries")
+    return component
+
+
+def rejoin_east_land_fragment(surface, underground, seed):
+    """Place a second-level east-edge land component on the surface preview.
+
+    Keep its original orientation and preserve existing surface land on overlap.
+    This is a terrain illustration, not a transfer of objects or map artwork.
+    """
+    stack_levels(surface, underground)  # validate compatible dimensions
+    component = east_land_fragment(underground, seed)
+    if any(surface[y][x][:2] == "rc" for x, y in component):
+        raise ValueError("Fragment overlaps surface rock; manual review is required")
+
+    new_surface = [list(row) for row in surface]
+    new_underground = [list(row) for row in underground]
+    copied, overlap = 0, 0
+    for x, y in component:
+        if surface[y][x][:2] == "wt":
+            new_surface[y][x] = underground[y][x]
+            copied += 1
+        else:
+            overlap += 1
+        new_underground[y][x] = "wt0_"
+    return new_surface, new_underground, {"source_cells": len(component), "copied": copied, "existing_land": overlap}
+
+
 def render_svg(rows):
     width, height = len(rows[0]), len(rows)
     lines = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
@@ -124,22 +178,78 @@ def polarize_snow_island(rows, seed):
     return result, north_depth, len(component)
 
 
+def oceanize_edge_rock(rows):
+    """Replace boundary-connected rock in a terrain-only illustration."""
+    width, height = len(rows[0]), len(rows)
+    boundary = ([(x, 0) for x in range(width)] + [(x, height - 1) for x in range(width)]
+                + [(0, y) for y in range(height)] + [(width - 1, y) for y in range(height)])
+    component = {(x, y) for x, y in boundary if rows[y][x][:2] == "rc"}
+    todo = list(component)
+    while todo:
+        x, y = todo.pop()
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+            nx, ny = x + dx, y + dy
+            if (0 <= nx < width and 0 <= ny < height and (nx, ny) not in component
+                    and rows[ny][nx][:2] == "rc"):
+                component.add((nx, ny))
+                todo.append((nx, ny))
+    return [["wt0_" if (x, y) in component else tile for x, tile in enumerate(row)]
+            for y, row in enumerate(rows)], len(component)
+
+
+def add_illustrative_snow_island(rows, center):
+    """Draw a schematic island in open water, only in the terrain preview."""
+    width, height = len(rows[0]), len(rows)
+    cx, cy = center
+    cells = set()
+    for dy in range(-18, 19):
+        for dx in range(-10, 11):
+            # A slightly tilted ellipse is an illustration, not original map data.
+            shifted_x = dx - dy // 5
+            if shifted_x * shifted_x * 18 * 18 + dy * dy * 7 * 7 <= 7 * 7 * 18 * 18:
+                x, y = cx + dx, cy + dy
+                if not (0 <= x < width and 0 <= y < height):
+                    raise ValueError("Illustrative island would cross a preview boundary")
+                if rows[y][x][:2] != "wt":
+                    raise ValueError("Illustrative island requires open water")
+                cells.add((x, y))
+    result = [list(row) for row in rows]
+    for x, y in cells:
+        result[y][x] = "sn0_"
+    return result, len(cells)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("vmap")
     parser.add_argument("output", help="New SVG file; existing files are not overwritten")
     parser.add_argument("--polar-seed", nargs=2, type=int, metavar=("X", "Y"),
                         help="Move an isolated snow component to new polar bands in the preview")
+    parser.add_argument("--rejoin-east-fragment", nargs=2, type=int, metavar=("X", "Y"),
+                        help="Move an east-edge second-level land component onto the surface preview")
+    parser.add_argument("--oceanize-edge-rock", action="store_true",
+                        help="Show boundary-connected rock as water in the preview")
+    parser.add_argument("--illustrative-snow-island", nargs=2, type=int, metavar=("X", "Y"),
+                        help="Draw a new schematic snow island in open water in the preview")
     args = parser.parse_args()
     with zipfile.ZipFile(args.vmap) as archive:
         surface = load_json(archive, "surface_terrain.json")
         underground = load_json(archive, "underground_terrain.json")
+    if args.rejoin_east_fragment is not None:
+        surface, underground, fragment = rejoin_east_land_fragment(surface, underground, args.rejoin_east_fragment)
+        print("East fragment:", json.dumps(fragment))
     rows = stack_levels(surface, underground)
     join_index = len(underground)
     if args.polar_seed is not None:
         rows, north_depth, cells = polarize_snow_island(rows, args.polar_seed)
         join_index += north_depth
         print(f"Polar component: {cells} snow cells; preview dimensions {len(rows[0])}x{len(rows)}")
+    if args.oceanize_edge_rock:
+        rows, rock_cells = oceanize_edge_rock(rows)
+        print(f"Boundary rock shown as ocean: {rock_cells} cells")
+    if args.illustrative_snow_island is not None:
+        rows, island_cells = add_illustrative_snow_island(rows, args.illustrative_snow_island)
+        print(f"Illustrative snow island: {island_cells} new cells")
     svg = render_svg(rows)
     with open(args.output, "x", encoding="utf-8") as output:
         output.write(svg)
