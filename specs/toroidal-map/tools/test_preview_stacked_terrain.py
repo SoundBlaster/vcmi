@@ -1,6 +1,6 @@
 import unittest
 
-from preview_stacked_terrain import render_svg, seam_summary, stack_levels
+from preview_stacked_terrain import polarize_snow_island, render_svg, seam_summary, stack_levels
 
 
 class TerrainPreviewTest(unittest.TestCase):
@@ -23,6 +23,24 @@ class TerrainPreviewTest(unittest.TestCase):
         self.assertEqual(summary["north_south"], {"land/water": 1, "water/rock": 1})
         self.assertEqual(sum(summary["west_east"].values()), 4)
         self.assertEqual(sum(summary["level_join"].values()), 2)
+
+    def test_polar_preview_moves_snow_without_overwriting_original_land(self):
+        rows = [["wt0_", "wt0_", "wt0_", "wt0_"],
+                ["gr0_", "sn0_", "sn1_", "wt0_"],
+                ["wt0_", "sn2_", "sn3_", "wt0_"],
+                ["wt0_", "wt0_", "wt0_", "wt0_"]]
+        preview, north_depth, cells = polarize_snow_island(rows, (1, 1))
+        self.assertEqual((north_depth, cells), (1, 4))
+        self.assertEqual(len(preview), 6)
+        self.assertEqual(preview[2][0], "gr0_")
+        self.assertEqual(preview[2][1], "wt0_")
+        self.assertTrue(all(tile.startswith("sn") for tile in preview[0]))
+        self.assertTrue(all(tile.startswith("sn") for tile in preview[-1]))
+        self.assertEqual(rows[1][1], "sn0_")
+
+    def test_polar_preview_rejects_snow_touching_the_boundary(self):
+        with self.assertRaises(ValueError):
+            polarize_snow_island([["sn0_", "wt0_"], ["wt0_", "wt0_"]], (0, 0))
 
 
 if __name__ == "__main__":
