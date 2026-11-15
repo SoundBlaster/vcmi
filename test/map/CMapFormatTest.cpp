@@ -1177,66 +1177,167 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			for(int at = approach; at != queue.front(); at = parent[at])
 				route.push_back(at);
 			std::reverse(route.begin(), route.end());
-			for(const int index : route)
+			if(std::getenv("VCMI_INSPECT_EARTH_SHIPYARD_ROUTE"))
 			{
-				const auto point = posOf(index);
-				if(!paths.getNode(point, EPathfindingLayer::LAND)->reachable())
+				for(const auto & object : map.objects)
+					if(auto * creature = dynamic_cast<CGCreature *>(object.get()))
+					{
+						creature->agression = 127;
+						creature->neverFlees = true;
+					}
+				GameHandlerTestServer routeServer(state, hero->getOwner());
+				CGameHandler routeHandler(routeServer, state);
+				hero->setMovementPoints(30000);
+				state->actingPlayers.insert(hero->getOwner());
+				int battles = 0;
+				for(const int step : route)
 				{
-					const auto guard = state->guardingCreaturePosition(point);
-					std::cout << "First unreachable geometric step=" << point.toString()
-					          << " guard=" << guard.toString() << std::endl;
-					if(map.isInTheMap(guard))
-						for(const auto & id : map.getTile(guard).visitableObjects)
-							if(auto * creature = dynamic_cast<CGCreature *>(map.getObject(id)))
+					const auto destination = posOf(step);
+					for(int attempt = 0; attempt < 4 && hero->visitablePos() != destination; ++attempt)
+					{
+						ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND)) << destination.toString();
+						if(state->getBattle(hero->getOwner()))
+						{
+							++battles;
+							routeHandler.battles->cheatBattleVictory(hero->getOwner());
+							const auto result = routeHandler.activities->topActivity(hero->getOwner());
+							ASSERT_NE(result, nullptr);
+							ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
+							ASSERT_EQ(routeHandler.activities->submitReply(result->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+							for(int limit = 0; limit < 16; ++limit)
 							{
-								std::cout << "Guard instance=" << creature->instanceName << std::endl;
-								const auto identifiedGuardID = creature->id;
-								GameHandlerTestServer server(state, hero->getOwner());
-								CGameHandler handler(server, state);
-								if(std::getenv("VCMI_INSPECT_EARTH_FIGHT_START_GUARD"))
-								{
-									creature->agression = 127;
-									creature->neverFlees = true;
-									hero->setMovementPoints(30000);
-									state->actingPlayers.insert(hero->getOwner());
-									for(const int step : route)
-									{
-										const auto destination = posOf(step);
-										ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
-										if(state->getBattle(hero->getOwner()))
-											break;
-										ASSERT_EQ(hero->visitablePos(), destination);
-									}
-									ASSERT_NE(state->getBattle(hero->getOwner()), nullptr);
-									handler.battles->cheatBattleVictory(hero->getOwner());
-									const auto result = handler.activities->topActivity(hero->getOwner());
-									ASSERT_NE(result, nullptr);
-									ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
-									ASSERT_EQ(handler.activities->submitReply(result->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
-									for(int limit = 0; limit < 16; ++limit)
-									{
-										const auto prompt = handler.activities->topActivity(hero->getOwner());
-										if(!prompt || (prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
-											break;
-										ASSERT_EQ(handler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
-									}
-									std::cout << "After battle hero=" << hero->visitablePos().toString()
-									          << " movement=" << hero->movementPointsRemaining()
-									          << " identified guard remains=" << (map.getObject(identifiedGuardID) != nullptr) << std::endl;
-									std::cout << "Battle started from ordinary route; victory forced" << std::endl;
-								}
-								else
-									ASSERT_TRUE(handler.removeObject(creature, hero->getOwner()));
-								CPathsInfo after(state->getMapSize(), hero);
-								auto afterConfig = std::make_shared<SingleHeroPathfinderConfig>(after, *state, hero);
-								CPathfinder(*state, afterConfig).calculatePaths();
-								std::cout << "Shipyard reachable after test intervention="
-								          << after.getNode(yardPos, EPathfindingLayer::LAND)->reachable() << std::endl;
-								break;
+								const auto prompt = routeHandler.activities->topActivity(hero->getOwner());
+								if(!prompt || (prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+									break;
+								ASSERT_EQ(routeHandler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
 							}
-					break;
+						}
+						ASSERT_EQ(routeHandler.activities->topActivity(hero->getOwner()), nullptr) << destination.toString();
+					}
+					ASSERT_EQ(hero->visitablePos(), destination);
+				}
+				std::cout << "Shipyard route reached approach=" << hero->visitablePos().toString()
+				          << " forced victories=" << battles << std::endl;
+				ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(yardPos), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
+				std::cout << "Shipyard visit hero=" << hero->visitablePos().toString()
+				          << " activity=" << (routeHandler.activities->topActivity(hero->getOwner()) != nullptr) << std::endl;
+				if(std::getenv("VCMI_INSPECT_EARTH_SHIPYARD_BOAT"))
+				{
+					auto * shipyard = dynamic_cast<CGShipyard *>(yard->second.get());
+					ASSERT_NE(shipyard, nullptr);
+					const auto boatPos = shipyard->bestLocation();
+					std::cout << "Shipyard boat location=" << boatPos.toString()
+					          << " status=" << static_cast<int>(shipyard->shipyardStatus()) << std::endl;
+					ASSERT_EQ(shipyard->shipyardStatus(), IBoatGenerator::GOOD);
+					ASSERT_TRUE(routeHandler.buildBoat(shipyard->id, hero->getOwner()));
+					CPathsInfo boatPaths(state->getMapSize(), hero);
+					auto boatConfig = std::make_shared<SingleHeroPathfinderConfig>(boatPaths, *state, hero);
+					CPathfinder(*state, boatConfig).calculatePaths();
+					CGPath boatRoute;
+					ASSERT_TRUE(boatPaths.getPath(boatRoute, boatPos, EPathfindingLayer::SAIL));
+					ASSERT_GE(boatRoute.nodes.size(), 2u);
+					for(size_t index = boatRoute.nodes.size() - 1; index > 0; --index)
+					{
+						const auto & step = boatRoute.nodes[index - 1];
+						ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(step.coord), EMovementMode::STANDARD, false, hero->getOwner(), step.layer));
+					}
+					ASSERT_TRUE(hero->inBoat());
+					std::cout << "Shipyard boat boarded at=" << hero->visitablePos().toString() << std::endl;
+					if(std::getenv("VCMI_INSPECT_EARTH_SHIPYARD_SEAM"))
+					{
+						hero->setMovementPoints(30000);
+						CPathsInfo seamPaths(state->getMapSize(), hero);
+						auto seamConfig = std::make_shared<SingleHeroPathfinderConfig>(seamPaths, *state, hero);
+						CPathfinder(*state, seamConfig).calculatePaths();
+						CGPath seamRoute;
+						const bool reachable = seamPaths.getPath(seamRoute, road, EPathfindingLayer::LAND);
+						std::cout << "Road route from boat reachable=" << reachable
+						          << " nodes=" << seamRoute.nodes.size() << std::endl;
+						for(const auto layer : {EPathfindingLayer::SAIL, EPathfindingLayer::LAND})
+						{
+							int closestDistance = std::numeric_limits<int>::max();
+							int3 closest(-1, -1, -1);
+							for(int x = 0; x < map.width; ++x)
+								for(int y = 0; y < map.height; ++y)
+								{
+									const int3 pos(x, y, 0);
+									if(!seamPaths.getPathInfo(pos, layer)->reachable())
+										continue;
+									const int dx = std::min(std::abs(x - road.x), map.width - std::abs(x - road.x));
+									const int dy = std::min(std::abs(y - road.y), map.height - std::abs(y - road.y));
+									if(dx * dx + dy * dy < closestDistance)
+									{
+										closestDistance = dx * dx + dy * dy;
+										closest = pos;
+									}
+								}
+							std::cout << "Closest reachable " << (layer == EPathfindingLayer::SAIL ? "water" : "land")
+							          << " to road=" << closest.toString() << " distanceSquared=" << closestDistance << std::endl;
+						}
+					}
 				}
 			}
+			else
+				for(const int index : route)
+				{
+					const auto point = posOf(index);
+					if(!paths.getNode(point, EPathfindingLayer::LAND)->reachable())
+					{
+						const auto guard = state->guardingCreaturePosition(point);
+						std::cout << "First unreachable geometric step=" << point.toString()
+						          << " guard=" << guard.toString() << std::endl;
+						if(map.isInTheMap(guard))
+							for(const auto & id : map.getTile(guard).visitableObjects)
+								if(auto * creature = dynamic_cast<CGCreature *>(map.getObject(id)))
+								{
+									std::cout << "Guard instance=" << creature->instanceName << std::endl;
+									const auto identifiedGuardID = creature->id;
+									GameHandlerTestServer server(state, hero->getOwner());
+									CGameHandler handler(server, state);
+									if(std::getenv("VCMI_INSPECT_EARTH_FIGHT_START_GUARD"))
+									{
+										creature->agression = 127;
+										creature->neverFlees = true;
+										hero->setMovementPoints(30000);
+										state->actingPlayers.insert(hero->getOwner());
+										for(const int step : route)
+										{
+											const auto destination = posOf(step);
+											ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
+											if(state->getBattle(hero->getOwner()))
+												break;
+											ASSERT_EQ(hero->visitablePos(), destination);
+										}
+										ASSERT_NE(state->getBattle(hero->getOwner()), nullptr);
+										handler.battles->cheatBattleVictory(hero->getOwner());
+										const auto result = handler.activities->topActivity(hero->getOwner());
+										ASSERT_NE(result, nullptr);
+										ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
+										ASSERT_EQ(handler.activities->submitReply(result->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+										for(int limit = 0; limit < 16; ++limit)
+										{
+											const auto prompt = handler.activities->topActivity(hero->getOwner());
+											if(!prompt || (prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+												break;
+											ASSERT_EQ(handler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+										}
+										std::cout << "After battle hero=" << hero->visitablePos().toString()
+										          << " movement=" << hero->movementPointsRemaining()
+										          << " identified guard remains=" << (map.getObject(identifiedGuardID) != nullptr) << std::endl;
+										std::cout << "Battle started from ordinary route; victory forced" << std::endl;
+									}
+									else
+										ASSERT_TRUE(handler.removeObject(creature, hero->getOwner()));
+									CPathsInfo after(state->getMapSize(), hero);
+									auto afterConfig = std::make_shared<SingleHeroPathfinderConfig>(after, *state, hero);
+									CPathfinder(*state, afterConfig).calculatePaths();
+									std::cout << "Shipyard reachable after test intervention="
+									          << after.getNode(yardPos, EPathfindingLayer::LAND)->reachable() << std::endl;
+									break;
+								}
+						break;
+					}
+				}
 			std::cout << "Free geometric shipyard approach=" << posOf(approach).toString()
 			          << " steps=" << route.size() << std::endl;
 		}

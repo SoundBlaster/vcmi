@@ -80,3 +80,30 @@ sail to the seam. Both diagnostic runs passed on macOS arm64 using `9daf069`
 plus the inspection change. XML files are local on TB5 at
 `runtime/earth-shipyard-removal-final.xml` and
 `runtime/earth-shipyard-battle-final.xml`.
+
+## Route to the shipyard and boat
+
+On 2026-11-16 the opt-in `VCMI_INSPECT_EARTH_SHIPYARD_ROUTE` diagnostic
+followed the same 33-step geometric route from the starting red hero using
+server movement requests. The test revealed the surface, set creature
+aggression and no-flee flags, gave the hero 30,000 movement points, and
+forced two battle victories. It reached `(179,377,0)`, then visited
+`shipyard_5987` at `(180,376,0)`.
+
+With `VCMI_INSPECT_EARTH_SHIPYARD_BOAT`, the normal server `buildBoat` call
+succeeded with the player's available resources at `(182,376,0)`, and the
+hero followed a computed route to board it. After the test replenished the
+hero's movement points and replanned with the surface fully revealed, the
+pathfinder did not return a route to the seam road at `(0,425,0)`. Among
+reachable nodes, the geometrically closest water tile was `(239,425,0)`
+and the closest land tile `(1,431,0)`, six rows and one column from the road
+using wrapped coordinates. This is a nearest-node measurement, not an
+executed route to either cell or proof that the road is inaccessible after
+further encounters or state changes.
+
+The diagnostic passed on macOS arm64 using test source changes on `950e94e`;
+the XML is `runtime/earth-yard-seam-closest-2026-11-16.xml` on TB5. The
+server calls exercise movement, visits, boat construction and boarding, but
+the forced wins, adjusted creature behavior, extra movement and revealed fog
+mean this is not a normal playthrough or evidence of battle balance. The map
+and its original source were not modified.
