@@ -433,6 +433,10 @@ Nullkiller2 direct seam routes are recorded in
 [`evidence/topology-ai-direct-route-2026-11-09.md`](evidence/topology-ai-direct-route-2026-11-09.md).
 The resource visit check is recorded in
 [`evidence/topology-resource-visit-2026-11-09.md`](evidence/topology-resource-visit-2026-11-09.md).
+The [guarded mine direction checks](evidence/topology-guarded-mine-directions-2026-11-15.md)
+add both levels, all approach directions and bounded controls, including
+refusal and selected victory or retreat paths. Their approach mask prohibits
+some directions; those cases test rejection rather than battle.
 The wrapped guard battle check is recorded in
 [`evidence/topology-guard-battle-2026-11-09.md`](evidence/topology-guard-battle-2026-11-09.md).
 The experimental single-level Earth-map draft and its bounded startup,
