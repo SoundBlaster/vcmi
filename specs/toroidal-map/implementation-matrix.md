@@ -100,6 +100,12 @@ bounded control and separate-level control remain isolated. One horizontal
 case also verifies actual turn start and transfer in an in-process server;
 network delivery and contact changes during play are not covered.
 
+Editor terrain redraw now preserves the unrelated road, river and tile-state
+bits when a rock transition uses rotated image frames. The
+[regression check](evidence/terrain-redraw-tile-flags-2026-11-15.md) covers
+a bounded interior, a toroidal corner, and undo/redo with synthetic flags;
+it does not establish graphical continuity after an actual terrain edit.
+
 Two graphical clients on one Mac also joined a loopback lobby, started the
 demo map, executed a corner crossing, transferred the turn, moved the second
 hero, reloaded the autosave in a new lobby and crossed the corner back. The

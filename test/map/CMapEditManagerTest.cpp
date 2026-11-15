@@ -224,6 +224,46 @@ TEST(MapManager, RedrawingRiverReplacesOnlyRiverRotationFlags)
 	}
 }
 
+TEST(MapManager, TerrainRedrawPreservesRoadAndRiverFlags)
+{
+	for(const bool toroidal : {false, true})
+	{
+		auto map = std::make_unique<CMap>(nullptr);
+		map->width = 20;
+		map->height = 20;
+		map->toroidal = toroidal;
+		map->initTerrain();
+		CRandomGenerator random;
+		auto * editor = map->getEditManager();
+		editor->clearTerrain(&random);
+
+		// A subterranean patch causes neighboring rock to be redrawn using
+		// separate terrain frames for its rotations. The upper bits belong to
+		// roads, rivers and other tile state, not to the terrain rotation.
+		for(int x = 0; x < map->width; ++x)
+			for(int y = 0; y < map->height; ++y)
+				map->getTile(int3(x, y, 1)).extTileFlags = 0xff;
+		editor->getTerrainSelection().select(toroidal ? int3(0, 0, 1) : int3(10, 10, 1));
+		editor->drawTerrain(ETerrainId::SUBTERRANEAN, 0, &random);
+
+		const auto checkFlags = [&]
+		{
+			for(int x = 0; x < map->width; ++x)
+				for(int y = 0; y < map->height; ++y)
+					EXPECT_EQ(map->getTile(int3(x, y, 1)).extTileFlags & 0xfc, 0xfc)
+						<< "toroidal=" << toroidal << " position=" << int3(x, y, 1).toString();
+		};
+		checkFlags();
+		const auto & rock = map->getTile(toroidal ? int3(18, 0, 1) : int3(8, 10, 1));
+		EXPECT_EQ(rock.getTerrainID(), ETerrainId::ROCK);
+		EXPECT_EQ(rock.extTileFlags & 3, 0);
+		editor->getUndoManager().undo();
+		checkFlags();
+		editor->getUndoManager().redo();
+		checkFlags();
+	}
+}
+
 TEST(MapManager, ToroidalLineBrushMatchesInteriorAtEdgesAndCorners)
 {
 	// Neighbourhoods cover all combinations around the center. Sprite groups

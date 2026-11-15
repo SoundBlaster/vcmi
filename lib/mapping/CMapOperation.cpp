@@ -349,7 +349,9 @@ void CDrawTerrainOperation::updateTerrainViews()
 			int flip = (pattern.rotationTypesCount == 2 && valRslt.flip == 2) ? 1 : valRslt.flip;
 			int firstFrame = mapping.first + flip * framesPerRot;
 			tile.terView = gen->nextInt(firstFrame, firstFrame + framesPerRot - 1);
-			tile.extTileFlags = 0;
+			// The terrain rotation is encoded in the selected image frame.
+			// Preserve the independent river, road and tile-state flags.
+			tile.extTileFlags &= 0b11111100;
 		}
 	}
 }

@@ -252,7 +252,7 @@ regenerating the index resets manually recorded statuses.
 | `lib/mapObjects/ObjectTemplate.cpp` | 255, 256, 260, 341, 342, 347, 350, 351, 352, 365, 372, 375, 377, 429, 430, 444, 447, 552, 553 | reviewed: these operate on template-local dimensions, masks, draw layers and offsets; map wrapping is handled at callers |
 | `lib/mapObjects/ObjectTemplate.h` | 72 | reviewed: declares template-local dimensions |
 | `lib/mapObjects/Quest.cpp` | 590, 593, 594, 595, 596, 598 | reviewed: seer-hut compass text divides the canonical map rectangle into absolute regions; relative toroidal directions are not computed |
-| `lib/mapping/CDrawRoadsOperation.cpp` | 316, 317 | unreviewed |
+| `lib/mapping/CDrawRoadsOperation.cpp` | 316, 317 | reviewed indexed candidates: neighbor lookup and redraw invalidation canonicalize through topology; road and river pattern selection matches interior neighborhoods in focused tests |
 | `lib/mapping/CMap.cpp` | 277, 292, 293, 331, 334, 354, 357, 366, 374, 395, 396, 412, 413, 459, 470, 497, 509, 525, 545, 547, 548, 608, 622, 653, 779, 783, 784, 786, 790, 908, 1003, 1231, 1236 | unreviewed |
 | `lib/mapping/CMap.h` | 107, 386, 390, 391, 397, 403 | unreviewed |
 | `lib/mapping/CMapHeader.h` | 109, 111, 112 | unreviewed |
