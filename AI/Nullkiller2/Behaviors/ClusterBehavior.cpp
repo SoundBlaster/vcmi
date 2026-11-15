@@ -42,6 +42,8 @@ Goals::TGoalVec ClusterBehavior::decompose(const Nullkiller * aiNk) const
 Goals::TGoalVec ClusterBehavior::decomposeCluster(const Nullkiller * aiNk, const std::shared_ptr<ObjectCluster> & cluster) const
 {
 	const auto * center = cluster->calculateCenter(aiNk->cc.get());
+	if(!center)
+		return {};
 	auto paths = aiNk->pathfinder->getPathInfo(center->visitablePos(), aiNk->isObjectGraphAllowed());
 	const auto blockerPos = cluster->blocker->visitablePos();
 	std::vector<AIPath> blockerPaths;

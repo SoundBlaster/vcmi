@@ -92,6 +92,10 @@ void ObjectCluster::addObject(const CGObjectInstance * obj, const AIPath & path,
 
 const CGObjectInstance * ObjectCluster::calculateCenter(const CPlayerSpecificInfoCallback * cpsic) const
 {
+	// A target may have disappeared while stale cluster members were validated.
+	if(objects.empty())
+		return nullptr;
+
 	const auto * header = cpsic->getMapHeader();
 	if(header->toroidal)
 	{

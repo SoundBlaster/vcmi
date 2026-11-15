@@ -153,4 +153,12 @@ TEST_F(Nullkiller2_ObjectClusterCenter, clusterCenterTreatsOppositeEdgesAsNearby
 		}
 	ASSERT_EQ(opposite.objects.size(), 2);
 	EXPECT_EQ(opposite.calculateCenter(callback.get()), first) << "an ambiguous circular mean has a deterministic fallback";
+
+	// Removing the last target can leave a locked cluster temporarily empty.
+	opposite.reset();
+	for(const bool toroidal : {false, true})
+	{
+		map()->toroidal = toroidal;
+		EXPECT_EQ(opposite.calculateCenter(callback.get()), nullptr);
+	}
 }
