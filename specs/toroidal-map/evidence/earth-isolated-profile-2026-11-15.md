@@ -9,6 +9,13 @@ path. `vcmiclient --version` also reported all of those paths under the
 selected directory. This is an experimental branch feature, not an upstream
 VCMI capability.
 
+The complete `vcmitest` run in a separate TB5 user-data directory passed
+2,004 tests, skipped eight optional external scenarios and listed three
+disabled tests. The output and XML are `isolated-profile-suite.log` and
+`isolated-profile-suite.xml` under the Earth research runtime. The test
+profile used local links to the existing base game data; it was not the
+playable Earth profile.
+
 The local profile is `runtime/earth-demo-profile/` under the TB5 build root.
 It contains its own mod settings, game settings, saves and logs. Its `Data`,
 `Mp3`, HotA mod and map entries point to locally available resources; it does
