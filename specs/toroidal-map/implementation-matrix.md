@@ -298,8 +298,11 @@ The [candidate Earth map](earth-map-demo-proposal-2026-11-15.md) has a local
 profile reports them missing. The draft initializes and round-trips; all
 eight initial heroes followed a short visible route to collect a resource,
 with serialized server packets applied to two in-process replicas. The engine
-also executed a test-selected Nullkiller2 resource plan for each player;
-autonomous AI goal selection on this draft remains unverified. The engine
+also executed a test-selected Nullkiller2 resource plan for each player. On
+the red-player start, Nullkiller then selected its own actions in five
+in-process repetitions: three reached a battle after a dwelling visit and
+two returned from planning without combat. The test stopped before combat;
+an autonomous server turn and the other players remain unverified. The engine
 recognized 44 repositioned guards. Artificially positioned heroes crossed
 each axis of the actual draft in both directions on land and with a test boat;
 diagonal disembarkation also crossed both axes at the corners. An in-process

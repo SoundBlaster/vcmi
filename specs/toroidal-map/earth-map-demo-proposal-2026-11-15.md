@@ -727,3 +727,37 @@ runtime directory as `ai-full-turn-experiment.patch` and
 `ai-dialog-battle-run.log`; the patch SHA-256 is
 `5a1140d01a21d18cdda93a6631acfe09be7c6d677070d8cbcb299c04cdf152a0`.
 This time-limited experiment is not enabled in the committed test suite.
+
+### Autonomous actions through a dwelling
+
+The test client in `303abcc` forwards visit start/end, blocking dialogs,
+question acknowledgements and recruitment windows to Nullkiller's gateway.
+It calls `Nullkiller::makeTurn()` on the unmodified red-player start, leaving
+goal selection to the AI. If a battle starts, the test interrupts the AI
+before combat because this client does not drive the battle. Otherwise it
+checks that the planning loop returned with no outstanding server activity,
+AI question or visit. It also requires at least one movement and no rejected
+movement. A 15-second cooperative watchdog interrupts AI waits; an external
+process timeout is still needed to bound a handler that itself cannot return.
+
+On the local macOS arm64 CMake build based on `d7d62fe` plus the source
+changes committed as `303abcc`, five repetitions on the same Earth draft
+passed. In three, the AI completed a dwelling visit, received one blocking
+dialog and one recruitment window, sent two accepted answers, and then
+started a battle after ten movement requests. In the other two, the planning
+loop returned without combat after nineteen movement requests. No movement
+request was rejected. The repetitions share one test process and are not
+independent statistical trials. The resource name supplied to the existing
+fixture is validated as an input but is not selected as an AI objective in
+the autonomous branch.
+
+Reproduce with the HotA test profile, this VMAP and portal-pair environment
+described above, `VCMI_INSPECT_AI_RESOURCE=0,randomResource_7029`,
+`VCMI_INSPECT_AI_AUTONOMOUS=1` and
+`vcmitest --gtest_filter=MapFormat.InitializesExternalToroidalMapAndChecksPortalPairs --gtest_repeat=5`.
+The output is `ai-autonomous-smoke-5.log` under the TB5 research runtime.
+The previously targeted red-player resource plan also passed; the local
+`MapFormat.*:*AIGateway*` run passed 42 tests and skipped five optional map
+inputs. These are in-process checks, not TCP or GUI play. They establish
+neither a complete server turn (`makeTurn()` does not itself send `EndTurn`)
+nor combat, later days, other players' autonomous turns or full map playability.
