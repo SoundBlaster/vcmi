@@ -2522,7 +2522,7 @@ TEST(MapFormat, PreparesExternalToroidalSeamRoad)
 				   || !map->canMoveBetween(int3(x, y, 0), int3(nx, ny, 0)))
 					continue;
 				parent[index] = current;
-				if(tile.getRoadID() == RoadId::DIRT_ROAD)
+				if(tile.getRoadID() != RoadId::NO_ROAD)
 				{
 					target = index;
 					break;
