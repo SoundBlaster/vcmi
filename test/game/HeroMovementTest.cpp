@@ -3679,10 +3679,17 @@ class ToroidalGuardedDisembarkTest : public HeroMovementTest, public ::testing::
 
 TEST_P(ToroidalGuardedDisembarkTest, DisembarkingStartsGuardBattleAndLeavesBoatAtSea)
 {
-	const bool corner = GetParam() % 2 != 0;
-	const int z = GetParam() / 2;
-	const int y = corner ? 0 : 10;
-	const int3 water(0, y, z), shore(35, corner ? 35 : y, z), guardPos(34, shore.y, z);
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions[GetParam() % directions.size()];
+	const int z = GetParam() / directions.size();
+	const MapTopology topology(36, 36, 2, true);
+	const int3 water(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+	const int3 direction(dx, dy, 0);
+	const auto shore = *topology.canonicalize(water + direction);
+	const auto guardPos = *topology.canonicalize(shore + direction);
+	const auto embarkShore = *topology.canonicalize(water - direction);
+	SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
 	const PlayerColor player(0);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
 	builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
@@ -3695,7 +3702,7 @@ TEST_P(ToroidalGuardedDisembarkTest, DisembarkingStartsGuardBattleAndLeavesBoatA
 	revealMap(player);
 	auto * hero = findHeroByOwner(player);
 	ASSERT_NE(hero, nullptr);
-	map()->moveObject(hero->id, hero->convertFromVisitablePos(int3(1, y, z)));
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(embarkShore));
 	const auto guardID = map()->getTile(guardPos).topVisitableObj();
 	auto * guard = dynamic_cast<CGCreature *>(map()->getObject(guardID));
 	ASSERT_NE(guard, nullptr);
@@ -3740,7 +3747,7 @@ TEST_P(ToroidalGuardedDisembarkTest, DisembarkingStartsGuardBattleAndLeavesBoatA
 	EXPECT_EQ(boat->visitablePos(), water);
 }
 
-INSTANTIATE_TEST_SUITE_P(EdgeAndCornerOnBothLevels, ToroidalGuardedDisembarkTest, ::testing::Range(0, 4));
+INSTANTIATE_TEST_SUITE_P(EdgeAndCornerOnBothLevels, ToroidalGuardedDisembarkTest, ::testing::Range(0, 16));
 
 TEST_F(HeroMovementTest, BoatCannotDisembarkOntoNonblockingEventAcrossSeam)
 {
