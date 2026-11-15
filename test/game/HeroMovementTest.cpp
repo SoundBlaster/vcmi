@@ -7071,6 +7071,45 @@ TEST_F(HeroMovementTest, MonsterGuardAcrossCornerStartsBattle)
 	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
 }
 
+class ToroidalGuardedCrossingTest : public HeroMovementTest, public ::testing::WithParamInterface<int> {};
+
+TEST_P(ToroidalGuardedCrossingTest, EnteringGuardedTileStartsBattleWithCorrectMonster)
+{
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions.at(GetParam() % directions.size());
+	const int level = GetParam() / directions.size();
+	const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, level);
+	const int3 destination(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, level);
+	const int3 guardPos(destination.x + dx, destination.y + dy, level);
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 1}}).monster(guardPos, CreatureID(27), 100);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+	ASSERT_EQ(hero->visitablePos(), origin);
+	const auto guardID = map()->getTile(guardPos).topVisitableObj();
+	const auto * guard = dynamic_cast<const CArmedInstance *>(map()->getObject(guardID));
+	ASSERT_NE(guard, nullptr);
+	ASSERT_EQ(map()->guardingCreaturePosition(destination), guardPos);
+	ASSERT_FALSE(map()->guardingCreaturePosition(origin).isValid());
+	hero->setMovementPoints(3000);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	const auto * battle = gameState()->getBattle(player);
+	ASSERT_NE(battle, nullptr);
+	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+}
+
+INSTANTIATE_TEST_SUITE_P(EdgesAndLevels, ToroidalGuardedCrossingTest, ::testing::Range(0, 16));
+
 class ToroidalMonsterAttackTest : public HeroMovementTest, public ::testing::WithParamInterface<int>
 {
 };
