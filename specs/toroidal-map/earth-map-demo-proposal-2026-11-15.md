@@ -776,3 +776,16 @@ The fixture configures these players as human in `StartInfo` (each has a
 connected player ID) even though the test directly drives them with
 Nullkiller. Consequently these runs do not establish the server behavior of
 a player configured as AI; that distinction needs a separate test.
+
+The fixture was subsequently extended in `b51b4db` with
+`VCMI_INSPECT_AI_SLOT=<player>`: the selected player's `StartInfo` has no
+connected player ID, and the initialized `PlayerState` is asserted to be AI.
+Each of the eight starts was then checked once in a separate process with
+that option and the matching `VCMI_INSPECT_AI_RESOURCE` input. All eight
+passed with 3–19 movement requests and no rejected movement. Five reached a
+battle and were stopped; three returned from the planning loop with no pending
+server activity. In the red run a dwelling visit, blocking dialog and
+recruitment window completed with two accepted answers. Logs are
+`ai-configured-player-0.log` through `ai-configured-player-7.log` in the TB5
+research runtime. This check still directly invokes Nullkiller's planning
+loop and does not exercise the actual turn-start event, `EndTurn`, or combat.

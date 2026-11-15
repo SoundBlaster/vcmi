@@ -302,9 +302,10 @@ also executed a test-selected Nullkiller2 resource plan for each player. On
 the red-player start, Nullkiller then selected its own actions in five
 in-process repetitions: three reached a battle after a dwelling visit and
 two returned from planning without combat. Each of the other seven starts
-also passed one bounded autonomous run. The fixture drives human-configured
-player slots with Nullkiller; it stops before combat. Complete server turns
-and the server behavior of AI-configured slots remain unverified. The engine
+also passed one bounded autonomous run. Those runs drove human-configured
+slots; a subsequent run for each of the eight starts explicitly configured
+the tested slot as AI and also passed. The fixture stops before combat;
+complete autonomous server turns remain unverified. The engine
 recognized 44 repositioned guards. Artificially positioned heroes crossed
 each axis of the actual draft in both directions on land and with a test boat;
 diagonal disembarkation also crossed both axes at the corners. An in-process
