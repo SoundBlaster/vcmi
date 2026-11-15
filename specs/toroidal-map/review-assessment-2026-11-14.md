@@ -7,6 +7,15 @@ allowed changes to legacy behavior when needed for the feature and requested
 that each review comment be judged on its merits. Recheck the live PR and its
 head before making any later review or merge decision.
 
+On 2026-11-15, the fork PR was rechecked at head
+`704c6efeb6ce34144fd135f7972d4dd1c8cb2d8b`: 17 review threads remained
+unresolved, and the latest review and thread comment were dated 2026-11-13.
+This is a status observation, not a decision that all threads are valid or
+that earlier fixes fully address them. In particular, the user chose not to
+add a new emergency rule for the rare case without a known safe landing; see
+the [recorded decision](evidence/topology-emergency-known-land-2026-11-14.md#user-decision-no-new-emergency-mechanic).
+No comments were posted and no threads were resolved by this check.
+
 | Review item | Assessment and branch evidence | Remaining question |
 | --- | --- | --- |
 | F1: turn can stall in AIR/WATER | Confirmed by [normal fog exploration](evidence/topology-stranded-fog-reproduction-2026-11-14.md). Fixed the timer gate and added [conditional return](evidence/topology-transient-origin-return-2026-11-14.md), [group prevalidation](evidence/topology-multiple-transient-return-2026-11-14.md), a [disk-save check](evidence/topology-return-origin-disk-save-2026-11-14.md), and [conditional aviation recovery](evidence/topology-aviate-multistep-2026-11-14.md). Nullkiller2 now [backs off rejected end-turn requests](evidence/topology-ai-endturn-backoff-2026-11-14.md). | No general liveness guarantee for old saves without an origin, unavailable origins and other cases. Backoff reduces load but does not resolve a permanently blocked turn. G12 remains pending. |
