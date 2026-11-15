@@ -904,6 +904,14 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	start.mapname = "inspection";
 	start.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
 	start.mode = EStartMode::NEW_GAME;
+	std::optional<int> aiSlot;
+	if(const char * configured = std::getenv("VCMI_INSPECT_AI_SLOT"); configured && *configured)
+	{
+		aiSlot = std::stoi(configured);
+		ASSERT_GE(*aiSlot, 0);
+		ASSERT_LT(*aiSlot, static_cast<int>(header->players.size()));
+		ASSERT_TRUE(header->players[*aiSlot].canComputerPlay);
+	}
 	for(int index = 0; index < static_cast<int>(header->players.size()); ++index)
 	{
 		const auto & info = header->players[index];
@@ -911,7 +919,8 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			continue;
 		auto & player = start.playerInfos[PlayerColor(index)];
 		player.color = PlayerColor(index);
-		player.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(index));
+		if(!aiSlot || *aiSlot != index)
+			player.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(index));
 		player.name = "Inspection";
 		player.castle = info.defaultCastle();
 		player.hero = info.defaultHero();
@@ -922,6 +931,8 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	GameRandomizer randomizer(*state);
 	Load::ProgressAccumulator progress;
 	state->init(&service, &start, randomizer, progress, false);
+	if(aiSlot)
+		ASSERT_FALSE(state->players.at(PlayerColor(*aiSlot)).isHuman());
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
 #ifdef ENABLE_NULLKILLER2_AI
@@ -932,6 +943,8 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_EQ(values.size(), 2u);
 		const PlayerColor player(std::stoi(values[0]));
 		ASSERT_TRUE(player.isValidPlayer());
+		if(aiSlot)
+			ASSERT_EQ(*aiSlot, player.getNum());
 		ASSERT_TRUE(state->players.contains(player));
 		ASSERT_NE(state->getPlayerTeam(player), nullptr);
 		const auto target = map.instanceNames.find(values[1]);
