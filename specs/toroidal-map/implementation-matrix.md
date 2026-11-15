@@ -123,6 +123,11 @@ red player's recorded viewport and fields. The separate
 the test-only entities found in the earlier prototype; one was started and
 played through a corner crossing.
 
+The newer [preview at `155b38b`](evidence/topology-preview-155b38b-2026-11-15.md)
+also loaded the clean demo and crossed a corner after collecting gold. Its
+direct launch is verified in the test environment; ordinary Launch Services
+startup and human visual acceptance remain open.
+
 A generated legacy H3M defaults to bounded mode and rejects direct crossings
 in all eight directions on both levels; the same steps succeed after an
 explicit in-memory toroidal opt-in. See the
