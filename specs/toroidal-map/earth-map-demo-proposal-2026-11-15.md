@@ -136,3 +136,16 @@ The 252 north/south pairs include 48 rock/water and 204 water/water. The
 internal join between the two source levels has the same totals. These are
 terrain-only counts; object occupancy, ships, coastline art and actual
 crossing behavior need separate checks.
+
+An optional second illustration selects the 4-connected snow component at
+`(130,30)` in the stacked preview, removes those 2,304 source snow cells,
+stretches its shape across the width and inserts new ocean bands around the
+north/south seam. Its candidate canvas is 252×576, with 72 added rows; this
+is a visualization choice, not a decided final map size. In the resulting
+terrain-only boundary, 183 paired cells are land/land and 69 are water/water.
+The preview remains blocked by the pre-existing rock areas elsewhere. It is
+saved as `runtime/earth-map-research-2026-11-15/stacked-polar-draft.png` on
+TB5. No object or gameplay data was transformed. The tool rejects a selected
+snow component that touches the original preview boundary; eight Python
+geometry and preview checks passed. Exact artwork, placing objects from the
+original island, seam roads and playability remain unresolved.
