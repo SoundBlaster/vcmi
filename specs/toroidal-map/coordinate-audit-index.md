@@ -354,4 +354,4 @@ regenerating the index resets manually recorded statuses.
 | `server/lobby/BattleOnlyMap.cpp` | 40, 41 | unreviewed |
 | `server/processors/NewTurnProcessor.cpp` | 579, 580 | reviewed: Grail rumor names an absolute region of the canonical map rectangle, not a distance from the hero |
 | `server/processors/PlayerMessageProcessor.cpp` | 688, 689, 692, 693, 694, 819 | reviewed: reveal cheat enumerates canonical tiles; teleport cheat explicitly accepts an in-map destination |
-| `server/processors/TurnOrderProcessor.cpp` | 132, 161, 162, 163, 177, 178, 179, 184, 185, 186 | unreviewed |
+| `server/processors/TurnOrderProcessor.cpp` | 132, 161, 162, 163, 177, 178, 179, 184, 185, 186 | partial: contact reachability uses shared pathfinder; bounded and toroidal server tests cover edges, corners and level isolation, plus one actual turn start/end; network delivery and dynamic changes remain unverified |

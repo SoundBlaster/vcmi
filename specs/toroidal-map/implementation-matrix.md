@@ -94,6 +94,12 @@ bounded and toroidal maps with two levels and two teams. See the
 [full-map fog record](evidence/full-map-fog-range-2026-11-14.md) for the
 scope and the remaining multiplayer and rendering limitations.
 
+The server's [simultaneous-turn contact checks](evidence/simultaneous-turn-contact-seams-2026-11-15.md)
+recognize a possible meeting across each edge and corner on both levels; a
+bounded control and separate-level control remain isolated. One horizontal
+case also verifies actual turn start and transfer in an in-process server;
+network delivery and contact changes during play are not covered.
+
 Two graphical clients on one Mac also joined a loopback lobby, started the
 demo map, executed a corner crossing, transferred the turn, moved the second
 hero, reloaded the autosave in a new lobby and crossed the corner back. The

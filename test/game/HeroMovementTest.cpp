@@ -87,6 +87,157 @@ protected:
 	void checkSingleIslandTransitStopsBeforeStranding(SpellID spell, BonusType bonus, EPathfindingLayer layer);
 };
 
+TEST_F(HeroMovementTest, SimultaneousTurnContactRecognizesMeetingAcrossToroidalSeams)
+{
+	const PlayerColor red(0), blue(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(red).playerActive(blue)
+		.hero(int3(1, 10, 0), HeroTypeID(0), red)
+		.hero(int3(35, 10, 0), HeroTypeID(1), blue);
+	startWithMap(std::move(builder));
+	auto * redHero = findHeroByOwner(red);
+	auto * blueHero = findHeroByOwner(blue);
+	ASSERT_NE(redHero, nullptr);
+	ASSERT_NE(blueHero, nullptr);
+	revealMap(red);
+	revealMap(blue);
+
+	struct ContactObserved {};
+	class ContactProbeServer : public GameHandlerTestServer
+	{
+	public:
+		using GameHandlerTestServer::GameHandlerTestServer;
+		std::optional<std::set<std::pair<PlayerColor, PlayerColor>>> contacts;
+		void applyPack(CPackForClient & pack) override
+		{
+			if(const auto * status = dynamic_cast<const SimturnsContactStatus *>(&pack))
+			{
+				contacts = status->blockedContacts;
+				GameHandlerTestServer::applyPack(pack);
+				throw ContactObserved{}; // Stop before starting turns, after applying the contact packet.
+			}
+			GameHandlerTestServer::applyPack(pack);
+		}
+	};
+
+	for(int level = 0; level < 2; ++level)
+	{
+		for(const auto & [redPos, crossing, bluePos] : std::vector<std::tuple<int3, int3, int3>>{
+			{{0, 10, level}, {35, 10, level}, {34, 10, level}},
+			{{34, 10, level}, {35, 10, level}, {0, 10, level}},
+			{{10, 0, level}, {10, 35, level}, {10, 34, level}},
+			{{10, 34, level}, {10, 35, level}, {10, 0, level}},
+			{{0, 0, level}, {35, 35, level}, {34, 34, level}},
+			{{0, 35, level}, {35, 0, level}, {34, 1, level}},
+			{{35, 0, level}, {0, 35, level}, {1, 34, level}},
+			{{35, 35, level}, {0, 0, level}, {1, 1, level}}})
+		{
+			for(int z = 0; z < 2; ++z)
+				for(int x = 0; x < 36; ++x)
+					for(int y = 0; y < 36; ++y)
+						map()->getTile(int3(x, y, z)).terrainType = TerrainId::ROCK;
+			for(const auto & position : {redPos, crossing, bluePos})
+				map()->getTile(position).terrainType = TerrainId::GRASS;
+			for(const bool toroidal : {false, true})
+			{
+				SCOPED_TRACE(::testing::Message() << "level=" << level << " crossing=" << crossing.toString() << " toroidal=" << toroidal);
+				map()->setToroidalAndRebuild(toroidal);
+				map()->moveObject(redHero->id, redHero->convertFromVisitablePos(redPos));
+				map()->moveObject(blueHero->id, blueHero->convertFromVisitablePos(bluePos));
+				redHero->setMovementPoints(1500);
+				blueHero->setMovementPoints(1500);
+				ASSERT_EQ(redHero->visitablePos(), redPos);
+				ASSERT_EQ(blueHero->visitablePos(), bluePos);
+				std::vector<bool> crossingReachable;
+				for(const auto * hero : {redHero, blueHero})
+				{
+					CPathsInfo paths(gameState()->getMapSize(), hero);
+					auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+					config->options.ignoreGuards = true;
+					config->options.turnLimit = 1;
+					CPathfinder(*gameState(), config).calculatePaths();
+					crossingReachable.push_back(paths.getNode(crossing)->reachable());
+				}
+				EXPECT_EQ(crossingReachable[0] && crossingReachable[1], toroidal);
+				ContactProbeServer server(gameState(), red);
+				CGameHandler handler(server, gameState());
+				handler.turnOrder->setMinSimturnsDuration(0);
+				handler.turnOrder->setMaxSimturnsDuration(99);
+				handler.turnOrder->addPlayer(red);
+				handler.turnOrder->addPlayer(blue);
+				EXPECT_THROW(handler.turnOrder->onGameStarted(), ContactObserved);
+				ASSERT_TRUE(server.contacts.has_value());
+				EXPECT_EQ(server.contacts->count({red, blue}), toroidal ? 0u : 1u);
+				EXPECT_EQ(gameState()->blockedContacts, *server.contacts);
+			}
+		}
+	}
+
+	for(const bool toroidal : {false, true})
+	{
+		SCOPED_TRACE(toroidal ? "different levels, toroidal" : "different levels, bounded");
+		map()->setToroidalAndRebuild(toroidal);
+		const int3 surface(10, 10, 0), underground(10, 10, 1);
+		map()->getTile(surface).terrainType = TerrainId::GRASS;
+		map()->getTile(underground).terrainType = TerrainId::GRASS;
+		map()->moveObject(redHero->id, redHero->convertFromVisitablePos(surface));
+		map()->moveObject(blueHero->id, blueHero->convertFromVisitablePos(underground));
+		ContactProbeServer server(gameState(), red);
+		CGameHandler handler(server, gameState());
+		handler.turnOrder->setMinSimturnsDuration(0);
+		handler.turnOrder->setMaxSimturnsDuration(99);
+		handler.turnOrder->addPlayer(red);
+		handler.turnOrder->addPlayer(blue);
+		EXPECT_THROW(handler.turnOrder->onGameStarted(), ContactObserved);
+		ASSERT_TRUE(server.contacts.has_value());
+		EXPECT_EQ(server.contacts->count({red, blue}), 1u);
+		EXPECT_EQ(gameState()->blockedContacts, *server.contacts);
+	}
+}
+
+class SeamSimultaneousTurnTest : public HeroMovementTest, public ::testing::WithParamInterface<bool> {};
+
+TEST_P(SeamSimultaneousTurnTest, ServerStartsBothPlayersOnlyWhenSeamKeepsThemApart)
+{
+	const PlayerColor red(0), blue(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(red).playerActive(blue)
+		.hero(int3(1, 10, 0), HeroTypeID(0), red)
+		.hero(int3(35, 10, 0), HeroTypeID(1), blue);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(GetParam());
+	revealMap(red);
+	revealMap(blue);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			map()->getTile(int3(x, y, 0)).terrainType = TerrainId::ROCK;
+	for(int x : {0, 34, 35})
+		map()->getTile(int3(x, 10, 0)).terrainType = TerrainId::GRASS;
+	auto * redHero = findHeroByOwner(red);
+	auto * blueHero = findHeroByOwner(blue);
+	ASSERT_NE(redHero, nullptr);
+	ASSERT_NE(blueHero, nullptr);
+	ASSERT_EQ(redHero->visitablePos(), int3(0, 10, 0));
+	ASSERT_EQ(blueHero->visitablePos(), int3(34, 10, 0));
+	redHero->setMovementPoints(1500);
+	blueHero->setMovementPoints(1500);
+	GameHandlerTestServer server(gameState(), red);
+	CGameHandler handler(server, gameState());
+	handler.turnOrder->setMinSimturnsDuration(0);
+	handler.turnOrder->setMaxSimturnsDuration(99);
+	handler.turnOrder->addPlayer(red);
+	handler.turnOrder->addPlayer(blue);
+	handler.turnOrder->onGameStarted();
+	EXPECT_TRUE(handler.turnOrder->isPlayerMakingTurn(red));
+	EXPECT_EQ(handler.turnOrder->isPlayerMakingTurn(blue), !GetParam());
+	EXPECT_EQ(gameState()->blockedContacts.count({red, blue}), GetParam() ? 0u : 1u);
+	ASSERT_TRUE(handler.turnOrder->onPlayerEndsTurn(red));
+	EXPECT_FALSE(handler.turnOrder->isPlayerMakingTurn(red));
+	EXPECT_TRUE(handler.turnOrder->isPlayerMakingTurn(blue));
+}
+
+INSTANTIATE_TEST_SUITE_P(BoundedAndToroidal, SeamSimultaneousTurnTest, ::testing::Values(false, true));
+
 class ToroidalDemoGameTest : public TinyMapGameTest
 {
 protected:
