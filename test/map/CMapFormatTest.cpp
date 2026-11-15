@@ -720,6 +720,102 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	state->init(&service, &start, randomizer, progress, false);
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_START_RESOURCE_ROUTES"))
+	{
+		std::set<PlayerColor> examined;
+		int collected = 0;
+		for(const auto & id : map.getHeroesOnMap())
+		{
+			auto * hero = dynamic_cast<CGHeroInstance *>(map.getObject(id));
+			if(!hero || !hero->getOwner().isValidPlayer() || hero->isGarrisoned() || hero->inBoat()
+			   || !examined.insert(hero->getOwner()).second)
+				continue;
+			const auto player = hero->getOwner();
+			const auto & fog = state->getPlayerTeam(player)->fogOfWarMap;
+			CPathsInfo paths(state->getMapSize(), hero);
+			auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
+			config->options.turnLimit = 0;
+			CPathfinder(*state, config).calculatePaths();
+			CGPath chosen;
+			const CGResource * target = nullptr;
+			for(const auto & object : map.objects)
+			{
+				const auto * resource = dynamic_cast<const CGResource *>(object.get());
+				if(!resource || resource->stacksCount() || !resource->getAmount())
+					continue;
+				const auto position = resource->visitablePos();
+				if(!map.isInTheMap(position) || !fog[position] || !map.getTile(position).isLand()
+				   || map.getTile(position).topVisitableObj() != resource->id
+				   || state->guardingCreaturePosition(position).isValid())
+					continue;
+				const auto * node = paths.getNode(position, EPathfindingLayer::LAND);
+				CGPath route;
+				if(!node->reachable() || node->turns != 0 || !paths.getPath(route, position, EPathfindingLayer::LAND)
+				   || route.nodes.size() < 3)
+					continue;
+				bool clear = true;
+				for(size_t index = 1; index + 1 < route.nodes.size(); ++index)
+				{
+					const auto & step = route.nodes[index];
+					clear = clear && step.layer == EPathfindingLayer::LAND && step.turns == 0 && fog[step.coord]
+						&& !map.getTile(step.coord).visitable() && !state->guardingCreaturePosition(step.coord).isValid();
+				}
+				if(clear && (!target || route.nodes.size() < chosen.nodes.size()))
+				{
+					chosen = std::move(route);
+					target = resource;
+				}
+			}
+			if(!target)
+			{
+				std::cout << "No short unguarded resource route for player " << player.getNum() << std::endl;
+				continue;
+			}
+			const auto targetID = target->id;
+			const auto resourceID = target->resourceID();
+			const auto amount = target->getAmount();
+			const auto before = state->players.at(player).resources[resourceID];
+			const auto name = target->instanceName;
+			state->actingPlayers.insert(player);
+			ExternalInspectionReplicaServer server(state, player);
+			if(std::getenv("VCMI_INSPECT_REPLICA_RESOURCES"))
+				for(int index = 0; index < 2; ++index)
+					server.replicas.push_back(reloadExternalInspectionState(state));
+			CGameHandler handler(server, state);
+			for(size_t index = chosen.nodes.size() - 1; index > 0; --index)
+			{
+				const auto & step = chosen.nodes[index - 1];
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(step.coord),
+				                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND))
+					<< name << " step " << step.coord.toString();
+				if(index > 1)
+					ASSERT_EQ(hero->visitablePos(), step.coord);
+			}
+			EXPECT_EQ(map.getObject(targetID), nullptr);
+			EXPECT_EQ(state->players.at(player).resources[resourceID], before + amount);
+			for(const auto & replica : server.replicas)
+			{
+				const auto * replicaHero = dynamic_cast<const CGHeroInstance *>(replica->getMap().getObject(hero->id));
+				ASSERT_NE(replicaHero, nullptr);
+				EXPECT_EQ(replicaHero->visitablePos(), hero->visitablePos());
+				EXPECT_EQ(replicaHero->movementPointsRemaining(), hero->movementPointsRemaining());
+				EXPECT_EQ(replica->getMap().getObject(targetID), nullptr);
+				EXPECT_EQ(replica->players.at(player).resources[resourceID], before + amount);
+				const auto [compared, mismatches] = compareExternalInspectionFog(*state, *replica);
+				EXPECT_GT(compared, 0u);
+				EXPECT_EQ(mismatches, 0u);
+			}
+			if(!server.replicas.empty())
+				EXPECT_EQ(server.deliveredMovements, 2 * static_cast<int>(chosen.nodes.size() - 1));
+			++collected;
+			std::cout << "Player " << player.getNum() << " collected " << name << " in "
+			          << chosen.nodes.size() - 1 << " planned steps" << std::endl;
+		}
+		std::cout << "Initial heroes examined=" << examined.size() << ", resource routes=" << collected << std::endl;
+		ASSERT_GT(collected, 0);
+		if(const char * required = std::getenv("VCMI_INSPECT_REQUIRE_RESOURCE_ROUTES"))
+			ASSERT_EQ(collected, std::stoi(required));
+	}
 	if(std::getenv("VCMI_INSPECT_SEAM_LAND_STEPS"))
 	{
 		CGHeroInstance * hero = nullptr;
