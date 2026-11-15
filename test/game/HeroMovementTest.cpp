@@ -596,6 +596,11 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	const auto * hero = heroes.front();
 	const auto goldBefore = server.gh->gameState().players.at(red).resources[GameResID::GOLD];
 	const int3 destination(35, 35, 0);
+	const auto resourceID = server.gh->gameState().getMap().getTile(destination).topVisitableObj();
+	ASSERT_TRUE(resourceID.hasValue());
+	ASSERT_NE(server.gh->gameState().getMap().getObject(resourceID), nullptr);
+	for(const LobbyPeer * peer : {&host, &guest})
+		ASSERT_NE(peer->state->getMap().getObject(resourceID), nullptr);
 	MoveHero movement({hero->convertFromVisitablePos(destination)}, EPathfindingLayer::LAND, hero->id, false);
 	movement.player = red;
 	movement.requestID = 10;
@@ -603,16 +608,20 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	pumpUntil([&] {
 		return host.results.contains(10)
 			&& host.state->players.at(red).resources[GameResID::GOLD] == goldBefore + 1000
-			&& guest.state->players.at(red).resources[GameResID::GOLD] == goldBefore + 1000;
+			&& guest.state->players.at(red).resources[GameResID::GOLD] == goldBefore + 1000
+			&& host.state->getMap().getObject(resourceID) == nullptr
+			&& guest.state->getMap().getObject(resourceID) == nullptr;
 	});
 	ASSERT_TRUE(host.results.contains(10)) << host.failure;
 	EXPECT_TRUE(host.results.at(10));
 	EXPECT_EQ(server.gh->gameState().getHero(hero->id)->visitablePos(), int3(0, 0, 0));
 	EXPECT_EQ(server.gh->gameState().players.at(red).resources[GameResID::GOLD], goldBefore + 1000);
+	EXPECT_EQ(server.gh->gameState().getMap().getObject(resourceID), nullptr);
 	for(const LobbyPeer * peer : {&host, &guest})
 	{
 		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), int3(0, 0, 0)) << peer->failure;
 		EXPECT_EQ(peer->state->players.at(red).resources[GameResID::GOLD], goldBefore + 1000);
+		EXPECT_EQ(peer->state->getMap().getObject(resourceID), nullptr);
 	}
 	movement.requestID = 11;
 	host.codec->sendPack(movement);
@@ -1185,6 +1194,13 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	const auto savedBluePoints = server.gh->gameState().getHero(blueHeroID)->movementPointsRemaining();
 	const auto savedUndergroundPosition = server.gh->gameState().getHero(undergroundBlueID)->visitablePos();
 	const auto savedUndergroundPoints = server.gh->gameState().getHero(undergroundBlueID)->movementPointsRemaining();
+	const auto savedGold = server.gh->gameState().players.at(red).resources[GameResID::GOLD];
+	ASSERT_EQ(server.gh->gameState().getMap().getObject(resourceID), nullptr);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_EQ(peer->state->players.at(red).resources[GameResID::GOLD], savedGold);
+		ASSERT_EQ(peer->state->getMap().getObject(resourceID), nullptr);
+	}
 	const auto savedFog = visibility(server.gh->gameState());
 	ASSERT_EQ(visibility(*host.state), savedFog);
 	ASSERT_EQ(visibility(*guest.state), savedFog);
@@ -1258,6 +1274,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
 		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->visitablePos(), savedUndergroundPosition);
 		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->movementPointsRemaining(), savedUndergroundPoints);
+		EXPECT_EQ(peer->state->players.at(red).resources[GameResID::GOLD], savedGold);
+		EXPECT_EQ(peer->state->getMap().getObject(resourceID), nullptr);
 		EXPECT_EQ(visibility(*peer->state), savedFog);
 	}
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(redHeroID)->visitablePos(), savedRedPosition);
@@ -1266,6 +1284,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(undergroundBlueID)->visitablePos(), savedUndergroundPosition);
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(undergroundBlueID)->movementPointsRemaining(), savedUndergroundPoints);
+	ASSERT_EQ(reloadedServer.gh->gameState().players.at(red).resources[GameResID::GOLD], savedGold);
+	ASSERT_EQ(reloadedServer.gh->gameState().getMap().getObject(resourceID), nullptr);
 	ASSERT_EQ(visibility(reloadedServer.gh->gameState()), savedFog);
 	ASSERT_TRUE(reloadedServer.gh->gameState().actingPlayers.contains(blue));
 	if(const auto activity = reloadedServer.gh->activities->topActivity(blue))

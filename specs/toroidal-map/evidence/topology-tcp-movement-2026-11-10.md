@@ -1,5 +1,23 @@
 # TCP movement and request acknowledgement — 2026-11-10
 
+## Resource removal and reload — 2026-11-15
+
+The lobby-start test now identifies the gold object at `(35,35,0)` before
+the red hero visits it across the northwest corner. The server and both
+client replicas initially contain that object. After the visit, all three
+have 1,000 more gold for red and no longer contain the object. The test also
+checks the object's absence and red's current gold on the original server and
+both replicas before saving, then on the reloaded server and two newly
+connected replicas. Later turn income can change the balance before the save.
+
+The expanded test passed three consecutive repetitions on macOS arm64 using
+the TB5 `vcmitest` built from `503ac6d` plus the test change. The XML report
+`runtime/tcp-resource-replication-2026-11-15.xml` contains the last repetition.
+The server and listeners run in one process and exchange actual TCP loopback
+packets; this does not compare the entire game state or establish behavior on
+remote hosts or in a graphical client. The build succeeded with duplicate
+library and missing Conan search-path warnings.
+
 A `CVCMIServer` and two test listeners negotiated the experimental toroidal
 capability over separate TCP loopback connections. The test installed a
 two-level toroidal game state and assigned one player to each connection;
