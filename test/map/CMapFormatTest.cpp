@@ -1034,9 +1034,12 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
 		const auto teleport = std::dynamic_pointer_cast<TeleportDialogActivity>(dialog);
 		ASSERT_NE(teleport, nullptr);
+		const char * requestedExit = std::getenv("VCMI_INSPECT_WATER_PORTAL_EXIT");
 		const auto selected = std::ranges::find_if(teleport->td.exits, [&](const auto & item)
 		{
-			return item.first != portal->second->id;
+			const auto * object = map.getObject(item.first);
+			return object && item.first != portal->second->id
+				&& (!requestedExit || !*requestedExit || object->instanceName == requestedExit);
 		});
 		ASSERT_NE(selected, teleport->td.exits.end());
 		const auto exitId = selected->first;
