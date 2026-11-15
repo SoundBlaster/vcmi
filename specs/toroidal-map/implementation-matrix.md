@@ -113,7 +113,9 @@ ending on land. The [transient movement record](evidence/nullkiller-transient-se
 also checks planned Flight and Water Walk casts, accepted and rejected server
 acknowledgements, and landings across all seam directions on both levels;
 an autonomous planning turn collected visible gold over the west seam using
-each spell on both levels. Other autonomous routes remain unverified.
+each spell on both levels. A subsequent turn test starts with limited sight,
+checks movement-driven fog reveal and AI notification on both levels, and
+confirms the other level remains hidden. Other autonomous routes remain unverified.
 After six test-driven server steps across a seam, the same record checks an
 unsafe seventh step is rejected and the AI gateway returns to the island for
 both abilities and levels. Its rejection of a water destination is not by

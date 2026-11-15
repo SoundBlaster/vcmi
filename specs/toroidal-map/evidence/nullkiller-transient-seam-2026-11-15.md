@@ -96,3 +96,31 @@ turn tests: 139 tests in four suites on macOS arm64. The binary was built from
 `runtime/ai-full-turn-transit-related-2026-11-15.{log,xml}` under the TB5 build
 root. This result does not establish autonomous spell use in other directions,
 under fog, with an interrupted landing, or in a remote or graphical session.
+
+## Autonomous route with newly revealed fog
+
+`ToroidalAITransientSafetyTest.FullTurnCrossesWithFogRevealedByMovement`
+uses the same island, visible gold and spell-equipped hero, but initially
+reveals only the hero's ordinary sight range. A cell just beyond that range
+across the west seam is initially hidden. For Flight and Water Walk on each
+level, Nullkiller chooses the task and casts the spell; the server accepts
+the movement across the seam, the hero collects the gold and ends on LAND.
+No movement request was rejected. Movement reveals the previously hidden
+frontier and the corresponding cell on the other level stays hidden.
+
+The in-process test adapter now also forwards movement-triggered
+`tileRevealed` notifications to the AI after applying each movement packet,
+as well as invalidating paths and forwarding `heroMoved`; the new test checks
+that a nonempty reveal notification was delivered. The starting fog is set
+up synthetically, while later fog reveals and server request acknowledgements
+come from the actual movement code. The target is visible before the move;
+this does not establish AI behavior when choosing a target hidden in fog,
+other directions, battles, interrupted movement, a graphical client or remote
+multiplayer. The adapter still does not emulate every client callback.
+
+On macOS arm64, `vcmitest` was built from `1794105` plus these test changes.
+The related AI seam and transient suites passed 140 cases, and the four new
+cases passed again after adding the other-level fog assertion. Reports are
+`runtime/ai-transient-fog-related-2026-11-15.xml` and
+`runtime/ai-transient-fog-final-2026-11-15.xml` under the TB5 build root.
+The linker retained duplicate-library and missing Conan search-path warnings.
