@@ -98,3 +98,16 @@ This bypasses the normal loader's mod compatibility gate and the multiplayer
 lobby; it does not establish graphical loading or an actual continued turn.
 The test uses a specific local fixture and is skipped unless
 `VCMI_ORIGINAL_BOUNDED_SAVE` is supplied. It does not modify the input save.
+
+The follow-up `ToroidalDemoVmapTest.LoadsOriginalBoundedSaveThroughServer`
+in `1d0da07` loads the same original save via `CGameHandler::load` with the
+isolated user-data profile used for the mixed-version game. It supplies the
+file through a temporary read-only resource loader, verifies the selected
+path and exercises the normal saved-mod compatibility check. The loaded map
+remains bounded; a new in-process handler acting on the loaded state moves the
+blue hero from `(19,18,0)` to `(20,18,0)` and deducts movement points. On
+macOS arm64 the test passed with the test source on top of `de19cf0`; its XML
+is local under TB5 at `runtime/original-bounded-normal-load-2026-11-15.xml`.
+The input SHA-256 remained unchanged. The test does not drive a graphical
+client, network lobby or a complete resumed turn; it uses a separate test
+handler for the move after the production load path returns.
