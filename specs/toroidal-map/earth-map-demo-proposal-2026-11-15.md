@@ -220,3 +220,37 @@ It is a candidate for the visual arrangement, not an automatic conversion of
 the H3M. For the toroidal demo, manually align and check corresponding edges,
 including ocean and any Antarctic land crossings; the projection alone does
 not establish a continuous toroidal seam.
+
+## Cross-level passages require explicit adaptation
+
+The converted source has four `subterraneanGate` instances: surface anchors
+`(3,100,0)` and `(3,128,0)`, and second-level anchors `(250,100,1)` and
+`(250,128,1)`. There are also four separate `borderGate` instances, which
+must not be confused with subterranean passages. The current
+`CGSubterraneanGate::postInit` pairs gates only when their visitable positions
+are on different levels. Thus merely relocating all four gates onto one
+surface produces no cross-level partners; they cannot be treated as working
+passages in the demo.
+
+The source map's surface gates lie near the western boundary and the other
+two in the eastern Africa fragment. One design candidate is to restore a
+walkable physical connection around the toroidal seam and remove or replace
+the redundant gate pairs. Another is to replace each pair with an explicitly
+paired same-level passage. Neither option has been implemented or selected;
+first inspect the terrain, footprints, access restrictions and actual source
+gate pairing. Retaining object names alone would not preserve this behavior.
+
+## Rotation and road rendering
+
+The converted source contains 1,846 surface and 1,330 second-level road
+tiles. `MapFormatJson` stores separate flip bits for terrain, roads and rivers,
+so reversing the cell grid alone does not rotate their artwork. In addition,
+`MapRendererRoad::renderTile` draws the upper half from the preceding row's
+road and the lower half from the current row's road, whereas pathfinding
+consults road data on the source and destination cells. Therefore blindly
+rotating road flags on their original cells is not sufficient evidence of
+either visual continuity or correct movement costs. Before exporting the
+rotated Americas, design a road transformation or regenerate road artwork,
+then test its rendered joins and movement costs independently, especially at
+new seams. No road transformation is implemented by the terrain-color
+preview.
