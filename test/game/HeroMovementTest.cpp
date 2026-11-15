@@ -531,6 +531,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		.hero(int3(1, 0, 0), HeroTypeID(0), red)
 		.hero(int3(1, 5, 0), HeroTypeID(1), blue)
 		.hero(int3(1, 0, 1), HeroTypeID(2), blue)
+		.hero(int3(2, 12, 0), HeroTypeID(3), blue)
 		.terrain(int3(35, 4, 0), TerrainId::ROCK)
 		.resource(int3(20, 10, 0), GameResID::GOLD, 1)
 		.resource(int3(35, 35, 0), GameResID::GOLD, 10);
@@ -1119,13 +1120,16 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_TRUE(host.state->actingPlayers.contains(blue));
 	ASSERT_TRUE(guest.state->actingPlayers.contains(blue));
 	const auto blueHeroes = server.gh->gameState().getHeroes(blue);
-	ASSERT_EQ(blueHeroes.size(), 2);
+	ASSERT_EQ(blueHeroes.size(), 3);
 	const auto surfaceBlue = std::ranges::find_if(blueHeroes, [](const auto * h) { return h->visitablePos() == int3(0, 5, 0); });
 	const auto undergroundBlue = std::ranges::find_if(blueHeroes, [](const auto * h) { return h->visitablePos() == int3(0, 0, 1); });
+	const auto seaBlue = std::ranges::find_if(blueHeroes, [](const auto * h) { return h->visitablePos() == int3(1, 12, 0); });
 	ASSERT_NE(surfaceBlue, blueHeroes.end());
 	ASSERT_NE(undergroundBlue, blueHeroes.end());
+	ASSERT_NE(seaBlue, blueHeroes.end());
 	const auto * blueHero = *surfaceBlue;
 	const auto undergroundBlueID = (*undergroundBlue)->id;
+	const auto seaBlueID = (*seaBlue)->id;
 	ASSERT_EQ(blueHero->visitablePos(), int3(0, 5, 0));
 	const auto blueMovementBefore = blueHero->movementPointsRemaining();
 	const auto visibility = [&](const CGameState & state)
@@ -1488,6 +1492,57 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(blueHero->id)->movementPointsRemaining(), server.gh->gameState().getHero(blueHero->id)->movementPointsRemaining());
 	}
 
+	// Save the game while another blue hero is aboard after embarking across
+	// the seam, then check the same hero and boat on the reloaded peers.
+	const int3 boatShore(35, 34, 0), boatWater(0, 34, 0);
+	ChangeObjPos stageSeaHero;
+	stageSeaHero.objid = seaBlueID;
+	stageSeaHero.nPos = boatShore;
+	server.gh->sendAndApply(stageSeaHero);
+	server.gh->createBoat(boatWater, BoatId::CASTLE, blue);
+	server.gh->setMovePoints(seaBlueID, 3000);
+	FowTilesType boatArea;
+	for(int dx = -2; dx <= 2; ++dx)
+		for(int dy = -2; dy <= 2; ++dy)
+			boatArea.insert(*topology.canonicalize(boatWater + int3(dx, dy, 0)));
+	server.gh->changeFogOfWar(boatArea, blue, ETileVisibility::REVEALED);
+	const auto boatID = server.gh->gameState().getMap().getTile(boatWater).topVisitableObj();
+	ASSERT_NE(dynamic_cast<const CGBoat *>(server.gh->gameState().getMap().getObject(boatID)), nullptr);
+	pumpUntil([&] {
+		return host.state->getMap().getObject(boatID) && guest.state->getMap().getObject(boatID)
+			&& host.state->getHero(seaBlueID)->visitablePos() == boatShore
+			&& guest.state->getHero(seaBlueID)->visitablePos() == boatShore
+			&& host.state->getHero(seaBlueID)->movementPointsRemaining() == 3000
+			&& guest.state->getHero(seaBlueID)->movementPointsRemaining() == 3000;
+	});
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_NE(peer->state->getMap().getObject(boatID), nullptr);
+		ASSERT_EQ(peer->state->getHero(seaBlueID)->visitablePos(), boatShore);
+		ASSERT_EQ(peer->state->getHero(seaBlueID)->movementPointsRemaining(), 3000);
+	}
+	const auto * seaHero = server.gh->gameState().getHero(seaBlueID);
+	ASSERT_NE(seaHero, nullptr);
+	MoveHero embark({seaHero->convertFromVisitablePos(boatWater)}, EPathfindingLayer::SAIL, seaBlueID, false);
+	embark.player = blue;
+	embark.requestID = 82;
+	guest.codec->sendPack(embark);
+	pumpUntil([&] { return guest.results.contains(82) && host.state->getHero(seaBlueID)->inBoat()
+		&& guest.state->getHero(seaBlueID)->inBoat(); });
+	ASSERT_TRUE(guest.results.contains(82)) << guest.failure;
+	ASSERT_TRUE(guest.results.at(82)) << testing::PrintToString(guest.systemMessages);
+	ASSERT_TRUE(server.gh->gameState().getHero(seaBlueID)->inBoat());
+	const auto savedSeaPoints = server.gh->gameState().getHero(seaBlueID)->movementPointsRemaining();
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		const auto * replicaHero = peer->state->getHero(seaBlueID);
+		ASSERT_TRUE(replicaHero->inBoat());
+		EXPECT_EQ(replicaHero->getBoat()->id, boatID);
+		EXPECT_EQ(replicaHero->visitablePos(), boatWater);
+		EXPECT_EQ(replicaHero->movementPointsRemaining(), savedSeaPoints);
+		EXPECT_EQ(replicaHero->getPathfindingStartLayer(), EPathfindingLayer::SAIL);
+	}
+
 	// Save the live TCP game, then start a new lobby and reconnect two fresh
 	// peers through the normal LOAD_GAME path before continuing movement.
 	boost::filesystem::create_directories(directory / "Saves");
@@ -1604,6 +1659,13 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
 		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->visitablePos(), savedUndergroundPosition);
 		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->movementPointsRemaining(), savedUndergroundPoints);
+		const auto * seaReplica = peer->state->getHero(seaBlueID);
+		ASSERT_NE(seaReplica, nullptr);
+		ASSERT_TRUE(seaReplica->inBoat());
+		EXPECT_EQ(seaReplica->getBoat()->id, boatID);
+		EXPECT_EQ(seaReplica->visitablePos(), boatWater);
+		EXPECT_EQ(seaReplica->movementPointsRemaining(), savedSeaPoints);
+		EXPECT_EQ(seaReplica->getPathfindingStartLayer(), EPathfindingLayer::SAIL);
 		EXPECT_EQ(peer->state->players.at(red).resources[GameResID::GOLD], savedGold);
 		EXPECT_EQ(peer->state->getMap().getObject(resourceID), nullptr);
 		ASSERT_NE(peer->state->getObjInstance(mineID), nullptr);
@@ -1616,6 +1678,11 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(blueHeroID)->movementPointsRemaining(), savedBluePoints);
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(undergroundBlueID)->visitablePos(), savedUndergroundPosition);
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(undergroundBlueID)->movementPointsRemaining(), savedUndergroundPoints);
+	ASSERT_TRUE(reloadedServer.gh->gameState().getHero(seaBlueID)->inBoat());
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(seaBlueID)->getBoat()->id, boatID);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(seaBlueID)->visitablePos(), boatWater);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(seaBlueID)->movementPointsRemaining(), savedSeaPoints);
+	ASSERT_EQ(reloadedServer.gh->gameState().getHero(seaBlueID)->getPathfindingStartLayer(), EPathfindingLayer::SAIL);
 	ASSERT_EQ(reloadedServer.gh->gameState().players.at(red).resources[GameResID::GOLD], savedGold);
 	ASSERT_EQ(reloadedServer.gh->gameState().getMap().getObject(resourceID), nullptr);
 	ASSERT_NE(reloadedServer.gh->gameState().getObjInstance(mineID), nullptr);
@@ -1683,6 +1750,36 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	{
 		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->visitablePos(), undergroundDestination);
 		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->movementPointsRemaining(), movedUnderground->movementPointsRemaining());
+		EXPECT_EQ(visibility(*peer->state), visibility(reloadedServer.gh->gameState()));
+	}
+
+	reloadedServer.gh->setMovePoints(seaBlueID, 3000);
+	pumpReload([&] { return reloadHost.state->getHero(seaBlueID)->movementPointsRemaining() == 3000
+		&& reloadGuest.state->getHero(seaBlueID)->movementPointsRemaining() == 3000; });
+	ASSERT_EQ(reloadHost.state->getHero(seaBlueID)->movementPointsRemaining(), 3000);
+	ASSERT_EQ(reloadGuest.state->getHero(seaBlueID)->movementPointsRemaining(), 3000);
+	const auto * resumedSailor = reloadedServer.gh->gameState().getHero(seaBlueID);
+	MoveHero disembark({resumedSailor->convertFromVisitablePos(boatShore)}, EPathfindingLayer::LAND, seaBlueID, false);
+	disembark.player = blue;
+	disembark.requestID = 83;
+	reloadGuest.codec->sendPack(disembark);
+	pumpReload([&] { return reloadGuest.results.contains(83)
+		&& reloadHost.state->getHero(seaBlueID)->visitablePos() == boatShore
+		&& reloadGuest.state->getHero(seaBlueID)->visitablePos() == boatShore; });
+	ASSERT_TRUE(reloadGuest.results.contains(83)) << reloadGuest.failure;
+	ASSERT_TRUE(reloadGuest.results.at(83)) << testing::PrintToString(reloadGuest.systemMessages);
+	ASSERT_FALSE(reloadedServer.gh->gameState().getHero(seaBlueID)->inBoat());
+	ASSERT_NE(reloadedServer.gh->gameState().getMap().getObject(boatID), nullptr);
+	ASSERT_EQ(reloadedServer.gh->gameState().getMap().getObject(boatID)->visitablePos(), boatWater);
+	for(const LobbyPeer * peer : {&reloadHost, &reloadGuest})
+	{
+		EXPECT_FALSE(peer->state->getHero(seaBlueID)->inBoat());
+		EXPECT_EQ(peer->state->getHero(seaBlueID)->visitablePos(), boatShore);
+		EXPECT_EQ(peer->state->getHero(seaBlueID)->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+		EXPECT_EQ(peer->state->getHero(seaBlueID)->movementPointsRemaining(),
+			reloadedServer.gh->gameState().getHero(seaBlueID)->movementPointsRemaining());
+		ASSERT_NE(peer->state->getMap().getObject(boatID), nullptr);
+		EXPECT_EQ(peer->state->getMap().getObject(boatID)->visitablePos(), boatWater);
 		EXPECT_EQ(visibility(*peer->state), visibility(reloadedServer.gh->gameState()));
 	}
 }
