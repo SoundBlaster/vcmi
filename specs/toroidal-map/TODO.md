@@ -78,7 +78,9 @@ demo preparation reviewable as separate changes where practical.
   new interactive overlap candidates; a staged engine check reaches each of
   one pair of creature banks and opens an activity. Other pairs are unverified.
 - [ ] Check land, water and region connectivity and the effects of replacing
-  the original underground gates. Document intentional gameplay changes.
+  the original underground gates. The [current pair and approach check](evidence/earth-current-gates-2026-11-16.md)
+  records their intentional behavior change; wider regional connectivity and
+  normal routes to each gate remain unverified.
 - [x] Investigate the [water-monolith mismatch](evidence/earth-portal-road-2026-11-15.md):
   restore the misplaced entrance to water in the demo preparation recipe.
 - [ ] Address remaining placement and collision problems if they affect demo
