@@ -36,3 +36,18 @@ root. The macOS arm64 test build succeeded with existing linker warnings.
 This extends the earlier four-case result; it still does not establish
 defeat, retreat, hidden guardians, alternative guard arrangements, actual
 battle play, multiplayer, or graphical behavior.
+
+## Retreat from the guarded shore
+
+`ToroidalGuardedDisembarkTest.RetreatFromGuardedShoreLeavesTheBoatAtSea`
+executes a retreat action after the hero disembarks and the guardian battle
+starts. The fixture explicitly selects one attacking stack as active before
+submitting the real server action; it does not play through combat turns.
+After acknowledging the battle result, it verifies the battle is confirmed,
+the hero is removed from the map, the same guard remains at its original
+position, and the same boat remains in the water. All eight directions on
+both levels passed, alongside the 16 forced-victory cases and three related
+boat tests: 35 tests total. The result is
+`runtime/guarded-shore-retreat-final-2026-11-15.{log,xml}` on the TB5 build
+root. The test does not exercise defeat, surrender, GUI combat, a hidden
+guardian or a remote multiplayer game.
