@@ -322,6 +322,14 @@ void VCMIDirsOSX::init()
 
 bfs::path VCMIDirsOSX::userDataPath() const
 {
+	if(const char * overridePath = std::getenv("VCMI_USER_DATA_PATH"); overridePath && *overridePath)
+	{
+		bfs::path path(overridePath);
+		if(!path.is_absolute())
+			throw std::runtime_error("VCMI_USER_DATA_PATH must be an absolute path");
+		return path;
+	}
+
 	// This is Cocoa code that should be normally used to get path to Application Support folder but can't use it here for now...
 	// NSArray* urls = [[NSFileManager defaultManager] URLsForDirectory:NSApplicationSupportDirectory inDomains:NSUserDomainMask];
 	// UserPath = path([urls[0] path] + "/vcmi").string();
@@ -337,6 +345,8 @@ bfs::path VCMIDirsOSX::userCachePath() const { return userDataPath(); }
 
 bfs::path VCMIDirsOSX::userLogsPath() const
 {
+	if(const char * overridePath = std::getenv("VCMI_USER_DATA_PATH"); overridePath && *overridePath)
+		return userDataPath() / "logs";
 	// TODO: use proper objc code from Foundation framework
 	if(const auto homeDir = std::getenv("HOME"))
 		return bfs::path{homeDir} / "Library" / "Logs" / "vcmi";
