@@ -80,3 +80,11 @@ The updated client, server and library SHA-256 values are respectively
 `f9300f92324d266f65f8f77ca5c7216d50555837c748fad7049de451ad4cb0c9`, and
 `f317f1911f96f0724a794eeb46bdc02303debd64ee3602e0a97bc1efc237c29c`.
 The build reported duplicate-library and missing Conan search-path warnings.
+
+A subsequent launch of the same binary and profile created its diagnostic
+socket in a private directory. A desktop screenshot showed a window titled
+`VCMI - Open Heroes 3 1.8.0.109a663`, partly covered by another active window;
+the game itself was not operated. Computer Use could not select the unbundled
+executable as an application. The test process was forcibly stopped without
+starting a game. This confirms that a window was created, not that the Earth
+scenario was selected or that the launcher works through Finder.
