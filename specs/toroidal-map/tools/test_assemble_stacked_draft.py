@@ -1,7 +1,8 @@
 import copy
 import unittest
 
-from assemble_stacked_draft import assemble, blocking_pairs, place_object, rotate_cell_art
+from assemble_stacked_draft import (assemble, blocking_pairs, place_object, relocate_decorations, replace_gate_pairs,
+                                    rotate_cell_art, source_gate_pairs)
 
 
 def obj(name, kind, x, y, level, mask):
@@ -135,6 +136,50 @@ class StackedDraftTest(unittest.TestCase):
         blocking = obj("b", "decoration", 24, 24, 1, ["B"])
         with self.assertRaisesRegex(ValueError, "overlaps objects"):
             assemble(header, water, water, [blocking], snow_island=(25, 25))
+
+    def test_replaces_only_original_pairs_with_unused_portal_subtypes(self):
+        source = [obj("a", "subterraneanGate", 1, 1, 0, ["A"]),
+                  obj("b", "subterraneanGate", 1, 3, 0, ["A"]),
+                  obj("c", "subterraneanGate", 4, 1, 1, ["A"]),
+                  obj("d", "subterraneanGate", 4, 3, 1, ["A"]),
+                  obj("existing", "monolithTwoWay", 2, 2, 0, ["A"])]
+        source[-1]["subtype"] = "monolith1"
+        self.assertEqual(source_gate_pairs(source, 6, 6, False), {("a", "c"), ("b", "d")})
+        converted = copy.deepcopy(source)
+        report = replace_gate_pairs(source, converted, [("a", "c", "monolith2"), ("b", "d", "monolith4")], 6, 6, False)
+        self.assertEqual(len(report), 2)
+        self.assertEqual([(a["type"], a["subtype"]) for a in converted],
+                         [("monolithTwoWay", "monolith2"), ("monolithTwoWay", "monolith4"),
+                          ("monolithTwoWay", "monolith2"), ("monolithTwoWay", "monolith4"),
+                          ("monolithTwoWay", "monolith1")])
+        self.assertEqual(converted[0]["template"], source[0]["template"])
+        self.assertEqual(source[0]["type"], "subterraneanGate")
+        with self.assertRaisesRegex(ValueError, "does not match source-map pairing"):
+            replace_gate_pairs(source, copy.deepcopy(source), [("a", "d", "monolith2")], 6, 6, False)
+        with self.assertRaisesRegex(ValueError, "subtype is unavailable"):
+            replace_gate_pairs(source, copy.deepcopy(source), [("a", "c", "monolith1")], 6, 6, False)
+        with self.assertRaisesRegex(ValueError, "subtype is unavailable"):
+            replace_gate_pairs(source, copy.deepcopy(source), [("a", "c", "monolith2"), ("b", "d", "monolith2")], 6, 6, False)
+
+    def test_relocates_plain_mountain_without_new_overlap_or_road_blockage(self):
+        rows = [["gr0_"] * 7 for _ in range(7)]
+        rows[2][3] = "gr0_pd1_"
+        mountain = obj("hill", "mountain", 3, 3, 0, ["B"])
+        portal = obj("gate", "monolithTwoWay", 3, 3, 0, ["A"])
+        report = relocate_decorations([mountain, portal], rows, ["hill"])
+        self.assertEqual(report, [{"object": "hill", "from": [3, 3], "to": [2, 3]}])
+        self.assertEqual((portal["x"], portal["y"]), (3, 3))
+        self.assertFalse(blocking_pairs([mountain, portal], 7, 7)[0])
+
+    def test_relocation_refuses_interactive_or_unplaceable_objects(self):
+        rows = [["wt0_"] * 4 for _ in range(4)]
+        interactive = obj("bad", "mountain", 1, 1, 0, ["A"])
+        with self.assertRaisesRegex(ValueError, "Interactive objects"):
+            relocate_decorations([interactive], rows, ["bad"])
+        mountain = obj("isolated", "mountain", 1, 1, 0, ["B"])
+        with self.assertRaisesRegex(ValueError, "No clear dry placement"):
+            relocate_decorations([mountain], rows, ["isolated"], max_distance=2)
+        self.assertEqual((mountain["x"], mountain["y"]), (1, 1))
 
 
 if __name__ == "__main__":

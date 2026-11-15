@@ -160,6 +160,127 @@ def changed_cells(before, after):
     return {(x, y) for y, row in enumerate(before) for x, cell in enumerate(row) if cell != after[y][x]}
 
 
+def relocate_decorations(objects, rows, names, max_distance=16):
+    """Move selected plain mountains to the nearest unoccupied dry cells."""
+    width, height = len(rows[0]), len(rows)
+    by_name = {obj["instanceName"]: obj for obj in objects}
+
+    def footprint(obj, x, y):
+        mask = obj["template"]["mask"]
+        return {((x - (len(line) - 1 - col)) % width, (y - (len(mask) - 1 - row)) % height)
+                for row, line in enumerate(mask) for col, kind in enumerate(line) if kind in "BHAT"}
+
+    occupied = collections.defaultdict(set)
+    for obj in objects:
+        for cell in footprint(obj, obj["x"], obj["y"]):
+            occupied[cell].add(obj["instanceName"])
+    report = []
+    if len(set(names)) != len(names):
+        raise ValueError("Decoration names must not repeat")
+    for name in names:
+        obj = by_name.get(name)
+        if not obj or obj["type"] != "mountain" or obj.get("options"):
+            raise ValueError(f"Expected a plain mountain decoration: {name!r}")
+        if any(kind in "AT" for line in obj["template"]["mask"] for kind in line):
+            raise ValueError(f"Interactive objects cannot be relocated as decorations: {name!r}")
+        old_x, old_y = obj["x"], obj["y"]
+        if not footprint(obj, old_x, old_y):
+            raise ValueError(f"Mountain has no active footprint: {name!r}")
+        offsets = sorted(((dx, dy) for dx in range(-max_distance, max_distance + 1)
+                          for dy in range(-max_distance, max_distance + 1) if dx or dy),
+                         key=lambda p: (max(abs(p[0]), abs(p[1])), p[0] ** 2 + p[1] ** 2, p[1], p[0]))
+        selected = None
+        for dx, dy in offsets:
+            x, y = (old_x + dx) % width, (old_y + dy) % height
+            if (x, y) == (old_x, old_y):
+                continue
+            cells = footprint(obj, x, y)
+            if any(occupied[cell] - {name} for cell in cells):
+                continue
+            if any(rows[cy][cx][:2] in ("wt", "rc") or len(list(CELL_PART.finditer(rows[cy][cx]))) != 1
+                   for cx, cy in cells):
+                continue
+            selected = x, y, cells
+            break
+        if selected is None:
+            raise ValueError(f"No clear dry placement for {name!r} within {max_distance} cells")
+        x, y, cells = selected
+        for cell in footprint(obj, old_x, old_y):
+            occupied[cell].discard(name)
+        obj["x"], obj["y"] = x, y
+        for cell in cells:
+            occupied[cell].add(name)
+        report.append({"object": name, "from": [old_x, old_y], "to": [x, y]})
+    return report
+
+
+def source_gate_pairs(objects, width, height, toroidal):
+    """Reproduce the engine's nondecorative, two-level gate pairing order."""
+    gates = []
+    for obj in objects:
+        if obj["type"] != "subterraneanGate":
+            continue
+        mask = obj["template"]["mask"]
+        entrances = [(obj["x"] - (len(line) - 1 - col), obj["y"] - (len(mask) - 1 - row), obj["l"])
+                     for row, line in enumerate(mask) for col, kind in enumerate(line) if kind in "AT"]
+        if not entrances:  # the engine gives decorative gates separate channels
+            continue
+        if len(entrances) != 1:
+            raise ValueError("Cannot infer pairing for a gate with multiple entrances")
+        gates.append((obj["instanceName"], entrances[0]))
+    if len({position for _, position in gates}) != len(gates):
+        raise ValueError("Cannot infer deterministic pairing for gates at the same position")
+    gates.sort(key=lambda item: (item[1][2], item[1][1], item[1][0]))
+    paired, used = set(), set()
+    for name, (x, y, z) in gates:
+        if name in used:
+            continue
+        candidates = []
+        for other, (ox, oy, oz) in gates:
+            if other == name or other in used or oz <= z:
+                continue
+            dx, dy = abs(x - ox), abs(y - oy)
+            if toroidal:
+                dx, dy = min(dx % width, (-dx) % width), min(dy % height, (-dy) % height)
+            candidates.append((dx * dx + dy * dy, other))
+        if candidates:
+            # min is stable on equal distances because gates are already in engine order.
+            best = min(candidates, key=lambda item: item[0])[1]
+            paired.add(tuple(sorted((name, best))))
+            used.update((name, best))
+    return paired
+
+
+def replace_gate_pairs(source, converted, pairs, width, height, toroidal):
+    """Turn explicit, original gate pairs into isolated two-way portal pairs."""
+    if not pairs:
+        return []
+    old_by_name = {obj["instanceName"]: obj for obj in source}
+    new_by_name = {obj["instanceName"]: obj for obj in converted}
+    original_pairs = source_gate_pairs(source, width, height, toroidal)
+    occupied_subtypes = {obj["subtype"].removeprefix("core:") for obj in source if obj["type"] == "monolithTwoWay"}
+    used_names = set()
+    report = []
+    for first, second, subtype in pairs:
+        if subtype not in {f"monolith{i}" for i in range(1, 9)} or subtype in occupied_subtypes:
+            raise ValueError(f"Two-way monolith subtype is unavailable: {subtype!r}")
+        if first == second or first in used_names or second in used_names:
+            raise ValueError("Each gate must appear in at most one pair")
+        if first not in old_by_name or second not in old_by_name:
+            raise ValueError("Gate pair references an unknown object")
+        if tuple(sorted((first, second))) not in original_pairs:
+            raise ValueError("Gate pair does not match source-map pairing")
+        for name in (first, second):
+            if old_by_name[name].get("options"):
+                raise ValueError("Gate has custom options requiring manual handling")
+            new_by_name[name]["type"] = "monolithTwoWay"
+            new_by_name[name]["subtype"] = subtype
+        used_names.update((first, second))
+        occupied_subtypes.add(subtype)
+        report.append({"gates": [first, second], "monolith_subtype": subtype})
+    return report
+
+
 def nested_positions(value, path=()):
     if isinstance(value, dict):
         if {"x", "y", "l"} <= value.keys():
@@ -172,7 +293,7 @@ def nested_positions(value, path=()):
 
 
 def assemble(header, surface, underground, objects, fragment_seed=None, polar_seed=None,
-             oceanize=False, snow_island=None):
+             oceanize=False, snow_island=None, gate_pairs=(), relocate=()):
     levels = sorted(header["mapLevels"].values(), key=lambda level: level["index"])
     if len(levels) != 2 or [level["index"] for level in levels] != [0, 1]:
         raise ValueError("Expected exactly two indexed levels")
@@ -193,6 +314,8 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
         moved = fragment_object_names(objects, component)
         surface, underground, fragment = rejoin_east_land_fragment(surface, underground, fragment_seed)
     converted = [place_object(obj, width, height, moved) for obj in objects]
+    replaced_gates = replace_gate_pairs(objects, converted, gate_pairs, width, height,
+                                       header.get("topology") == "toroidal")
     rows = [[rotate_cell_art(cell) for cell in reversed(row)] for row in reversed(underground)]
     rows += copy.deepcopy(surface)
     polar = None
@@ -237,6 +360,7 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
             raise ValueError("Illustrative snow island overlaps objects requiring manual handling")
         greenland = {"cells": island_count, "center": list(snow_island), "objects": 0}
         rows = island_rows
+    relocated = relocate_decorations(converted, rows, relocate)
     if polar is not None:
         for obj in converted:
             reference = references.get(obj["instanceName"])
@@ -281,16 +405,21 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
         "polar_component": polar,
         "oceanized_boundary_rock": rock,
         "illustrative_snow_island": greenland,
-        "subterranean_gates": sum(obj["type"] == "subterraneanGate" for obj in objects),
+        "subterranean_gates": sum(obj["type"] == "subterraneanGate" for obj in converted),
+        "replacement_gate_pairs": replaced_gates,
+        "relocated_decorations": relocated,
         "limitations": ["diagnostic draft only", "object and interaction overlaps unresolved",
-                        "road artwork and movement costs unverified", "cross-level gates unpaired",
+                        "road artwork and movement costs unverified",
                         "required mods not assessed"]
                        + (["polar geography not adapted"] if polar is None
                           else ["polar terrain artwork, object placement and collisions unverified"])
                        + (["east fragment not adapted"] if fragment is None
                           else ["east fragment object placement and overlaps unverified"])
                        + (["oceanized rock and affected decorations unverified"] if rock is not None else [])
-                       + (["new snow island is schematic and has no objects"] if greenland is not None else []),
+                       + (["new snow island is schematic and has no objects"] if greenland is not None else [])
+                       + (["remaining subterranean gates are unpaired"]
+                          if any(obj["type"] == "subterraneanGate" for obj in converted) else [])
+                       + (["replacement monolith behavior differs from subterranean gates"] if replaced_gates else []),
     }
 
 
@@ -306,6 +435,10 @@ def main():
                         help="Replace boundary-connected rock with ocean where no visitable objects are affected")
     parser.add_argument("--illustrative-snow-island", nargs=2, type=int, metavar=("X", "Y"),
                         help="Add a schematic unpopulated snow island in clear water")
+    parser.add_argument("--gate-pair", nargs=3, action="append", metavar=("GATE1", "GATE2", "SUBTYPE"),
+                        help="Replace a verified original gate pair with an unused two-way monolith subtype")
+    parser.add_argument("--relocate-mountain", action="append", default=[], metavar="INSTANCE",
+                        help="Move a selected plain mountain to nearby unoccupied dry terrain")
     args = parser.parse_args()
     with zipfile.ZipFile(args.source) as archive:
         expected = {"header.json", "surface_terrain.json", "underground_terrain.json", "objects.json"}
@@ -316,7 +449,7 @@ def main():
             load_json(archive, "header.json"), load_json(archive, "surface_terrain.json"),
             load_json(archive, "underground_terrain.json"), load_json(archive, "objects.json"),
             args.rejoin_east_fragment, args.polar_seed, args.oceanize_edge_rock,
-            args.illustrative_snow_island)
+            args.illustrative_snow_island, args.gate_pair or (), args.relocate_mountain)
     with zipfile.ZipFile(args.output, "x", compression=zipfile.ZIP_DEFLATED) as output:
         for name, data in extras.items():
             output.writestr(name, data)
