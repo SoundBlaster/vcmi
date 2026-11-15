@@ -20,6 +20,9 @@
 #include "AI/Nullkiller2/Goals/AdventureSpellCast.h"
 #include "lib/mapObjects/CGTownInstance.h"
 #include "lib/mapObjects/CGResource.h"
+#include "lib/mapObjects/ObjectTemplate.h"
+#include "lib/json/JsonNode.h"
+#include "lib/modding/IdentifierResolver.h"
 #include "lib/mapping/TerrainTile.h"
 #include "lib/serializer/CMemorySerializer.h"
 #include "server/CGameHandler.h"
@@ -783,6 +786,100 @@ TEST_F(Nullkiller2_AIGateway, dimensionDoorSeamPlanningUsesVisibleGuardInformati
 	EXPECT_EQ(planCast(), hiddenGuardPlan) << "a hidden guard must not change cost, danger or loss";
 	team->fogOfWarMap[destination] = 0;
 	EXPECT_FALSE(planCast()) << "the hidden landing remains unavailable without the guard";
+}
+
+TEST_F(Nullkiller2_AIGateway, hiddenSeamGuardDoesNotChangeDimensionDoorPlanToVisibleArmedObject)
+{
+	const int3 destination(35, 10, 0), guardPosition(0, 9, 0);
+	overrideSettingBeforeInit(EGameSettings::SPELLS_DIMENSION_DOOR_TRIGGERS_GUARDS, true);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(PLAYER)
+		.hero({8, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.heroPrimary(10, 10, 10, 50)
+		.heroSecondarySkills({{SecondarySkill::AIR_MAGIC, 3}})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({SpellID(8)})
+		.garrison(destination, PlayerColor::NEUTRAL, {{CreatureID(27), 1000}}, false)
+		.monster(guardPosition, CreatureID(27), 1000);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	hero->mana = 200;
+	hero->setMovementPoints(300);
+	const int3 origin = hero->visitablePos();
+	for(int dx = -1; dx <= 1; ++dx)
+		for(int dy = -1; dy <= 1; ++dy)
+			if(dx || dy)
+				map()->getTile(origin + int3(dx, dy, 0)).terrainType = TerrainId::ROCK;
+
+	// H3M masks can encode a visitable but nonblocking footprint.
+	CGObjectInstance * armedObject = nullptr;
+	for(const auto & object : map()->objects)
+		if(object && object->ID == Obj::GARRISON)
+			armedObject = object.get();
+	ASSERT_NE(armedObject, nullptr);
+	map()->hideObject(armedObject);
+	const std::string text = R"({ "animation": "test.def", "mask": [ "V" ] })";
+	JsonNode definition(text.data(), text.size(), "NonblockingArmedObject");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	appearance->id = Obj::EVENT; // Produce a visitable, nonblocking tile.
+	appearance->subid = armedObject->subID;
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	appearance->id = armedObject->ID;
+	armedObject->appearance = appearance;
+	armedObject->pos = destination;
+	map()->showObject(armedObject);
+	ASSERT_TRUE(map()->getTile(destination).visitable());
+	ASSERT_FALSE(map()->getTile(destination).blocked());
+
+	setMapVisibility(PLAYER, false);
+	auto * team = gameState()->getPlayerTeam(PLAYER);
+	team->fogOfWarMap[origin] = 1;
+	team->fogOfWarMap[destination] = 1;
+	const auto planCast = [&]() -> std::optional<std::tuple<float, uint64_t, uint64_t>>
+	{
+		client = std::make_unique<ScriptedMovementClient>(gameState());
+		callback = makeCallback(PLAYER, client.get());
+		gateway = makeGateway(callback);
+		client->notify(*gateway);
+		const auto paths = withGameStateReadLock([&]
+		{
+			NK2AI::HeroMap<NK2AI::HeroRole> heroes;
+			heroes[hero] = NK2AI::HeroRole::MAIN;
+			NK2AI::PathfinderSettings settings;
+			settings.useHeroChain = false;
+			settings.useDimensionDoor = true;
+			gateway->nullkiller->pathfinder->updatePaths(heroes, settings);
+			return gateway->nullkiller->pathfinder->getPathInfo(destination);
+		});
+		for(const auto & path : paths)
+			if(path.turn() == 0 && std::ranges::any_of(path.nodes, [](const auto & node)
+			{
+				return dynamic_cast<const NK2AI::AIPathfinding::DimensionDoorAction *>(node.specialAction.get()) != nullptr;
+			}))
+				return std::make_tuple(path.movementCost(), path.getPathDanger(), path.armyLoss);
+		return std::nullopt;
+	};
+	const auto hiddenGuardPlan = planCast();
+	ASSERT_TRUE(callback->isTileGuardedUnchecked(destination));
+	ASSERT_TRUE(callback->getGuardingCreatures(destination).empty());
+	ASSERT_TRUE(hiddenGuardPlan);
+	team->fogOfWarMap[guardPosition] = 1;
+	ASSERT_FALSE(callback->getGuardingCreatures(destination).empty());
+	EXPECT_FALSE(planCast()) << "the visible guard still prevents an unsafe landing";
+	team->fogOfWarMap[guardPosition] = 0;
+	const auto * guard = map()->getObject(map()->getTile(guardPosition).topVisitableObj());
+	ASSERT_NE(guard, nullptr);
+	GameHandlerTestServer server(gameState(), PLAYER);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.removeObject(guard, PLAYER));
+	const auto unguardedPlan = planCast();
+	ASSERT_TRUE(unguardedPlan);
+	EXPECT_EQ(hiddenGuardPlan, unguardedPlan);
 }
 
 TEST_F(Nullkiller2_AIGateway, startupRecognizesHeroNearTownAcrossSeam)

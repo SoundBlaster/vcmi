@@ -1287,11 +1287,19 @@ AINodeStorage::DimensionDoorLandingInfo AINodeStorage::getDimensionDoorLandingIn
 	DimensionDoorLandingInfo landing;
 	landing.destinationActor = srcNode->actor->castActor;
 
-	if(!aiNk->cc->getSettings().getBoolean(EGameSettings::SPELLS_DIMENSION_DOOR_TRIGGERS_GUARDS)
-		|| !aiNk->cc->isTileGuardedUnchecked(destination))
-	{
+	if(!aiNk->cc->getSettings().getBoolean(EGameSettings::SPELLS_DIMENSION_DOOR_TRIGGERS_GUARDS))
 		return landing;
+
+	if(aiNk->cc->getMapHeader()->toroidal)
+	{
+		// The unchecked query also sees monsters outside this player's
+		// fog. Only known guards may influence a speculative landing plan.
+		// A hidden destination cannot become a path node in any case.
+		if(!aiNk->cc->tryGetTile(destination) || aiNk->cc->getGuardingCreatures(destination).empty())
+			return landing;
 	}
+	else if(!aiNk->cc->isTileGuardedUnchecked(destination))
+		return landing;
 
 	landing.guardedLandingDanger = aiNk->dangerEvaluator->evaluateDanger(destination, hero, true);
 

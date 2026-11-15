@@ -138,8 +138,10 @@ AI's perspective, with bounded and toroidal danger-map checks; see the
 For one Dimension Door landing across a seam, a hidden guard and no guard
 produce matching first-plan cost, danger and loss; revealing an overwhelming
 guard prevents the plan. The separate hidden destination is not planned in
-either case. The [guard and fog record](evidence/nullkiller-dimension-door-guard-fog-2026-11-15.md)
-describes the unchecked guard query and the limits of this comparison.
+either case. A synthetic visible armed object previously exposed a difference
+between hidden-guard and no-guard plans; toroidal landing planning now uses
+the player's visible guards. The [guard and fog record](evidence/nullkiller-dimension-door-guard-fog-2026-11-15.md)
+describes both comparisons and their limits.
 
 The later [preview run](evidence/topology-preview-eeb3540-2026-11-15.md)
 completed two Nullkiller2 turns with crossings on both axes, then reloaded an
@@ -158,6 +160,11 @@ A newer [local preview at `fd38877`](evidence/topology-preview-fd38877-2026-11-1
 loads the clean map when invoked directly. A helper prepares bundle-local
 library paths, but Launch Services still waited while opening the existing
 save directory, so ordinary Finder launch remains unverified.
+
+After the user granted TB5 access, Launch Services opened the later
+[`ab35306` local preview](evidence/topology-preview-ab35306-2026-11-15.md)
+to its main menu. This was a separate startup check, not a Finder double-click,
+gameplay in that run, or verification of later rebuilt bundles.
 
 A generated legacy H3M defaults to bounded mode and rejects direct crossings
 in all eight directions on both levels; the same steps succeed after an
