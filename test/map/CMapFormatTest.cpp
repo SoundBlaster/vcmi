@@ -990,6 +990,67 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_FALSE(state->players.at(PlayerColor(*aiSlot)).isHuman());
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_WATER_PORTAL"))
+	{
+		const PlayerColor player(0);
+		CGHeroInstance * hero = nullptr;
+		for(const auto & id : map.getHeroesOnMap())
+			if(auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id)); candidate
+			   && candidate->getOwner() == player && !candidate->isGarrisoned() && !candidate->inBoat())
+			{
+				hero = candidate;
+				break;
+			}
+		ASSERT_NE(hero, nullptr);
+		const auto portal = map.instanceNames.find("monolithTwoWay_5267");
+		ASSERT_NE(portal, map.instanceNames.end());
+		ASSERT_EQ(portal->second->visitablePos(), int3(239, 429, 0));
+		const int3 shore(241, 430, 0), water(240, 430, 0), approach(239, 430, 0);
+		ASSERT_TRUE(map.getTile(shore).isLand());
+		ASSERT_FALSE(map.getTile(shore).blocked());
+		ASSERT_TRUE(map.getTile(water).isWater());
+		ASSERT_FALSE(map.getTile(water).blocked());
+		ASSERT_TRUE(map.getTile(approach).isWater());
+		ASSERT_FALSE(map.getTile(approach).blocked());
+		ASSERT_FALSE(state->guardingCreaturePosition(water).isValid());
+		ASSERT_FALSE(state->guardingCreaturePosition(approach).isValid());
+		state->actingPlayers.insert(player);
+		ChangeObjPos place;
+		place.objid = hero->id;
+		place.nPos = shore;
+		state->apply(place);
+		GameHandlerTestServer server(state, player);
+		CGameHandler handler(server, state);
+		handler.createBoat(water, BoatId::CASTLE, player);
+		hero->setMovementPoints(3000);
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+		ASSERT_TRUE(hero->inBoat());
+		const auto boatId = hero->getBoat()->id;
+		hero->setMovementPoints(3000);
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(approach), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(portal->second->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+		const auto dialog = handler.activities->topActivity(player);
+		ASSERT_NE(dialog, nullptr);
+		ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+		const auto teleport = std::dynamic_pointer_cast<TeleportDialogActivity>(dialog);
+		ASSERT_NE(teleport, nullptr);
+		const auto selected = std::ranges::find_if(teleport->td.exits, [&](const auto & item)
+		{
+			return item.first != portal->second->id;
+		});
+		ASSERT_NE(selected, teleport->td.exits.end());
+		const auto exitId = selected->first;
+		const auto * exitObject = map.getObject(exitId);
+		ASSERT_NE(exitObject, nullptr);
+		const auto exit = exitObject->visitablePos();
+		ASSERT_TRUE(map.getTile(exit).isWater());
+		const auto answer = static_cast<ui32>(std::distance(teleport->td.exits.begin(), selected));
+		ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, answer), ReplyOutcome::Accepted);
+		EXPECT_EQ(hero->visitablePos(), exit);
+		ASSERT_TRUE(hero->inBoat());
+		EXPECT_EQ(hero->getBoat()->id, boatId);
+		std::cout << "Water portal from " << approach.toString() << " to " << exit.toString() << std::endl;
+	}
 #ifdef ENABLE_NULLKILLER2_AI
 	if(const char * input = std::getenv("VCMI_INSPECT_AI_RESOURCE"); input && *input)
 	{
@@ -2695,6 +2756,69 @@ TEST(MapFormat, PreparesEarthPortalRoadFixture)
 	EXPECT_EQ(reopened->instanceNames.count("yuccaTrees_7568"), 0u);
 	EXPECT_EQ(reopened->instanceNames.count("mountain_7569"), 0u);
 	EXPECT_EQ(reopened->instanceNames.count("monolithTwoWay_5267"), 1u);
+	std::ofstream out(outputPath, std::ios::binary);
+	ASSERT_TRUE(out);
+	out.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+	out.close();
+	ASSERT_TRUE(out);
+}
+
+TEST(MapFormat, PreparesEarthWaterPortalRepair)
+{
+	const char * inputPath = std::getenv("VCMI_INSPECT_START_VMAP");
+	const char * outputPath = std::getenv("VCMI_EARTH_WATER_PORTAL_OUTPUT");
+	if(!inputPath || !*inputPath || !outputPath || !*outputPath)
+		GTEST_SKIP() << "Set VCMI_INSPECT_START_VMAP and VCMI_EARTH_WATER_PORTAL_OUTPUT";
+	ASSERT_FALSE(boost::filesystem::exists(outputPath));
+	std::ifstream file(inputPath, std::ios::binary);
+	ASSERT_TRUE(file);
+	std::vector<ui8> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderJson reader(&input);
+	auto map = reader.loadMap(&callback);
+	ASSERT_NE(map, nullptr);
+	callback.setMap(map.get());
+	ASSERT_TRUE(map->toroidal);
+	ASSERT_EQ(map->width, 252);
+	ASSERT_EQ(map->height, 576);
+	const auto portal = map->instanceNames.find("monolithTwoWay_5267");
+	ASSERT_NE(portal, map->instanceNames.end());
+	ASSERT_EQ(portal->second->anchorPos(), int3(251, 429, 0));
+	ASSERT_TRUE(map->getTile(portal->second->visitablePos()).isLand());
+	for(int x : {238, 239, 240})
+	{
+		const auto & tile = map->getTile(int3(x, 429, 0));
+		ASSERT_TRUE(tile.isWater());
+		ASSERT_FALSE(tile.blocked());
+		ASSERT_FALSE(tile.visitable());
+		ASSERT_EQ(tile.getRiverID(), RiverId::NO_RIVER);
+	}
+	const int3 approach(239, 430, 0);
+	ASSERT_TRUE(map->getTile(approach).isWater());
+	ASSERT_FALSE(map->getTile(approach).blocked());
+	ASSERT_FALSE(map->getTile(approach).visitable());
+	map->moveObject(portal->second->id, int3(240, 429, 0));
+	ASSERT_EQ(portal->second->visitablePos(), int3(239, 429, 0));
+	ASSERT_TRUE(map->canMoveBetween(approach, portal->second->visitablePos()));
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reopenedReader(&output);
+	auto reopened = reopenedReader.loadMap(&reopenedCallback);
+	ASSERT_NE(reopened, nullptr);
+	const auto restored = reopened->instanceNames.find("monolithTwoWay_5267");
+	ASSERT_NE(restored, reopened->instanceNames.end());
+	EXPECT_EQ(restored->second->visitablePos(), int3(239, 429, 0));
+	EXPECT_TRUE(reopened->getTile(restored->second->visitablePos()).isWater());
+	EXPECT_TRUE(reopened->canMoveBetween(approach, restored->second->visitablePos()));
 	std::ofstream out(outputPath, std::ios::binary);
 	ASSERT_TRUE(out);
 	out.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
