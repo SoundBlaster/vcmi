@@ -772,3 +772,7 @@ when encountered. The separate logs are `ai-autonomous-player-1.log` through
 `ai-autonomous-player-7.log` in the same TB5 runtime directory. Together with
 the red-player checks, this covers the beginning of autonomous actions for
 all eight starts, not complete server turns or battles for all players.
+The fixture configures these players as human in `StartInfo` (each has a
+connected player ID) even though the test directly drives them with
+Nullkiller. Consequently these runs do not establish the server behavior of
+a player configured as AI; that distinction needs a separate test.
