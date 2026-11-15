@@ -39,6 +39,32 @@ alone does not establish that the VCMI HotA port is installed or active.
 These observations do not establish whether a fully configured VCMI can
 load or play this particular map.
 
+## Load and VMAP round trip with the HotA port
+
+The VCMI HotA port was cloned separately on TB5 from
+[`vcmi-mods/horn-of-the-abyss`](https://github.com/vcmi-mods/horn-of-the-abyss)
+at commit `6a5e21f3995996ae3d6083f8c94a1c8b0ff34cf3`. An explicit external
+test profile enabled the port and its map-support dependencies without
+changing the user's normal mod preset. In that environment,
+`MapFormat.LoadsExternalLegacyMapForInspection` loaded the original H3M:
+252×252, two levels, 12,249 object slots and 48 towns. The surface had 7,496
+non-null objects, 1,846 road tiles and 170 river tiles; the second level had
+4,753 objects, 1,330 road tiles and 144 river tiles.
+
+An opt-in in-memory H3M → VMAP → VCMI loader round trip retained dimensions,
+level count, town and named-instance counts. Every named instance retained
+its type and anchor position; every tile retained its terrain, road and river
+types. This is a partial data comparison: artwork variants, complete object
+properties, references, event behavior, playability and visual correctness
+were not checked. The VMAP was not published or added to the repository.
+
+The test accepts `VCMI_TEST_MODDED_ROOT` pointing to a directory containing
+`config/modSettings.json` and `Mods/`; an invalid root is rejected before
+initialization. `VCMI_INSPECT_LEGACY_H3M` selects the external map and
+`VCMI_INSPECT_VMAP_ROUNDTRIP` requests the in-memory round trip. The ordinary
+VCMI mod and game settings retained their earlier SHA-256 values; ordinary
+test runs updated the validation checksums in the separate test preset.
+
 The loader change is covered by synthetic HotA v5 maps: default hero entries
 past the installed pool load, custom entries for an unavailable hero report
 its index, and an available customised hero is still created. The local full
