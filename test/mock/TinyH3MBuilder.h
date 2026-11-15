@@ -227,6 +227,9 @@ public:
 	/// One-way monolith exit. Matching entrance/exit subids form a channel.
 	TinyH3MBuilder & oneWayPortalExit(const int3 & pos, int channel);
 
+	/// Two-way monoliths with the same subid share a channel.
+	TinyH3MBuilder & twoWayPortal(const int3 & pos, int channel);
+
 	// ---- quest objects -------------------------------------------------
 
 	/// Keymaster Tent. Subid encodes the keymaster colour (0..7).

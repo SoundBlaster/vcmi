@@ -2561,6 +2561,10 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 	builder.size(36, true).playerActive(player).playerActive(otherPlayer)
 		.hero(int3(1, 0, 0), HeroTypeID(0), player)
 		.hero(int3(1, 5, 0), HeroTypeID(1), otherPlayer)
+		.hero(int3(6, 10, 0), HeroTypeID(2), player)
+		.twoWayPortal(int3(10, 25, 0), 0)
+		.twoWayPortal(int3(0, 10, 0), 0)
+		.twoWayPortal(int3(20, 25, 0), 0)
 		.terrain(int3(34, 35, 0), TerrainId::ROCK);
 	startWithMap(std::move(builder));
 	map()->setToroidalAndRebuild(true);
@@ -2570,8 +2574,22 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 	gameState()->actingPlayers.insert(otherPlayer);
 	auto * hero = findHeroByOwner(player);
 	auto * otherHero = findHeroByOwner(otherPlayer);
+	auto * blocker = findHeroAt(int3(6, 10, 0));
 	ASSERT_NE(hero, nullptr);
 	ASSERT_NE(otherHero, nullptr);
+	ASSERT_NE(blocker, nullptr);
+	const auto portals = map()->getObjects<CGMonolith>();
+	ASSERT_EQ(portals.size(), 3u);
+	const auto findPortal = [&](const int3 & anchor) -> CGMonolith *
+	{
+		const auto found = std::ranges::find_if(portals, [&](const auto * portal) { return portal->anchorPos() == anchor; });
+		return found == portals.end() ? nullptr : *found;
+	};
+	const auto * entrance = findPortal(int3(10, 25, 0));
+	const auto * exit = findPortal(int3(0, 10, 0));
+	ASSERT_NE(entrance, nullptr);
+	ASSERT_NE(exit, nullptr);
+	ASSERT_EQ(entrance->channel, exit->channel);
 	ASSERT_EQ(hero->visitablePos(), int3(0, 0, 0));
 	ASSERT_EQ(otherHero->visitablePos(), int3(0, 5, 0));
 	hero->setMovementPoints(3000);
@@ -2611,15 +2629,27 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 			{
 				state->apply(*movement);
 				++movements;
+				if(movement->result == TryMoveHero::FAILED)
+					events.emplace_back("failed movement");
 			}
+			if(auto * movedObject = dynamic_cast<ChangeObjPos *>(packet.get()); movedObject && state)
+				state->apply(*movedObject);
+			if(const auto * teleport = dynamic_cast<const TeleportDialog *>(packet.get()))
+				dialog = *teleport;
 			if(const auto * applied = dynamic_cast<const PackageApplied *>(packet.get()))
+			{
 				results[applied->requestID] = applied->result;
+				if(applied->requestID == 8)
+					events.emplace_back("reply applied");
+			}
 		}
 		std::string name;
 		std::string failure;
 		bool negotiated = false;
 		int movements = 0;
 		std::map<uint32_t, bool> results;
+		std::optional<TeleportDialog> dialog;
+		std::vector<std::string> events;
 		std::shared_ptr<INetworkConnection> transport;
 		std::unique_ptr<GameConnection> codec;
 		std::shared_ptr<CGameState> state;
@@ -2764,6 +2794,74 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 	ASSERT_TRUE(first.results.at(6));
 	for(const Peer * peer : {&first, &second})
 		EXPECT_EQ(peer->state->getHero(hero->id)->getPathfindingStartLayer(), EPathfindingLayer::LAND);
+
+	// Stage a normal teleport request, then change exit occupancy while its
+	// question is outstanding. Both replicas receive the setup packet via TCP.
+	const int3 approach = entrance->visitablePos() + int3(0, 1, 0);
+	ChangeObjPos stageHero;
+	stageHero.objid = hero->id;
+	stageHero.nPos = approach;
+	server.gh->sendAndApply(stageHero);
+	pumpUntil([&] { return first.state->getHero(hero->id)->visitablePos() == approach
+		&& second.state->getHero(hero->id)->visitablePos() == approach; });
+	ASSERT_EQ(first.state->getHero(hero->id)->visitablePos(), approach);
+	ASSERT_EQ(second.state->getHero(hero->id)->visitablePos(), approach);
+	ASSERT_TRUE(CGTeleport::isExitPassable(server.gh->gameState(), hero, exit));
+	MoveHero enterPortal({hero->convertFromVisitablePos(entrance->visitablePos())}, EPathfindingLayer::LAND, hero->id, false);
+	enterPortal.player = player;
+	enterPortal.requestID = 7;
+	first.codec->sendPack(enterPortal);
+	pumpUntil([&] { return first.results.contains(7) && first.dialog.has_value(); });
+	ASSERT_TRUE(first.results.contains(7)) << first.failure;
+	ASSERT_TRUE(first.results.at(7));
+	ASSERT_TRUE(first.dialog.has_value()) << first.failure;
+	const auto chosen = std::ranges::find_if(first.dialog->exits, [&](const auto & item) { return item.first == exit->id; });
+	ASSERT_NE(chosen, first.dialog->exits.end());
+	const auto chosenIndex = static_cast<int32_t>(std::distance(first.dialog->exits.begin(), chosen));
+	ChangeObjPos occupyExit;
+	occupyExit.objid = blocker->id;
+	occupyExit.nPos = exit->visitablePos();
+	server.gh->sendAndApply(occupyExit);
+	pumpUntil([&] { return first.state->getHero(blocker->id)->visitablePos() == exit->visitablePos()
+		&& second.state->getHero(blocker->id)->visitablePos() == exit->visitablePos(); });
+	ASSERT_EQ(first.state->getHero(blocker->id)->visitablePos(), exit->visitablePos());
+	ASSERT_EQ(second.state->getHero(blocker->id)->visitablePos(), exit->visitablePos());
+	ASSERT_FALSE(CGTeleport::isExitPassable(server.gh->gameState(), hero, exit));
+	const auto visibility = [&](const CGameState & state)
+	{
+		std::vector<bool> result;
+		for(const PlayerColor color : {player, otherPlayer})
+			for(int z = 0; z < 2; ++z)
+				for(int y = 0; y < 36; ++y)
+					for(int x = 0; x < 36; ++x)
+						result.push_back(state.isVisibleFor(int3(x, y, z), color));
+		return result;
+	};
+	const auto serverFog = visibility(server.gh->gameState());
+	ASSERT_EQ(visibility(*first.state), serverFog);
+	ASSERT_EQ(visibility(*second.state), serverFog);
+	first.events.clear();
+	second.events.clear();
+	const auto before = hero->movementPointsRemaining();
+	QuestionAnswer rejectStale(first.dialog->questionID, chosenIndex);
+	rejectStale.player = player;
+	rejectStale.requestID = 8;
+	first.codec->sendPack(rejectStale);
+	pumpUntil([&] { return first.results.contains(8) && !first.events.empty() && !second.events.empty(); });
+	ASSERT_TRUE(first.results.contains(8)) << first.failure;
+	EXPECT_TRUE(first.results.at(8));
+	EXPECT_EQ(first.events, (std::vector<std::string>{"failed movement", "reply applied"}));
+	EXPECT_EQ(second.events, (std::vector<std::string>{"failed movement"}));
+	EXPECT_EQ(hero->visitablePos(), entrance->visitablePos());
+	EXPECT_EQ(visibility(server.gh->gameState()), serverFog);
+	for(const Peer * peer : {&first, &second})
+	{
+		EXPECT_EQ(peer->state->getHero(hero->id)->visitablePos(), entrance->visitablePos());
+		EXPECT_EQ(peer->state->getHero(hero->id)->movementPointsRemaining(), before);
+		EXPECT_EQ(peer->state->getHero(blocker->id)->visitablePos(), exit->visitablePos());
+		EXPECT_EQ(peer->state->getMap().getTile(exit->visitablePos()).topVisitableObj(), blocker->id);
+		EXPECT_EQ(visibility(*peer->state), serverFog);
+	}
 }
 
 TEST_F(HeroMovementTest, blockedToroidalStepIsRejected)
