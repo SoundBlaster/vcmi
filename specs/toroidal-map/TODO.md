@@ -74,7 +74,9 @@ demo preparation reviewable as separate changes where practical.
   animation and normal access from the starting position remain unverified.
 - [ ] Make the demo convenient to launch and play with an isolated profile;
   keep third-party map and game assets outside the repository unless their
-  distribution rights have been established.
+  distribution rights have been established. The [current draft starts
+  through the human scenario list and accepts a first move](evidence/earth-human-start-2026-11-15.md);
+  Finder launcher execution and a normal route to the seam remain unverified.
 
 ## 5. AI and bounded compatibility
 
