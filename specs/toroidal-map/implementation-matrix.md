@@ -166,6 +166,12 @@ After the user granted TB5 access, Launch Services opened the later
 to its main menu. This was a separate startup check, not a Finder double-click,
 gameplay in that run, or verification of later rebuilt bundles.
 
+The [preview at `f0f7f4a`](evidence/topology-preview-f0f7f4a-2026-11-15.md)
+subsequently started via Launch Services, loaded the versioned Crossroads
+map and crossed its northwest corner. One static view showed both roads at
+the corner junction; live AI spell planning and visual smoothness remain
+unverified in this run.
+
 A generated legacy H3M defaults to bounded mode and rejects direct crossings
 in all eight directions on both levels; the same steps succeed after an
 explicit in-memory toroidal opt-in. See the
