@@ -605,6 +605,27 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	state->init(&service, &start, randomizer, progress, false);
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(const char * list = std::getenv("VCMI_INSPECT_MINE_GUARDS"); list && *list)
+	{
+		std::vector<std::string> groups;
+		boost::split(groups, list, boost::is_any_of(";"));
+		for(const auto & group : groups)
+		{
+			std::vector<std::string> names;
+			boost::split(names, group, boost::is_any_of(","));
+			ASSERT_EQ(names.size(), 2u);
+			const auto mine = map.instanceNames.find(names[0]);
+			const auto guard = map.instanceNames.find(names[1]);
+			ASSERT_NE(mine, map.instanceNames.end()) << names[0];
+			ASSERT_NE(guard, map.instanceNames.end()) << names[1];
+			const auto guardPos = guard->second->visitablePos();
+			SCOPED_TRACE(group);
+			EXPECT_EQ(guard->second->ID, Obj::MONSTER);
+			EXPECT_FALSE(mine->second->blockingAt(guardPos));
+			EXPECT_EQ(state->guardingCreaturePosition(mine->second->visitablePos()), guardPos);
+		}
+		std::cout << "Checked guarded mines=" << groups.size() << std::endl;
+	}
 	if(std::getenv("VCMI_INSPECT_MOD_SCOPES"))
 	{
 		std::map<std::string, size_t> objectScopes;
