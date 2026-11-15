@@ -501,3 +501,32 @@ object positions, terrain and artwork. The 33 focused Python tests passed.
 These checks exercise the engine API, not the graphical launcher's display.
 Because the requirements are unversioned, they do not enforce compatibility
 with a particular HotA release.
+
+### Restoring mine guards after rotation
+
+Twenty newly overlapping mine/monster pairs shared the same source pattern:
+the monster's visitable cell was immediately south of its mine's entrance on
+the original underground level. Rotating the entrance coordinates while
+keeping the mine sprite upright put each monster on a blocking cell of that
+mine. The optional `--repair-mine-guards` restores this specific relative
+placement only when the source relationship is unambiguous, the monster had
+no original interactive overlap, and its destination is a free land cell
+without a road or river. It skips other cases rather than guessing. This can
+still change which surrounding cells the monster guards and requires review.
+
+For this draft it moved 20 guards and skipped none. Comparison with the
+preceding draft found exactly 20 changed objects, only their `x` and `y`
+fields changed, unchanged header and terrain, no new blocking or interactive
+object pairs, and 22 removed pairs of each kind. The estimate of new
+interactive overlap occurrences relative to the source fell from 211 to 189;
+this metric remains an estimate, not a count of confirmed gameplay bugs.
+
+The result is `draft-stacked/earth-mine-guards-diagnostic.vmap` on TB5,
+SHA-256 `d974bd9f960f1cd2b3a6ce293139e58e1b0270cd231af7f8b41a4abc3641ed82`.
+After real game-state initialization, VCMI recognized all 20 restored
+monsters as guarding their respective mine entrances and none occupied a
+blocking tile of its mine. All eight starting heroes again made one server
+move. The VMAP round trip passed and the four portal approaches still passed
+three runs with forced guard victories. The 35 focused Python tests passed.
+These tests do not establish complete routing or balance and do not play out
+the twenty mine battles.
