@@ -35,3 +35,20 @@ The XML and log are under `runtime/teleport-stale-exits-final-packets-2026-11-15
 and `runtime/full-suite-teleport-final-2026-11-15.*` in the TB5 build root.
 Actual client route stopping, remote multiplayer timing, other objects changing
 while a dialog is open, and untested teleport configurations remain unverified.
+
+## Reply ordering and another hero's movement
+
+The focused tests now send `QuestionAnswer` through the actual server request
+handler. A test server records the outgoing failure and request acknowledgement:
+the failed `TryMoveHero` is emitted before the successful `PackageApplied`
+reply for both the occupied monolith exit and whirlpool exit. This verifies
+the order at the server callback boundary, not delivery over TCP or execution
+by a graphical client. All ten focused tests passed on macOS arm64; the XML is
+`runtime/teleport-reply-order-2026-11-15.xml` under the TB5 build root.
+
+Source review found that `HeroMovementController::onTryMoveHero` stopped its
+active movement on a stop packet for *any* visible hero. Such packets can be
+broadcast for another player during simultaneous turns. The controller now
+stops only when the packet's hero is the currently moving hero. The client
+target built successfully with this change; no test or graphical session yet
+exercises simultaneous clients receiving an unrelated hero's stop packet.
