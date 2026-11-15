@@ -121,8 +121,9 @@ demo preparation reviewable as separate changes where practical.
   minimap and static seam rendering. Do not treat one screenshot or game-state
   observations as proof of continuous animation.
 - [ ] Have the user assess scrolling and movement animation continuity when
-  convenient; this does not block the remaining engineering work but is needed
-  for visual acceptance.
+  convenient; an [isolated seam preview](evidence/earth-seam-preview-2026-11-16.md)
+  starts the hero beside the road crossing. This does not block the remaining
+  engineering work but is needed for visual acceptance.
 - [ ] Commit each major code, specification or documentation step and push
   the feature branch to the user's fork. Declare the feature complete only
   after the agreed functional and visual acceptance has been established.

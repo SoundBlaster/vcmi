@@ -11,14 +11,18 @@ from analyze_stacked_map import load_json
 
 
 def stage(source, output):
-    expected = "f87b9ec936d3056a0aeaade05ece6bddd9ca0a24840ad1963c37047e2ad5c52b"
+    expected = {
+        "f87b9ec936d3056a0aeaade05ece6bddd9ca0a24840ad1963c37047e2ad5c52b",
+        # Integrated Earth draft with a guarded route from the starting area.
+        "20c6b4c4abb50a2f1d20e0f39053d90c47680e01654711b2fb24901453ef11b1",
+    }
     with ZipFile(source) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}
         digest = hashlib.sha256()
         for name in sorted(files):
             digest.update(name.encode("utf-8") + b"\0")
             digest.update(files[name])
-        if digest.hexdigest() != expected:
+        if digest.hexdigest() not in expected:
             raise ValueError("unexpected Earth seam-road input")
         objects = load_json(archive, "objects.json")
         texts = load_json(archive, "russian.json")
