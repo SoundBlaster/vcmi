@@ -6,6 +6,21 @@ tracks requirement coverage, verification and acceptance separately; update
 it and link evidence as work progresses. An unchecked item may have partial
 coverage already and does not imply that all of its cases are unimplemented.
 
+## Verification scope
+
+Prioritize the common topology mechanisms and representative seam scenarios:
+movement and obstacles, interactions, boats and transient movement, fog,
+authority and persistence, AI, and bounded-map compatibility. Test both
+axes and corners where the geometry itself differs; add focused regression
+tests for actual failures. This is not an exhaustive regression of every
+game object, map, spell, combination or AI profile. Record unsupported or
+untested cases without presenting representative checks as comprehensive.
+
+Earth-specific investigations should resolve defects that affect the demo
+or reveal a general topology problem. Exhaustive portal-route permutations
+are not an acceptance gate. Keep core topology, independent legacy fixes and
+demo preparation reviewable as separate changes where practical.
+
 ## 1. Earth seam playthroughs
 
 - [x] Check human-controlled north/south crossings in both directions in the
@@ -19,11 +34,11 @@ coverage already and does not imply that all of its cases are unimplemented.
 
 ## 2. Movement and interactions
 
-- [ ] Extend checks for remaining seam combinations involving impassable
-  terrain, roads, guards, interactive objects, boats, embarkation and
-  disembarkation. Include both levels where applicable.
-- [ ] Check remaining relevant Flight and Water Walk routes and other
-  movement effects; reproduce and fix failures with focused regression tests.
+- [ ] Review existing evidence for representative seam scenarios involving
+  impassable terrain, roads, guards, interactive objects, boats, embarkation
+  and disembarkation; fill consequential gaps on either level as needed.
+- [ ] Review representative Flight and Water Walk seam routes and relevant
+  movement effects; reproduce observed failures with focused regression tests.
 - [ ] Keep the documented rare case where no known safe landing exists under
   the current game rules. General recovery and the hidden-event case are not
   prerequisites for the next work unless the agreed scope changes.
@@ -40,16 +55,16 @@ coverage already and does not imply that all of its cases are unimplemented.
 
 ## 4. Earth demo and authoring
 
-- [ ] Review remaining object footprints and collisions on the Earth draft;
-  resolve issues affecting actual play while preserving the source and an
-  independently reproducible local test copy.
+- [ ] Review Earth draft object footprints and collisions for issues affecting
+  actual play, preserving the source and a reproducible local test copy.
 - [ ] Check land, water and region connectivity and the effects of replacing
   the original underground gates. Document intentional gameplay changes.
 - [x] Investigate the [water-monolith mismatch](evidence/earth-portal-road-2026-11-15.md):
   restore the misplaced entrance to water in the demo preparation recipe.
-- [ ] Verify reverse water-monolith routes and broader placement and collision
-  effects; [all three exits and one graphical route](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits)
-  are checked from the relocated entrance.
+- [ ] Address remaining placement and collision problems if they affect demo
+  play. [All three water-monolith exits and one graphical route](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits)
+  are checked from the relocated entrance; exhaustive reverse-route checks
+  are deferred unless a defect or a demo requirement warrants them.
 - [ ] Prepare a road that crosses a seam and verify its logical and static
   visual continuity. The current Earth draft's roads do not reach its edges.
 - [ ] Make the demo convenient to launch and play with an isolated profile;
@@ -58,9 +73,9 @@ coverage already and does not imply that all of its cases are unimplemented.
 
 ## 5. AI and bounded compatibility
 
-- [ ] Continue Nullkiller2 playthroughs and targeted checks for planning,
-  interaction and movement across edges and corners; document supported scope
-  and failures rather than treating prior partial runs as complete coverage.
+- [ ] Review Nullkiller2 playthroughs and targeted planning, interaction and
+  movement checks across edges and corners; resolve consequential gaps and
+  document supported scope without claiming a complete AI audit.
 - [ ] Verify that ordinary maps and older saves remain bounded and that
   existing gameplay is preserved for the profiles under test.
 
