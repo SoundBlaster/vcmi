@@ -13,6 +13,7 @@
 #include "mainwindow.h"
 #include <QGraphicsSceneMouseEvent>
 #include "mapcontroller.h"
+#include "TerrainViewTopology.h"
 #include "../lib/mapObjectConstructors/AObjectTypeHandler.h"
 #include "../lib/mapObjectConstructors/CObjectClassesHandler.h"
 #include "../lib/mapping/CMap.h"
@@ -377,42 +378,26 @@ void MapView::mousePressEvent(QMouseEvent *event)
 		if(event->button() != Qt::RightButton && event->button() != Qt::LeftButton)
 			break;
 
-		std::vector<int3> queue;
-		std::set<int3> tilesToFill;
-		queue.push_back(tileStart);
-
-		const std::array<int3, 4> dirs{ int3{1, 0, 0}, int3{-1, 0, 0}, int3{0, 1, 0}, int3{0, -1, 0} };
-
-		while(!queue.empty())
-		{
-			auto tile = queue.back();
-			queue.pop_back();
-			tilesToFill.insert(tile);
-			for(auto & d : dirs)
+		const auto tilesToFill = TerrainViewTopology::floodSelection(controller->map()->getTopology(), tileStart,
+			[&](const int3 & tile, const int3 & tilen)
 			{
-				auto tilen = tile + d;
-				if (tilesToFill.count(tilen))
-					continue;
-				if(!controller->map()->isInTheMap(tilen))
-					continue;
 				if(event->button() == Qt::LeftButton)
 				{
 					if(controller->map()->getTile(tile).roadType
 							&& controller->map()->getTile(tile).roadType != controller->map()->getTile(tilen).roadType)
-						continue;
+						return false;
 					else if(controller->map()->getTile(tile).riverType
 							&& controller->map()->getTile(tile).riverType != controller->map()->getTile(tilen).riverType)
-						continue;
+						return false;
 					else if(controller->map()->getTile(tile).terrainType != controller->map()->getTile(tilen).terrainType)
-						continue;
+						return false;
 				}
 				if(event->button() == Qt::LeftButton && sc->selectionTerrainView.selection().count(tilen))
-					continue;
+					return false;
 				if(event->button() == Qt::RightButton && !sc->selectionTerrainView.selection().count(tilen))
-					continue;
-				queue.push_back(tilen);
-			}
-		}
+					return false;
+				return true;
+			});
 		std::vector<int3> result(tilesToFill.begin(), tilesToFill.end());
 
 		if(event->button() == Qt::LeftButton)

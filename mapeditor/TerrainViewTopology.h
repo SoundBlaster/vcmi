@@ -8,6 +8,9 @@
 
 #include "../lib/mapping/MapTopology.h"
 
+#include <array>
+#include <set>
+
 namespace TerrainViewTopology
 {
 struct TileRectangle
@@ -21,6 +24,33 @@ struct TileRectangle
 inline std::optional<int3> roadSourceAbove(const MapTopology & topology, const int3 & tile)
 {
 	return topology.canonicalize(tile + int3(0, -1, 0));
+}
+
+/// Flood the four-connected selection using canonical map neighbors.
+template<typename CanTraverse>
+std::set<int3> floodSelection(const MapTopology & topology, const int3 & start, CanTraverse canTraverse)
+{
+	const auto first = topology.canonicalize(start);
+	if(!first || *first != start)
+		return {};
+
+	const std::array<int3, 4> directions{int3(1, 0, 0), int3(-1, 0, 0), int3(0, 1, 0), int3(0, -1, 0)};
+	std::set<int3> result{start};
+	std::vector<int3> queue{start};
+	while(!queue.empty())
+	{
+		const auto current = queue.back();
+		queue.pop_back();
+		for(const auto & direction : directions)
+		{
+			const auto neighbor = topology.canonicalize(current + direction);
+			if(!neighbor || result.count(*neighbor) || !canTraverse(current, *neighbor))
+				continue;
+			result.insert(*neighbor);
+			queue.push_back(*neighbor);
+		}
+	}
+	return result;
 }
 
 /// Matches the editor's existing two-tile margin, splitting it at the seams.

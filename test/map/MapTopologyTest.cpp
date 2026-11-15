@@ -69,6 +69,40 @@ TEST(MapTopology, EditorRoadAndRedrawCrossToroidalSeams)
 	}
 }
 
+TEST(MapTopology, EditorFloodSelectionRespectsTopologyAndBarriers)
+{
+	for(int level = 0; level < 2; ++level)
+	{
+		const MapTopology wrapped(7, 5, 2, true);
+		const MapTopology bounded(7, 5, 2, false);
+		const int3 start(0, 0, level);
+		const std::set<int3> region{{0, 0, level}, {6, 0, level}, {0, 4, level}, {6, 4, level}};
+		const auto sameRegion = [&](const int3 &, const int3 & neighbor) { return region.count(neighbor) != 0; };
+		EXPECT_EQ(TerrainViewTopology::floodSelection(wrapped, start, sameRegion), region);
+		EXPECT_EQ(TerrainViewTopology::floodSelection(bounded, start, sameRegion), (std::set<int3>{start}));
+
+		// The selection predicate models the editor's add and erase barriers.
+		const std::set<int3> selected{{6, 0, level}, {6, 4, level}};
+		const auto add = [&](const int3 &, const int3 & neighbor)
+		{
+			return region.count(neighbor) && !selected.count(neighbor);
+		};
+		EXPECT_EQ(TerrainViewTopology::floodSelection(wrapped, start, add),
+			(std::set<int3>{{0, 0, level}, {0, 4, level}}));
+		const auto erase = [&](const int3 &, const int3 & neighbor) { return selected.count(neighbor) != 0; };
+		EXPECT_EQ(TerrainViewTopology::floodSelection(wrapped, int3(6, 0, level), erase), selected);
+
+		// A uniform region terminates and visits each physical tile once.
+		const auto all = TerrainViewTopology::floodSelection(wrapped, start, [](const int3 &, const int3 &) { return true; });
+		EXPECT_EQ(all.size(), 35u);
+		for(const auto & tile : all)
+			EXPECT_EQ(tile.z, level);
+	}
+	const MapTopology wrapped(7, 5, 2, true);
+	EXPECT_TRUE(TerrainViewTopology::floodSelection(wrapped, {-1, 0, 0}, [](const auto &, const auto &) { return true; }).empty());
+	EXPECT_TRUE(TerrainViewTopology::floodSelection(wrapped, {0, 0, 2}, [](const auto &, const auto &) { return true; }).empty());
+}
+
 TEST(MapTopology, ToroidalMinimapClicksAddressTheTileUnderThePixel)
 {
 	EXPECT_EQ(minimapPixelToTile(0, 150, 36, true), 0);
