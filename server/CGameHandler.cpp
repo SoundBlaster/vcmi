@@ -520,11 +520,16 @@ void CGameHandler::init(StartInfo *si, Load::ProgressAccumulator & progressTrack
 {
 	CMapService mapService;
 	gs = std::make_shared<CGameState>();
-	int requestedSeed = settings["server"]["seed"].Integer();
+	int requestedSeed = settings["session"]["testseed"].Integer();
+	if(requestedSeed == 0)
+		requestedSeed = settings["server"]["seed"].Integer();
 	randomizer = std::make_unique<GameRandomizer>(*gs);
 	if (requestedSeed != 0)
+	{
 		randomizer->setSeed(requestedSeed);
-	logGlobal->info("Using random seed: %d", randomizer->getDefault().nextInt());
+		logGlobal->info("Using requested random seed: %d", requestedSeed);
+	}
+	logGlobal->info("First random value: %d", randomizer->getDefault().nextInt());
 	gs->preInit(LIBRARY);
 	logGlobal->info("Gamestate created!");
 	gs->init(&mapService, si, *randomizer, progressTracking);

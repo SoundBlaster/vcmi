@@ -158,6 +158,12 @@ sparse fixture reached day 224 without finishing and was stopped. See the
 [AI game record](evidence/topology-ai-game-06ea341-2026-11-15.md); these
 runs do not prove general AI play or remote multiplayer.
 
+A [seeded comparison](evidence/nullkiller-seeded-ai-2026-11-15.md) reproduced
+repeated no-task turns and town-defender reservation with seed 4 in both a
+toroidal fixture and its bounded control. The runs were stopped before a
+winner, so this is neither proof of permanent deadlock nor proof of identical
+causes. One other seed eventually won after multiple no-task turns.
+
 After framed-packet support, two current test listeners also negotiated an
 unframed lobby with the original external server, selected a bounded map and
 exchanged chat. The [legacy-server record](evidence/current-client-legacy-server-2026-11-15.md)

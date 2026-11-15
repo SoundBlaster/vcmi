@@ -172,6 +172,7 @@ int main(int argc, char * argv[])
 		("help,h", "display help and exit")
 		("version,v", "display version information and exit")
 		("testmap", po::value<std::string>(), "")
+		("testseed", po::value<si64>(), "fixed seed for an in-process --testmap session (1-2147483647)")
 		("testsave", po::value<std::string>(), "")
 		("logLocation", po::value<std::string>(), "new location for log files")
 		("spectate,s", "enable spectator interface for AI-only games")
@@ -231,6 +232,15 @@ int main(int argc, char * argv[])
 			return 1;
 		}
 	}
+	if(vm.count("testseed"))
+	{
+		const auto seed = vm["testseed"].as<si64>();
+		if(seed < 1 || seed > std::numeric_limits<int>::max() || !vm.count("testmap") || vm.count("donotstartserver"))
+		{
+			std::cerr << "--testseed requires --testmap, a local server, and a value from 1 to 2147483647" << std::endl;
+			return 1;
+		}
+	}
 
 	// Init old logging system and new (temporary) logging system
 	CStopWatch total;
@@ -281,6 +291,13 @@ int main(int argc, char * argv[])
 	}
 
 	Settings session = settings.write["session"];
+	if(vm.count("testseed") && settings["server"]["useProcess"].Bool())
+	{
+		logGlobal->error("--testseed requires the in-process server");
+		return 1;
+	}
+	if(vm.count("testseed"))
+		session["testseed"].Integer() = vm["testseed"].as<si64>();
 	auto setSettingBool = [&](const std::string & key, const std::string & arg) {
 		Settings s = settings.write(vstd::split(key, "/"));
 		if(vm.count(arg))
