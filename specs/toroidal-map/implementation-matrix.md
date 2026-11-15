@@ -124,7 +124,11 @@ neighbors and known guards even when simulating an enemy hero. Synthetic
 threat checks cover all edges and corners on both levels with a bounded
 control and deliberately different team visibility; see the
 [threat perspective record](evidence/nullkiller-threat-observer-2026-11-15.md).
-Live enemy discovery and an autonomous defensive response remain unverified.
+In a synthetic corridor, a visible enemy also prompts an escape plan, and an
+AI planning turn reaches that plan's destination through an in-process
+server across all edges and corners on both levels. See the
+[escape record](evidence/nullkiller-escape-seams-2026-11-15.md). Live enemy
+discovery, graphical defence and other defensive responses remain unverified.
 
 The later [preview run](evidence/topology-preview-eeb3540-2026-11-15.md)
 completed two Nullkiller2 turns with crossings on both axes, then reloaded an
