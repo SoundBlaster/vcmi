@@ -146,6 +146,11 @@ also loaded the clean demo and crossed a corner after collecting gold. Its
 direct launch is verified in the test environment; ordinary Launch Services
 startup and human visual acceptance remain open.
 
+A newer [local preview at `fd38877`](evidence/topology-preview-fd38877-2026-11-15.md)
+loads the clean map when invoked directly. A helper prepares bundle-local
+library paths, but Launch Services still waited while opening the existing
+save directory, so ordinary Finder launch remains unverified.
+
 A generated legacy H3M defaults to bounded mode and rejects direct crossings
 in all eight directions on both levels; the same steps succeed after an
 explicit in-memory toroidal opt-in. See the
