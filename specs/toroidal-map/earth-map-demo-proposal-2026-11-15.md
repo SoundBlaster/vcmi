@@ -696,3 +696,15 @@ each of three in-process runs. The player actions were executed sequentially
 in the same game state, and the replicas used a memory transport rather than
 TCP. This does not prove the rest of the map is connected, balanced or
 playable, and it does not establish what a graphical player sees.
+
+In eight separate fresh initializations of the same draft, Nullkiller2's
+hero manager and pathfinder were given the corresponding visible resource
+as a target, with hero chains and Dimension Door disabled. Each player had
+a current-turn plan. The test executed each selected `ExecuteHeroChain`
+through an in-process `CGameHandler`, serializing AI requests and forwarding
+movement, reveal, object-removal and acknowledgement notifications to the
+gateway. All eight runs collected the chosen resources without a rejected
+movement request; hero positions, movement points and fog were not altered
+before planning. The test chose the target and invoked the plan: it does not
+establish autonomous goal selection, a complete AI turn, combat, TCP or GUI
+behavior on this map.
