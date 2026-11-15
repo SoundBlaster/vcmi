@@ -35,3 +35,17 @@ a farther boat as last used by the caster, the farther boat wins instead.
 All eight `SummonBoatTopologyTest` cases passed three consecutive runs on
 macOS arm64. GUI effects, other level arrangements and multiplayer remain
 unverified here.
+
+## Nullkiller planning from an edge shipyard
+
+`Nullkiller2_Behaviors_WaterExploration.plansBoatFromShipyardAcrossToroidalSeam`
+loads a synthetic 36×36 map with a hero and owned shipyard near the western
+edge, water at the eastern edge and one hidden sea cell. The shipyard cannot
+build on that distant water in bounded mode. After the in-memory topology
+switch, its boat location is `(35,10,0)`; Nullkiller produces an unblocked
+exploration route containing a `BuildBoatAction` at that exact tile and ending
+on water. The four water-exploration tests and eight `SummonBoatTopologyTest`
+server tests passed three times each on macOS arm64 with build `0e04dce` plus
+the test in `7f3dc0b`. This verifies AI route planning and separately tested
+server construction; it does not execute that AI route, establish fog safety
+for arbitrary hidden configurations, or validate GUI/network play.
