@@ -97,8 +97,10 @@ scope and the remaining multiplayer and rendering limitations.
 The server's [simultaneous-turn contact checks](evidence/simultaneous-turn-contact-seams-2026-11-15.md)
 recognize a possible meeting across each edge and corner on both levels; a
 bounded control and separate-level control remain isolated. One horizontal
-case also verifies actual turn start and transfer in an in-process server;
-network delivery and contact changes during play are not covered.
+case also verifies actual turn start and transfer in an in-process server.
+A synthetic passage change is reflected in contact and turn scheduling at
+the next day boundary; network delivery and actual hero movement during the
+day are not covered by that check.
 
 Editor terrain redraw now preserves the unrelated road, river and tile-state
 bits when a rock transition uses rotated image frames. The

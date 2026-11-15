@@ -236,6 +236,44 @@ TEST_P(SeamSimultaneousTurnTest, ServerStartsBothPlayersOnlyWhenSeamKeepsThemApa
 	EXPECT_TRUE(handler.turnOrder->isPlayerMakingTurn(blue));
 }
 
+TEST_P(SeamSimultaneousTurnTest, ContactIsRecomputedAfterTheLastPlayerEndsTheDay)
+{
+	const PlayerColor red(0), blue(1);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(red).playerActive(blue)
+		.hero(int3(1, 10, 0), HeroTypeID(0), red)
+		.hero(int3(35, 10, 0), HeroTypeID(1), blue);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(GetParam());
+	revealMap(red);
+	revealMap(blue);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			map()->getTile(int3(x, y, 0)).terrainType = TerrainId::ROCK;
+	for(int x : {0, 34})
+		map()->getTile(int3(x, 10, 0)).terrainType = TerrainId::GRASS;
+	GameHandlerTestServer server(gameState(), red);
+	CGameHandler handler(server, gameState());
+	handler.turnOrder->setMinSimturnsDuration(0);
+	handler.turnOrder->setMaxSimturnsDuration(99);
+	handler.turnOrder->addPlayer(red);
+	handler.turnOrder->addPlayer(blue);
+	handler.turnOrder->onGameStarted();
+	ASSERT_TRUE(handler.turnOrder->isPlayerMakingTurn(red));
+	ASSERT_TRUE(handler.turnOrder->isPlayerMakingTurn(blue));
+	ASSERT_EQ(gameState()->blockedContacts.count({red, blue}), 1u);
+
+	ASSERT_TRUE(handler.turnOrder->onPlayerEndsTurn(red));
+	// Simulate a changed passage after the day's contact check. The contact
+	// packet is recalculated when all players enter the next day.
+	map()->getTile(int3(35, 10, 0)).terrainType = TerrainId::GRASS;
+	EXPECT_EQ(gameState()->blockedContacts.count({red, blue}), 1u);
+	ASSERT_TRUE(handler.turnOrder->onPlayerEndsTurn(blue));
+	EXPECT_EQ(gameState()->blockedContacts.count({red, blue}), GetParam() ? 0u : 1u);
+	EXPECT_TRUE(handler.turnOrder->isPlayerMakingTurn(red));
+	EXPECT_EQ(handler.turnOrder->isPlayerMakingTurn(blue), !GetParam());
+}
+
 INSTANTIATE_TEST_SUITE_P(BoundedAndToroidal, SeamSimultaneousTurnTest, ::testing::Values(false, true));
 
 class ToroidalDemoGameTest : public TinyMapGameTest

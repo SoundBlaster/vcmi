@@ -19,10 +19,22 @@ map both players start simultaneously; on the toroidal map only the first
 starts because the players can meet. Ending that player's turn leaves the
 second player acting in both cases. These tests use an in-process test server,
 fully revealed terrain, a forced-turn minimum of zero and a maximum of 99 days;
-they do not exercise packets on TCP, graphical clients, changes during a
-running day, AI decisions, boats or every possible obstacle arrangement.
+they do not exercise packets on TCP, graphical clients, AI decisions, boats
+or every possible obstacle arrangement.
+
+`ContactIsRecomputedAfterTheLastPlayerEndsTheDay` starts both players on
+isolated tiles, then directly changes an intervening rock tile to grass after
+the first player ends their turn. Contact remains blocked for the rest of
+that day. At the next day boundary, the processor allows contact and starts
+the players sequentially on the toroidal map; the bounded control keeps
+both players simultaneous. This synthetic terrain mutation exercises the
+recalculation, not a normal gameplay mechanism for changing terrain, hero
+movement during the day, or network delivery.
 
 On macOS arm64, `vcmitest` built from `746d247` plus the tests, and all three
 focused tests passed. The XML report is
 `runtime/simturn-seams-final-2026-11-15.xml` on the TB5 build root. The build
 completed with duplicate-library and missing Conan search-path warnings.
+The five tests including the new day-boundary case passed on a build of
+`dd57519` plus that test. The report is
+`runtime/simturn-dynamic-seam-2026-11-15.xml` under the TB5 build root.
