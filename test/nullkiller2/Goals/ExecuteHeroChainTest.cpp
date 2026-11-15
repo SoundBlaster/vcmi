@@ -14,6 +14,7 @@
 #include "AI/Nullkiller2/Engine/AIMemory.h"
 #include "AI/Nullkiller2/Goals/ExecuteHeroChain.h"
 #include "AI/Nullkiller2/Pathfinding/Actions/AdventureSpellCastMovementActions.h"
+#include "AI/Nullkiller2/Pathfinding/Actions/BoatActions.h"
 
 #include "mock/GameHandlerTestClient.h"
 #include "mock/TinyH3MBuilder.h"
@@ -73,6 +74,13 @@ public:
 					gateway->objectRemoved(object, removal->initiator);
 		GameHandlerTestServer::applyPack(pack);
 		if(gateway)
+			if(const auto * created = dynamic_cast<const NewObject *>(&pack))
+			{
+				gateway->invalidatePaths();
+				if(state->isVisibleFor(created->newObject.get(), gateway->playerID))
+					gateway->newObject(created->newObject.get());
+			}
+		if(gateway)
 			if(const auto * move = dynamic_cast<const TryMoveHero *>(&pack))
 			{
 				gateway->invalidatePaths();
@@ -113,6 +121,8 @@ public:
 			if(beforeCast)
 				beforeCast();
 		}
+		if(dynamic_cast<const ::BuildBoat *>(&request))
+			++boatBuilds;
 		const auto * movement = dynamic_cast<const MoveHero *>(&request);
 		const auto * hero = movement ? handler.gameState().getHero(movement->hid) : nullptr;
 		const auto before = hero ? hero->visitablePos() : int3(-1, -1, -1);
@@ -132,6 +142,7 @@ public:
 	}
 	NK2AI::AIGateway * gateway = nullptr;
 	int casts = 0;
+	int boatBuilds = 0;
 	int moves = 0;
 	int rejectedMoves = 0;
 	std::vector<std::tuple<int3, int3, EPathfindingLayer>> appliedMoves;
@@ -331,6 +342,72 @@ TEST_F(ExecuteHeroChainMovementTest, blockingVisitOnRouteStopsChainForReplanning
 	EXPECT_EQ(gameState()->getObjInstance(scrollID), nullptr) << "the hero must pick up the scroll";
 	EXPECT_EQ(hero->visitablePos(), HERO_POS) << "picking up a scroll does not move the hero";
 	EXPECT_EQ(client.movementRequests, 1) << "the chain must stop after the pickup instead of following the stale route";
+}
+
+TEST_F(ExecuteHeroChainMovementTest, buildsAndBoardsBoatAcrossSeamUsingRealServer)
+{
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(PLAYER).playerActive(ENEMY)
+		.hero({8, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 100}})
+		.shipyard({2, 10, 0}, PLAYER)
+		.hero({15, 25, 0}, HeroTypeID(1), ENEMY);
+	for(int x = 20; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			builder.terrain({x, y, 0}, TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	auto * hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	auto * shipyard = findFirst<CGShipyard>();
+	ASSERT_NE(shipyard, nullptr);
+	ASSERT_EQ(shipyard->bestLocation(), int3(35, 10, 0));
+	hero->setMovementPoints(5000);
+	SpellAndMoveClient client(gameState(), PLAYER);
+	auto gateway = makeGateway(PLAYER, &client);
+	client.gateway = gateway.get();
+	client.enableNotifications();
+	const auto paths = withGameStateReadLock([&]
+	{
+		preparePlanning(*gateway);
+		return gateway->nullkiller->pathfinder->getPathInfo(int3(35, 10, 0));
+	});
+	const auto path = std::ranges::find_if(paths, [&](const auto & candidate)
+	{
+		return candidate.targetHero == hero && !candidate.nodes.empty() && candidate.turn() == 0
+			&& std::ranges::any_of(candidate.nodes, [](const auto & node)
+			{
+				return node.coord == int3(35, 10, 0)
+					&& dynamic_cast<const NK2AI::AIPathfinding::BuildBoatAction *>(node.specialAction.get());
+			});
+	});
+	ASSERT_NE(path, paths.end());
+	EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(*path).accept(gateway.get()); }));
+	EXPECT_EQ(client.boatBuilds, 1);
+	EXPECT_EQ(client.rejectedMoves, 0);
+	ASSERT_EQ(findAll<CGBoat>().size(), 1u);
+	EXPECT_EQ(findAll<CGBoat>().front()->visitablePos(), int3(35, 10, 0));
+	const auto boardPaths = withGameStateReadLock([&]
+	{
+		preparePlanning(*gateway);
+		return gateway->nullkiller->pathfinder->getPathInfo(int3(35, 10, 0));
+	});
+	const auto boardPath = std::ranges::find_if(boardPaths, [&](const auto & candidate)
+	{
+		return candidate.targetHero == hero && !candidate.nodes.empty() && candidate.turn() == 0
+			&& !candidate.getFirstBlockedAction();
+	});
+	ASSERT_NE(boardPath, boardPaths.end());
+	EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(*boardPath).accept(gateway.get()); }));
+	EXPECT_EQ(client.rejectedMoves, 0);
+	ASSERT_NE(hero->getBoat(), nullptr);
+	EXPECT_EQ(hero->visitablePos(), int3(35, 10, 0));
+	EXPECT_TRUE(std::ranges::any_of(client.appliedMoves, [](const auto & move)
+	{
+		const auto & [from, to, layer] = move;
+		return from.x == 0 && to == int3(35, 10, 0);
+	}));
 }
 
 TEST_P(ToroidalHeroChainTest, plannedResourceVisitUsesRealServer)
