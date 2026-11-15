@@ -50,3 +50,33 @@ human movement, not seamless animation, seam appearance, balanced gameplay,
 complete HotA compatibility, multiplayer or a full playthrough. The client
 also reported a libpng interlace warning and legacy HotA map warnings while
 scanning other scenarios. Further visual acceptance remains with the user.
+
+## Updated local build and launcher working directory
+
+The existing local launcher previously invoked the client by absolute path
+without changing the working directory. The build reports its game data and
+server paths as `.` and `./vcmiserver`, so invoking the script from another
+directory could resolve those relative paths incorrectly. The local launcher
+now changes into the TB5 CMake `bin` directory before executing
+`./vcmiclient --nointro`; its isolated `VCMI_USER_DATA_PATH` is unchanged.
+This is a local launcher adjustment, not an installed application or a
+tracked portable launcher.
+
+The client and server were rebuilt from clean revision `109a663` on macOS
+arm64. Both `--version` commands reported that revision and the Earth profile
+paths. Invoking the corrected launcher with `/Users/egor` as its initial
+working directory loaded core and HotA content, initialized the Metal renderer,
+loaded main-menu resources and started menu music. The unbundled process did
+not appear in the available Computer Use application inventory; the test was
+terminated after checking the log, without interacting with the GUI. This
+does not verify Finder double-click, game selection, actual play, or graceful
+exit in this updated build. The earlier graphical evidence remains tied to
+its named revisions.
+
+The map symlink still resolves to the assembled Earth draft, SHA-256
+`97f5222ab48e5987b58c12643be985e450524488bf042a9f6ae27ab9f03ea1f3`.
+The updated client, server and library SHA-256 values are respectively
+`a359a0fc4ce81309db52721ac4e0c2c9c5273ab8660ee71fb2e1ca64de6002b7`,
+`f9300f92324d266f65f8f77ca5c7216d50555837c748fad7049de451ad4cb0c9`, and
+`f317f1911f96f0724a794eeb46bdc02303debd64ee3602e0a97bc1efc237c29c`.
+The build reported duplicate-library and missing Conan search-path warnings.
