@@ -79,3 +79,22 @@ garbled Russian text and logged missing lobby animation frames.
 This is one bounded map and one local mixed-version session. It does not
 establish full state or fog equivalence, mixed-version save reload, remote
 network behavior, all original versions, or compatibility with toroidal maps.
+
+## Reading the original server's bounded autosave
+
+The original host's `00 Bounded Two Humans Test` autosave from the session
+above was inspected with the current branch on macOS arm64. Its SHA-256 was
+`879f68ef85f95a08a9b17238daed0d73058fcf65dc2e7c42bb6cd8564c6b6d4d`
+both before and after the test. `ToroidalDemoVmapTest.DecodesOriginalBoundedSaveAndMovesHero`
+from commit `bbe64c4` decodes the header, game state and server state directly,
+checks that the 36×36 map remains bounded, then uses the in-process server
+handler to move the blue hero from `(19,18,0)` to `(20,18,0)` and verifies
+that movement points decrease. The test passed; its XML is local to TB5 at
+`runtime/original-bounded-save-2026-11-15.xml`. The executable contained the
+test change on top of `c92782c`; linking reported duplicate-library and
+missing Conan search-path warnings.
+
+This bypasses the normal loader's mod compatibility gate and the multiplayer
+lobby; it does not establish graphical loading or an actual continued turn.
+The test uses a specific local fixture and is skipped unless
+`VCMI_ORIGINAL_BOUNDED_SAVE` is supplied. It does not modify the input save.
