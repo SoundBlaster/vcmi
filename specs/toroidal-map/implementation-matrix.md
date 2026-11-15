@@ -236,6 +236,10 @@ winner, so this was neither proof of permanent deadlock nor proof of identical
 causes. A later run on the current build with the same seed completed on day
 69, while its bounded control was stopped at day 79; no-task turns recurred in
 both. One other seed also eventually won after multiple no-task turns.
+On the later `ff23f4b` client, Crossroads seed 3 completed with red's victory
+on day 60 after a logged edge crossing. Crossroads seed 4 on an earlier build
+was stopped at day 1316 without a winner; these individual runs do not prove
+general AI progress. See the [seeded comparison](evidence/nullkiller-seeded-ai-2026-11-15.md).
 
 After framed-packet support, two current test listeners also negotiated an
 unframed lobby with the original external server, selected a bounded map and
@@ -293,6 +297,11 @@ and the source's required-mod metadata and gameplay still require work.
 The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)
 also covers boat embarkation and disembarkation across one edge with two
 replicas. This is a staged loopback test, not a remote graphical game.
+
+A [bounded rectangular Grail regression](evidence/rectangular-grail-placement-2026-11-15.md)
+also removes the old width-derived limit when no center or radius is specified.
+Synthetic tall and wide maps, the bounded border, explicit radius and existing
+toroidal Grail cases were checked; broader rectangular scenarios remain open.
 [Guarded-mine tests](evidence/guarded-mine-directions-2026-11-15.md)
 exercise legal seam approaches, refusal, forced victory and retreat on both
 levels, with bounded controls; some starting positions overlap the mine and
