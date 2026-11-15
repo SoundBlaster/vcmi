@@ -47,8 +47,9 @@ coverage already and does not imply that all of its cases are unimplemented.
   the original underground gates. Document intentional gameplay changes.
 - [x] Investigate the [water-monolith mismatch](evidence/earth-portal-road-2026-11-15.md):
   restore the misplaced entrance to water in the demo preparation recipe.
-- [ ] Verify remaining water-monolith routes and the repaired entrance in a
-  graphical game; check broader placement and collision effects.
+- [ ] Verify reverse water-monolith routes and broader placement and collision
+  effects; [all three exits and one graphical route](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits)
+  are checked from the relocated entrance.
 - [ ] Prepare a road that crosses a seam and verify its logical and static
   visual continuity. The current Earth draft's roads do not reach its edges.
 - [ ] Make the demo convenient to launch and play with an isolated profile;

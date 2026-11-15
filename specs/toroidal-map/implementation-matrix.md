@@ -477,8 +477,10 @@ reached the entrance in a staged graphical game, but the water-monolith exit
 was rejected for a land hero. The adaptation and road appearance remain open.
 The entry was originally on water and became land during the Africa rejoin;
 an [integrated repair](evidence/earth-portal-road-2026-11-15.md#reproducible-assembly-and-local-demo-profile)
-passed one server-side boat teleport to another water exit and a limited
-graphical startup. Other portal routes and graphical portal traversal remain open.
+passed server-side boat teleports to all three other exits. A staged graphical
+game traversed one exit and continued sailing after save/reload; see the
+[graphical portal record](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits).
+Reverse routes and broader placement checks remain open.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

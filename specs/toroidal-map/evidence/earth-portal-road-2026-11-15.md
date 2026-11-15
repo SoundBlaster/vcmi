@@ -116,5 +116,37 @@ client build `32936c5` with the diagnostic shortcuts started the selected map
 through the normal scenario list; a human hero moved from `(164,353,0)` to
 `(165,353,0)` and the client exited with code 0. The observation stream is
 `runtime/earth-map-research-2026-11-15/assembled-portal-gui-observation.jsonl`.
-The relocated portal itself has not yet been traversed in the graphical client;
-these checks do not establish full scenario playability or visual acceptance.
+The initial launch did not traverse the relocated portal; these checks do not
+establish full scenario playability or visual acceptance.
+
+## Graphical water portal and other exits
+
+A separate local copy of the assembled map, SHA-256
+`63253681b327921c95af3e784bb370476a17e7cac3f9da7bc142cd5fe0b28ad7`,
+changes only the scenario name and the red hero's start anchor to
+`(240,430,0)`. Its visitable starting tile is `(239,430,0)` on water;
+game initialization creates the hero's boat. On macOS arm64, the SDL3/Metal
+client build `32936c5` with diagnostic shortcuts from `17c6a69` started that
+fixture as a human player. A northward move entered the relocated monolith
+and arrived at `(201,145,0)` with 1,400 movement points. A screenshot shows
+the hero in a boat at the exit. The hero sailed south to `(201,146,0)`,
+quick-saved, sailed to `(201,147,0)`, reloaded, and sailed south again; the
+recorded movement points were 1,300 after the first southward step and 1,200
+after the second in both executions. A second screenshot shows the boat after
+reload. The client and local server exited normally, client exit code 0.
+
+Separately, the opt-in server check extended in `031a487` was run three times
+against the assembled map with a specified different exit each time. It
+reached `monolithTwoWay_5607` at `(168,290,0)`, `monolithTwoWay_10467` at
+`(201,145,0)`, and `monolithTwoWay_10806` at `(169,285,0)`, preserving the
+same boat ID. These are three independent staged server runs from the moved
+entry, not checks of every reverse route. The graphical run covers one exit,
+not normal access to the staged boat or continuous animation.
+
+The graphical fixture, save and screenshots are local under TB5
+`runtime/earth-water-portal-gui-profile/`. Observation SHA-256:
+`9af69c02dfc12ddc6d0a39c217a7e7530aede2628e85162201d1e81d781262ec`;
+client log SHA-256:
+`fa7eaca05875e3504a5115c0f247dc974a8e7a54168a6ca35d2c47241f40e3ac`;
+`after-reload-sail.png` SHA-256:
+`65b9301419e7cab621dada111cd2de4e33f0f7ed3aee9002a752f392e3c92cf6`.
