@@ -56,6 +56,7 @@
 #include "../../server/activities/Activity.h"
 #include "../../server/activities/MapActivities.h"
 #include "../../server/activities/ActivityProcessor.h"
+#include "../../server/processors/TurnOrderProcessor.h"
 #include "../mock/GameHandlerTestServer.h"
 
 #include "../JsonComparer.h"
@@ -689,9 +690,16 @@ public:
 		{
 			++battleStarts;
 			gateway->nullkiller->makingTurnInterruption.interruptThread();
+			if(onBattleStart)
+				onBattleStart();
 		}
 		if(gateway && forwardDialogs)
 		{
+			if(const auto * turn = dynamic_cast<const PlayerStartsTurn *>(&pack); forwardTurn && turn)
+			{
+				if(turn->player == gateway->playerID)
+					gateway->yourTurn(turn->questionID);
+			}
 			if(const auto * visit = dynamic_cast<const HeroVisit *>(&pack); visit && visit->player == gateway->playerID)
 			{
 				const auto * hero = state->getHero(visit->heroId);
@@ -754,6 +762,8 @@ public:
 	std::vector<std::string> messages;
 	bool forwardDialogs = false;
 	bool stopAtBattle = false;
+	bool forwardTurn = false;
+	std::function<void()> onBattleStart;
 	std::atomic<int> battleStarts{0};
 	int completedVisits = 0;
 	int blockingDialogs = 0;
@@ -769,7 +779,9 @@ public:
 	ExternalInspectionAIClient(const std::shared_ptr<CGameState> & state, PlayerColor player)
 		: server(state, player), handler(server, state)
 	{
-		state->actingPlayers.insert(player);
+		if(!std::getenv("VCMI_INSPECT_AI_SERVER_TURN"))
+			state->actingPlayers.insert(player);
+		server.onBattleStart = [this] { terminal.notify_all(); };
 	}
 
 	std::optional<BattleAction> makeSurrenderRetreatDecision(PlayerColor, const BattleID &,
@@ -812,6 +824,11 @@ public:
 			std::cout << std::endl;
 		}
 		gateway->requestRealized(&*server.response);
+		if(dynamic_cast<const EndTurn *>(&request) && server.response->result)
+		{
+			++acceptedEndTurns;
+			terminal.notify_all();
+		}
 		return requestID;
 	}
 
@@ -819,8 +836,36 @@ public:
 	{
 		gateway = value;
 		server.gateway = value;
-		server.forwardDialogs = std::getenv("VCMI_INSPECT_AI_AUTONOMOUS") != nullptr;
+		server.forwardTurn = std::getenv("VCMI_INSPECT_AI_SERVER_TURN") != nullptr;
+		server.forwardDialogs = std::getenv("VCMI_INSPECT_AI_AUTONOMOUS") != nullptr || server.forwardTurn;
 		server.stopAtBattle = server.forwardDialogs;
+	}
+
+	void startServerTurn()
+	{
+		std::lock_guard lock(requestMutex);
+		handler.turnOrder->setMinSimturnsDuration(0);
+		handler.turnOrder->setMaxSimturnsDuration(0);
+		for(const auto & [player, info] : handler.gameState().players)
+			if(info.status == EPlayerStatus::INGAME)
+				handler.turnOrder->addPlayer(player);
+		handler.turnOrder->onGameStarted();
+		for(const auto & [player, info] : handler.gameState().players)
+		{
+			if(player == gateway->playerID || !info.isHuman() || info.status != EPlayerStatus::INGAME)
+				continue;
+			if(!handler.turnOrder->onPlayerEndsTurn(player))
+				throw std::runtime_error("Could not advance the preceding human turn");
+		}
+	}
+
+	bool waitForServerTurn()
+	{
+		std::unique_lock lock(requestMutex);
+		return terminal.wait_for(lock, std::chrono::seconds(15), [this]
+		{
+			return acceptedEndTurns > 0 || server.battleStarts.load() > 0;
+		});
 	}
 
 	struct Result
@@ -833,14 +878,20 @@ public:
 		int blockingDialogs;
 		int recruitmentWindows;
 		int acceptedAnswers;
+		int acceptedEndTurns;
+		bool playerStillActing;
+		bool anotherPlayerActing;
 		bool hasActivities;
 	};
 
 	Result result(PlayerColor player)
 	{
 		std::lock_guard lock(requestMutex);
+		const bool anotherPlayerActing = std::ranges::any_of(handler.gameState().players,
+			[&](const auto & entry) { return entry.first != player && handler.turnOrder->isPlayerMakingTurn(entry.first); });
 		return {requests, moves, rejectedMoves, server.battleStarts.load(), server.completedVisits,
-		        server.blockingDialogs, server.recruitmentWindows, acceptedAnswers,
+		        server.blockingDialogs, server.recruitmentWindows, acceptedAnswers, acceptedEndTurns,
+		        handler.turnOrder->isPlayerMakingTurn(player), anotherPlayerActing,
 		        handler.activities->topActivity(player) != nullptr};
 	}
 
@@ -848,6 +899,7 @@ public:
 	int rejectedMoves = 0;
 	int requests = 0;
 	int acceptedAnswers = 0;
+	int acceptedEndTurns = 0;
 
 private:
 	ExternalInspectionAIServer server;
@@ -855,6 +907,7 @@ private:
 	NK2AI::AIGateway * gateway = nullptr;
 	int requestID = 0;
 	std::recursive_mutex requestMutex;
+	std::condition_variable_any terminal;
 };
 #endif
 }
@@ -929,6 +982,8 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	auto state = std::make_shared<CGameState>();
 	state->preInit(LIBRARY);
 	GameRandomizer randomizer(*state);
+	if(const char * seed = std::getenv("VCMI_INSPECT_AI_SEED"); seed && *seed)
+		randomizer.setSeed(std::stoi(seed));
 	Load::ProgressAccumulator progress;
 	state->init(&service, &start, randomizer, progress, false);
 	if(aiSlot)
@@ -960,13 +1015,33 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_TRUE(map.isInTheMap(position));
 		ASSERT_NE(state->getPlayerTeam(player)->fogOfWarMap[position], 0);
 		std::unique_ptr<ExternalInspectionAIClient> client;
-		if(std::getenv("VCMI_INSPECT_AI_EXECUTE") || std::getenv("VCMI_INSPECT_AI_AUTONOMOUS"))
+		if(std::getenv("VCMI_INSPECT_AI_EXECUTE") || std::getenv("VCMI_INSPECT_AI_AUTONOMOUS") || std::getenv("VCMI_INSPECT_AI_SERVER_TURN"))
 			client = std::make_unique<ExternalInspectionAIClient>(state, player);
 		auto callback = std::make_shared<CCallback>(state, std::optional<PlayerColor>{player}, client.get());
 		auto gateway = std::make_unique<NK2AI::AIGateway>();
 		gateway->initGameInterface(std::shared_ptr<Environment>(), callback);
 		if(client)
 			client->notify(gateway.get());
+		if(std::getenv("VCMI_INSPECT_AI_SERVER_TURN"))
+		{
+			ASSERT_TRUE(aiSlot.has_value());
+			ASSERT_EQ(*aiSlot, 0);
+			client->startServerTurn();
+			const bool reachedTerminal = client->waitForServerTurn();
+			gateway->finish();
+			const auto result = client->result(player);
+			EXPECT_TRUE(reachedTerminal) << "AI did not end its turn or start a battle in 15 seconds";
+			EXPECT_EQ(result.rejectedMoves, 0);
+			EXPECT_GT(result.moves, 0);
+			EXPECT_EQ(result.battles + result.acceptedEndTurns, 1);
+			EXPECT_EQ(result.playerStillActing, result.battles == 1);
+			if(result.acceptedEndTurns)
+				EXPECT_TRUE(result.anotherPlayerActing);
+			std::cout << "Nullkiller server turn: movement=" << result.moves
+			          << ", rejected=" << result.rejectedMoves << ", battles=" << result.battles
+			          << ", accepted end turns=" << result.acceptedEndTurns << std::endl;
+			return;
+		}
 		std::shared_lock lock(CGameState::mutex);
 		auto & ai = *gateway->nullkiller;
 		if(std::getenv("VCMI_INSPECT_AI_AUTONOMOUS"))
