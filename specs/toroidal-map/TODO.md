@@ -105,8 +105,10 @@ demo preparation reviewable as separate changes where practical.
   establish representative behavior, not general AI support or an AI audit.
   Seed 4's long-running scenario is unresolved without a demonstrated
   topology-specific cause. Continue treating AI support as experimental.
-- [ ] Verify that ordinary maps and older saves remain bounded and that
-  existing gameplay is preserved for the profiles under test.
+- [x] Verify representative ordinary-map and older-save behavior for the
+  profiles under test: [mixed-version bounded game and old save](evidence/topology-old-network-peer-2026-11-15.md),
+  plus the [current suite and save repeat](evidence/full-suite-40bffe9-2026-11-16.md).
+  This does not establish compatibility with every map, mod or save.
 
 ## 6. Verification and acceptance
 
