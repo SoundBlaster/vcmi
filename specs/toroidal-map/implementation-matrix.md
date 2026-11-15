@@ -153,6 +153,9 @@ Nullkiller skips an empty blocked-object cluster rather than dereferencing a
 missing center; the isolated test covers bounded and toroidal maps, while the
 complete object-removal sequence remains unverified. See the
 [empty-cluster evidence](evidence/nullkiller-empty-cluster-2026-11-15.md).
+The later [current preview](evidence/topology-preview-ef53b71-2026-11-15.md)
+also exercised a player corner crossing, a battle initiated by Nullkiller, an
+AI corner crossing and the return to the player on a clean demo map.
 
 ## Specification evidence discipline
 
