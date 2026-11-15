@@ -149,6 +149,10 @@ editor's dirt-road and water-river brushes select equivalent sprite groups
 and reflections for all 256 neighboring-cell combinations at each seam and
 corner on both levels; see the
 [neighborhood comparison](evidence/line-neighborhoods-2026-11-15.md).
+Nullkiller skips an empty blocked-object cluster rather than dereferencing a
+missing center; the isolated test covers bounded and toroidal maps, while the
+complete object-removal sequence remains unverified. See the
+[empty-cluster evidence](evidence/nullkiller-empty-cluster-2026-11-15.md).
 
 ## Specification evidence discipline
 
