@@ -2771,6 +2771,15 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGateWithVisitableTileAcrossSeam)
 	auto * hero = findHeroByOwner(player);
 	ASSERT_NE(hero, nullptr);
 	ASSERT_NO_THROW(EXPECT_TRUE(CGTeleport::isExitPassable(*gameState(), hero, exit.get())));
+	// The object callback may temporarily lack a map while an independent
+	// game-info callback is already available to the teleport query.
+	{
+		auto * attachedCallback = exit->cb;
+		exit->cb = nullptr;
+		EXPECT_EQ(exit->visitablePos(), int3(-1, 5, 1));
+		EXPECT_NO_THROW(EXPECT_TRUE(CGTeleport::isExitPassable(*gameState(), hero, exit.get())));
+		exit->cb = attachedCallback;
+	}
 	hero->setMovementPoints(3000);
 	GameHandlerTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
