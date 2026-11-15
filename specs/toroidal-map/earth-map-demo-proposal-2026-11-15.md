@@ -149,3 +149,12 @@ TB5. No object or gameplay data was transformed. The tool rejects a selected
 snow component that touches the original preview boundary; eight Python
 geometry and preview checks passed. Exact artwork, placing objects from the
 original island, seam roads and playability remain unresolved.
+
+The read-only [`tools/analyze_polar_objects.py`](tools/analyze_polar_objects.py)
+compares the selected snow component with second-level source object masks.
+For this map, 330 object anchors and 330 footprints intersect it; 117 objects
+have a visitable mask cell on the island. They include 10 mines, 25 monsters,
+28 random resources, two shipyards and a keymaster tent. This is a footprint
+estimate on the original placement, not proof of reachability or a decision
+about which objects should move. Ten combined Python geometry and preview
+checks passed after adding the object analysis.
