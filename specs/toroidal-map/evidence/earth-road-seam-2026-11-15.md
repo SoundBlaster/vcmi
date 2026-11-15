@@ -94,3 +94,14 @@ does not exclude a connection after other map edits or under less restrictive
 rules. The temporary experiment was removed; the connected Earth road remains
 open. A separate Crossroads fixture already demonstrates a road at a seam,
 as described in [the graphical record](topology-preview-f0f7f4a-2026-11-15.md).
+
+An additional worktree-only run removed `cactus_7575`, `yuccaTrees_7567`
+and `mountain_7577` in memory after checking that each was non-visitable.
+On the same assembled Earth map, the constrained search found nine candidate
+segments; eight had a left-side road connection and none had a right-side
+connection. Its positive assertion failed and no map was saved. The test
+binary was built from `d8584d1` plus the temporary experiment; the XML is
+`runtime/earth-road-three-objects.xml` on TB5. The experiment was removed
+afterwards. This result suggests that clearing these particular decorations
+is not sufficient; it does not prove that no connection is possible with
+other terrain, object or route changes.
