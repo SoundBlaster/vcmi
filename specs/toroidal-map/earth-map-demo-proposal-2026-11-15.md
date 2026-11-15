@@ -202,3 +202,12 @@ not established to have geographic coordinates suitable for automatic
 reprojection. Transferring its objects, roads, events and references still
 requires map-aware transformations and validation. The current sketch is not
 calculated using the reference projection.
+
+The user also shared [Adams Hemispheres in a Square](https://www.map-projections.net/single-view/adams-hemispheres)
+as a reference for a possible future spherical topology. That future mode is
+outside the current toroidal feature: the relationship between hemisphere
+edges, orientation after a crossing, polar behavior, distances, projection
+distortions and game-grid representation would need their own design and
+tests. The cited page identifies the depiction as a transverse aspect of the
+Peirce Quincuncial projection. Referencing this illustration does not select
+its geometry as an implementation or license its image for redistribution.
