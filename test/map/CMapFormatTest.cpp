@@ -2624,6 +2624,84 @@ TEST(MapFormat, PreparesExternalToroidalSeamRoad)
 	std::cout << "Seam road row=" << road.front().y << " tiles=" << road.size() << std::endl;
 }
 
+TEST(MapFormat, PreparesEarthPortalRoadFixture)
+{
+	const char * inputPath = std::getenv("VCMI_INSPECT_START_VMAP");
+	const char * outputPath = std::getenv("VCMI_EARTH_PORTAL_ROAD_OUTPUT");
+	if(!inputPath || !*inputPath || !outputPath || !*outputPath)
+		GTEST_SKIP() << "Set VCMI_INSPECT_START_VMAP and VCMI_EARTH_PORTAL_ROAD_OUTPUT";
+	ASSERT_FALSE(boost::filesystem::exists(outputPath));
+	std::ifstream file(inputPath, std::ios::binary);
+	ASSERT_TRUE(file);
+	std::vector<ui8> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderJson reader(&input);
+	auto map = reader.loadMap(&callback);
+	ASSERT_NE(map, nullptr);
+	callback.setMap(map.get());
+	ASSERT_TRUE(map->toroidal);
+	ASSERT_EQ(map->width, 252);
+	ASSERT_EQ(map->height, 576);
+	for(const auto & [name, anchor] : std::array{
+		std::pair{"yuccaTrees_7568", int3(251, 430, 0)}, std::pair{"mountain_7569", int3(1, 431, 0)}})
+	{
+		const auto decoration = map->instanceNames.find(name);
+		ASSERT_NE(decoration, map->instanceNames.end());
+		ASSERT_FALSE(decoration->second->isVisitable());
+		ASSERT_EQ(decoration->second->anchorPos(), anchor);
+		map->removeObject(decoration->second->id);
+	}
+	const auto portal = map->instanceNames.find("monolithTwoWay_5267");
+	ASSERT_NE(portal, map->instanceNames.end());
+	ASSERT_EQ(portal->second->visitablePos(), int3(250, 429, 0));
+	ASSERT_TRUE(map->canMoveBetween(int3(250, 430, 0), portal->second->visitablePos()));
+	const std::vector<int3> road = {
+		int3(251, 425, 0), int3(0, 425, 0), int3(1, 425, 0),
+		int3(1, 426, 0), int3(1, 427, 0), int3(0, 428, 0),
+		int3(0, 429, 0), int3(0, 430, 0), int3(251, 430, 0), int3(250, 430, 0)};
+	for(const auto & pos : road)
+	{
+		const auto & tile = map->getTile(pos);
+		if(tile.blocked())
+			for(const auto & id : tile.blockingObjects)
+				std::cout << "Blocked road cell " << pos.toString() << ": " << map->getObject(id)->instanceName << std::endl;
+		ASSERT_TRUE(tile.isLand()) << pos.toString();
+		ASSERT_FALSE(tile.blocked()) << pos.toString();
+		ASSERT_FALSE(tile.visitable()) << pos.toString();
+		ASSERT_EQ(tile.getRiverID(), RiverId::NO_RIVER) << pos.toString();
+	}
+	ASSERT_NE(map->getTile(int3(2, 425, 0)).getRoadID(), RoadId::NO_ROAD);
+	CRandomGenerator random(12345);
+	auto * editor = map->getEditManager();
+	editor->getTerrainSelection().setSelection(road);
+	editor->drawRoad(RoadId::DIRT_ROAD, &random);
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reopenedReader(&output);
+	auto reopened = reopenedReader.loadMap(&reopenedCallback);
+	ASSERT_NE(reopened, nullptr);
+	ASSERT_TRUE(reopened->toroidal);
+	for(const auto & pos : road)
+		EXPECT_EQ(reopened->getTile(pos).getRoadID(), RoadId::DIRT_ROAD) << pos.toString();
+	EXPECT_EQ(reopened->instanceNames.count("yuccaTrees_7568"), 0u);
+	EXPECT_EQ(reopened->instanceNames.count("mountain_7569"), 0u);
+	EXPECT_EQ(reopened->instanceNames.count("monolithTwoWay_5267"), 1u);
+	std::ofstream out(outputPath, std::ios::binary);
+	ASSERT_TRUE(out);
+	out.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+	out.close();
+	ASSERT_TRUE(out);
+}
+
 TEST(MapFormat, ToroidalMixedRoadTurnsRoundTrip)
 {
 	auto bytes = makeToroidalDemoMap().build();
