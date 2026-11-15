@@ -888,6 +888,8 @@ void CMapLoaderH3M::readPredefinedHeroes()
 
 	const auto createPredefinedHero = [this](int heroID)
 	{
+		if(static_cast<size_t>(heroID) >= LIBRARY->heroh->size())
+			throw std::runtime_error("Map '" + mapName + "': predefined hero " + std::to_string(heroID) + " is not available; required content may be missing");
 		auto handler = LIBRARY->objtypeh->getHandlerFor(Obj::HERO, HeroTypeID(heroID).toHeroType()->getHeroClass()->getIndex());
 		auto object = handler->create(map->cb, handler->getTemplates().front());
 		auto hero = std::dynamic_pointer_cast<CGHeroInstance>(object);
@@ -961,6 +963,15 @@ void CMapLoaderH3M::readPredefinedHeroes()
 			const bool alwaysAddSkills = reader->readBool();
 			const bool cannotGainXP = reader->readBool();
 			const int32_t level = reader->readInt32Checked(1, std::numeric_limits<int32_t>::max());
+
+			// HotA writes an entry for every format hero, even when the entry has
+			// default settings and the corresponding expansion is not installed.
+			if(static_cast<size_t>(heroID) >= LIBRARY->heroh->size())
+			{
+				if(level > 1 || cannotGainXP)
+					throw std::runtime_error("Map '" + mapName + "': predefined hero " + std::to_string(heroID) + " is not available; required content may be missing");
+				continue;
+			}
 
 			auto * hero = map->tryGetFromHeroPool(HeroTypeID(heroID));
 

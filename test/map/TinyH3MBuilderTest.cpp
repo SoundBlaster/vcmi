@@ -96,6 +96,66 @@ TEST(TinyH3MBuilderTest, EmptyROEFullLoad)
 	EXPECT_TRUE(loaded.map->getHeroesOnMap().empty());
 }
 
+TEST(TinyH3MBuilderTest, HotaDefaultPredefinedHeroesMayExceedInstalledHeroCount)
+{
+	const auto installedHeroes = static_cast<uint32_t>(LIBRARY->heroh->size());
+	auto bytes = TinyH3M::TinyH3MBuilder(EMapFormat::HOTA)
+		.hotaVersion(5)
+		.hotaPredefinedHeroes(installedHeroes + 1)
+		.build();
+	EXPECT_NO_THROW({ auto loaded = loadMap(bytes); EXPECT_NE(loaded.map, nullptr); });
+}
+
+TEST(TinyH3MBuilderTest, HotaMissingCustomizedPredefinedHeroReportsItsId)
+{
+	const auto missingHero = static_cast<uint32_t>(LIBRARY->heroh->size());
+	auto bytes = TinyH3M::TinyH3MBuilder(EMapFormat::HOTA)
+		.hotaVersion(5)
+		.hotaPredefinedHeroes(missingHero + 1, missingHero)
+		.build();
+	try
+	{
+		loadMap(bytes);
+		FAIL() << "A missing hero with a custom level must be rejected";
+	}
+	catch(const std::exception & error)
+	{
+		EXPECT_NE(std::string(error.what()).find("predefined hero " + std::to_string(missingHero)), std::string::npos)
+			<< error.what();
+	}
+}
+
+TEST(TinyH3MBuilderTest, HotaMissingFullPredefinedHeroReportsItsId)
+{
+	const auto missingHero = static_cast<uint32_t>(LIBRARY->heroh->size());
+	auto bytes = TinyH3M::TinyH3MBuilder(EMapFormat::HOTA)
+		.hotaVersion(5)
+		.hotaPredefinedHeroes(missingHero + 1)
+		.hotaCustomizedPredefinedHero(missingHero)
+		.build();
+	try
+	{
+		loadMap(bytes);
+		FAIL() << "An unavailable customised hero must be rejected";
+	}
+	catch(const std::exception & error)
+	{
+		EXPECT_NE(std::string(error.what()).find("predefined hero " + std::to_string(missingHero)), std::string::npos)
+			<< error.what();
+	}
+}
+
+TEST(TinyH3MBuilderTest, HotaKnownPredefinedHeroIsCreated)
+{
+	auto bytes = TinyH3M::TinyH3MBuilder(EMapFormat::HOTA)
+		.hotaVersion(5)
+		.hotaPredefinedHeroes(static_cast<uint32_t>(LIBRARY->heroh->size()) + 1, 0)
+		.build();
+	auto loaded = loadMap(bytes);
+	auto * hero = loaded.map->tryGetFromHeroPool(HeroTypeID(0));
+	ASSERT_NE(hero, nullptr);
+}
+
 TEST(TinyH3MBuilderTest, EmptySODFullLoad)
 {
 	auto bytes = TinyH3M::TinyH3MBuilder(EMapFormat::SOD)

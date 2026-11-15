@@ -207,6 +207,19 @@ TinyH3MBuilder & TinyH3MBuilder::hotaVersion(uint32_t version)
 	return *this;
 }
 
+TinyH3MBuilder & TinyH3MBuilder::hotaPredefinedHeroes(uint32_t count, std::optional<uint32_t> leveledHero)
+{
+	hotaPredefinedHeroCount = count;
+	hotaPredefinedLeveledHero = leveledHero;
+	return *this;
+}
+
+TinyH3MBuilder & TinyH3MBuilder::hotaCustomizedPredefinedHero(uint32_t hero)
+{
+	hotaPredefinedCustomHero = hero;
+	return *this;
+}
+
 TinyH3MBuilder & TinyH3MBuilder::playerActive(PlayerColor color)
 {
 	playerEnabled.at(color.getNum()) = true;
@@ -1064,8 +1077,34 @@ void TinyH3MBuilder::writePredefinedHeroes(TinyH3MWriter & w) const
 
 	if(features.levelHOTA0)
 	{
-		// HOTA prefixes the per-hero "customised" flags with their count; 0 = none.
-		w.writeUInt32(0);
+		if(hotaPredefinedHeroCount && !features.levelHOTA5)
+			throw std::runtime_error("Predefined hero fixture requires HotA version 5 or later");
+		if(hotaPredefinedLeveledHero && *hotaPredefinedLeveledHero >= hotaPredefinedHeroCount)
+			throw std::runtime_error("Predefined hero fixture level index is out of range");
+		if(hotaPredefinedCustomHero && *hotaPredefinedCustomHero >= hotaPredefinedHeroCount)
+			throw std::runtime_error("Predefined hero fixture custom index is out of range");
+		w.writeUInt32(hotaPredefinedHeroCount);
+		for(uint32_t i = 0; i < hotaPredefinedHeroCount; ++i)
+		{
+			const bool custom = hotaPredefinedCustomHero == i;
+			w.writeBool(custom);
+			if(custom)
+			{
+				w.writeBool(false); // experience
+				w.writeBool(false); // secondary skills
+				w.writeBool(false); // artifacts
+				w.writeBool(false); // biography
+				w.writeInt8(-1);   // default gender
+				w.writeBool(false); // spells
+				w.writeBool(false); // primary skills
+			}
+		}
+		for(uint32_t i = 0; i < hotaPredefinedHeroCount; ++i)
+		{
+			w.writeUInt8(0); // always add skills
+			w.writeUInt8(0); // cannot gain XP
+			w.writeUInt32(hotaPredefinedLeveledHero == i ? 2 : 1);
+		}
 		return;
 	}
 	w.skipZero(features.heroesCount);

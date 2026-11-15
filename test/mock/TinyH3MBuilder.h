@@ -123,6 +123,12 @@ public:
 	/// Versions 0..5 are emittable; higher values throw at build() time.
 	TinyH3MBuilder & hotaVersion(uint32_t version);
 
+	/// Emit a HotA predefined-hero table with default entries and an optional
+	/// explicit level for one entry. Requires HotA version 5 or later.
+	TinyH3MBuilder & hotaPredefinedHeroes(uint32_t count, std::optional<uint32_t> leveledHero = std::nullopt);
+	/// Mark one predefined hero as customised, with otherwise default fields.
+	TinyH3MBuilder & hotaCustomizedPredefinedHero(uint32_t hero);
+
 	/// Mark a player as both human- and computer-playable. Required for any
 	/// object that ownership-validates against canAnyonePlay (towns, heroes).
 	TinyH3MBuilder & playerActive(PlayerColor color);
@@ -412,6 +418,9 @@ private:
 
 	EMapFormat     format;
 	uint32_t       hotaFormatVersion = 3; // HotA sub-format; only used when format == HOTA
+	uint32_t       hotaPredefinedHeroCount = 0;
+	std::optional<uint32_t> hotaPredefinedLeveledHero;
+	std::optional<uint32_t> hotaPredefinedCustomHero;
 	int            sideLength = 36;
 	bool           twoLevel = false;
 	std::string    mapName = "TinyH3M test map";
