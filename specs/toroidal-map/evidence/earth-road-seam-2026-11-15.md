@@ -139,3 +139,29 @@ The local Earth profile still points to the previous assembled map. This road
 candidate has not been checked in a graphical client, so its static appearance
 and integration into the playable demo remain open. The staged route does not
 prove a normal starting hero can reach it or that map balance is preserved.
+
+## Isolated graphical fixture
+
+`tools/stage_earth_seam_road.py`, added in `bf8d056`, creates a new local
+fixture from the road candidate. It validates a SHA-256 over sorted ZIP
+member names and contents, avoiding dependence on archive timestamps, and
+requires the expected red hero and initial anchor. It changes the hero anchor
+from `(165,353,0)` to `(1,425,0)` and renames the scenario to `Earth Seam
+Road QA`. On the documented fixture this places the hero's visitable tile at
+`(0,425,0)`. It refuses to overwrite an existing output.
+
+The local fixture is under TB5 at
+`runtime/earth-seam-road-qa-profile/Maps/earth-seam-road-qa.vmap`, SHA-256
+`cde4d4d42cc2cf40b53b3a88782a6e55c4cf0ce378d1b19ee19c808c62d12fb8`.
+A semantic comparison confirmed that only the named hero's coordinates and
+the scenario name changed; all other ZIP members were byte-identical. The
+external-map initialization and staged server road route passed with this
+fixture and its separate HotA profile; XML is
+`runtime/earth-seam-road-qa-profile/initialization.xml` on TB5. A local
+`Start Earth Seam Road QA.command` points at that profile and sets the build
+working directory; its shell syntax was checked. The profile links to the
+local game resources and keeps its own configuration and saves.
+
+This prepares, but does not prove, the graphical seam view: neither the new
+launcher nor the fixture has been operated in a graphical session. The
+ordinary Earth demo profile remains pointed at the prior map.
