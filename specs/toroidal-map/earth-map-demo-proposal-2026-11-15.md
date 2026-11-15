@@ -654,3 +654,12 @@ team's fog on all 145,152 map cells. The restored server handler then moved
 the hero back across the same seam. Both axes passed three in-process runs;
 temporary saves were removed. This does not test a full graphical save/load,
 server activity state, other teams' fog or a networked session.
+
+The sailing fixture also saved after crossing each seam while the hero was
+aboard. A fresh game-state load retained the hero's position, boat identity,
+map topology and all 145,152 fog cells for that player's team. A new
+in-process server handler then sailed the hero back across the seam and
+disembarked on the original shore. Both axes passed three runs, and the land
+save test passed again after sharing the save/load helper. As above, the hero
+and boat were set up artificially and the full server/UI session was not
+saved or reloaded.

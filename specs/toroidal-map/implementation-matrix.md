@@ -301,12 +301,13 @@ repositioned guards. Artificially positioned heroes crossed each axis of the
 actual draft in both directions on land and with a test boat; diagonal
 disembarkation also crossed both axes at the corners. An in-process game-state
 save/load retained hero position and the moving team's full-map fog after a
-previously hidden destination was revealed on each land seam. Four replacement
-portal approaches were tested with forced battle victories. The map still has an
-estimated 164 new interactive overlap occurrences, unreviewed terrain and
-object moves, incomplete mod dependency assessment and unknown distribution
-rights. It is not evidence
-of a fully playable or accepted demo.
+previously hidden destination was revealed on each land seam; a separate
+game-state load retained the boat and allowed sailing back and disembarking.
+Four replacement portal approaches were tested with forced battle victories.
+The map still has an estimated 164 new interactive overlap occurrences,
+unreviewed terrain and object moves, incomplete mod dependency assessment and
+unknown distribution rights. It is not evidence of a fully playable or
+accepted demo.
 
 The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)
 also covers boat embarkation and disembarkation across one edge with two
