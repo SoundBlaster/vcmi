@@ -50,7 +50,7 @@ regenerating the index resets manually recorded statuses.
 | `AI/Nullkiller2/Pathfinding/AIPathfinder.cpp` | 97, 98 | reviewed candidates: configure limits in pathfinder turns, not map coordinate distances |
 | `AI/Nullkiller2/Pathfinding/AIPathfinder.h` | 35, 36 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/ObjectGraph.cpp` | 52 | unreviewed |
-| `AI/Nullkiller2/Pathfinding/ObjectGraphCalculator.cpp` | 59, 68, 91, 108, 138 | reviewed candidates: neighbor iteration uses topology-aware foreach_neighbour; cost comes from pathfinder |
+| `AI/Nullkiller2/Pathfinding/ObjectGraphCalculator.cpp` | 59, 68, 91, 108, 138 | reviewed candidates: neighbor iteration uses topology-aware foreach_neighbour; synthetic actors are now explicitly recognized during graph path reconstruction, with bounded and toroidal edge/corner graph tests on both levels |
 | `AI/Nullkiller2/Pathfinding/ObjectGraphCalculator.h` | 43, 44 | unreviewed |
 | `AI/Nullkiller2/Pathfinding/Rules/AIMovementAfterDestinationRule.cpp` | 86, 158 | reviewed candidates: distance-limit helper compares path turn counts |
 | `AI/Nullkiller2/pforeach.h` | 12, 21, 23 | unreviewed |
