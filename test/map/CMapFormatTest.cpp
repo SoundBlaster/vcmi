@@ -990,6 +990,35 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_FALSE(state->players.at(PlayerColor(*aiSlot)).isHuman());
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_EARTH_START_CONNECTIVITY"))
+	{
+		const auto entry = map.instanceNames.find("randomHero_7305");
+		ASSERT_NE(entry, map.instanceNames.end());
+		const auto * hero = dynamic_cast<const CGHeroInstance *>(entry->second.get());
+		ASSERT_NE(hero, nullptr);
+		ASSERT_EQ(hero->getOwner(), PlayerColor(0));
+		auto * team = state->getPlayerTeam(hero->getOwner());
+		ASSERT_NE(team, nullptr);
+		for(int x = 0; x < map.width; ++x)
+			for(int y = 0; y < map.height; ++y)
+				team->fogOfWarMap[int3(x, y, 0)] = 1;
+		CPathsInfo paths(state->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
+		CPathfinder(*state, config).calculatePaths();
+		for(const char * name : {"subterraneanGate_5430", "subterraneanGate_10528", "subterraneanGate_5431", "subterraneanGate_10533"})
+		{
+			const auto target = map.instanceNames.find(name);
+			ASSERT_NE(target, map.instanceNames.end()) << name;
+			const auto pos = target->second->visitablePos();
+			const auto * node = paths.getNode(pos, EPathfindingLayer::LAND);
+			std::cout << "Revealed start connectivity " << name << " at=" << pos.toString()
+			          << " reachable=" << node->reachable() << " turns=" << static_cast<int>(node->turns) << std::endl;
+		}
+		const int3 road(0, 425, 0);
+		const auto * node = paths.getNode(road, EPathfindingLayer::LAND);
+		std::cout << "Revealed start connectivity seam road at=" << road.toString()
+		          << " reachable=" << node->reachable() << " turns=" << static_cast<int>(node->turns) << std::endl;
+	}
 	if(std::getenv("VCMI_INSPECT_EARTH_SEAM_ROAD"))
 	{
 		const PlayerColor player(0);
