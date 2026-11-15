@@ -10,6 +10,7 @@
 
 #include "AI/Nullkiller2/AIGateway.h"
 #include "AI/Nullkiller2/Goals/ExecuteHeroChain.h"
+#include "AI/Nullkiller2/Pathfinding/Actions/AdventureSpellCastMovementActions.h"
 
 #include "mock/GameHandlerTestClient.h"
 #include "mock/TinyH3MBuilder.h"
@@ -23,6 +24,8 @@
 #include "lib/mapObjects/MiscObjects.h"
 #include "lib/mapping/MapTopology.h"
 #include "lib/networkPacks/PacksForServer.h"
+#include "lib/serializer/CMemorySerializer.h"
+#include "lib/spells/CSpell.h"
 
 namespace
 {
@@ -52,6 +55,63 @@ public:
 
 	int movementRequests = 0;
 	std::vector<std::pair<int3, EPathfindingLayer>> moves;
+};
+
+class AcknowledgingServer : public GameHandlerTestServer
+{
+public:
+	using GameHandlerTestServer::GameHandlerTestServer;
+	void sendPack(CPackForClient & pack, GameConnectionID) override
+	{
+		if(const auto * applied = dynamic_cast<const PackageApplied *>(&pack))
+			response = *applied;
+	}
+	std::optional<PackageApplied> response;
+};
+
+class SpellAndMoveClient : public IClient
+{
+public:
+	SpellAndMoveClient(const std::shared_ptr<CGameState> & state, PlayerColor player)
+		: server(state, player), handler(server, state)
+	{
+		state->actingPlayers.insert(player);
+	}
+	std::optional<BattleAction> makeSurrenderRetreatDecision(PlayerColor, const BattleID &, const BattleStateInfoForRetreat &) override { return std::nullopt; }
+	int sendRequest(const CPackForServer & request, PlayerColor player, bool) override
+	{
+		request.player = player;
+		request.requestID = ++requestID;
+		if(dynamic_cast<const CastAdvSpell *>(&request))
+		{
+			++casts;
+			if(beforeCast)
+				beforeCast();
+		}
+		const auto * movement = dynamic_cast<const MoveHero *>(&request);
+		const auto * hero = movement ? handler.gameState().getHero(movement->hid) : nullptr;
+		const auto before = hero ? hero->visitablePos() : int3(-1, -1, -1);
+		if(movement)
+			++moves;
+		server.response.reset();
+		auto copy = CMemorySerializer::deepCopy(request);
+		handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, *copy);
+		if(!server.response || server.response->requestID != requestID)
+			throw std::runtime_error("Server did not acknowledge request");
+		if(hero && server.response->result)
+			appliedMoves.emplace_back(before, hero->visitablePos(), movement->layer);
+		gateway->requestRealized(&*server.response);
+		return requestID;
+	}
+	NK2AI::AIGateway * gateway = nullptr;
+	int casts = 0;
+	int moves = 0;
+	std::vector<std::tuple<int3, int3, EPathfindingLayer>> appliedMoves;
+	std::function<void()> beforeCast;
+private:
+	AcknowledgingServer server;
+	CGameHandler handler;
+	int requestID = 0;
 };
 
 class ExecuteHeroChainMovementTest : public NullkillerTest
@@ -132,6 +192,82 @@ protected:
 		EXPECT_GE(client.movementRequests, 2);
 		EXPECT_NE(std::ranges::find(client.moves, std::pair(hero->convertFromVisitablePos(water), transitLayer)), client.moves.end());
 		EXPECT_LT(hero->movementPointsRemaining(), 2000);
+	}
+
+	void planAndCastTransitSpell(bool flight, bool rejectCast = false)
+	{
+		const auto [start, water] = seamPositions();
+		const MapTopology topology(36, 36, 2, true);
+		const auto shore = *topology.canonicalize(water + topology.displacement(start, water));
+		const SpellID spell(SpellID::decode(flight ? "core:fly" : "core:waterWalk"));
+		TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+		builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
+			.hero(int3(19, 18, 0), HeroTypeID(0), PLAYER)
+			.heroGarrison({{CreatureID(0), 1}})
+			.heroPrimary(1, 1, 10, 10)
+			.heroSecondarySkills({{SecondarySkill::WISDOM, 3}, {SecondarySkill::AIR_MAGIC, 3}, {SecondarySkill::WATER_MAGIC, 3}})
+			.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+			.heroSpells({spell})
+			.hero(int3(20, 20, 0), HeroTypeID(1), ENEMY);
+		for(int x = 0; x < 36; ++x)
+			for(int y = 0; y < 36; ++y)
+			{
+				const int3 position(x, y, start.z);
+				if(position != start && position != shore && position != int3(18, 18, 0) && position != int3(19, 20, 0))
+					builder.terrain(position, TerrainId::WATER);
+			}
+		startWithMap(std::move(builder));
+		map()->setToroidalAndRebuild(true);
+		revealMap(PLAYER);
+		auto * hero = findHeroByOwner(PLAYER);
+		ASSERT_NE(hero, nullptr);
+		map()->moveObject(hero->id, hero->convertFromVisitablePos(start));
+		hero->mana = 100;
+		hero->setMovementPoints(2000);
+		ASSERT_TRUE(hero->canCastThisSpell(spell.toSpell()));
+		SpellAndMoveClient client(gameState(), PLAYER);
+		auto gateway = makeGateway(PLAYER, &client);
+		client.gateway = gateway.get();
+		const auto paths = withGameStateReadLock([&]
+		{
+			preparePlanning(*gateway);
+			return gateway->nullkiller->pathfinder->getPathInfo(shore);
+		});
+		const auto path = std::ranges::find_if(paths, [&](const auto & candidate)
+		{
+			return candidate.targetHero == hero && !candidate.nodes.empty() && candidate.turn() == 0
+				&& std::ranges::any_of(candidate.nodes, [](const auto & node)
+				{
+					return dynamic_cast<const NK2AI::AIPathfinding::AdventureCastAction *>(node.specialAction.get()) != nullptr;
+				});
+		});
+		ASSERT_NE(path, paths.end());
+		if(rejectCast)
+		{
+			client.beforeCast = [&] { hero->mana = 0; };
+			EXPECT_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(*path).accept(gateway.get()); }), NK2AI::cannotFulfillGoalException);
+			EXPECT_EQ(client.casts, 1);
+			EXPECT_FALSE(gateway->lastAdventureCastSucceeded.load());
+			EXPECT_EQ(client.moves, 0);
+			EXPECT_EQ(hero->visitablePos(), start);
+			EXPECT_EQ(hero->movementPointsRemaining(), 2000);
+			EXPECT_FALSE(hero->hasBonusOfType(flight ? BonusType::FLYING_MOVEMENT : BonusType::WATER_WALKING));
+			return;
+		}
+		EXPECT_NO_THROW(withGameStateReadLock([&] { NK2AI::Goals::ExecuteHeroChain(*path).accept(gateway.get()); }));
+		EXPECT_EQ(client.casts, 1);
+		EXPECT_TRUE(gateway->lastAdventureCastSucceeded.load());
+		EXPECT_TRUE(hero->hasBonusOfType(flight ? BonusType::FLYING_MOVEMENT : BonusType::WATER_WALKING));
+		EXPECT_LT(hero->mana, 100);
+		EXPECT_GE(client.moves, 2);
+		EXPECT_TRUE(std::ranges::any_of(client.appliedMoves, [flight](const auto & move)
+		{
+			const auto & [from, to, layer] = move;
+			return (std::abs(from.x - to.x) > 1 || std::abs(from.y - to.y) > 1)
+				&& layer == (flight ? EPathfindingLayer::AIR : EPathfindingLayer::WATER);
+		}));
+		EXPECT_EQ(hero->visitablePos(), shore);
+		EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 	}
 };
 }
@@ -253,6 +389,26 @@ TEST_P(ToroidalHeroChainTest, plannedWaterWalkCrossesSeamAndLands)
 TEST_P(ToroidalHeroChainTest, plannedFlightCrossesSeamAndLands)
 {
 	executeTransitToShore(BonusType::FLYING_MOVEMENT, EPathfindingLayer::AIR);
+}
+
+TEST_P(ToroidalHeroChainTest, plansAndCastsWaterWalkAcrossSeam)
+{
+	planAndCastTransitSpell(false);
+}
+
+TEST_P(ToroidalHeroChainTest, plansAndCastsFlightAcrossSeam)
+{
+	planAndCastTransitSpell(true);
+}
+
+TEST_P(ToroidalHeroChainTest, rejectedWaterWalkDoesNotMoveAcrossSeam)
+{
+	planAndCastTransitSpell(false, true);
+}
+
+TEST_P(ToroidalHeroChainTest, rejectedFlightDoesNotMoveAcrossSeam)
+{
+	planAndCastTransitSpell(true, true);
 }
 
 INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalHeroChainTest, ::testing::Range(0, 16));
