@@ -232,8 +232,10 @@ runs do not prove general AI play or remote multiplayer.
 A [seeded comparison](evidence/nullkiller-seeded-ai-2026-11-15.md) reproduced
 repeated no-task turns and town-defender reservation with seed 4 in both a
 toroidal fixture and its bounded control. The runs were stopped before a
-winner, so this is neither proof of permanent deadlock nor proof of identical
-causes. One other seed eventually won after multiple no-task turns.
+winner, so this was neither proof of permanent deadlock nor proof of identical
+causes. A later run on the current build with the same seed completed on day
+69, while its bounded control was stopped at day 79; no-task turns recurred in
+both. One other seed also eventually won after multiple no-task turns.
 
 After framed-packet support, two current test listeners also negotiated an
 unframed lobby with the original external server, selected a bounded map and

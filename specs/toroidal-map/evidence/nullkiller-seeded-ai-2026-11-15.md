@@ -38,3 +38,36 @@ Logs and the XML report are in `runtime/ai-seed-2026-11-15/` on the TB5
 build root. The build emitted existing duplicate-library and missing Conan
 search-path warnings. No graphical behavior, remote game or AI strategy fix
 was verified here.
+
+## Seed 4 on the current build
+
+On macOS arm64, the client built from `9f20a0b` (the later `11e9d55`
+revision changed documentation only) ran two headless, in-process games with
+seed 4 and a private log directory per game. Copies of the earlier toroidal
+fixture and its bounded control used distinct scenario names to isolate saves.
+The copies' `objects.json` and `surface_terrain.json` were byte-identical;
+their headers differed in the toroidal flag and format major version, and
+their Russian text differed in the scenario name. Both logs reported requested
+seed 4 and first random value `1916493703`.
+
+The toroidal run exited normally on day 69 after blue's victory and red's
+elimination. It logged 92 full-scan no-task outcomes and 135 defender
+reservations across both players. The bounded control had not finished at the
+75-day limit and was interrupted; polling observed it at day 79. It logged
+97 full-scan no-task outcomes and 139 defender reservations. Both sessions
+continued to process turns, and the toroidal run therefore demonstrates that
+this particular run was not a permanent game deadlock. The bounded control
+was stopped before its outcome, so it provides no comparable completion day.
+These counts are log-line counts, not counts of distinct heroes or proven
+strategic errors. A fixed game RNG seed does not control scheduling or all AI
+decisions; the two games should not be treated as identical trajectories.
+
+The full logs and run summaries are under
+`runtime/seed4-current-11e9d55-2026-11-15/` on TB5. Client log SHA-256 values
+are `44a6fa18c1a0a21b291a7951bd359522f626fe8a386bc1f202e39317d4a9f758`
+for the toroidal run and
+`b30ebd2a708377809e8ee5766d12a1105e0900b652a0da1b7ced7c41e2e555e6`
+for the bounded control. The stop condition is polled, so the recorded limit
+may overshoot, and the summary's final-log day is more accurate than its
+last polled day. This does not prove balanced strategy, general AI liveness,
+remote play or any graphical behavior.
