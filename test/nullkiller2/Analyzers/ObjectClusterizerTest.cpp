@@ -14,6 +14,7 @@
 #include "AI/Nullkiller2/Pathfinding/ObjectGraph.h"
 #include "AI/Nullkiller2/Pathfinding/AIPathfinder.h"
 #include "AI/Nullkiller2/Engine/AIMemory.h"
+#include "AI/Nullkiller2/Markers/UnlockCluster.h"
 #include "lib/CPlayerState.h"
 #include "lib/mapping/MapTopology.h"
 #include "lib/mapObjects/CGHeroInstance.h"
@@ -218,6 +219,53 @@ TEST_F(Nullkiller2_ObjectClusterCenter, ignoresTargetsNoLongerVisibleToPlayer)
 	{
 		map()->toroidal = toroidal;
 		EXPECT_EQ(cluster.getObjects(callback.get()), (std::vector<const CGObjectInstance *>{*edge}));
+	}
+}
+
+TEST_F(Nullkiller2_ObjectClusterCenter, resolvesBlockerAfterVisibilityChangesAndRemoval)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(player)
+		.hero({6, 5, 0}, HeroTypeID(0), player)
+		.resource({0, 10, 0}, GameResID::GOLD, 1000);
+	startWithMap(std::move(builder));
+	revealMap(player);
+	auto callback = makeCallback(player);
+	const auto resources = findAll<CGResource>();
+	ASSERT_EQ(resources.size(), 1u);
+	const auto * blocker = resources.front();
+	const auto blockerId = blocker->id;
+	const auto blockerPos = blocker->visitablePos();
+	auto cluster = std::make_shared<NK2AI::ObjectCluster>(blockerId);
+	NK2AI::AIPath path;
+	path.targetHero = findHeroByOwner(player);
+	ASSERT_NE(path.targetHero, nullptr);
+	NK2AI::Goals::UnlockCluster goal(cluster, path, blocker);
+	const auto description = goal.toString();
+	auto * team = gameState()->getPlayerTeam(player);
+	for(int x = 0; x < map()->width; ++x)
+		for(int y = 0; y < map()->height; ++y)
+			team->fogOfWarMap[int3(x, y, 0)] = 0;
+	for(const bool toroidal : {false, true})
+	{
+		map()->toroidal = toroidal;
+		team->fogOfWarMap[blockerPos] = 1;
+		EXPECT_EQ(cluster->getBlocker(callback.get()), blocker);
+		team->fogOfWarMap[blockerPos] = 0;
+		EXPECT_EQ(cluster->getBlocker(callback.get()), nullptr);
+		EXPECT_EQ(goal.toString(), description);
+	}
+	team->fogOfWarMap[blockerPos] = 1;
+	auto removed = map()->eraseObject(blockerId);
+	ASSERT_TRUE(removed);
+	removed.reset();
+	for(const bool toroidal : {false, true})
+	{
+		map()->toroidal = toroidal;
+		EXPECT_EQ(cluster->getBlocker(callback.get()), nullptr);
+		EXPECT_EQ(goal.toString(), description);
 	}
 }
 

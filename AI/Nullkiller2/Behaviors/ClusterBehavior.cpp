@@ -41,11 +41,14 @@ Goals::TGoalVec ClusterBehavior::decompose(const Nullkiller * aiNk) const
 
 Goals::TGoalVec ClusterBehavior::decomposeCluster(const Nullkiller * aiNk, const std::shared_ptr<ObjectCluster> & cluster) const
 {
+	const auto * clusterBlocker = cluster->getBlocker(aiNk->cc.get());
+	if(!clusterBlocker)
+		return {};
 	const auto * center = cluster->calculateCenter(aiNk->cc.get());
 	if(!center)
 		return {};
 	auto paths = aiNk->pathfinder->getPathInfo(center->visitablePos(), aiNk->isObjectGraphAllowed());
-	const auto blockerPos = cluster->blocker->visitablePos();
+	const auto blockerPos = clusterBlocker->visitablePos();
 	std::vector<AIPath> blockerPaths;
 	blockerPaths.reserve(paths.size());
 	TGoalVec goals;
@@ -53,8 +56,8 @@ Goals::TGoalVec ClusterBehavior::decomposeCluster(const Nullkiller * aiNk, const
 #if NK2AI_TRACE_LEVEL >= 2
 	logAi->trace(
 		"Checking cluster %s %s, found %d paths",
-		cluster->blocker->getObjectNameTextID(),
-		cluster->blocker->visitablePos().toString(),
+		clusterBlocker->getObjectNameTextID(),
+		clusterBlocker->visitablePos().toString(),
 		paths.size());
 #endif
 
@@ -65,7 +68,7 @@ Goals::TGoalVec ClusterBehavior::decomposeCluster(const Nullkiller * aiNk, const
 #endif
 
 		const auto * blocker = aiNk->objectClusterizer->getBlocker(*path);
-		if(blocker != cluster->blocker)
+		if(blocker != clusterBlocker)
 		{
 			path = paths.erase(path);
 			continue;
@@ -108,7 +111,7 @@ Goals::TGoalVec ClusterBehavior::decomposeCluster(const Nullkiller * aiNk, const
 	logAi->trace("Decompose unlock paths");
 #endif
 
-	auto unlockTasks = CaptureObjectsBehavior::getVisitGoals(blockerPaths, aiNk, cluster->blocker);
+	auto unlockTasks = CaptureObjectsBehavior::getVisitGoals(blockerPaths, aiNk, clusterBlocker);
 
 	for(int i = 0; i < paths.size(); i++)
 	{
@@ -119,7 +122,7 @@ Goals::TGoalVec ClusterBehavior::decomposeCluster(const Nullkiller * aiNk, const
 			continue;
 
 		auto path = paths[i];
-		auto elementarUnlock = sptr(UnlockCluster(cluster, path));
+		auto elementarUnlock = sptr(UnlockCluster(cluster, path, clusterBlocker));
 		goals.push_back(sptr(Composition().addNext(elementarUnlock).addNext(unlockTasks[i])));
 	}
 

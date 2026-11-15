@@ -27,14 +27,15 @@ namespace Goals
 	private:
 		std::shared_ptr<ObjectCluster> cluster;
 		AIPath pathToCenter;
+		std::string blockerName;
 
 	public:
-		UnlockCluster(std::shared_ptr<ObjectCluster> cluster, const AIPath & pathToCenter)
-			: CGoal(Goals::UNLOCK_CLUSTER), cluster(cluster), pathToCenter(pathToCenter)
+		UnlockCluster(std::shared_ptr<ObjectCluster> cluster, const AIPath & pathToCenter, const CGObjectInstance * blocker)
+			: CGoal(Goals::UNLOCK_CLUSTER), cluster(cluster), pathToCenter(pathToCenter), blockerName(blocker->getObjectNameTextID())
 		{
-			tile = cluster->blocker->visitablePos();
+			tile = blocker->visitablePos();
 			hero = pathToCenter.targetHero;
-			objid = cluster->blocker->id.getNum();
+			objid = blocker->id.getNum();
 		}
 
 		bool operator==(const UnlockCluster & other) const override;

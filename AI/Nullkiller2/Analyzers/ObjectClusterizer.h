@@ -54,7 +54,7 @@ struct ObjectCluster
 {
 public:
 	ClusterObjects objects;
-	const CGObjectInstance * blocker;
+	ObjectInstanceID blockerId;
 
 	void reset()
 	{
@@ -63,12 +63,14 @@ public:
 
 	void addObject(const CGObjectInstance * object, const AIPath & path, float priority);
 
-	ObjectCluster(const CGObjectInstance * blocker): blocker(blocker) {}
+	explicit ObjectCluster(ObjectInstanceID blockerId): blockerId(blockerId) {}
 
-	ObjectCluster() : ObjectCluster(nullptr)
+	ObjectCluster() : ObjectCluster(ObjectInstanceID::NONE)
 	{
 	}
 
+	/// Resolves the blocker while it remains visible to this callback.
+	const CGObjectInstance * getBlocker(const CPlayerSpecificInfoCallback * cpsic) const;
 	/// Returns only objects visible to this callback.
 	std::vector<const CGObjectInstance *> getObjects(const CPlayerSpecificInfoCallback * cpsic) const;
 	/// Returns nullptr if the cluster has no objects visible to this callback.

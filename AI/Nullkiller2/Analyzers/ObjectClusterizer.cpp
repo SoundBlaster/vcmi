@@ -90,6 +90,11 @@ void ObjectCluster::addObject(const CGObjectInstance * obj, const AIPath & path,
 	}
 }
 
+const CGObjectInstance * ObjectCluster::getBlocker(const CPlayerSpecificInfoCallback * cpsic) const
+{
+	return blockerId == ObjectInstanceID::NONE ? nullptr : cpsic->tryGetObj(blockerId);
+}
+
 const CGObjectInstance * ObjectCluster::calculateCenter(const CPlayerSpecificInfoCallback * cpsic) const
 {
 	// Visibility or object removal can invalidate a cluster member between
@@ -610,7 +615,7 @@ void ObjectClusterizer::clusterizeObject(
 				ClusterMap::accessor cluster;
 				blockedObjects.insert(
 					cluster,
-					ClusterMap::value_type(blocker->id, std::make_shared<ObjectCluster>(blocker)));
+					ClusterMap::value_type(blocker->id, std::make_shared<ObjectCluster>(blocker->id)));
 
 				cluster->second->addObject(obj, path, priority);
 
