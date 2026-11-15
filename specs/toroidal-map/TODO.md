@@ -117,9 +117,10 @@ demo preparation reviewable as separate changes where practical.
 - [ ] Run appropriate automated and graphical checks for each change, update
   the SpecPM evidence and implementation matrix, and record revisions and
   environment. Keep known failures and unverified scenarios visible.
-- [ ] Check available interface behavior, including tile and route selection,
-  minimap and static seam rendering. Do not treat one screenshot or game-state
-  observations as proof of continuous animation.
+- [x] Review representative interface checks: [mouse route across both seams](evidence/topology-gui-mouse-route-2026-11-09.md),
+  [minimap selection](evidence/topology-minimap-pixel-alignment-2026-11-14.md)
+  and [static Earth road](evidence/earth-road-seam-2026-11-15.md#static-view-and-local-demo-integration).
+  These do not prove every input, rendering backend or continuous animation.
 - [ ] Have the user assess scrolling and movement animation continuity when
   convenient; an [isolated seam preview](evidence/earth-seam-preview-2026-11-16.md)
   starts the hero beside the road crossing. This does not block the remaining

@@ -68,3 +68,19 @@ aa3a0f2adf7e4226bfc10fbe42b61b3c0f681343b5ef891127c47c25ede6f6a6  specs/toroidal
 dfd88da5dbdb0f6120c2895a9e99cd628021e20a45f03af3b3c3a23cdcaba8ca  specs/toroidal-map/review.md
 bad9b1de5ca83067d9def627d4a77452fe1bae1da185533438951fa33cc2ccc6  specs/toroidal-map/implementation-matrix.md
 ```
+
+## Current package and traceability check
+
+On 2026-11-16, at repository revision `4a8876d`, `specpm validate . --json`
+reported a valid package with zero errors and zero warnings. The validation
+was run with Python bytecode disabled and temporary files directed to TB5.
+
+The historical identifier-check command above reports `E5` as unmapped on
+the current matrix because it does not expand the `E4–E6` range. The new
+`python3 -B specs/toroidal-map/tools/check_traceability.py` expands scenario
+ranges and reported 18 requirements with no missing or unknown IDs and 29
+scenarios with no undefined or unmapped IDs. Two focused Python tests passed,
+including range expansion and invalid ranges. This is an identifier check:
+it neither judges evidence sufficiency nor changes implementation or
+acceptance status. The new script and tests were present as uncommitted
+changes when these checks ran.
