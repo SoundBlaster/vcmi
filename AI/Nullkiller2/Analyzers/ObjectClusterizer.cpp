@@ -167,10 +167,9 @@ std::vector<const CGObjectInstance *> ObjectCluster::getObjects(const CPlayerSpe
 {
 	std::vector<const CGObjectInstance *> result;
 
-	for(auto & pair : objects)
-	{
-		result.push_back(cpsic->getObj(pair.first));
-	}
+	for(const auto & pair : objects)
+		if(const auto * object = cpsic->tryGetObj(pair.first))
+			result.push_back(object);
 
 	return result;
 }

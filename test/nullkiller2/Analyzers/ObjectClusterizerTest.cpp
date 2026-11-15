@@ -203,6 +203,7 @@ TEST_F(Nullkiller2_ObjectClusterCenter, ignoresTargetsNoLongerVisibleToPlayer)
 	{
 		map()->toroidal = toroidal;
 		EXPECT_EQ(cluster.calculateCenter(callback.get()), *interior);
+		EXPECT_EQ(cluster.getObjects(callback.get()), (std::vector<const CGObjectInstance *>{*interior}));
 	}
 	team->fogOfWarMap[(*interior)->visitablePos()] = 0;
 	ASSERT_EQ(callback->tryGetObj((*interior)->id), nullptr);
@@ -210,6 +211,13 @@ TEST_F(Nullkiller2_ObjectClusterCenter, ignoresTargetsNoLongerVisibleToPlayer)
 	{
 		map()->toroidal = toroidal;
 		EXPECT_EQ(cluster.calculateCenter(callback.get()), nullptr);
+		EXPECT_TRUE(cluster.getObjects(callback.get()).empty());
+	}
+	team->fogOfWarMap[(*edge)->visitablePos()] = 1;
+	for(const bool toroidal : {false, true})
+	{
+		map()->toroidal = toroidal;
+		EXPECT_EQ(cluster.getObjects(callback.get()), (std::vector<const CGObjectInstance *>{*edge}));
 	}
 }
 

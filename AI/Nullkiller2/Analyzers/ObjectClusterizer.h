@@ -69,6 +69,7 @@ public:
 	{
 	}
 
+	/// Returns only objects visible to this callback.
 	std::vector<const CGObjectInstance *> getObjects(const CPlayerSpecificInfoCallback * cpsic) const;
 	/// Returns nullptr if the cluster has no objects visible to this callback.
 	const CGObjectInstance * calculateCenter(const CPlayerSpecificInfoCallback * cpsic) const;
