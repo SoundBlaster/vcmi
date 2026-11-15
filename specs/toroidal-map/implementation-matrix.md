@@ -119,6 +119,13 @@ unsafe seventh step is rejected and the AI gateway returns to the island for
 both abilities and levels. Its rejection of a water destination is not by
 itself a test of route-safety filtering.
 
+Nullkiller's danger-map path searches now use the AI player's fog for
+neighbors and known guards even when simulating an enemy hero. Synthetic
+threat checks cover all edges and corners on both levels with a bounded
+control and deliberately different team visibility; see the
+[threat perspective record](evidence/nullkiller-threat-observer-2026-11-15.md).
+Live enemy discovery and an autonomous defensive response remain unverified.
+
 The later [preview run](evidence/topology-preview-eeb3540-2026-11-15.md)
 completed two Nullkiller2 turns with crossings on both axes, then reloaded an
 autosave and crossed a corner. The compared fog and state were limited to the
