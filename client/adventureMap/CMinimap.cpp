@@ -248,9 +248,11 @@ void CMinimap::showAll(Canvas & to)
 			for(const auto & [x, width] : MapTopology::splitWrappedInterval(screenArea.x, screenArea.w, mapSizes.x))
 				for(const auto & [y, height] : MapTopology::splitWrappedInterval(screenArea.y, screenArea.h, mapSizes.y))
 				{
-					Rect radar{x * pos.w / mapSizes.x, y * pos.h / mapSizes.y,
-						std::max(0, (x + width) * pos.w / mapSizes.x - x * pos.w / mapSizes.x - 1),
-						std::max(0, (y + height) * pos.h / mapSizes.y - y * pos.h / mapSizes.y - 1)};
+					const auto [x0, x1] = minimapTileRangePixelInterval(x, x + width, pos.w, mapSizes.x);
+					const auto [y0, y1] = minimapTileRangePixelInterval(y, y + height, pos.h, mapSizes.y);
+					if(x0 == x1 || y0 == y1)
+						continue;
+					Rect radar{x0, y0, x1 - x0 - 1, y1 - y0 - 1};
 					clippedTarget.drawBorderDashed(radar, Colors::PURPLE);
 				}
 		}

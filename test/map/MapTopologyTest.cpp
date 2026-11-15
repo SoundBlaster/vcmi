@@ -117,6 +117,24 @@ TEST(MapTopology, ToroidalMinimapTileIntervalsPartitionDisplayPixels)
 		}
 }
 
+TEST(MapTopology, ToroidalMinimapRadarMatchesDisplayedTiles)
+{
+	// At this fractional scale pixel 12 belongs to tile 2, not tile 3.
+	EXPECT_EQ(minimapTileRangePixelInterval(3, 4, 150, 36), (std::pair{13, 17}));
+	for(const auto & [mapExtent, displayExtent] : {std::pair{36, 150}, std::pair{23, 144}, std::pair{252, 144}, std::pair{3, 1}})
+		for(int start = 0; start < mapExtent; ++start)
+			for(int end = start + 1; end <= mapExtent; ++end)
+			{
+				const auto [first, last] = minimapTileRangePixelInterval(start, end, displayExtent, mapExtent);
+				for(int pixel = 0; pixel < displayExtent; ++pixel)
+				{
+					const int tile = minimapPixelToTile(pixel, displayExtent, mapExtent, true);
+					if((first <= pixel && pixel < last) != (start <= tile && tile < end))
+						FAIL() << "map=" << mapExtent << " display=" << displayExtent << " range=" << start << ":" << end << " pixel=" << pixel;
+				}
+			}
+}
+
 TEST(MapTopology, WrapsEdgesAndCornersOnTheSameLevel)
 {
 	const MapTopology topology(100, 80, 2, true);

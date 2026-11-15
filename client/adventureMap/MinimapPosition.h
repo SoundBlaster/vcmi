@@ -45,3 +45,11 @@ inline std::pair<int, int> minimapTilePixelInterval(int tile, int displayExtent,
 	};
 	return {lowerBound(tile), lowerBound(tile + 1)};
 }
+
+/// Display pixels whose sampled tiles lie in the half-open tile interval.
+inline std::pair<int, int> minimapTileRangePixelInterval(int firstTile, int endTile, int displayExtent, int mapExtent)
+{
+	assert(firstTile >= 0 && firstTile < endTile && endTile <= mapExtent);
+	return {minimapTilePixelInterval(firstTile, displayExtent, mapExtent).first,
+		minimapTilePixelInterval(endTile - 1, displayExtent, mapExtent).second};
+}
