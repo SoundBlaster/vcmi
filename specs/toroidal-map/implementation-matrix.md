@@ -444,6 +444,9 @@ also found and verified a fix for HotA bonus value aliases; it does not accept
 the visual continuity or overall playability of the adapted map.
 The [isolated macOS profile](evidence/earth-isolated-profile-2026-11-15.md)
 starts that draft through the ordinary scenario list and checks one human move.
+Its [graphical save/load check](evidence/earth-gui-save-reload-2026-11-15.md)
+restored the selected hero's position and movement points before another move;
+that graphical run did not cross a seam.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
