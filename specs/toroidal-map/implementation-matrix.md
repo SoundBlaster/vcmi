@@ -409,6 +409,10 @@ The resource visit check is recorded in
 [`evidence/topology-resource-visit-2026-11-09.md`](evidence/topology-resource-visit-2026-11-09.md).
 The wrapped guard battle check is recorded in
 [`evidence/topology-guard-battle-2026-11-09.md`](evidence/topology-guard-battle-2026-11-09.md).
+The experimental single-level Earth-map draft and its loader-only checks are
+recorded in [the Earth demo proposal](earth-map-demo-proposal-2026-11-15.md);
+the draft has unresolved collisions, gates and geography and is not playable
+demo evidence.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

@@ -254,3 +254,39 @@ rotated Americas, design a road transformation or regenerate road artwork,
 then test its rendered joins and movement costs independently, especially at
 new seams. No road transformation is implemented by the terrain-color
 preview.
+
+## Diagnostic stacked VMAP
+
+[`tools/assemble_stacked_draft.py`](tools/assemble_stacked_draft.py) builds a
+first-stage single-level VMAP from two equally sized source levels, keeping
+surface objects upright and rotating second-level coordinates and tile art.
+It attempts to preserve each rotated object's first visitable cell and remaps
+player main-town references to the corresponding new anchor. The input map is
+not modified, the output must not exist, and unsupported nested coordinate
+references are rejected. The tool's report explicitly lists unresolved work;
+it is not a general-purpose converter or a playable-map claim.
+
+On the Earth source, the local draft has SHA-256
+`57689688e9a21a6f63ee86be40cde9a7a382b1571ad4d77edabf243895eadae2`
+and is stored only on TB5 under
+`runtime/earth-map-research-2026-11-15/draft-stacked/`. The source has 53
+second-level object anchors outside its rectangle, each with at least one
+blocking or visitable footprint cell inside; these anchors are canonicalized
+in the draft. Its placement estimate reports 1,274 new blocking pairs, with
+245 occurrences affecting a visitable cell. These counts are diagnostic
+estimates, not individually confirmed gameplay conflicts. The draft still
+has four unpaired subterranean gates and does not implement the proposed
+African fragment, Antarctica or Greenland edits. It also inherits an empty
+mod-dependency declaration that must be corrected before distribution.
+
+With the isolated HotA test profile, the VCMI loader opened the draft as a
+252×504, one-level toroidal map with 12,249 objects, 48 towns, 3,176 road
+tiles and 314 river tiles; each declared main-town anchor resolved to a town.
+An in-memory VMAP save/reload retained named object types and anchors and
+terrain, road and river types and artwork flags. This checks format handling,
+not map initialization, all object properties, visual road joins or gameplay.
+Nineteen Python geometry and preview tests passed; the regular `MapFormat`
+suite passed 14 cases with three opt-in cases skipped. The tool and inspection
+changes were subsequently committed as `c805b47`; the test executable was
+built from `2b53c74` with those inspection changes in the worktree. No adapted
+map data has been added to the repository.
