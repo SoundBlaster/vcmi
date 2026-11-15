@@ -354,6 +354,30 @@ TEST(GameConnectionTopologyTest, TcpConnectionsNegotiateBeforeToroidalStartGuard
 	EXPECT_TRUE(server.supportsMapTopology(map));
 }
 
+TEST(GameConnectionTopologyTest, ConnectsToExternalCurrentServer)
+{
+	const auto * portText = std::getenv("VCMI_TOROID_EXTERNAL_SERVER_PORT");
+	if(!portText || !*portText)
+		GTEST_SKIP() << "Set VCMI_TOROID_EXTERNAL_SERVER_PORT to test a running current server";
+	char * end = nullptr;
+	const auto value = std::strtol(portText, &end, 10);
+	ASSERT_TRUE(end && *end == '\0' && value > 0 && value <= 65535);
+	auto network = INetworkHandler::createHandler();
+	LobbyProbe guest("external-port-probe", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	network->connectToRemote(guest, "127.0.0.1", static_cast<uint16_t>(value));
+	const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+	while(!guest.ack && guest.failure.empty() && std::chrono::steady_clock::now() < deadline)
+	{
+		network->getContext().restart();
+		network->getContext().poll();
+		std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	}
+	ASSERT_TRUE(guest.ack.has_value()) << guest.failure;
+	EXPECT_TRUE(LobbyTopologyCapability::isSafeServerGreeting(*guest.ack));
+	EXPECT_TRUE(guest.ack->toroidal);
+	EXPECT_EQ(guest.ack->version, ESerializationVersion::CURRENT);
+}
+
 TEST(GameConnectionTopologyTest, ConnectsToExternalLegacyServerWithBoundedMap)
 {
 	const auto * portText = std::getenv("VCMI_TOROID_LEGACY_SERVER_PORT");

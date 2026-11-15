@@ -402,7 +402,7 @@ const std::string & CServerHandler::getLocalHostname() const
 
 ui16 CServerHandler::getLocalPort() const
 {
-	return settings["server"]["localPort"].Integer();
+	return serverPortWithSessionOverride(settings["server"]["localPort"].Integer());
 }
 
 const std::string & CServerHandler::getRemoteHostname() const
@@ -412,7 +412,7 @@ const std::string & CServerHandler::getRemoteHostname() const
 
 ui16 CServerHandler::getRemotePort() const
 {
-	return settings["server"]["remotePort"].Integer();
+	return serverPortWithSessionOverride(settings["server"]["remotePort"].Integer());
 }
 
 const std::string & CServerHandler::getCurrentHostname() const

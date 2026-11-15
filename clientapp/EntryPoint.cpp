@@ -188,7 +188,7 @@ int main(int argc, char * argv[])
 		("disable-video", "disable video player")
 		("nointro,i", "skips intro movies")
 		("donotstartserver,d","do not attempt to start server and just connect to it instead server")
-		("serverport", po::value<si64>(), "override port specified in config file")
+		("serverport", po::value<si64>(), "override server port (1-65535; 0 uses configured port)")
 		("savefrequency", po::value<si64>(), "limit auto save creation to each N days");
 
 	if(argc > 1)
@@ -221,6 +221,15 @@ int main(int argc, char * argv[])
 #else
 		return 0;
 #endif
+	}
+	if(vm.count("serverport"))
+	{
+		const auto port = vm["serverport"].as<si64>();
+		if(port < 0 || port > 65535)
+		{
+			std::cerr << "Invalid server port: expected a value from 0 to 65535" << std::endl;
+			return 1;
+		}
 	}
 
 	// Init old logging system and new (temporary) logging system

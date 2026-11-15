@@ -32,13 +32,19 @@
 
 #include <future>
 
+uint16_t serverPortWithSessionOverride(uint16_t configuredPort)
+{
+	const auto overridePort = settings["session"]["serverport"].Integer();
+	return overridePort > 0 ? static_cast<uint16_t>(overridePort) : configuredPort;
+}
+
 ServerThreadRunner::ServerThreadRunner() = default;
 ServerThreadRunner::~ServerThreadRunner() = default;
 
 void ServerThreadRunner::start(bool listenForConnections, bool connectToLobby, std::shared_ptr<StartInfo> startingInfo)
 {
 	// cfgport may be 0 -- the real port is returned after calling prepare()
-	uint16_t port = settings["server"]["localPort"].Integer();
+	uint16_t port = serverPortWithSessionOverride(settings["server"]["localPort"].Integer());
 	server = std::make_unique<CVCMIServer>(port, true);
 	lobbyMode = connectToLobby;
 
@@ -81,7 +87,7 @@ void ServerThreadRunner::connect(INetworkHandler & network, INetworkClientListen
 	if (lobbyMode)
 	{
 		std::string host = settings["server"]["localHostname"].String();
-		uint16_t port = settings["server"]["localPort"].Integer();
+		uint16_t port = serverPortWithSessionOverride(settings["server"]["localPort"].Integer());
 		logNetwork->info("Establishing connection to %s:%d...", host, port);
 
 		network.connectToRemote(listener, host, port);
@@ -114,7 +120,7 @@ int ServerProcessRunner::exitCode()
 
 void ServerProcessRunner::start(bool listenForConnections, bool connectToLobby, std::shared_ptr<StartInfo> startingInfo)
 {
-	uint16_t port = settings["server"]["localPort"].Integer();
+	uint16_t port = serverPortWithSessionOverride(settings["server"]["localPort"].Integer());
 	boost::filesystem::path serverPath = VCMIDirs::get().serverPath();
 	boost::filesystem::path logPath = VCMIDirs::get().userLogsPath() / "server_log.txt";
 	std::vector<std::string> args;
@@ -133,7 +139,7 @@ void ServerProcessRunner::start(bool listenForConnections, bool connectToLobby, 
 void ServerProcessRunner::connect(INetworkHandler & network, INetworkClientListener & listener)
 {
 	std::string host = settings["server"]["localHostname"].String();
-	uint16_t port = settings["server"]["localPort"].Integer();
+	uint16_t port = serverPortWithSessionOverride(settings["server"]["localPort"].Integer());
 	logNetwork->info("Establishing connection to %s:%d...", host, port);
 
 	network.connectToRemote(listener, host, port);

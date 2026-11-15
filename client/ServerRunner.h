@@ -9,6 +9,11 @@
  */
 #pragma once
 
+#include <cstdint>
+
+/// Apply the per-session command-line override without changing saved settings.
+uint16_t serverPortWithSessionOverride(uint16_t configuredPort);
+
 struct StartInfo;
 class INetworkHandler;
 class INetworkClientListener;
