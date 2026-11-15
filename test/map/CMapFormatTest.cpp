@@ -990,6 +990,97 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_FALSE(state->players.at(PlayerColor(*aiSlot)).isHuman());
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_EARTH_BANK_OVERLAP"))
+	{
+		const auto heroEntry = map.instanceNames.find("randomHero_7305");
+		const auto firstEntry = map.instanceNames.find("creatureBank_10789");
+		const auto secondEntry = map.instanceNames.find("creatureBank_11365");
+		ASSERT_NE(heroEntry, map.instanceNames.end());
+		ASSERT_NE(firstEntry, map.instanceNames.end());
+		ASSERT_NE(secondEntry, map.instanceNames.end());
+		auto * hero = dynamic_cast<CGHeroInstance *>(heroEntry->second.get());
+		ASSERT_NE(hero, nullptr);
+		const bool reverse = std::getenv("VCMI_INSPECT_EARTH_BANK_SECOND") != nullptr;
+		auto * first = (reverse ? secondEntry : firstEntry)->second.get();
+		auto * second = (reverse ? firstEntry : secondEntry)->second.get();
+		auto * team = state->getPlayerTeam(hero->getOwner());
+		ASSERT_NE(team, nullptr);
+		for(int x = 0; x < map.width; ++x)
+			for(int y = 0; y < map.height; ++y)
+				team->fogOfWarMap[int3(x, y, 0)] = 1;
+		const auto target = first->visitablePos();
+		std::cout << "Bank entrances first=" << target.toString()
+		          << " second=" << second->visitablePos().toString() << std::endl;
+		std::optional<int3> origin;
+		for(const auto & dir : int3::getDirs())
+		{
+			const auto candidate = map.getTopology().canonicalize(target + dir);
+			if(candidate && map.getTile(*candidate).isLand() && !map.getTile(*candidate).blocked()
+			   && !map.getTile(*candidate).visitable())
+			{
+				origin = *candidate;
+				break;
+			}
+		}
+		ASSERT_TRUE(origin.has_value());
+		ChangeObjPos place;
+		place.objid = hero->id;
+		place.nPos = *origin;
+		state->apply(place);
+		ASSERT_EQ(hero->visitablePos(), *origin);
+		hero->setMovementPoints(3000);
+		const auto reachable = [&]()
+		{
+			CPathsInfo paths(state->getMapSize(), hero);
+			auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
+			CPathfinder(*state, config).calculatePaths();
+			return paths.getPathInfo(target, EPathfindingLayer::LAND)->reachable();
+		};
+		std::cout << "Bank origin=" << origin->toString()
+		          << " target blocked=" << map.getTile(target).blocked()
+		          << " reachable before removal=" << reachable() << std::endl;
+		GameHandlerTestServer server(state, hero->getOwner());
+		CGameHandler handler(server, state);
+		if(std::getenv("VCMI_INSPECT_EARTH_BANK_VISIT"))
+		{
+			const auto top = map.getTile(target).topVisitableObj();
+			std::cout << "Target top object=" << (map.getObject(top) ? map.getObject(top)->instanceName : "none") << std::endl;
+			ASSERT_EQ(top, first->id);
+			CPathsInfo paths(state->getMapSize(), hero);
+			auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
+			CPathfinder(*state, config).calculatePaths();
+			CGPath route;
+			ASSERT_TRUE(paths.getPath(route, target, EPathfindingLayer::LAND));
+			ASSERT_GE(route.nodes.size(), 2u);
+			state->actingPlayers.insert(hero->getOwner());
+			for(size_t index = route.nodes.size() - 1; index > 0; --index)
+			{
+				const auto pos = route.nodes[index - 1].coord;
+				const bool accepted = handler.moveHero(hero->id, hero->convertFromVisitablePos(pos), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND);
+				std::cout << "Bank route step=" << pos.toString() << " accepted=" << accepted
+				          << " hero=" << hero->visitablePos().toString()
+				          << " battle=" << (state->getBattle(hero->getOwner()) != nullptr)
+				          << " activity=" << (handler.activities->topActivity(hero->getOwner()) != nullptr) << std::endl;
+				ASSERT_TRUE(accepted);
+				if(index == 1)
+				{
+					EXPECT_EQ(hero->visitablePos(), target);
+					EXPECT_NE(handler.activities->topActivity(hero->getOwner()), nullptr);
+				}
+				if(state->getBattle(hero->getOwner()) || handler.activities->topActivity(hero->getOwner()))
+				{
+					ASSERT_EQ(index, 1u) << "Unexpected interaction before the bank";
+					break;
+				}
+			}
+		}
+		else
+		{
+			ASSERT_TRUE(handler.removeObject(second, hero->getOwner()));
+			std::cout << "Bank target blocked after removal=" << map.getTile(target).blocked()
+			          << " reachable after removal=" << reachable() << std::endl;
+		}
+	}
 	if(std::getenv("VCMI_INSPECT_EARTH_START_CONNECTIVITY"))
 	{
 		const auto entry = map.instanceNames.find("randomHero_7305");

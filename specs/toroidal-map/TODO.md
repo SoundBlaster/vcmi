@@ -75,8 +75,8 @@ demo preparation reviewable as separate changes where practical.
 - [ ] Review Earth draft object footprints and collisions for issues affecting
   actual play, preserving the source and a reproducible local test copy.
   A [mask audit](evidence/earth-object-overlap-audit-2026-11-15.md) identifies
-  new interactive overlap candidates, including a pair of creature banks;
-  their actual gameplay effects have not yet been established.
+  new interactive overlap candidates; a staged engine check reaches each of
+  one pair of creature banks and opens an activity. Other pairs are unverified.
 - [ ] Check land, water and region connectivity and the effects of replacing
   the original underground gates. Document intentional gameplay changes.
 - [x] Investigate the [water-monolith mismatch](evidence/earth-portal-road-2026-11-15.md):
