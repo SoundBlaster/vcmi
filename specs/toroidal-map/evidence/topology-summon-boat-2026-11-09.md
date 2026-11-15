@@ -46,6 +46,15 @@ switch, its boat location is `(35,10,0)`; Nullkiller produces an unblocked
 exploration route containing a `BuildBoatAction` at that exact tile and ending
 on water. The four water-exploration tests and eight `SummonBoatTopologyTest`
 server tests passed three times each on macOS arm64 with build `0e04dce` plus
-the test in `7f3dc0b`. This verifies AI route planning and separately tested
-server construction; it does not execute that AI route, establish fog safety
-for arbitrary hidden configurations, or validate GUI/network play.
+the test in `7f3dc0b`.
+
+`ExecuteHeroChainMovementTest.buildsAndBoardsBoatAcrossSeamUsingRealServer`
+uses a separate synthetic two-player game and an in-process `CGameHandler`.
+Nullkiller plans and executes the construction action; after the new-boat
+notification, the test explicitly replans and executes the boarding route.
+The server accepts the hero's passage from the western boundary to the boat
+at `(35,10,0)`, and the hero ends aboard. No autonomous full turn or sailing
+after embarkation is demonstrated by this test. The 144 selected AI-chain,
+water-exploration and server boat cases passed three consecutive runs on
+macOS arm64 with build `e26fdd0` plus the test in `7dc438b`. GUI/network play,
+other shipyard layouts and fog configurations remain unverified here.
