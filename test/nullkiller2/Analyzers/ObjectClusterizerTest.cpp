@@ -14,6 +14,7 @@
 #include "AI/Nullkiller2/Pathfinding/ObjectGraph.h"
 #include "AI/Nullkiller2/Pathfinding/AIPathfinder.h"
 #include "AI/Nullkiller2/Engine/AIMemory.h"
+#include "lib/CPlayerState.h"
 #include "lib/mapping/MapTopology.h"
 #include "lib/mapObjects/CGHeroInstance.h"
 #include "lib/mapObjects/CGResource.h"
@@ -164,6 +165,51 @@ TEST_F(Nullkiller2_ObjectClusterCenter, clusterCenterTreatsOppositeEdgesAsNearby
 	{
 		map()->toroidal = toroidal;
 		EXPECT_EQ(opposite.calculateCenter(callback.get()), nullptr);
+	}
+}
+
+TEST_F(Nullkiller2_ObjectClusterCenter, ignoresTargetsNoLongerVisibleToPlayer)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(player)
+		.hero({6, 5, 0}, HeroTypeID(0), player)
+		.resource({0, 10, 0}, GameResID::GOLD, 1000)
+		.resource({18, 10, 0}, GameResID::GOLD, 1000);
+	startWithMap(std::move(builder));
+	revealMap(player);
+	auto callback = makeCallback(player);
+	const auto resources = findAll<CGResource>();
+	ASSERT_EQ(resources.size(), 2u);
+	const auto edge = std::ranges::find_if(resources, [](const auto * object) { return object->visitablePos().x == 0; });
+	const auto interior = std::ranges::find_if(resources, [](const auto * object) { return object->visitablePos().x == 18; });
+	ASSERT_NE(edge, resources.end());
+	ASSERT_NE(interior, resources.end());
+
+	NK2AI::ObjectCluster cluster;
+	NK2AI::ClusterObjectInfo info{};
+	info.priority = 1;
+	cluster.objects.insert({(*edge)->id, info});
+	cluster.objects.insert({(*interior)->id, info});
+	auto * team = gameState()->getPlayerTeam(player);
+	for(int x = 0; x < map()->width; ++x)
+		for(int y = 0; y < map()->height; ++y)
+			team->fogOfWarMap[int3(x, y, 0)] = 0;
+	team->fogOfWarMap[(*interior)->visitablePos()] = 1;
+	ASSERT_EQ(callback->tryGetObj((*edge)->id), nullptr);
+	ASSERT_EQ(callback->tryGetObj((*interior)->id), *interior);
+	for(const bool toroidal : {false, true})
+	{
+		map()->toroidal = toroidal;
+		EXPECT_EQ(cluster.calculateCenter(callback.get()), *interior);
+	}
+	team->fogOfWarMap[(*interior)->visitablePos()] = 0;
+	ASSERT_EQ(callback->tryGetObj((*interior)->id), nullptr);
+	for(const bool toroidal : {false, true})
+	{
+		map()->toroidal = toroidal;
+		EXPECT_EQ(cluster.calculateCenter(callback.get()), nullptr);
 	}
 }
 

@@ -92,8 +92,13 @@ void ObjectCluster::addObject(const CGObjectInstance * obj, const AIPath & path,
 
 const CGObjectInstance * ObjectCluster::calculateCenter(const CPlayerSpecificInfoCallback * cpsic) const
 {
-	// A target may have disappeared while stale cluster members were validated.
-	if(objects.empty())
+	// Visibility or object removal can invalidate a cluster member between
+	// clustering and selecting its representative.
+	std::vector<std::pair<const CGObjectInstance *, float>> candidates;
+	for(const auto & pair : objects)
+		if(const auto * object = cpsic->tryGetObj(pair.first))
+			candidates.emplace_back(object, pair.second.priority);
+	if(candidates.empty())
 		return nullptr;
 
 	const auto * header = cpsic->getMapHeader();
@@ -103,13 +108,12 @@ const CGObjectInstance * ObjectCluster::calculateCenter(const CPlayerSpecificInf
 		const double tau = 2.0 * std::acos(-1.0);
 		double sinX = 0, cosX = 0, sinY = 0, cosY = 0, totalWeight = 0;
 		const CGObjectInstance * fallback = nullptr;
-		for(const auto & pair : objects)
+		for(const auto & [object, priority] : candidates)
 		{
-			const auto * object = cpsic->getObj(pair.first);
 			if(!fallback || object->id.getNum() < fallback->id.getNum())
 				fallback = object;
 			const auto position = object->visitablePos();
-			const double weight = std::pow(pair.second.priority, 4);
+			const double weight = std::pow(priority, 4);
 			const double angleX = tau * position.x / header->width;
 			const double angleY = tau * position.y / header->height;
 			sinX += weight * std::sin(angleX);
@@ -129,21 +133,21 @@ const CGObjectInstance * ObjectCluster::calculateCenter(const CPlayerSpecificInf
 		const int3 center(centerCoordinate(sinX, cosX, header->width, fallbackPosition.x),
 			centerCoordinate(sinY, cosY, header->height, fallbackPosition.y), fallbackPosition.z);
 		const auto topology = header->getTopology();
-		const auto closest = *vstd::minElementByFun(objects, [&](const std::pair<ObjectInstanceID, ClusterObjectInfo> & pair) -> ui32
+		const auto closest = *vstd::minElementByFun(candidates, [&](const auto & candidate) -> ui32
 		{
-			const auto position = cpsic->getObj(pair.first)->visitablePos();
+			const auto position = candidate.first->visitablePos();
 			return topology.horizontalDistanceSquaredIgnoringLevel(center, position).value_or(position.dist2dSQ(center));
 		});
-		return cpsic->getObj(closest.first);
+		return closest.first;
 	}
 
 	auto tile = int3(0);
 	float priority = 0;
 
-	for(auto & pair : objects)
+	for(const auto & [object, objectPriority] : candidates)
 	{
-		auto newPoint = cpsic->getObj(pair.first)->visitablePos();
-		float newPriority = std::pow(pair.second.priority, 4); // lets make high priority targets more weghtful
+		auto newPoint = object->visitablePos();
+		float newPriority = std::pow(objectPriority, 4); // lets make high priority targets more weghtful
 		int3 direction = newPoint - tile;
 		float priorityRatio = newPriority / (priority + newPriority);
 
@@ -151,12 +155,12 @@ const CGObjectInstance * ObjectCluster::calculateCenter(const CPlayerSpecificInf
 		priority += newPriority;
 	}
 
-	auto closestPair = *vstd::minElementByFun(objects, [&](const std::pair<ObjectInstanceID, ClusterObjectInfo> & pair) -> int
+	auto closestPair = *vstd::minElementByFun(candidates, [&](const auto & candidate) -> int
 	{
-		return cpsic->getObj(pair.first)->visitablePos().dist2dSQ(tile);
+		return candidate.first->visitablePos().dist2dSQ(tile);
 	});
 
-	return cpsic->getObj(closestPair.first);
+	return closestPair.first;
 }
 
 std::vector<const CGObjectInstance *> ObjectCluster::getObjects(const CPlayerSpecificInfoCallback * cpsic) const
