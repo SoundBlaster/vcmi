@@ -292,11 +292,16 @@ AI corner crossing and the return to the player on a clean demo map.
 exercise disembarkation across an edge and a corner on both levels, including
 the server battle and forced-victory return with the boat left at sea.
 
-The [candidate Earth map](earth-map-demo-proposal-2026-11-15.md) now loads
-with an isolated HotA test profile and passes a two-level toroidal footprint
-round trip. This does not satisfy the single-level authoring goal: mask
-analysis identifies potential collisions after the proposed rearrangement,
-and the source's required-mod metadata and gameplay still require work.
+The [candidate Earth map](earth-map-demo-proposal-2026-11-15.md) has a local
+252×576 single-level toroidal draft. Its isolated HotA test profile accepts
+15 explicitly declared, unversioned mod requirements; the no-HotA test
+profile reports them missing. The draft initializes and round-trips, all
+eight initial heroes made a short server move, and the engine recognized 44
+repositioned guards. Four replacement portal approaches were tested with
+forced battle victories. The map still has an estimated 164 new interactive
+overlap occurrences, unreviewed terrain and object moves, incomplete mod
+dependency assessment and unknown distribution rights. It is not evidence
+of a fully playable or accepted demo.
 
 The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)
 also covers boat embarkation and disembarkation across one edge with two
@@ -409,10 +414,11 @@ The resource visit check is recorded in
 [`evidence/topology-resource-visit-2026-11-09.md`](evidence/topology-resource-visit-2026-11-09.md).
 The wrapped guard battle check is recorded in
 [`evidence/topology-guard-battle-2026-11-09.md`](evidence/topology-guard-battle-2026-11-09.md).
-The experimental single-level Earth-map draft and its loader-only checks are
-recorded in [the Earth demo proposal](earth-map-demo-proposal-2026-11-15.md);
-the draft has unresolved collisions, gates and geography and is not playable
-demo evidence.
+The experimental single-level Earth-map draft and its bounded startup,
+guard and portal checks are recorded in
+[the Earth demo proposal](earth-map-demo-proposal-2026-11-15.md). The source
+gates were replaced by paired monoliths with different behavior; remaining
+collisions and geography require review before calling the demo playable.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
