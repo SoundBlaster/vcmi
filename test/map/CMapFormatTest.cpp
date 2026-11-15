@@ -544,6 +544,32 @@ private:
 	std::vector<ui8> bytes;
 	CMapService service;
 };
+
+std::shared_ptr<CGameState> reloadExternalInspectionState(const std::shared_ptr<CGameState> & state)
+{
+	CMemorySerializer stateBytes, headerBytes;
+	state->saveGame(stateBytes.oser);
+	state->saveHeader(headerBytes.oser);
+	const auto path = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-earth-seam-%%%%-%%%%.vsgm1");
+	struct TemporarySave
+	{
+		boost::filesystem::path path;
+		~TemporarySave() { boost::filesystem::remove(path); }
+	} temporarySave{path};
+	CSaveFile save;
+	save.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*state).toBytes());
+	save.addChunk(SaveFileFormat::CHUNK_HEADER, headerBytes.extractBuffer());
+	save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, stateBytes.extractBuffer());
+	save.write(path);
+	CLoadFile load(path);
+	auto restored = std::make_shared<CGameState>();
+	restored->preInit(LIBRARY);
+	auto chunk = load.openChunk(SaveFileFormat::CHUNK_GAMESTATE, restored.get());
+	restored->loadGame(chunk->iser);
+	if(!chunk->isFullyRead())
+		throw std::runtime_error("External inspection save was not fully read");
+	return restored;
+}
 }
 
 TEST(MapFormat, ChecksExternalMapModRequirements)
@@ -660,26 +686,7 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			ASSERT_EQ(hero->visitablePos(), crossing->second);
 			if(std::getenv("VCMI_INSPECT_SEAM_SAVE"))
 			{
-				CMemorySerializer stateBytes, headerBytes;
-				state->saveGame(stateBytes.oser);
-				state->saveHeader(headerBytes.oser);
-				const auto path = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-earth-seam-%%%%-%%%%.vsgm1");
-				struct TemporarySave
-				{
-					boost::filesystem::path path;
-					~TemporarySave() { boost::filesystem::remove(path); }
-				} temporarySave{path};
-				CSaveFile save;
-				save.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*state).toBytes());
-				save.addChunk(SaveFileFormat::CHUNK_HEADER, headerBytes.extractBuffer());
-				save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, stateBytes.extractBuffer());
-				save.write(path);
-				CLoadFile load(path);
-				auto restored = std::make_shared<CGameState>();
-				restored->preInit(LIBRARY);
-				auto chunk = load.openChunk(SaveFileFormat::CHUNK_GAMESTATE, restored.get());
-				restored->loadGame(chunk->iser);
-				ASSERT_TRUE(chunk->isFullyRead());
+				auto restored = reloadExternalInspectionState(state);
 				ASSERT_TRUE(restored->getMap().toroidal);
 				ASSERT_EQ(restored->getMap().width, map.width);
 				ASSERT_EQ(restored->getMap().height, map.height);
@@ -772,6 +779,37 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(target),
 				                             EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
 				ASSERT_EQ(hero->visitablePos(), target);
+				if(target == *destination && std::getenv("VCMI_INSPECT_BOAT_SAVE"))
+				{
+					auto restored = reloadExternalInspectionState(state);
+					ASSERT_TRUE(restored->getMap().toroidal);
+					ASSERT_EQ(restored->getMap().width, map.width);
+					ASSERT_EQ(restored->getMap().height, map.height);
+					auto * restoredHero = dynamic_cast<CGHeroInstance *>(restored->getMap().getObject(hero->id));
+					ASSERT_NE(restoredHero, nullptr);
+					ASSERT_EQ(restoredHero->visitablePos(), target);
+					ASSERT_TRUE(restoredHero->inBoat());
+					ASSERT_NE(restoredHero->getBoat(), nullptr);
+					ASSERT_NE(hero->getBoat(), nullptr);
+					ASSERT_EQ(restoredHero->getBoat()->id, hero->getBoat()->id);
+					const auto & beforeFog = state->getPlayerTeam(player)->fogOfWarMap;
+					const auto & afterFog = restored->getPlayerTeam(player)->fogOfWarMap;
+					size_t mismatchedFog = 0;
+					for(int x = 0; x < map.width; ++x)
+						for(int y = 0; y < map.height; ++y)
+							mismatchedFog += beforeFog[int3(x, y, 0)] != afterFog[int3(x, y, 0)];
+					EXPECT_EQ(mismatchedFog, 0u);
+					GameHandlerTestServer restoredServer(restored, player);
+					CGameHandler restoredHandler(restoredServer, restored);
+					ASSERT_TRUE(restoredHandler.moveHero(restoredHero->id, restoredHero->convertFromVisitablePos(*source),
+					                                     EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+					ASSERT_EQ(restoredHero->visitablePos(), *source);
+					ASSERT_TRUE(restoredHandler.moveHero(restoredHero->id, restoredHero->convertFromVisitablePos(*shore),
+					                                     EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+					ASSERT_FALSE(restoredHero->inBoat());
+					ASSERT_EQ(restoredHero->visitablePos(), *shore);
+					std::cout << "Restored boat, fog and disembark after seam crossing" << std::endl;
+				}
 			}
 			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*shore),
 			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
