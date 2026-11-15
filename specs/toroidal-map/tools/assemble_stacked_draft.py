@@ -242,6 +242,72 @@ def repair_mountain_interactions(source, converted, rows, source_width, source_h
     return {"candidates": len(candidates), "moves": moved, "no_clear_placement": skipped}
 
 
+def repair_mine_guards(source, converted, rows, source_width, source_height):
+    """Restore guards that rotation placed inside their original mine's upright footprint."""
+    width, height = len(rows[0]), len(rows)
+    original = {obj["instanceName"]: obj for obj in source}
+    current = {obj["instanceName"]: obj for obj in converted}
+    _, old_interactions, _ = occupants(source, source_width, source_height, False)
+    old_pairs = {tuple(sorted((first[0], second[0]))) for _, first, second in old_interactions}
+    prior_interactive = {item[0] for _, first, second in old_interactions for item in (first, second)}
+    _, interactions = blocking_pairs(converted, width, height)
+
+    def cells(obj):
+        mask = obj["template"]["mask"]
+        return [((obj["x"] - len(line) + 1 + col) % width,
+                 (obj["y"] - len(mask) + 1 + row) % height, kind)
+                for row, line in enumerate(mask) for col, kind in enumerate(line) if kind in "BHAT"]
+
+    def entrance(obj, wrap):
+        mask = obj["template"]["mask"]
+        visits = [(obj["x"] - len(line) + 1 + col, obj["y"] - len(mask) + 1 + row)
+                  for row, line in enumerate(mask) for col, kind in enumerate(line) if kind in "AT"]
+        if len(visits) != 1:
+            return None
+        x, y = visits[0]
+        return (x % width, y % height) if wrap else (x, y)
+
+    candidates = collections.defaultdict(set)
+    for a, b in set(interactions) - old_pairs:
+        for mine, guard in ((a, b), (b, a)):
+            m, g = original[mine], original[guard]
+            if m["type"] != "mine" or not (g["type"] == "monster" or g["type"].startswith("randomMonster")):
+                continue
+            if m["l"] != 1 or g["l"] != 1 or guard in prior_interactive:
+                continue
+            old_mine, old_guard = entrance(m, False), entrance(g, False)
+            if old_mine and old_guard == (old_mine[0], old_mine[1] + 1):
+                candidates[guard].add(mine)
+
+    occupied = collections.defaultdict(set)
+    for obj in converted:
+        for x, y, _ in cells(obj):
+            occupied[x, y].add(obj["instanceName"])
+    moves, skipped = [], []
+    for guard, mines in sorted(candidates.items()):
+        g = current[guard]
+        if len(mines) != 1 or len(cells(g)) != 1 or entrance(g, True) is None:
+            skipped.append(guard)
+            continue
+        mine = next(iter(mines))
+        mine_pos = entrance(current[mine], True)
+        if mine_pos is None:
+            skipped.append(guard)
+            continue
+        target = (mine_pos[0], (mine_pos[1] + 1) % height)
+        terrain = rows[target[1]][target[0]]
+        if occupied[target] - {guard} or terrain[:2] in ("wt", "rc") or len(list(CELL_PART.finditer(terrain))) != 1:
+            skipped.append(guard)
+            continue
+        before = entrance(g, True)
+        occupied[before].discard(guard)
+        g["x"] = (g["x"] + target[0] - before[0]) % width
+        g["y"] = (g["y"] + target[1] - before[1]) % height
+        occupied[target].add(guard)
+        moves.append({"guard": guard, "mine": mine, "from": before, "to": target})
+    return {"candidates": len(candidates), "moves": moves, "skipped": skipped}
+
+
 def source_gate_pairs(objects, width, height, toroidal):
     """Reproduce the engine's nondecorative, two-level gate pairing order."""
     gates = []
@@ -322,7 +388,7 @@ def nested_positions(value, path=()):
 
 def assemble(header, surface, underground, objects, fragment_seed=None, polar_seed=None,
              oceanize=False, snow_island=None, gate_pairs=(), relocate=(), repair_mountains=False,
-             required_mods=()):
+             required_mods=(), repair_guards=False):
     levels = sorted(header["mapLevels"].values(), key=lambda level: level["index"])
     if len(levels) != 2 or [level["index"] for level in levels] != [0, 1]:
         raise ValueError("Expected exactly two indexed levels")
@@ -393,6 +459,7 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
     mountain_repair = (repair_mountain_interactions(objects, converted, rows, width, height,
                                                    references if polar else None)
                        if repair_mountains else None)
+    guard_repair = repair_mine_guards(objects, converted, rows, width, height) if repair_guards else None
     if polar is not None:
         for obj in converted:
             reference = references.get(obj["instanceName"])
@@ -457,6 +524,7 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
         "replacement_gate_pairs": replaced_gates,
         "relocated_decorations": relocated,
         "automatic_mountain_repair": mountain_repair,
+        "mine_guard_repair": guard_repair,
         "limitations": ["diagnostic draft only", "object and interaction overlaps unresolved",
                         "road artwork and movement costs unverified",
                         "required mods not assessed"]
@@ -469,7 +537,8 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
                        + (["remaining subterranean gates are unpaired"]
                           if any(obj["type"] == "subterraneanGate" for obj in converted) else [])
                        + (["replacement monolith behavior differs from subterranean gates"] if replaced_gates else [])
-                       + (["automatic mountain moves may alter routes and need review"] if mountain_repair else []),
+                       + (["automatic mountain moves may alter routes and need review"] if mountain_repair else [])
+                       + (["mine guard moves may change nearby guard coverage"] if guard_repair else []),
     }
 
 
@@ -493,6 +562,8 @@ def main():
                         help="Try to move mountains that newly overlap interactive cells")
     parser.add_argument("--require-mod", action="append", default=[], metavar="MOD_ID",
                         help="Declare an unversioned required mod; does not discover dependencies")
+    parser.add_argument("--repair-mine-guards", action="store_true",
+                        help="Restore eligible mine guards to their original relative entrance position")
     args = parser.parse_args()
     with zipfile.ZipFile(args.source) as archive:
         expected = {"header.json", "surface_terrain.json", "underground_terrain.json", "objects.json"}
@@ -504,7 +575,7 @@ def main():
             load_json(archive, "underground_terrain.json"), load_json(archive, "objects.json"),
             args.rejoin_east_fragment, args.polar_seed, args.oceanize_edge_rock,
             args.illustrative_snow_island, args.gate_pair or (), args.relocate_mountain,
-            args.repair_mountain_interactions, args.require_mod)
+            args.repair_mountain_interactions, args.require_mod, args.repair_mine_guards)
     with zipfile.ZipFile(args.output, "x", compression=zipfile.ZIP_DEFLATED) as output:
         for name, data in extras.items():
             output.writestr(name, data)

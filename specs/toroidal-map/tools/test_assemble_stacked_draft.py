@@ -2,7 +2,7 @@ import copy
 import unittest
 
 from assemble_stacked_draft import (assemble, blocking_pairs, place_object, relocate_decorations, replace_gate_pairs,
-                                    repair_mountain_interactions, rotate_cell_art, source_gate_pairs)
+                                    repair_mine_guards, repair_mountain_interactions, rotate_cell_art, source_gate_pairs)
 
 
 def obj(name, kind, x, y, level, mask):
@@ -11,6 +11,37 @@ def obj(name, kind, x, y, level, mask):
 
 
 class StackedDraftTest(unittest.TestCase):
+    def test_repair_mine_guard_restores_relative_position_and_keeps_options(self):
+        source = [obj("mine", "mine", 5, 4, 1, ["BBB", "BAB"]),
+                  obj("guard", "randomMonsterLevel2", 5, 5, 1, ["AV"])]
+        source[1]["options"] = {"count": 17}
+        converted = copy.deepcopy(source)
+        converted[0]["l"] = converted[1]["l"] = 0
+        converted[1]["y"] = 3
+        rows = [["gr0_"] * 8 for _ in range(8)]
+        self.assertIn(("guard", "mine"), blocking_pairs(converted, 8, 8)[0])
+        report = repair_mine_guards(source, converted, rows, 8, 8)
+        self.assertEqual(report["candidates"], 1)
+        self.assertEqual(len(report["moves"]), 1)
+        self.assertEqual(report["skipped"], [])
+        self.assertEqual((converted[1]["x"], converted[1]["y"]), (5, 5))
+        self.assertEqual(converted[1]["options"], {"count": 17})
+        self.assertNotIn(("guard", "mine"), blocking_pairs(converted, 8, 8)[0])
+        self.assertEqual(source[1]["y"], 5)
+
+    def test_repair_mine_guard_leaves_occupied_target_untouched(self):
+        source = [obj("mine", "mine", 5, 4, 1, ["BBB", "BAB"]),
+                  obj("guard", "monster", 5, 5, 1, ["AV"]),
+                  obj("obstacle", "mountain", 0, 0, 0, ["B"])]
+        converted = copy.deepcopy(source)
+        converted[0]["l"] = converted[1]["l"] = 0
+        converted[1]["y"] = 3
+        converted[2].update(x=4, y=5)
+        report = repair_mine_guards(source, converted, [["gr0_"] * 8 for _ in range(8)], 8, 8)
+        self.assertEqual(report["moves"], [])
+        self.assertEqual(report["skipped"], ["guard"])
+        self.assertEqual(converted[1]["y"], 3)
+
     def test_required_mods_preserve_existing_and_do_not_modify_input(self):
         header = {"mapLevels": {"surface": {"width": 1, "height": 1, "index": 0},
                                 "underground": {"width": 1, "height": 1, "index": 1}},
