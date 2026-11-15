@@ -3796,6 +3796,118 @@ TEST_F(HeroMovementTest, BoatCannotDisembarkOntoNonblockingEventAcrossSeam)
 	EXPECT_FALSE(hero->inBoat());
 }
 
+TEST(ObjectTemplateJsonTest, SelectiveVisitDirectionsReplaceDefaultsAndPreviousTemplate)
+{
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	ObjectTemplate reused;
+	for(const auto & [rows, expected] : std::array{
+		std::pair{std::array<std::string, 3>{"---", "+--", "---"}, int3(-1, 0, 0)},
+		std::pair{std::array<std::string, 3>{"--+", "---", "---"}, int3(1, -1, 0)},
+		std::pair{std::array<std::string, 3>{"---", "---", "-+-"}, int3(0, 1, 0)}})
+	{
+		const auto text = R"({ "animation": "test.def", "visitableFrom": [ ")" + rows[0]
+			+ R"(", ")" + rows[1] + R"(", ")" + rows[2] + R"(" ], "mask": [ "A" ] })";
+		JsonNode definition(text.data(), text.size(), "SelectiveApproachRoundTrip");
+		reused.readJson(definition, resolver, false);
+		JsonNode serialized;
+		reused.writeJson(serialized, false);
+		ObjectTemplate restored;
+		restored.readJson(serialized, resolver, false);
+		for(int dy = -1; dy <= 1; ++dy)
+			for(int dx = -1; dx <= 1; ++dx)
+			{
+				if(dx == 0 && dy == 0)
+					continue;
+				const bool allowed = dx == expected.x && dy == expected.y;
+				EXPECT_EQ(reused.isVisitableFrom(dx, dy), allowed);
+				EXPECT_EQ(restored.isVisitableFrom(dx, dy), allowed);
+			}
+	}
+}
+
+class ToroidalDirectionalEntranceTest : public HeroMovementTest, public ::testing::WithParamInterface<int> {};
+
+TEST_P(ToroidalDirectionalEntranceTest, SelectiveApproachMatchesPathfinderAndServer)
+{
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions.at(GetParam() % directions.size());
+	const int level = GetParam() / directions.size();
+	const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, level);
+	const int3 destination(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, level);
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.resource(destination, GameResID::GOLD, 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	auto * resource = findFirst<CGResource>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(resource, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+	ASSERT_EQ(hero->visitablePos(), origin);
+	ASSERT_EQ(resource->visitablePos(), destination);
+
+	const auto makeAppearance = [](int allowedX, int allowedY)
+	{
+		std::array<std::string, 3> rows = {"---", "---", "---"};
+		rows[allowedY + 1][allowedX + 1] = '+';
+		const auto text = R"({ "animation": "test.def", "visitableFrom": [ ")" + rows[0]
+			+ R"(", ")" + rows[1] + R"(", ")" + rows[2] + R"(" ], "mask": [ "A" ] })";
+		JsonNode definition(text.data(), text.size(), "SelectiveApproach");
+		auto appearance = std::make_shared<ObjectTemplate>();
+		InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+		appearance->readJson(definition, resolver, false);
+		return appearance;
+	};
+	const auto setAppearance = [&](const std::shared_ptr<ObjectTemplate> & appearance)
+	{
+		map()->hideObject(resource);
+		resource->appearance = appearance;
+		map()->showObject(resource);
+	};
+	const auto forbidden = makeAppearance(dx, dy);
+	ASSERT_TRUE(forbidden->isVisitableFrom(dx, dy));
+	ASSERT_FALSE(forbidden->isVisitableFrom(-dx, -dy));
+	setAppearance(forbidden);
+	const auto resourceID = resource->id;
+	const auto gold = gameState()->players.at(player).resources[GameResID::GOLD];
+	hero->setMovementPoints(3000);
+	CPathsInfo blocked(gameState()->getMapSize(), hero);
+	auto blockedConfig = std::make_shared<SingleHeroPathfinderConfig>(blocked, *gameState(), hero);
+	CPathfinder(*gameState(), blockedConfig).calculatePaths();
+	const auto * blockedNode = blocked.getNode(destination, EPathfindingLayer::LAND);
+	if(blockedNode->reachable() && blockedNode->theNodeBefore)
+		EXPECT_NE(blockedNode->theNodeBefore->coord, origin);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold);
+	ASSERT_NE(map()->getObject(resourceID), nullptr);
+
+	const auto allowed = makeAppearance(-dx, -dy);
+	ASSERT_TRUE(allowed->isVisitableFrom(-dx, -dy));
+	ASSERT_FALSE(allowed->isVisitableFrom(dx, dy));
+	setAppearance(allowed);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder(*gameState(), config).calculatePaths();
+	const auto * node = paths.getNode(destination, EPathfindingLayer::LAND);
+	ASSERT_TRUE(node->reachable());
+	ASSERT_NE(node->theNodeBefore, nullptr);
+	EXPECT_EQ(node->theNodeBefore->coord, origin);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), origin);
+	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], gold + 1000);
+	EXPECT_EQ(map()->getObject(resourceID), nullptr);
+}
+
+INSTANTIATE_TEST_SUITE_P(EdgesAndLevels, ToroidalDirectionalEntranceTest, ::testing::Range(0, 16));
+
 TEST_F(HeroMovementTest, ServerRejectsForbiddenObjectEntranceAcrossToroidalSeam)
 {
 	const PlayerColor player(0);
@@ -4007,7 +4119,7 @@ TEST_F(HeroMovementTest, ObjectEntranceDirectionIsRespectedAcrossToroidalSeams)
 	ASSERT_NE(hero, nullptr);
 	ASSERT_NE(resource, nullptr);
 	ASSERT_EQ(hero->visitablePos(), origin);
-	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["---", "---", "---"], "mask": [ "A" ] })";
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["---", "+--", "---"], "mask": [ "A" ] })";
 	JsonNode definition(text.data(), text.size(), "DirectionalSeamEntrance");
 	auto appearance = std::make_shared<ObjectTemplate>();
 	InstantIdentifierResolver resolver(*LIBRARY->identifiers());

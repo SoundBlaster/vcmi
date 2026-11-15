@@ -203,6 +203,7 @@ void ObjectTemplate::readJson(const JsonNode &node, IIdentifierResolver & resolv
 	editorAnimationFile = AnimationPath::fromJson(node["editorAnimation"]);
 
 	const JsonVector & visitDirs = node["visitableFrom"].Vector();
+	visitDir = 0;
 	if (!visitDirs.empty())
 	{
 		if (visitDirs[0].String()[0] == '+') visitDir |= 1;
@@ -214,8 +215,6 @@ void ObjectTemplate::readJson(const JsonNode &node, IIdentifierResolver & resolv
 		if (visitDirs[2].String()[0] == '+') visitDir |= 64;
 		if (visitDirs[1].String()[0] == '+') visitDir |= 128;
 	}
-	else
-		visitDir = 0x00;
 
 	anyLandTerrain = true;
 	if(withTerrain)
