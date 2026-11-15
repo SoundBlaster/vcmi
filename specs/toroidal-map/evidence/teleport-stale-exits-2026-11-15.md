@@ -52,3 +52,33 @@ broadcast for another player during simultaneous turns. The controller now
 stops only when the packet's hero is the currently moving hero. The client
 target built successfully with this change; no test or graphical session yet
 exercises simultaneous clients receiving an unrelated hero's stop packet.
+
+## Two TCP replicas
+
+`HeroMovementTest.TcpPeersReceiveAuthoritativeCornerMovement` now adds three
+ordinary two-way monoliths to its two-level toroidal fixture. The real server
+and two listeners negotiate topology over separate framed TCP loopback
+connections. After the earlier movement checks, a server setup packet places
+the active hero near a monolith; a normal network movement request enters it
+and sends a teleport question to the first peer. A second setup packet places
+the same player's other hero on the selected exit at the edge after the
+question was sent. Both packets are applied to the two replicas over TCP.
+
+The first listener answers with that now-stale exit. Both listeners receive
+the failed movement; on the first connection it precedes the successful
+`PackageApplied` acknowledgement. The second listener does not receive that
+acknowledgement. The server and replicas agree on the stationary hero,
+movement points and occupied exit, and all fog cells for both teams on both
+levels remain equal and unchanged after the answer. The TCP scenario and ten
+related in-process teleport cases passed five consecutive repetitions on
+macOS arm64. The full local suite passed 1,930 tests, skipped the external
+legacy-server test, and reported three disabled tests. The repeat XML and
+full-suite log/XML are `runtime/tcp-stale-teleport-repeat-2026-11-15.xml` and
+`runtime/full-suite-tcp-teleport-2026-11-15.*` on the TB5 build root.
+
+The fixture installs its game state and player slots directly; the listeners
+and server run in one process. Exit occupancy is injected, rather than caused
+by another player's actual move. These checks do not demonstrate graphical
+client route stopping, a second machine, real simultaneous-player timing or
+network confidentiality. The observed ordered delivery is on the requesting
+TCP connection; no order is claimed between independent connections.
