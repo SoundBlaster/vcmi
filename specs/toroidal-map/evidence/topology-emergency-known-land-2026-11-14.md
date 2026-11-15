@@ -35,10 +35,12 @@ can occur in a synthetic changed-world state or an old save, but its actual
 frequency in play has not been measured. If no safe recovery is available,
 the current turn guard can still prevent turn completion.
 
-The broader safe-recovery obligation remains unfulfilled and its verification
-and acceptance remain pending; the decision does not prove it implemented or
-accept the toroidal feature as a whole. The separate hidden-event scenario
-remains deferred as previously agreed.
+The earlier draft proposed a general safe-recovery guarantee. That guarantee
+is not implemented, and the user's later decision excludes the no-known-safe-
+landing case from the experimental feature's required recovery scope. This is
+an explicit unresolved limitation, not evidence that recovery succeeds or
+acceptance of the toroidal feature as a whole. The separate hidden-event
+scenario remains deferred as previously agreed.
 
 ## Evidence and scope
 

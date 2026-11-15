@@ -29,6 +29,11 @@ No comments were posted and no threads were resolved by this check.
 | G2: redundant canonicalization and getter cost | Potential cleanup and performance concern, not established by the review alone. | Verify call-site invariants and measure before changing legacy-coordinate, object-position or mod behavior. |
 | Documentation: editor and VMAP | The review correctly identified missing author-facing documentation. The editor guide now describes experimental opt-in, seam and object restrictions, and compatibility; the file-format guide records the branch-local header fields. | Editor workflow, multiplayer and AI support remain subject to the limits in the implementation matrix. |
 
+The original G12 proposal required recovery in every stranded state. The
+later user decision excludes the no-known-suitable-safe-landing case from that
+guarantee; it remains a documented limitation rather than a claim of a fix.
+Other G12 verification and acceptance remain pending.
+
 No conclusion here is an acceptance decision for the feature. See the
 [implementation matrix](implementation-matrix.md) for requirement-by-requirement
 status and evidence, including unsupported or unverified profiles.

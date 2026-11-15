@@ -39,9 +39,9 @@ demo preparation reviewable as separate changes where practical.
   and disembarkation; fill consequential gaps on either level as needed.
 - [ ] Review representative Flight and Water Walk seam routes and relevant
   movement effects; reproduce observed failures with focused regression tests.
-- [ ] Keep the documented rare case where no known safe landing exists under
-  the current game rules. General recovery and the hidden-event case are not
-  prerequisites for the next work unless the agreed scope changes.
+- [x] Record the user's decision to leave the rare case with no known suitable
+  safe landing unresolved under current rules. This does not resolve the case;
+  general recovery and the hidden-event case remain outside the agreed scope.
 
 ## 3. Persistence, server and multiplayer
 
