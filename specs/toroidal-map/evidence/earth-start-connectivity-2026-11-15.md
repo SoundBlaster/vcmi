@@ -32,3 +32,25 @@ approaches and exits with staged heroes and forced guard victories. Together,
 these results identify a remaining demo question: whether a player can reach
 the seam region through ordinary exploration and transport. They do not show
 that the transformed Earth map is balanced or fully connected.
+
+## Transport possibilities
+
+The opt-in inspection extended in `1164236` also examined all initialized
+shipyard and boat visitable positions. With the same fully revealed initial
+state and selected red hero, no shipyard LAND node or boat SAIL node was
+reachable. This is a pathfinder result for the initial game state, not proof
+that a player cannot fight through obstacles, build a boat later, use a town
+shipyard, or find another route. The test passed as a diagnostic on macOS
+arm64 using the `877e872` build plus this extension; its XML is local to TB5
+at `runtime/earth-start-transport.xml`.
+
+A separate read-only terrain and serialized-mask inspection found seven
+shipyard visitable cells on the start hero's 13,588-cell land component:
+`shipyard_5987`, `shipyard_6236`, `shipyard_6414`, `shipyard_6682`,
+`shipyard_7303`, `shipyard_7452` and `shipyard_7455`. A terrain-only flood
+fill also found a shared 97,108-cell water component adjacent to both that
+land component and the road's land component, using eight-neighbor toroidal
+adjacency. These are geometric estimates: they ignore occupancy, approach
+directions, guards, navigation rules, the availability and cost of boats,
+and whether any particular landing is permitted. Thus they identify a
+potential sea connection but do not establish a usable gameplay route.
