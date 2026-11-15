@@ -76,7 +76,7 @@ void MapViewController::setViewCenter(const Point & position, int level)
 		betterPosition = {std::clamp(position.x, lowerLimit.x, upperLimit.x), std::clamp(position.y, lowerLimit.y, upperLimit.y)};
 
 	model->setViewCenter(betterPosition);
-	model->setLevel(std::clamp(level, 0, context->getMapSize().z));
+	model->setLevel(std::clamp(level, 0, context->getMapSize().z - 1));
 
 	if(adventureInt && !puzzleMapContext) // may be called before adventureInt is initialized
 		adventureInt->onMapViewMoved(model->getTilesTotalRect(), model->getLevel());
