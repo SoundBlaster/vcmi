@@ -25,3 +25,19 @@ save. Logs and XML results are under the checkout's TB5 build root in
 `runtime/ai-hidden-cluster-before-2026-11-15.xml`,
 `runtime/ai-hidden-cluster-after-2026-11-15.xml`, and
 `runtime/full-suite-hidden-cluster-final-2026-11-15.{log,xml}`.
+
+## Enumerating cluster targets
+
+The same fixture subsequently exercised `getObjects`, which is used by
+exploration, recruitment, startup and capture behaviors. Before its fix, the
+method raised the same exception when one target was hidden. It now filters
+unavailable IDs through the player callback. The fixture checks one visible
+target, no visible targets, and a target becoming visible again, on both
+bounded and toroidal maps. The cluster's IDs are not removed by this lookup.
+Eight focused tests passed; the before and after XML results are
+`runtime/ai-hidden-list-before-2026-11-15.xml` and
+`runtime/ai-hidden-list-final-2026-11-15.xml` under the TB5 build root.
+The full enabled suite passed 1,728 tests, with three disabled; its results are
+`runtime/full-suite-hidden-list-2026-11-15.{log,xml}`.
+This synthetic test does not establish that a real AI turn encounters such a
+visibility change, nor that stale blocker pointers are safe.
