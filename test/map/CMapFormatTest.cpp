@@ -994,7 +994,7 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	{
 		const auto entry = map.instanceNames.find("randomHero_7305");
 		ASSERT_NE(entry, map.instanceNames.end());
-		const auto * hero = dynamic_cast<const CGHeroInstance *>(entry->second.get());
+		auto * hero = dynamic_cast<CGHeroInstance *>(entry->second.get());
 		ASSERT_NE(hero, nullptr);
 		ASSERT_EQ(hero->getOwner(), PlayerColor(0));
 		auto * team = state->getPlayerTeam(hero->getOwner());
@@ -1035,6 +1035,120 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			}
 		}
 		std::cout << "Revealed start reachable transport count=" << reachableTransport << std::endl;
+		const auto yard = map.instanceNames.find("shipyard_5987");
+		ASSERT_NE(yard, map.instanceNames.end());
+		const auto yardPos = yard->second->visitablePos();
+		std::cout << "Selected shipyard " << yard->first << " at=" << yardPos.toString() << std::endl;
+		for(const auto & direction : int3::getDirs())
+		{
+			const auto neighbor = map.getTopology().canonicalize(yardPos + direction);
+			if(!neighbor)
+				continue;
+			const auto * candidate = paths.getNode(*neighbor, EPathfindingLayer::LAND);
+			std::cout << "Shipyard neighbor " << neighbor->toString() << " land=" << map.getTile(*neighbor).isLand()
+			          << " blocked=" << map.getTile(*neighbor).blocked() << " reachable=" << candidate->reachable()
+			          << " approach=" << map.canMoveBetween(*neighbor, yardPos)
+			          << " guard=" << state->guardingCreaturePosition(*neighbor).toString() << std::endl;
+		}
+		const auto start = hero->visitablePos();
+		const auto indexOf = [&](const int3 & pos) { return pos.y * map.width + pos.x; };
+		const auto posOf = [&](int index) { return int3(index % map.width, index / map.width, 0); };
+		std::vector<int> parent(map.width * map.height, -1);
+		std::vector<int> queue{indexOf(start)};
+		parent[queue.front()] = queue.front();
+		int approach = -1;
+		for(size_t index = 0; index < queue.size() && approach < 0; ++index)
+		{
+			const auto current = posOf(queue[index]);
+			for(const auto & direction : int3::getDirs())
+			{
+				const auto candidate = map.getTopology().canonicalize(current + direction);
+				if(!candidate || *candidate == yardPos)
+					continue;
+				const auto & tile = map.getTile(*candidate);
+				const auto next = indexOf(*candidate);
+				if(parent[next] != -1 || !tile.isLand() || tile.blocked() || tile.visitable()
+				   || !map.canMoveBetween(current, *candidate))
+					continue;
+				parent[next] = queue[index];
+				queue.push_back(next);
+				for(const auto & lastStep : int3::getDirs())
+					if(map.getTopology().canonicalize(*candidate + lastStep) == yardPos
+					   && map.canMoveBetween(*candidate, yardPos))
+						approach = next;
+			}
+		}
+		if(approach < 0)
+			std::cout << "No free geometric shipyard approach ignoring guards" << std::endl;
+		else
+		{
+			std::vector<int> route;
+			for(int at = approach; at != queue.front(); at = parent[at])
+				route.push_back(at);
+			std::reverse(route.begin(), route.end());
+			for(const int index : route)
+			{
+				const auto point = posOf(index);
+				if(!paths.getNode(point, EPathfindingLayer::LAND)->reachable())
+				{
+					const auto guard = state->guardingCreaturePosition(point);
+					std::cout << "First unreachable geometric step=" << point.toString()
+					          << " guard=" << guard.toString() << std::endl;
+					if(map.isInTheMap(guard))
+						for(const auto & id : map.getTile(guard).visitableObjects)
+							if(auto * creature = dynamic_cast<CGCreature *>(map.getObject(id)))
+							{
+								std::cout << "Guard instance=" << creature->instanceName << std::endl;
+								const auto identifiedGuardID = creature->id;
+								GameHandlerTestServer server(state, hero->getOwner());
+								CGameHandler handler(server, state);
+								if(std::getenv("VCMI_INSPECT_EARTH_FIGHT_START_GUARD"))
+								{
+									creature->agression = 127;
+									creature->neverFlees = true;
+									hero->setMovementPoints(30000);
+									state->actingPlayers.insert(hero->getOwner());
+									for(const int step : route)
+									{
+										const auto destination = posOf(step);
+										ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
+										if(state->getBattle(hero->getOwner()))
+											break;
+										ASSERT_EQ(hero->visitablePos(), destination);
+									}
+									ASSERT_NE(state->getBattle(hero->getOwner()), nullptr);
+									handler.battles->cheatBattleVictory(hero->getOwner());
+									const auto result = handler.activities->topActivity(hero->getOwner());
+									ASSERT_NE(result, nullptr);
+									ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
+									ASSERT_EQ(handler.activities->submitReply(result->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+									for(int limit = 0; limit < 16; ++limit)
+									{
+										const auto prompt = handler.activities->topActivity(hero->getOwner());
+										if(!prompt || (prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+											break;
+										ASSERT_EQ(handler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+									}
+									std::cout << "After battle hero=" << hero->visitablePos().toString()
+									          << " movement=" << hero->movementPointsRemaining()
+									          << " identified guard remains=" << (map.getObject(identifiedGuardID) != nullptr) << std::endl;
+									std::cout << "Battle started from ordinary route; victory forced" << std::endl;
+								}
+								else
+									ASSERT_TRUE(handler.removeObject(creature, hero->getOwner()));
+								CPathsInfo after(state->getMapSize(), hero);
+								auto afterConfig = std::make_shared<SingleHeroPathfinderConfig>(after, *state, hero);
+								CPathfinder(*state, afterConfig).calculatePaths();
+								std::cout << "Shipyard reachable after test intervention="
+								          << after.getNode(yardPos, EPathfindingLayer::LAND)->reachable() << std::endl;
+								break;
+							}
+					break;
+				}
+			}
+			std::cout << "Free geometric shipyard approach=" << posOf(approach).toString()
+			          << " steps=" << route.size() << std::endl;
+		}
 	}
 	if(std::getenv("VCMI_INSPECT_EARTH_SEAM_ROAD"))
 	{
