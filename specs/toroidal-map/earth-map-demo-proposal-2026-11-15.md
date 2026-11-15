@@ -128,3 +128,11 @@ the join, but also the underground's black rock areas and Antarctica as a
 separate island near the top. The planned polar and seam edits have not been
 performed. The picture omits objects, tile art, roads and rivers; it is not
 an editor rendering, a playable map or evidence of seamless transitions.
+
+The preview tool also classifies paired edge terrain without declaring a
+water/land pair invalid. For this unedited layout, the 504 west/east pairs
+include 157 pairs with rock on one side, 155 land/water and 192 water/water.
+The 252 north/south pairs include 48 rock/water and 204 water/water. The
+internal join between the two source levels has the same totals. These are
+terrain-only counts; object occupancy, ships, coastline art and actual
+crossing behavior need separate checks.
