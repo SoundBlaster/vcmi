@@ -644,3 +644,13 @@ with artificial hero and boat setup; they do not establish an ordinary route
 to those positions, a complete boat journey, GUI behavior or visual seams.
 The normal `MapFormat.*` suite passed 14 tests and skipped five optional
 external-fixture tests without their environment variables.
+
+For each land seam crossing above, a further test confirmed that the
+destination began hidden to the moving player's team and became visible after
+the step. It serialized the initialized game state and header into a local
+save, loaded the game-state chunk into a fresh `CGameState`, and compared the
+hero position, toroidal flag, dimensions, object and town counts, and that
+team's fog on all 145,152 map cells. The restored server handler then moved
+the hero back across the same seam. Both axes passed three in-process runs;
+temporary saves were removed. This does not test a full graphical save/load,
+server activity state, other teams' fog or a networked session.
