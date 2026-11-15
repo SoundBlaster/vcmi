@@ -153,6 +153,12 @@ guarded tiles, matching the adjacent recovery search. The
 [aviation record](evidence/topology-aviate-in-place-2026-11-14.md) documents
 the synthetic changed-world tests and their limits.
 
+The user chose to leave the no-known-safe-landing emergency case unresolved
+rather than add a rescue boat or extend a spell. See the
+[recovery decision](evidence/topology-emergency-known-land-2026-11-14.md#user-decision-no-new-emergency-mechanic).
+The broader safe-recovery requirement remains partial and unaccepted; the
+existing conditional return to known safe land remains in place.
+
 Nullkiller's danger-map path searches now use the AI player's fog for
 neighbors and known guards even when simulating an enemy hero. Synthetic
 threat checks cover all edges and corners on both levels with a bounded

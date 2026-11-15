@@ -24,6 +24,22 @@ transient hero is in a boat, this fallback does not invent a destination or
 complete the recovery. Other dynamic-world cases and global optimality of group
 assignment are not established.
 
+## User decision: no new emergency mechanic
+
+On 2026-11-15 the user chose to leave the exceptional no-known-safe-landing
+case unresolved rather than introduce a new game rule, such as creating a
+rescue boat or extending Flight or Water Walk. This decision concerns the
+missing fallback; it does not remove the existing conditional return to a
+recorded origin or other suitable known land described above. The situation
+can occur in a synthetic changed-world state or an old save, but its actual
+frequency in play has not been measured. If no safe recovery is available,
+the current turn guard can still prevent turn completion.
+
+The broader safe-recovery obligation remains unfulfilled and its verification
+and acceptance remain pending; the decision does not prove it implemented or
+accept the toroidal feature as a whole. The separate hidden-event scenario
+remains deferred as previously agreed.
+
 ## Evidence and scope
 
 - `OldSaveCanRecoverToNearestKnownSafeLand` loads a previous server-state
