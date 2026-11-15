@@ -3665,6 +3665,75 @@ TEST_F(HeroMovementTest, EmbarkAndDisembarkAcrossEveryToroidalSeamOnBothLevels)
 			}
 }
 
+class ToroidalGuardedDisembarkTest : public HeroMovementTest, public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(ToroidalGuardedDisembarkTest, DisembarkingStartsGuardBattleAndLeavesBoatAtSea)
+{
+	const bool corner = GetParam() % 2 != 0;
+	const int z = GetParam() / 2;
+	const int y = corner ? 0 : 10;
+	const int3 water(0, y, z), shore(35, corner ? 35 : y, z), guardPos(34, shore.y, z);
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 100}})
+		.terrain(water, TerrainId::WATER)
+		.monster(guardPos, CreatureID(27), 1);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(int3(1, y, z)));
+	const auto guardID = map()->getTile(guardPos).topVisitableObj();
+	auto * guard = dynamic_cast<CGCreature *>(map()->getObject(guardID));
+	ASSERT_NE(guard, nullptr);
+	guard->agression = 127;
+	guard->neverFlees = true;
+	ASSERT_EQ(gameState()->guardingCreaturePosition(shore), guardPos);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(water, BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	const auto boatId = hero->getBoat()->id;
+	hero->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), hero);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+	CPathfinder finder(*gameState(), config);
+	finder.calculatePaths();
+	const auto * node = paths.getNode(shore, EPathfindingLayer::LAND);
+	ASSERT_TRUE(node->reachable());
+	ASSERT_NE(node->theNodeBefore, nullptr);
+	EXPECT_EQ(node->theNodeBefore->coord, water);
+	const auto expectedMovement = node->moveRemains;
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), shore);
+	EXPECT_EQ(hero->movementPointsRemaining(), expectedMovement);
+	EXPECT_FALSE(hero->inBoat());
+	const auto * battle = gameState()->getBattle(player);
+	ASSERT_NE(battle, nullptr);
+	EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+	handler.battles->cheatBattleVictory(player);
+	auto resultDialog = handler.activities->topActivity(player);
+	ASSERT_NE(resultDialog, nullptr);
+	ASSERT_EQ(resultDialog->getType(), ActivityType::BattleDialog);
+	ASSERT_EQ(handler.activities->submitReply(resultDialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(gameState()->getBattle(player), nullptr);
+	EXPECT_EQ(map()->getObject(guardID), nullptr);
+	EXPECT_EQ(hero->visitablePos(), shore);
+	EXPECT_FALSE(hero->inBoat());
+	const auto * boat = map()->getObject(boatId);
+	ASSERT_NE(boat, nullptr);
+	EXPECT_EQ(boat->visitablePos(), water);
+}
+
+INSTANTIATE_TEST_SUITE_P(EdgeAndCornerOnBothLevels, ToroidalGuardedDisembarkTest, ::testing::Range(0, 4));
+
 TEST_F(HeroMovementTest, BoatCannotDisembarkOntoNonblockingEventAcrossSeam)
 {
 	const PlayerColor player(0);
