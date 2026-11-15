@@ -88,3 +88,25 @@ the game itself was not operated. Computer Use could not select the unbundled
 executable as an application. The test process was forcibly stopped without
 starting a game. This confirms that a window was created, not that the Earth
 scenario was selected or that the launcher works through Finder.
+
+## Integrated road map: current AI startup
+
+The client and separate server executable were rebuilt on TB5 from clean
+revision `7744dbd` on macOS arm64. A new isolated profile linked the exact
+integrated road map, SHA-256
+`61f9f042612fb86aa611c64e57b2c2e6ee7a39409cf2b4eeb1fd74b8b00d40b7`,
+and copied the Earth profile configuration while linking to the same local
+game resources. With `--testmap`, seed 17 and a spectator interface, the
+client observation reported a 252×576 toroidal map. During the first red AI
+turn, the log recorded town construction, hero recruitment and movement
+requests with server and client processing. The run used an in-process local
+server and was force-stopped after 25 seconds; it does not establish normal
+exit, a full turn or match, movement across the seam, human play or visual
+continuity. The new profile did not use the ordinary Earth's saves.
+
+The logs and observation are local on TB5 at
+`runtime/earth-integrated-smoke-7744dbd/`; `stdout.log` SHA-256 is
+`97c699430a7036b975453f90059bff3a2f09629cdb90bf37d02c5dc2aad8595a`
+and `observe.jsonl` SHA-256 is
+`6a39ba56bb4875a8b604f43b1a9c5102f31c167687837b8f9e043f116f0b996d`.
+The build retained duplicate-library and missing Conan search-path warnings.
