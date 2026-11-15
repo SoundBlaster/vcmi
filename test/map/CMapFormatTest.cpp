@@ -27,6 +27,7 @@
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/entities/hero/CHero.h"
 #include "../../lib/gameState/CGameState.h"
+#include "../../lib/gameState/SaveMetadata.h"
 #include "../../lib/StartInfo.h"
 #include "../../lib/spells/CSpell.h"
 #include "../../lib/mapping/CMap.h"
@@ -40,6 +41,9 @@
 #include "../../lib/modding/CModHandler.h"
 #include "../../lib/pathfinder/CPathfinder.h"
 #include "../../lib/pathfinder/PathfinderOptions.h"
+#include "../../lib/serializer/CMemorySerializer.h"
+#include "../../lib/serializer/CLoadFile.h"
+#include "../../lib/serializer/CSaveFile.h"
 
 #include "../../lib/VCMIDirs.h"
 #include "../../server/CGameHandler.h"
@@ -648,9 +652,58 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			hero->setMovementPoints(3000);
 			GameHandlerTestServer server(state, player);
 			CGameHandler handler(server, state);
+			const bool destinationWasVisible = state->getPlayerTeam(player)->fogOfWarMap[crossing->second] != 0;
+			if(std::getenv("VCMI_INSPECT_EXPECT_HIDDEN_SEAMS"))
+				ASSERT_FALSE(destinationWasVisible);
 			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(crossing->second),
 			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 			ASSERT_EQ(hero->visitablePos(), crossing->second);
+			if(std::getenv("VCMI_INSPECT_SEAM_SAVE"))
+			{
+				CMemorySerializer stateBytes, headerBytes;
+				state->saveGame(stateBytes.oser);
+				state->saveHeader(headerBytes.oser);
+				const auto path = boost::filesystem::current_path() / boost::filesystem::unique_path("vcmi-earth-seam-%%%%-%%%%.vsgm1");
+				struct TemporarySave
+				{
+					boost::filesystem::path path;
+					~TemporarySave() { boost::filesystem::remove(path); }
+				} temporarySave{path};
+				CSaveFile save;
+				save.addChunk(SaveFileFormat::CHUNK_METADATA, SaveMetadata::create(*state).toBytes());
+				save.addChunk(SaveFileFormat::CHUNK_HEADER, headerBytes.extractBuffer());
+				save.addChunk(SaveFileFormat::CHUNK_GAMESTATE, stateBytes.extractBuffer());
+				save.write(path);
+				CLoadFile load(path);
+				auto restored = std::make_shared<CGameState>();
+				restored->preInit(LIBRARY);
+				auto chunk = load.openChunk(SaveFileFormat::CHUNK_GAMESTATE, restored.get());
+				restored->loadGame(chunk->iser);
+				ASSERT_TRUE(chunk->isFullyRead());
+				ASSERT_TRUE(restored->getMap().toroidal);
+				ASSERT_EQ(restored->getMap().width, map.width);
+				ASSERT_EQ(restored->getMap().height, map.height);
+				ASSERT_EQ(restored->getMap().objects.size(), map.objects.size());
+				ASSERT_EQ(restored->getMap().getAllTowns().size(), map.getAllTowns().size());
+				auto * restoredHero = dynamic_cast<CGHeroInstance *>(restored->getMap().getObject(hero->id));
+				ASSERT_NE(restoredHero, nullptr);
+				ASSERT_EQ(restoredHero->visitablePos(), crossing->second);
+				const auto & beforeFog = state->getPlayerTeam(player)->fogOfWarMap;
+				const auto & afterFog = restored->getPlayerTeam(player)->fogOfWarMap;
+				ASSERT_NE(beforeFog[crossing->second], 0);
+				size_t mismatchedFog = 0;
+				for(int x = 0; x < map.width; ++x)
+					for(int y = 0; y < map.height; ++y)
+						mismatchedFog += beforeFog[int3(x, y, 0)] != afterFog[int3(x, y, 0)];
+				EXPECT_EQ(mismatchedFog, 0u);
+				GameHandlerTestServer restoredServer(restored, player);
+				CGameHandler restoredHandler(restoredServer, restored);
+				ASSERT_TRUE(restoredHandler.moveHero(restoredHero->id, restoredHero->convertFromVisitablePos(crossing->first),
+				                                     EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				ASSERT_EQ(restoredHero->visitablePos(), crossing->first);
+				std::cout << "Restored seam crossing, compared fog tiles=" << map.width * map.height
+				          << ", destination previously visible=" << destinationWasVisible << std::endl;
+			}
 			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(crossing->first),
 			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 			ASSERT_EQ(hero->visitablePos(), crossing->first);
