@@ -3588,6 +3588,69 @@ TEST_F(HeroMovementTest, MovingBlockingObjectUpdatesAdjacentGuardCache)
 	EXPECT_EQ(gameState()->guardingCreaturePosition(target), guardPosition);
 }
 
+TEST_F(HeroMovementTest, StaleSeamStepIsRejectedAfterBlockingObjectMovesIntoTheWay)
+{
+	const PlayerColor player(0);
+	const int3 initial(15, 15, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.resource(initial, GameResID::GOLD, 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	auto * blocker = findFirst<CGResource>();
+	ASSERT_NE(hero, nullptr);
+	ASSERT_NE(blocker, nullptr);
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "B" ] })";
+	JsonNode definition(text.data(), text.size(), "MovingBlocker");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	map()->hideObject(blocker);
+	blocker->appearance = appearance;
+	map()->showObject(blocker);
+
+	for(int z = 0; z < 2; ++z)
+		for(int dx = -1; dx <= 1; ++dx)
+			for(int dy = -1; dy <= 1; ++dy)
+			{
+				if(dx == 0 && dy == 0)
+					continue;
+				SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
+				const int3 origin(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+				const auto destination = map()->getTopology().canonicalize(origin + int3(dx, dy, 0));
+				ASSERT_TRUE(destination);
+				map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+				hero->setConfirmedMovementLayer(EPathfindingLayer::LAND);
+				hero->setMovementPoints(3000);
+				GameHandlerTestServer server(gameState(), player);
+				CGameHandler handler(server, gameState());
+				CPathsInfo paths(gameState()->getMapSize(), hero);
+				auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+				CPathfinder(*gameState(), config).calculatePaths();
+				const auto * node = paths.getNode(*destination, EPathfindingLayer::LAND);
+				ASSERT_TRUE(node->reachable());
+				ASSERT_NE(node->theNodeBefore, nullptr);
+				ASSERT_EQ(node->theNodeBefore->coord, origin);
+
+				handler.changeObjPos(blocker->id, *destination, player);
+				ASSERT_TRUE(map()->getTile(*destination).blocked());
+				EXPECT_FALSE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), origin);
+				EXPECT_EQ(hero->movementPointsRemaining(), 3000);
+				CPathsInfo blockedPaths(gameState()->getMapSize(), hero);
+				auto blockedConfig = std::make_shared<SingleHeroPathfinderConfig>(blockedPaths, *gameState(), hero);
+				CPathfinder(*gameState(), blockedConfig).calculatePaths();
+				EXPECT_FALSE(blockedPaths.getNode(*destination, EPathfindingLayer::LAND)->reachable());
+
+				handler.changeObjPos(blocker->id, initial, player);
+				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+				EXPECT_EQ(hero->visitablePos(), *destination);
+				EXPECT_EQ(hero->movementPointsRemaining(), 3000 - (dx && dy ? 141 : 100));
+			}
+}
+
 TEST_F(HeroMovementTest, grailCanBeDugAfterCrossingToroidalCorner)
 {
 	const PlayerColor player(0);
