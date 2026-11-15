@@ -54,15 +54,33 @@ non-null objects, 1,846 road tiles and 170 river tiles; the second level had
 An opt-in in-memory H3M → VMAP → VCMI loader round trip retained dimensions,
 level count, town and named-instance counts. Every named instance retained
 its type and anchor position; every tile retained its terrain, road and river
-types. This is a partial data comparison: artwork variants, complete object
-properties, references, event behavior, playability and visual correctness
-were not checked. The VMAP was not published or added to the repository.
+types and their used artwork variants and flip bits. Bit 6 of `extTileFlags`
+changed on 6,952 tiles; bit 7 did not change. The source labels bit 6 as a
+coastal flag, but the examined current engine uses computed coast checks and
+does not directly read that bit. Its loss is recorded, not assumed harmless
+for all consumers. Complete object properties, references, event behavior,
+playability and visual correctness were not checked. The VMAP was not
+published or added to the repository.
+
+With the same HotA test profile, the existing
+`MapFormat.ConvertsExternalLegacyMapWithWrappedFootprints` test also passed on
+the original, still two-level Earth map. It enabled toroidal topology in
+memory, confirmed at least one seam-crossing static footprint, saved and
+reopened a VMAP, and compared named objects' IDs, anchors, dimensions and
+per-cell covering, blocking and visitability masks. This is evidence for that
+conversion path, not an adapted single-level map or a playable-session test.
 
 The test accepts `VCMI_TEST_MODDED_ROOT` pointing to a directory containing
 `config/modSettings.json` and `Mods/`; an invalid root is rejected before
 initialization. `VCMI_INSPECT_LEGACY_H3M` selects the external map and
-`VCMI_INSPECT_VMAP_ROUNDTRIP` requests the in-memory round trip. The ordinary
-VCMI mod and game settings retained their earlier SHA-256 values; ordinary
+`VCMI_INSPECT_VMAP_ROUNDTRIP` requests the in-memory round trip. Optional
+`VCMI_INSPECT_VMAP_OUTPUT_DIR` writes the archive as `map.vmap` only after
+creating a new directory; an existing directory is rejected. The local copy
+under `runtime/earth-map-research-2026-11-15/converted-source/` on TB5 has
+SHA-256 `69e1f1aff0398a7042e7b158b1ac638ae3237b23d0a5a8927f0afcb7ef0c4023`.
+It is a two-level conversion of the source, not the proposed demo; the bit-6
+difference above applies.
+The ordinary VCMI mod and game settings retained their earlier SHA-256 values; ordinary
 test runs updated the validation checksums in the separate test preset.
 
 The loader change is covered by synthetic HotA v5 maps: default hero entries
