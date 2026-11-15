@@ -2228,6 +2228,71 @@ protected:
 	}
 };
 
+class RectangularGrailTest : public TinyMapGameTest
+{
+protected:
+	int width = 23;
+	int height = 100;
+	int3 eligible = int3(11, 80, 0);
+	int3 grailCenter = int3(-1, -1, -1);
+	int grailRadius = 0;
+	const Services * gameServices() override { return LIBRARY; }
+
+	void mapLoaded(CMap * loaded) override
+	{
+		TinyMapGameTest::mapLoaded(loaded);
+		loaded->width = width;
+		loaded->height = height;
+		loaded->initTerrain();
+		for(const auto & object : loaded->objects)
+			if(object)
+				loaded->showObject(object.get());
+		loaded->grailPos = grailCenter;
+		loaded->grailRadius = grailRadius;
+		for(int x = 0; x < width; ++x)
+			for(int y = 0; y < height; ++y)
+				loaded->getTile(int3(x, y, 0)).terrainType = TerrainId::ROCK;
+		loaded->getTile(eligible).terrainType = TerrainId::GRASS;
+	}
+
+	void startGame()
+	{
+		TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+		builder.size(36, false).playerActive(PlayerColor(0)).hero(int3(6, 5, 0), HeroTypeID(0), PlayerColor(0));
+		startWithMap(std::move(builder));
+	}
+};
+
+TEST_F(RectangularGrailTest, UnspecifiedGrailCanUseFarEndOfTallBoundedMap)
+{
+	startGame();
+	EXPECT_EQ(map()->grailPos, eligible);
+}
+
+TEST_F(RectangularGrailTest, UnspecifiedGrailCanUseFarEndOfWideBoundedMap)
+{
+	width = 100;
+	height = 23;
+	eligible = int3(80, 11, 0);
+	startGame();
+	EXPECT_EQ(map()->grailPos, eligible);
+}
+
+TEST_F(RectangularGrailTest, ExplicitRadiusStillRestrictsBoundedPlacement)
+{
+	grailCenter = int3(11, 15, 0);
+	grailRadius = 2;
+	startGame();
+	EXPECT_EQ(map()->grailPos, grailCenter);
+}
+
+TEST_F(RectangularGrailTest, UnspecifiedGrailStillRespectsBoundedBorder)
+{
+	eligible = int3(2, 80, 0);
+	startGame();
+	EXPECT_EQ(map()->grailPos, grailCenter);
+}
+
 class FavorableWindsTopologyTest : public TinyMapGameTest
 {
 protected:

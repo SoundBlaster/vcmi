@@ -524,6 +524,8 @@ void CGameState::initGrailPosition(vstd::RNG & randomGenerator)
 	if(map->grailPos.x < 0 || map->grailRadius) //grail not set or set within a radius around some place
 	{
 		const bool unspecified = map->grailPos.x < 0;
+		// A width-derived radius does not cover a tall rectangular map.
+		const bool unrestricted = unspecified && !map->grailRadius;
 		if(!map->grailRadius) //radius not given -> anywhere on map
 			map->grailRadius = map->width * 2;
 
@@ -554,7 +556,7 @@ void CGameState::initGrailPosition(vstd::RNG & randomGenerator)
 					   && !t.visitable()
 						&& t.isLand()
 						&& t.getTerrain()->isPassable()
-						&& ((map->toroidal && unspecified) || distanceSquared <= (map->grailRadius * map->grailRadius)))
+						&& (unrestricted || (map->toroidal && unspecified) || distanceSquared <= (map->grailRadius * map->grailRadius)))
 						allowedPos.emplace_back(x, y, z);
 				}
 			}
