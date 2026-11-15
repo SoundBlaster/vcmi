@@ -424,3 +424,38 @@ three consecutive runs. This is stronger than direct visits, but still does
 not prove an approach from a starting town, normal battle play, graphics,
 remote networking, or the rest of the scenario. The test change is
 `0cbde2c`; it was built from `505ef7f` with that change in the worktree.
+
+### Relocating mountains that cover interactive cells
+
+The `--repair-mountain-interactions` option addresses one subset of the
+estimated new overlaps. It selects plain noninteractive mountain objects
+involved in newly overlapping interactive footprint pairs, excluding any
+mountain that already participated in an interactive overlap in the clipped
+source. It tries a deterministic nearby position within 16 cells, requiring
+the entire active footprint to be on dry terrain without roads, rivers or
+other active footprints. A selected polar reference must remain on snow.
+Mountains for which no such position exists are reported and left untouched.
+The procedure is opt-in and its edits may alter passages or gameplay; it
+does not decide whether all reported overlaps are defects.
+
+On the candidate with the two manual portal-area relocations, 36 mountains
+qualified; 33 were moved and `mountain_4341`, `mountain_7900` and
+`mountain_8145` had no available position under those conditions. The
+number of estimated new interactive-cell overlap occurrences fell from 248
+to 211, and new blocking pairs from 1,293 to 1,213, compared with the
+original clipped map. A direct comparison of the two drafts found exactly 33
+changed objects, all mountains with unchanged non-position JSON fields, no
+new blocking object pairs, and no moved mountain with a pre-existing source
+interactive overlap. Pair-based analysis can still miss additional overlap
+cells between a pair that already interacted in the source.
+
+The local result is
+`runtime/earth-map-research-2026-11-15/draft-stacked/earth-mountain-repair-diagnostic.vmap`,
+SHA-256 `277c29ac2fa7f3594d8bf47bbb19c13eefba9fa15a8a9f9b4197028499ffaa76`.
+VCMI loaded and round-tripped it with the same 12,249 object and 48 town
+counts. The in-process portal-approach test still passed three times with
+four forced guard victories per run. The current assembler reproduced the
+tested header, terrain and object data, and all 31 Python tests passed. The
+repair tool is `f80801e`. These results do not verify ordinary routes from
+starting towns, map balance, visual layout, unhandled interactive overlaps,
+or the rest of the game.
