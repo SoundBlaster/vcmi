@@ -106,6 +106,11 @@ test fixtures; this does not yet establish a full AI turn or a graphical
 multiplayer session. See the
 [AI route record](evidence/topology-ai-direct-route-2026-11-09.md).
 
+The same server fixture now also exercises Nullkiller2 plans using active
+Water Walk and Flight bonuses across all seam directions and both levels,
+ending on land. See the [transient movement record](evidence/nullkiller-transient-seam-2026-11-15.md)
+for its limits; spell casting and autonomous route choice are not covered.
+
 The later [preview run](evidence/topology-preview-eeb3540-2026-11-15.md)
 completed two Nullkiller2 turns with crossings on both axes, then reloaded an
 autosave and crossed a corner. The compared fog and state were limited to the
