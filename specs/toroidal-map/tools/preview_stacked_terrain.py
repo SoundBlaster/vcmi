@@ -6,6 +6,8 @@ This is not a playable map, an editor preview, or a seam-art check.
 """
 
 import argparse
+import collections
+import json
 import zipfile
 
 from analyze_stacked_map import load_json
@@ -49,6 +51,25 @@ def render_svg(rows):
     return "\n".join(lines) + "\n"
 
 
+def seam_summary(rows):
+    def kind(tile):
+        code = tile[:2]
+        if code not in PALETTE:
+            raise ValueError(f"Unknown terrain code {code!r}")
+        return {"wt": "water", "rc": "rock"}.get(code, "land")
+
+    def counts(pairs):
+        result = collections.Counter(f"{kind(a)}/{kind(b)}" for a, b in pairs)
+        return dict(sorted(result.items()))
+
+    midpoint = len(rows) // 2
+    return {
+        "west_east": counts((row[0], row[-1]) for row in rows),
+        "north_south": counts(zip(rows[0], rows[-1])),
+        "level_join": counts(zip(rows[midpoint - 1], rows[midpoint])),
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("vmap")
@@ -57,10 +78,12 @@ def main():
     with zipfile.ZipFile(args.vmap) as archive:
         surface = load_json(archive, "surface_terrain.json")
         underground = load_json(archive, "underground_terrain.json")
-    svg = render_svg(stack_levels(surface, underground))
+    rows = stack_levels(surface, underground)
+    svg = render_svg(rows)
     with open(args.output, "x", encoding="utf-8") as output:
         output.write(svg)
     print(f"Wrote terrain-only preview to {args.output}")
+    print(json.dumps(seam_summary(rows), indent=2))
 
 
 if __name__ == "__main__":

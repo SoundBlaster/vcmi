@@ -1,6 +1,6 @@
 import unittest
 
-from preview_stacked_terrain import render_svg, stack_levels
+from preview_stacked_terrain import render_svg, seam_summary, stack_levels
 
 
 class TerrainPreviewTest(unittest.TestCase):
@@ -15,6 +15,14 @@ class TerrainPreviewTest(unittest.TestCase):
             render_svg([["unknown"]])
         with self.assertRaises(ValueError):
             stack_levels([["gr0_"]], [["wt0_", "wt1_"]])
+
+    def test_summarizes_opposing_edges_without_assuming_coast_is_invalid(self):
+        rows = stack_levels([["gr0_", "wt0_"], ["rc0_", "wt0_"]],
+                            [["wt0_", "wt0_"], ["gr0_", "wt0_"]])
+        summary = seam_summary(rows)
+        self.assertEqual(summary["north_south"], {"land/water": 1, "water/rock": 1})
+        self.assertEqual(sum(summary["west_east"].values()), 4)
+        self.assertEqual(sum(summary["level_join"].values()), 2)
 
 
 if __name__ == "__main__":
