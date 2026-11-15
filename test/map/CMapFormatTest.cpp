@@ -44,6 +44,9 @@
 #include "../../lib/serializer/CMemorySerializer.h"
 #include "../../lib/serializer/CLoadFile.h"
 #include "../../lib/serializer/CSaveFile.h"
+#include "../../lib/serializer/ESerializationVersion.h"
+#include "../../lib/serializer/GameConnection.h"
+#include "../../lib/network/NetworkInterface.h"
 
 #include "../../lib/VCMIDirs.h"
 #include "../../server/CGameHandler.h"
@@ -600,6 +603,56 @@ std::pair<size_t, size_t> compareExternalInspectionFog(const CGameState & before
 	}
 	return {compared, mismatches};
 }
+
+class ExternalInspectionCapture final : public INetworkConnection
+{
+public:
+	void sendPacket(const std::vector<std::byte> & packet) override { bytes = packet; }
+	void setAsyncWritesEnabled(bool) override {}
+	void close() override {}
+	std::vector<std::byte> bytes;
+};
+
+class ExternalInspectionReplicaServer final : public GameHandlerTestServer
+{
+public:
+	ExternalInspectionReplicaServer(const std::shared_ptr<CGameState> & state, PlayerColor player)
+		: GameHandlerTestServer(state, player), transport(std::make_shared<ExternalInspectionCapture>()),
+		  sender(transport), receiver(transport)
+	{
+		sender.setSerializationVersion(ESerializationVersion::CURRENT);
+		receiver.setSerializationVersion(ESerializationVersion::CURRENT);
+		sender.setCallback(*state);
+	}
+
+	void applyPack(CPackForClient & pack) override
+	{
+		if(!replicas.empty())
+		{
+			sender.sendPack(pack);
+			for(const auto & replica : replicas)
+			{
+				receiver.setCallback(*replica);
+				auto decoded = receiver.retrievePack(transport->bytes);
+				auto * clientPack = dynamic_cast<CPackForClient *>(decoded.get());
+				if(!clientPack)
+					throw std::runtime_error("External inspection client packet did not decode");
+				replica->apply(*clientPack);
+				if(dynamic_cast<TryMoveHero *>(clientPack))
+					++deliveredMovements;
+			}
+		}
+		GameHandlerTestServer::applyPack(pack);
+	}
+
+	std::vector<std::shared_ptr<CGameState>> replicas;
+	int deliveredMovements = 0;
+
+private:
+	std::shared_ptr<ExternalInspectionCapture> transport;
+	GameConnection sender;
+	GameConnection receiver;
+};
 }
 
 TEST(MapFormat, ChecksExternalMapModRequirements)
@@ -706,7 +759,10 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			place.nPos = crossing->first;
 			state->apply(place);
 			hero->setMovementPoints(3000);
-			GameHandlerTestServer server(state, player);
+			ExternalInspectionReplicaServer server(state, player);
+			if(std::getenv("VCMI_INSPECT_REPLICA_SEAMS"))
+				for(int index = 0; index < 2; ++index)
+					server.replicas.push_back(reloadExternalInspectionState(state));
 			CGameHandler handler(server, state);
 			const bool destinationWasVisible = state->getPlayerTeam(player)->fogOfWarMap[crossing->second] != 0;
 			if(std::getenv("VCMI_INSPECT_EXPECT_HIDDEN_SEAMS"))
@@ -714,6 +770,22 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(crossing->second),
 			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 			ASSERT_EQ(hero->visitablePos(), crossing->second);
+			const auto checkReplicas = [&](const int3 & expected)
+			{
+				for(const auto & replica : server.replicas)
+				{
+					const auto * replicaHero = dynamic_cast<const CGHeroInstance *>(replica->getMap().getObject(hero->id));
+					ASSERT_NE(replicaHero, nullptr);
+					EXPECT_EQ(replicaHero->visitablePos(), expected);
+					EXPECT_EQ(replicaHero->movementPointsRemaining(), hero->movementPointsRemaining());
+					const auto [compared, mismatches] = compareExternalInspectionFog(*state, *replica);
+					EXPECT_GT(compared, 0u);
+					EXPECT_EQ(mismatches, 0u);
+				}
+			};
+			checkReplicas(crossing->second);
+			if(!server.replicas.empty())
+				std::cout << "Two in-process replicas matched hero and all player fog" << std::endl;
 			if(std::getenv("VCMI_INSPECT_SEAM_SAVE"))
 			{
 				auto restored = reloadExternalInspectionState(state);
@@ -741,6 +813,9 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(crossing->first),
 			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 			ASSERT_EQ(hero->visitablePos(), crossing->first);
+			checkReplicas(crossing->first);
+			if(!server.replicas.empty())
+				EXPECT_EQ(server.deliveredMovements, 4);
 			std::cout << "Land seam crossing in both directions: " << crossing->first.toString()
 			          << " <-> " << crossing->second.toString() << std::endl;
 		}
@@ -793,19 +868,52 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			place.objid = hero->id;
 			place.nPos = *shore;
 			state->apply(place);
-			GameHandlerTestServer server(state, player);
+			hero->setMovementPoints(3000);
+			ExternalInspectionReplicaServer server(state, player);
+			if(std::getenv("VCMI_INSPECT_REPLICA_BOATS"))
+				for(int index = 0; index < 2; ++index)
+					server.replicas.push_back(reloadExternalInspectionState(state));
 			CGameHandler handler(server, state);
 			handler.createBoat(*source, BoatId::CASTLE, player);
-			hero->setMovementPoints(3000);
+			const auto boatID = map.getTile(*source).topVisitableObj();
+			ASSERT_NE(dynamic_cast<const CGBoat *>(map.getObject(boatID)), nullptr);
+			const auto checkReplicas = [&]
+			{
+				for(const auto & replica : server.replicas)
+				{
+					const auto * replicaHero = dynamic_cast<const CGHeroInstance *>(replica->getMap().getObject(hero->id));
+					ASSERT_NE(replicaHero, nullptr);
+					EXPECT_EQ(replicaHero->visitablePos(), hero->visitablePos());
+					EXPECT_EQ(replicaHero->movementPointsRemaining(), hero->movementPointsRemaining());
+					ASSERT_EQ(replicaHero->inBoat(), hero->inBoat());
+					if(hero->inBoat())
+					{
+						ASSERT_NE(replicaHero->getBoat(), nullptr);
+						ASSERT_NE(hero->getBoat(), nullptr);
+						EXPECT_EQ(replicaHero->getBoat()->id, hero->getBoat()->id);
+					}
+					const auto [compared, mismatches] = compareExternalInspectionFog(*state, *replica);
+					EXPECT_GT(compared, 0u);
+					EXPECT_EQ(mismatches, 0u);
+				}
+			};
 			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*source),
 			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
 			ASSERT_TRUE(hero->inBoat());
+			checkReplicas();
 			hero->setMovementPoints(3000);
+			for(const auto & replica : server.replicas)
+			{
+				auto * replicaHero = dynamic_cast<CGHeroInstance *>(replica->getMap().getObject(hero->id));
+				ASSERT_NE(replicaHero, nullptr);
+				replicaHero->setMovementPoints(3000);
+			}
 			for(const auto & target : {*destination, *source})
 			{
 				ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(target),
 				                             EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
 				ASSERT_EQ(hero->visitablePos(), target);
+				checkReplicas();
 				if(target == *destination && std::getenv("VCMI_INSPECT_BOAT_SAVE"))
 				{
 					auto restored = reloadExternalInspectionState(state);
@@ -838,6 +946,21 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 			ASSERT_FALSE(hero->inBoat());
 			ASSERT_EQ(hero->visitablePos(), *shore);
+			const auto * boat = dynamic_cast<const CGBoat *>(map.getObject(boatID));
+			ASSERT_NE(boat, nullptr);
+			EXPECT_EQ(boat->visitablePos(), *source);
+			checkReplicas();
+			for(const auto & replica : server.replicas)
+			{
+				const auto * replicaBoat = dynamic_cast<const CGBoat *>(replica->getMap().getObject(boatID));
+				ASSERT_NE(replicaBoat, nullptr);
+				EXPECT_EQ(replicaBoat->visitablePos(), *source);
+			}
+			if(!server.replicas.empty())
+			{
+				EXPECT_EQ(server.deliveredMovements, 8);
+				std::cout << "Two replicas matched boat, hero and all player fog" << std::endl;
+			}
 			std::cout << "Embarked at " << shore->toString() << ", sailed " << source->toString()
 			          << " <-> " << destination->toString() << " and disembarked" << std::endl;
 		}
