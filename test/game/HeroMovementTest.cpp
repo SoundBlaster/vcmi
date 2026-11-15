@@ -1819,6 +1819,43 @@ TEST(ToroidalDemoVmapTest, DecodesExternalUntaggedPrototypeSave)
 	EXPECT_EQ(state->getMap().height, header.height);
 }
 
+TEST(ToroidalDemoVmapTest, DecodesOriginalBoundedSaveAndMovesHero)
+{
+	const char * suppliedPath = std::getenv("VCMI_ORIGINAL_BOUNDED_SAVE");
+	if(!suppliedPath || !*suppliedPath)
+		GTEST_SKIP() << "Set VCMI_ORIGINAL_BOUNDED_SAVE to the documented original-server save";
+	const boost::filesystem::path path(suppliedPath);
+	ASSERT_TRUE(boost::filesystem::is_regular_file(path));
+	CLoadFile saved(path);
+	CMapHeader header;
+	StartInfo info;
+	auto headerChunk = saved.openChunk(SaveFileFormat::CHUNK_HEADER, nullptr);
+	headerChunk->iser & header;
+	headerChunk->iser & info;
+	ASSERT_TRUE(headerChunk->isFullyRead());
+	ASSERT_FALSE(header.toroidal);
+	auto state = std::make_shared<CGameState>();
+	GameHandlerTestServer server(state, PlayerColor(1));
+	CGameHandler handler(server, state);
+	auto game = saved.openChunk(SaveFileFormat::CHUNK_GAMESTATE, state.get());
+	ASSERT_NO_THROW(state->loadGame(game->iser));
+	ASSERT_NO_THROW(game->iser & handler);
+	ASSERT_TRUE(game->isFullyRead());
+	ASSERT_FALSE(state->getMap().toroidal);
+	ASSERT_EQ(state->getMap().width, 36);
+	ASSERT_EQ(state->getMap().height, 36);
+	CGHeroInstance * hero = nullptr;
+	for(const auto & object : state->getMap().objects)
+		if(auto * candidate = dynamic_cast<CGHeroInstance *>(object.get()); candidate && candidate->getOwner() == PlayerColor(1))
+			hero = candidate;
+	ASSERT_NE(hero, nullptr);
+	ASSERT_EQ(hero->visitablePos(), int3(19, 18, 0));
+	const auto points = hero->movementPointsRemaining();
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(20, 18, 0)), EMovementMode::STANDARD, false, PlayerColor(1), EPathfindingLayer::LAND));
+	EXPECT_EQ(hero->visitablePos(), int3(20, 18, 0));
+	EXPECT_LT(hero->movementPointsRemaining(), points);
+}
+
 TEST_F(ToroidalDemoGameTest, CrossroadsMinesAreReachableByBothPlayers)
 {
 	startWithMap(makeToroidalPlaygroundMap());
