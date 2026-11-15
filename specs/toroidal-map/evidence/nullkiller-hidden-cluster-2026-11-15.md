@@ -40,4 +40,5 @@ Eight focused tests passed; the before and after XML results are
 The full enabled suite passed 1,728 tests, with three disabled; its results are
 `runtime/full-suite-hidden-list-2026-11-15.{log,xml}`.
 This synthetic test does not establish that a real AI turn encounters such a
-visibility change, nor that stale blocker pointers are safe.
+visibility change. Blocker lifetime was addressed separately in the
+[blocker check](nullkiller-cluster-blocker-2026-11-15.md).

@@ -31,7 +31,7 @@ regenerating the index resets manually recorded statuses.
 | `AI/Nullkiller2/AIUtility.h` | 144, 145, 147, 149, 160, 165, 172, 177 | unreviewed |
 | `AI/Nullkiller2/Analyzers/DangerHitMapAnalyzer.cpp` | 81, 83, 133, 219, 221, 257 | reviewed candidates: map dimensions allocate the hit map; distance limits bound pathfinder turns |
 | `AI/Nullkiller2/Analyzers/HeroManager.cpp` | 146 | unreviewed |
-| `AI/Nullkiller2/Analyzers/ObjectClusterizer.cpp` | 22, 37, 60, 61, 97, 103, 496 | partial: Dimension Door reach and cluster representative fixed and tested after baseline; representative selection and target enumeration skip inaccessible objects; other candidates and stale blocker handling unreviewed |
+| `AI/Nullkiller2/Analyzers/ObjectClusterizer.cpp` | 22, 37, 60, 61, 97, 103, 496 | partial: Dimension Door reach and cluster representative fixed and tested after baseline; representative selection and target enumeration skip inaccessible objects; blocker ID resolution is covered by a synthetic lifetime test; other candidates and lifetime paths unreviewed |
 | `AI/Nullkiller2/Behaviors/EscapeBehavior.cpp` | 186 | reviewed candidate: map dimensions bound enumeration of pathfinder results |
 | `AI/Nullkiller2/Behaviors/ExplorationBehavior.cpp` | 64, 65, 216, 217, 878 | reviewed candidates: canonical same-level object ordering uses wrapped displacement, fallback handles other levels; portal limits are path turns; neighbor exploration uses topology-aware enumeration |
 | `AI/Nullkiller2/Behaviors/GatherArmyBehavior.cpp` | 235, 297 | reviewed candidates: compare pathfinder turn counts, not coordinate distances |
