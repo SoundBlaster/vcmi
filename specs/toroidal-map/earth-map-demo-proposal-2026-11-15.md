@@ -590,3 +590,19 @@ and four portal approaches passed, with forced portal-guard victories. The
 checked VMAP round trip and 39 focused Python tests also passed. Other
 overlaps, geographical accuracy, actual battles and long routes remain
 unverified.
+
+The overlap estimate must not be read as a count of inaccessible objects.
+For three distinct resources whose visitable cell overlaps blocking flower
+decorations, an opt-in server test placed a hero on a free adjacent cell,
+gave it movement points, visited the resource and checked the resource amount
+and object removal. In these cases the hero stayed on the adjacent cell and
+then moved to a second free cell. This uses an artificial starting position,
+does not prove a route from a starting town, and does not check whether the
+resource is visually identifiable.
+
+An additional resource, `randomResource_11936` at `(29,114)`, could also be
+collected from an artificially selected adjacent cell. The test did not find
+an adjacent free, unguarded approach with a second free, unguarded cell to
+depart to; a mine guard is nearby. This does not prove the resource or hero
+is trapped: an ordinary route or battle may change the result. The case
+remains open rather than being automatically edited.
