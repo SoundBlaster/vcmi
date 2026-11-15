@@ -64,7 +64,52 @@ de7f9b3946bae850f3f1db03202b766f4d90e65e9dba2da65f551576e55bd44a  vcmiserver
 5b9eacc55446460311fd7262b64b51ec0526867619200287331cbcdc70c05b12  libvcmi.dylib
 ```
 
-The new protocol has not yet been exercised with two graphical clients, a
-remote host, actual older network binaries, or a malformed server packet to
-the graphical client. The local check does not establish smooth camera or
+The protocol has not yet been exercised with a remote host, actual older
+network binaries, or a malformed server packet to the graphical client. The local check does not establish smooth camera or
 animation timing. The test build is not a distribution or notarized release.
+
+## Two graphical clients and reload with framing
+
+A later run used the same client, server and library implementation in two
+separately signed app bundles on macOS arm64. Both clients were launched
+directly with separate diagnostic sockets, observation files and logs, using
+the same VCMI data directory. The guest joined the host at `127.0.0.1:3030`.
+The server listened on all IPv4 interfaces; this was not a remote-host test.
+The host selected `Toroid Roads Demo`, and the lobby assigned red and blue to
+different connections. Both observation streams recorded a 36×36 toroidal
+map and separate player identities.
+
+Red visited gold across the northwest corner and then moved from `(0,0,0)` to
+`(35,35,0)`, with movement 1,560 → 1,278 and gold 20,000 → 21,000. The guest
+log recorded both `TryMoveHero` packets. After red ended its turn, the server
+wrote `Autosave-111` and the guest received the blue turn. Blue moved from
+`(18,18,0)` to `(19,18,0)`, with movement 1,630 → 1,530; the host received
+the move packet. The save was written before blue's move.
+
+Both clients exited normally. In a new network lobby they loaded that save:
+red returned at `(35,35,0)` with 1,278 movement and 21,000 gold, and blue at
+`(18,18,0)` with 1,630 movement. Red then moved southeast through the corner
+to `(0,0,0)` with 1,137 movement; the guest received its `TryMoveHero` packet.
+Both clients and the server exited normally and port 3030 was not listening
+afterwards. The game created an autosave in its normal user-data directory.
+No unavailable-frame message was found in these four client logs.
+
+Point-in-time logs, observations and the copied save are under TB5 build root
+`runtime/gui-framed-multiplayer-2026-11-15/`. SHA-256 values:
+
+```text
+79a18e85703f320ba6dba640808396d4bb898e2a41decea6c1b231851fbb9496  Autosave-111.vsgm1
+4e71a62c3c5f8661a0fd1c23dd94890fc79b76610fe4e7bd412656fd52b03a0e  host-VCMI_Client_log.txt
+d87db67c15b34d7e63f50a4f34e8d3eda3710ba0b86535d2a9a18b94e2f5b3f7  guest-VCMI_Client_log.txt
+5bcc40f1638b3bc3f74c56642a4cd7304e9a5892e695d2f52cb5ebe4c0849b4c  host-observations.jsonl
+bdd06af48efe21118329176d4262408a01f420a99d9b6a752a77cd4b02d10332  guest-observations.jsonl
+30d549c51b5d7e3fc15da950dcc190feffe368352a2b97f9bbc07f4b5027c5ea  reload-host-VCMI_Client_log.txt
+67fa30327dcac824e70d37f4045ad368a7c6856e1b04a86dbdfa6c45cedbcfa8  reload-guest-VCMI_Client_log.txt
+dd176b2c5a323db55ed80f3afdc7fa1a63647b6979c2320c522369240dbec67f  reload-host-observations.jsonl
+aba3977adc91cfa35bd598b966aa422e2b96444964fb73f0fd39068267e317f6  reload-guest-observations.jsonl
+```
+
+Observations describe each player's selected hero and resources, not a complete
+independent replica comparison or fog confidentiality. The logs establish
+receipt of movement packets, not all remote gameplay behavior or animation
+smoothness. This run does not validate old network binaries or remote hosts.
