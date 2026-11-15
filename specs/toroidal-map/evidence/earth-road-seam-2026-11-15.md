@@ -75,3 +75,22 @@ two-way monolith, `monolithTwoWay_5267`, has its visitable cell at
 templates, not an engine-verified route. The monolith has restricted approach
 directions, and reaching it may require an object or terrain edit; neither a
 valid approach nor a road connection to it has yet been established.
+
+## Minimal obstacle experiment on the current assembled map
+
+On the later assembled Earth map, SHA-256
+`97f5222ab48e5987b58c12643be985e450524488bf042a9f6ae27ab9f03ea1f3`,
+an exploratory worktree-only variant of the connection audit removed the
+non-visitable `cactus_7575` from the in-memory map after confirming that it
+blocked `(250,425,0)`. The original map was not changed. With the existing
+search constraints, the test found four candidate seam segments: three had
+a connection on the left side and none had one on the right. It failed its
+positive connection assertion and wrote no output map. The macOS arm64
+`vcmitest` binary was built from `8ca4678` plus this temporary experiment;
+the XML is local at TB5 `runtime/earth-road-cactus-test.xml`.
+
+Removing this cactus alone is insufficient under that search algorithm. This
+does not exclude a connection after other map edits or under less restrictive
+rules. The temporary experiment was removed; the connected Earth road remains
+open. A separate Crossroads fixture already demonstrates a road at a seam,
+as described in [the graphical record](topology-preview-f0f7f4a-2026-11-15.md).
