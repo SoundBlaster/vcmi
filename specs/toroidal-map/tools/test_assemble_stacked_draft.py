@@ -259,6 +259,28 @@ class StackedDraftTest(unittest.TestCase):
             relocate_decorations([mountain], rows, ["isolated"], max_distance=2)
         self.assertEqual((mountain["x"], mountain["y"]), (1, 1))
 
+    def test_selected_spruce_relocation_is_explicit_and_preserves_source_interactions(self):
+        rows = [["gr0_"] * 4 for _ in range(4)]
+        spruce = obj("tree", "spruces", 1, 1, 0, ["B"])
+        with self.assertRaisesRegex(ValueError, "plain allowed decoration"):
+            relocate_decorations([spruce], rows, ["tree"])
+        report = relocate_decorations([spruce], rows, ["tree"], allowed_types={"spruces"})
+        self.assertEqual(len(report), 1)
+        header = {"mapLevels": {"surface": {"width": 4, "height": 4, "index": 0},
+                                "underground": {"width": 4, "height": 4, "index": 1}}}
+        overlap = [obj("tree", "spruces", 1, 1, 0, ["B"]),
+                   obj("hero", "hero", 1, 1, 0, ["A"])]
+        with self.assertRaisesRegex(ValueError, "source interactive overlap"):
+            assemble(header, rows, rows, overlap, relocate_obstacles=("tree",))
+
+    def test_selected_obstacle_relocation_avoids_reserved_cells(self):
+        rows = [["gr0_"] * 4 for _ in range(4)]
+        mountain = obj("hill", "mountain", 1, 1, 0, ["B"])
+        report = relocate_decorations([mountain], rows, ["hill"], reserved={(1, 0)})
+        self.assertEqual(len(report), 1)
+        self.assertNotEqual((mountain["x"], mountain["y"]), (1, 0))
+
+
     def test_repair_moves_only_new_mountain_interactions(self):
         source = [obj("mountain", "mountain", 1, 1, 0, ["B"]),
                   obj("portal", "monolithTwoWay", 3, 3, 0, ["A"])]

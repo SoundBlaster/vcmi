@@ -164,7 +164,7 @@ def changed_cells(before, after):
     return {(x, y) for y, row in enumerate(before) for x, cell in enumerate(row) if cell != after[y][x]}
 
 
-def relocate_decorations(objects, rows, names, max_distance=16, polar_references=None):
+def relocate_decorations(objects, rows, names, max_distance=16, polar_references=None, allowed_types=None, reserved=()):
     """Move selected plain mountains to the nearest unoccupied dry cells."""
     width, height = len(rows[0]), len(rows)
     by_name = {obj["instanceName"]: obj for obj in objects}
@@ -181,10 +181,12 @@ def relocate_decorations(objects, rows, names, max_distance=16, polar_references
     report = []
     if len(set(names)) != len(names):
         raise ValueError("Decoration names must not repeat")
+    allowed_types = {"mountain"} if allowed_types is None else set(allowed_types)
+    reserved = set(reserved)
     for name in names:
         obj = by_name.get(name)
-        if not obj or obj["type"] != "mountain" or obj.get("options"):
-            raise ValueError(f"Expected a plain mountain decoration: {name!r}")
+        if not obj or obj["type"] not in allowed_types or obj.get("options"):
+            raise ValueError(f"Expected a plain allowed decoration: {name!r}")
         if any(kind in "AT" for line in obj["template"]["mask"] for kind in line):
             raise ValueError(f"Interactive objects cannot be relocated as decorations: {name!r}")
         old_x, old_y = obj["x"], obj["y"]
@@ -199,6 +201,8 @@ def relocate_decorations(objects, rows, names, max_distance=16, polar_references
             if (x, y) == (old_x, old_y):
                 continue
             cells = footprint(obj, x, y)
+            if cells & reserved:
+                continue
             if any(occupied[cell] - {name} for cell in cells):
                 continue
             if any(rows[cy][cx][:2] in ("wt", "rc") or len(list(CELL_PART.finditer(rows[cy][cx]))) != 1
@@ -400,7 +404,8 @@ def nested_positions(value, path=()):
 
 def assemble(header, surface, underground, objects, fragment_seed=None, polar_seed=None,
              oceanize=False, snow_island=None, gate_pairs=(), relocate=(), repair_mountains=False,
-             required_mods=(), repair_guards=False, repair_other_guards=False):
+             required_mods=(), repair_guards=False, repair_other_guards=False, relocate_obstacles=(),
+             reserve_tiles=()):
     levels = sorted(header["mapLevels"].values(), key=lambda level: level["index"])
     if len(levels) != 2 or [level["index"] for level in levels] != [0, 1]:
         raise ValueError("Expected exactly two indexed levels")
@@ -471,6 +476,17 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
     mountain_repair = (repair_mountain_interactions(objects, converted, rows, width, height,
                                                    references if polar else None)
                        if repair_mountains else None)
+    if relocate_obstacles:
+        _, original_interactions, _ = occupants(objects, width, height, False)
+        prior_interactive = {item[0] for _, first, second in original_interactions for item in (first, second)}
+        if any(name in prior_interactive for name in relocate_obstacles):
+            raise ValueError("Selected obstacle has a source interactive overlap")
+    reserved = {tuple(tile) for tile in reserve_tiles}
+    if any(len(tile) != 2 or not (0 <= tile[0] < width and 0 <= tile[1] < len(rows)) for tile in reserved):
+        raise ValueError("Reserved tile must be inside the destination map")
+    obstacles = relocate_decorations(converted, rows, relocate_obstacles,
+                                    polar_references=references if polar else None,
+                                    allowed_types={"mountain", "spruces"}, reserved=reserved)
     guard_repair = repair_mine_guards(objects, converted, rows, width, height, underground) if repair_guards else None
     other_guards = (repair_south_guards(objects, converted, rows, width, height,
                     {"randomTown", "arena", "creatureGeneratorCommon", "university", "waterWheel",
@@ -539,6 +555,8 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
         "subterranean_gates": sum(obj["type"] == "subterraneanGate" for obj in converted),
         "replacement_gate_pairs": replaced_gates,
         "relocated_decorations": relocated,
+        "relocated_obstacles": obstacles,
+        "reserved_obstacle_tiles": sorted(reserved),
         "automatic_mountain_repair": mountain_repair,
         "mine_guard_repair": guard_repair,
         "other_guard_repair": other_guards,
@@ -555,6 +573,7 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
                           if any(obj["type"] == "subterraneanGate" for obj in converted) else [])
                        + (["replacement monolith behavior differs from subterranean gates"] if replaced_gates else [])
                        + (["automatic mountain moves may alter routes and need review"] if mountain_repair else [])
+                       + (["selected obstacle moves may alter routes and need review"] if obstacles else [])
                        + (["guard moves may change nearby guard coverage"] if guard_repair or other_guards else []),
     }
 
@@ -583,6 +602,10 @@ def main():
                         help="Restore eligible mine guards to their original relative entrance position")
     parser.add_argument("--repair-other-guards", action="store_true",
                         help="Restore eligible guards of selected non-mine object types")
+    parser.add_argument("--relocate-obstacle", action="append", default=[], metavar="INSTANCE",
+                        help="Move an explicitly selected plain mountain or spruce with no source interactive overlap")
+    parser.add_argument("--reserve-tile", action="append", default=[], nargs=2, type=int, metavar=("X", "Y"),
+                        help="Keep this destination cell free during selected obstacle relocation")
     args = parser.parse_args()
     with zipfile.ZipFile(args.source) as archive:
         expected = {"header.json", "surface_terrain.json", "underground_terrain.json", "objects.json"}
@@ -594,7 +617,8 @@ def main():
             load_json(archive, "underground_terrain.json"), load_json(archive, "objects.json"),
             args.rejoin_east_fragment, args.polar_seed, args.oceanize_edge_rock,
             args.illustrative_snow_island, args.gate_pair or (), args.relocate_mountain,
-            args.repair_mountain_interactions, args.require_mod, args.repair_mine_guards, args.repair_other_guards)
+            args.repair_mountain_interactions, args.require_mod, args.repair_mine_guards, args.repair_other_guards,
+            args.relocate_obstacle, args.reserve_tile)
     with zipfile.ZipFile(args.output, "x", compression=zipfile.ZIP_DEFLATED) as output:
         for name, data in extras.items():
             output.writestr(name, data)
