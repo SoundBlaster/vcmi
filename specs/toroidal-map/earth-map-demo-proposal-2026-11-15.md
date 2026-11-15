@@ -105,6 +105,10 @@ the existing bound types; the repeated startup emitted no corresponding
 validation or parsing errors. The graphical launch was short and is not a
 visual continuity or full-playability acceptance.
 
+A separate macOS profile and local launcher were later prepared on TB5. The
+draft appeared in the ordinary scenario list, started with a human red player,
+and accepted one movement; see the [isolated profile record](evidence/earth-isolated-profile-2026-11-15.md).
+
 ## Candidate placement analysis
 
 The read-only [`tools/analyze_stacked_map.py`](tools/analyze_stacked_map.py)

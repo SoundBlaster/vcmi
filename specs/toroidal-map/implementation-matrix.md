@@ -442,6 +442,8 @@ collisions and geography require review before calling the demo playable.
 The [Earth graphical startup](evidence/earth-gui-hota-bonus-bounds-2026-11-15.md)
 also found and verified a fix for HotA bonus value aliases; it does not accept
 the visual continuity or overall playability of the adapted map.
+The [isolated macOS profile](evidence/earth-isolated-profile-2026-11-15.md)
+starts that draft through the ordinary scenario list and checks one human move.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
