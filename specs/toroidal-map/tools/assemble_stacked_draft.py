@@ -321,7 +321,8 @@ def nested_positions(value, path=()):
 
 
 def assemble(header, surface, underground, objects, fragment_seed=None, polar_seed=None,
-             oceanize=False, snow_island=None, gate_pairs=(), relocate=(), repair_mountains=False):
+             oceanize=False, snow_island=None, gate_pairs=(), relocate=(), repair_mountains=False,
+             required_mods=()):
     levels = sorted(header["mapLevels"].values(), key=lambda level: level["index"])
     if len(levels) != 2 or [level["index"] for level in levels] != [0, 1]:
         raise ValueError("Expected exactly two indexed levels")
@@ -421,6 +422,20 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
                                            "layer": "core:surface", "width": width}}
     new_header["versionMajor"] = TAGGED_TOROIDAL_VERSION
     new_header["topology"] = "toroidal"
+    if required_mods:
+        mods = new_header.get("mods")
+        if mods is None:
+            mods = {"allOf": []}
+        if not isinstance(mods, dict) or not isinstance(mods.get("allOf"), list):
+            raise ValueError("Cannot append unversioned mod requirements to this header format")
+        if any(not isinstance(mod, str) or not mod or mod != mod.strip() for mod in mods["allOf"]):
+            raise ValueError("Invalid existing mod requirement")
+        for mod in required_mods:
+            if not isinstance(mod, str) or not mod or mod != mod.strip():
+                raise ValueError("Invalid mod requirement")
+            if mod not in mods["allOf"]:
+                mods["allOf"].append(mod)
+        new_header["mods"] = mods
     original, original_interactions, clipped = occupants(objects, width, height, False)
     original_interaction_pairs = {tuple(sorted((first[0], second[0])))
                                   for _, first, second in original_interactions}
@@ -476,6 +491,8 @@ def main():
                         help="Move a selected plain mountain to nearby unoccupied dry terrain")
     parser.add_argument("--repair-mountain-interactions", action="store_true",
                         help="Try to move mountains that newly overlap interactive cells")
+    parser.add_argument("--require-mod", action="append", default=[], metavar="MOD_ID",
+                        help="Declare an unversioned required mod; does not discover dependencies")
     args = parser.parse_args()
     with zipfile.ZipFile(args.source) as archive:
         expected = {"header.json", "surface_terrain.json", "underground_terrain.json", "objects.json"}
@@ -487,7 +504,7 @@ def main():
             load_json(archive, "underground_terrain.json"), load_json(archive, "objects.json"),
             args.rejoin_east_fragment, args.polar_seed, args.oceanize_edge_rock,
             args.illustrative_snow_island, args.gate_pair or (), args.relocate_mountain,
-            args.repair_mountain_interactions)
+            args.repair_mountain_interactions, args.require_mod)
     with zipfile.ZipFile(args.output, "x", compression=zipfile.ZIP_DEFLATED) as output:
         for name, data in extras.items():
             output.writestr(name, data)

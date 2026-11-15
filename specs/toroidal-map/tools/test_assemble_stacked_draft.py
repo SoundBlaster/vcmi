@@ -11,6 +11,25 @@ def obj(name, kind, x, y, level, mask):
 
 
 class StackedDraftTest(unittest.TestCase):
+    def test_required_mods_preserve_existing_and_do_not_modify_input(self):
+        header = {"mapLevels": {"surface": {"width": 1, "height": 1, "index": 0},
+                                "underground": {"width": 1, "height": 1, "index": 1}},
+                  "mods": {"allOf": ["hota.cove"]}}
+        result, _, _, _ = assemble(header, [["gr0_"]], [["wt0_"]], [],
+                                   required_mods=("hota.cove", "hota.factory"))
+        self.assertEqual(result["mods"]["allOf"], ["hota.cove", "hota.factory"])
+        self.assertEqual(header["mods"]["allOf"], ["hota.cove"])
+        header["mods"] = None
+        result, _, _, _ = assemble(header, [["gr0_"]], [["wt0_"]], [], required_mods=("hota.cove",))
+        self.assertEqual(result["mods"], {"allOf": ["hota.cove"]})
+
+    def test_required_mods_refuse_to_downgrade_versioned_metadata(self):
+        header = {"mapLevels": {"surface": {"width": 1, "height": 1, "index": 0},
+                                "underground": {"width": 1, "height": 1, "index": 1}},
+                  "mods": [{"modId": "hota.cove", "version": "1.0"}]}
+        with self.assertRaisesRegex(ValueError, "unversioned mod requirements"):
+            assemble(header, [["gr0_"]], [["wt0_"]], [], required_mods=("hota.factory",))
+
     def test_art_rotation_is_involutive_for_terrain_road_and_river(self):
         for tile in ("gr12_", "sn2-", "sw55_pd10_rw12|", "hl81_pd12_rw1+"):
             self.assertEqual(rotate_cell_art(rotate_cell_art(tile)), tile)
