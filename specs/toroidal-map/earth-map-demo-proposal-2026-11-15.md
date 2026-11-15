@@ -459,3 +459,14 @@ tested header, terrain and object data, and all 31 Python tests passed. The
 repair tool is `f80801e`. These results do not verify ordinary routes from
 starting towns, map balance, visual layout, unhandled interactive overlaps,
 or the rest of the game.
+
+The external-map initialization test now optionally inspects one initially
+placed, non-garrisoned land hero per player using the server-side pathfinder.
+It selects a reachable adjacent empty, unguarded land tile and sends the actual
+standard move through `CGameHandler`, without artificially repositioning the
+hero or adding movement points. With `VCMI_INSPECT_START_ROUTES=1` and
+`VCMI_INSPECT_REQUIRE_START_MOVES=8`, all eight players' heroes found such a
+tile and moved there in each of three in-process runs on the map identified
+above. The observed number of reachable neighboring tiles was between two
+and seven. This checks one short move per player, not longer routes, fog
+behavior, player-facing controls, balance, or overall scenario playability.
