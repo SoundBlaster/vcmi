@@ -296,7 +296,9 @@ and the source's required-mod metadata and gameplay still require work.
 
 The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)
 also covers boat embarkation and disembarkation across one edge with two
-replicas. This is a staged loopback test, not a remote graphical game.
+replicas. A running server also saved an embarked hero, a new lobby loaded
+the save for two peers, and the hero disembarked across the edge. These are
+staged loopback tests, not a remote graphical game.
 
 A [bounded rectangular Grail regression](evidence/rectangular-grail-placement-2026-11-15.md)
 also removes the old width-derived limit when no center or radius is specified.

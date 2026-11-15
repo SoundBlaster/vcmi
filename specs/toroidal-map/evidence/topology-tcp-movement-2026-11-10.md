@@ -254,3 +254,23 @@ are `runtime/full-suite-tcp-boat-2026-11-15.{xml,log}` under the TB5 build
 root. The separately run HotA inspection and toroidal-footprint checks above
 used their explicit external fixtures; they are among the optional tests not
 run in this full-suite invocation.
+
+## Boat in a server save reloaded by TCP peers
+
+`ToroidalDemoVmapTest.TcpLobbyStartsToroidalGameForTwoPeers` now stages a
+third blue hero on shore `(35,34,0)`, creates a boat on `(0,34,0)` and reveals
+the nearby tiles through ordinary server packets. The blue peer embarks across
+the seam. The running server writes a save to an isolated temporary directory,
+then a new server and two fresh TCP peers load that save through the lobby.
+Both peers and the server retain the hero's position, movement points, sailing
+layer and boat identity. After the server replenishes movement points, the
+blue peer requests disembarkation back across the seam; both peers agree on
+the hero, boat position, remaining movement points and the full two-team fog
+on both levels.
+
+The extended lobby test, the staged TCP boat movement test, and the existing
+corner-boat save test passed three consecutive runs on macOS arm64. The XML is
+`runtime/tcp-boat-save-2026-11-15.xml` on TB5. This uses a synthetic map,
+server-assisted staging and movement replenishment, and in-process test
+listeners over loopback. It does not establish remote or graphical play,
+boat animation, all shore configurations or a full-state comparison.
