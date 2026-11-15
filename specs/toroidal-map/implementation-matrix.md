@@ -151,6 +151,13 @@ in all eight directions on both levels; the same steps succeed after an
 explicit in-memory toroidal opt-in. See the
 [bounded seam regression](evidence/bounded-seam-regression-2026-11-14.md).
 
+The signed graphical preview at `06ea341` ran two Nullkiller players on the
+clean toroidal demo through red's day-nine victory. Server movement packets
+show selected crossings on both axes. A separate headless run on the same
+sparse fixture reached day 224 without finishing and was stopped. See the
+[AI game record](evidence/topology-ai-game-06ea341-2026-11-15.md); these
+runs do not prove general AI play or remote multiplayer.
+
 After framed-packet support, two current test listeners also negotiated an
 unframed lobby with the original external server, selected a bounded map and
 exchanged chat. The [legacy-server record](evidence/current-client-legacy-server-2026-11-15.md)
