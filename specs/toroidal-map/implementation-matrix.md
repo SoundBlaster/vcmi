@@ -295,13 +295,14 @@ the server battle and forced-victory return with the boat left at sea.
 The [candidate Earth map](earth-map-demo-proposal-2026-11-15.md) has a local
 252×576 single-level toroidal draft. Its isolated HotA test profile accepts
 15 explicitly declared, unversioned mod requirements; the no-HotA test
-profile reports them missing. The draft initializes and round-trips, all
-eight initial heroes made a short server move, and the engine recognized 44
-repositioned guards. Artificially positioned heroes crossed each axis of the
-actual draft in both directions on land and with a test boat; diagonal
-disembarkation also crossed both axes at the corners. An in-process game-state
-save/load retained hero position and all eight players' team fog views after a
-previously hidden destination was revealed on each land seam; a separate
+profile reports them missing. The draft initializes and round-trips; all
+eight initial heroes followed a short visible route to collect a resource,
+with serialized server packets applied to two in-process replicas. The engine
+recognized 44 repositioned guards. Artificially positioned heroes crossed
+each axis of the actual draft in both directions on land and with a test boat;
+diagonal disembarkation also crossed both axes at the corners. An in-process
+game-state save/load retained hero position and all eight players' team fog
+views after a previously hidden destination was revealed on each land seam; a separate
 game-state load retained the boat and allowed sailing back and disembarking.
 Two in-process replicas decoded server packets and matched hero, boat and
 player fog across the tested land and sea seams; no TCP transport was used.

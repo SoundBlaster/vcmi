@@ -683,3 +683,16 @@ reset the server hero's allowance after boarding. Each land and boat scenario
 passed three runs; an additional run verified the left-behind boat position.
 This checks packet serialization and application with an in-process capture,
 not TCP transport, a real lobby or remote graphical clients.
+
+The initial game state was also tested without relocating heroes, granting
+movement points or artificially revealing fog. For one starting hero of each
+of the eight players, the pathfinder selected a visible, unguarded resource
+reachable during the current turn through visible, unguarded land cells. The
+server executed the complete two-to-five-step planned route and collected
+the resource. For each route two independently loaded replicas decoded the
+server's packets and matched the hero position and movement points, resource
+removal and credit, and all players' fog views. All eight routes passed in
+each of three in-process runs. The player actions were executed sequentially
+in the same game state, and the replicas used a memory transport rather than
+TCP. This does not prove the rest of the map is connected, balanced or
+playable, and it does not establish what a graphical player sees.
