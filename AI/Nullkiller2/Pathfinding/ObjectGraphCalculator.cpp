@@ -25,6 +25,13 @@ ObjectGraphCalculator::ObjectGraphCalculator(ObjectGraph * target, const Nullkil
 {
 }
 
+// The storage contains pointers to temporary actors owned by this calculator.
+// Discard it before those actors are destroyed, including on exceptional exit.
+ObjectGraphCalculator::~ObjectGraphCalculator()
+{
+	aiNk->pathfinder->discardPaths();
+}
+
 void ObjectGraphCalculator::setGraphObjects()
 {
 	for(const ObjectInstanceID objId : aiNk->memory->visitableObjs)
@@ -127,6 +134,7 @@ void ObjectGraphCalculator::updatePaths()
 	ps.scoutTurnDistanceLimit = 1;
 	ps.allowBypassObjects = false;
 	ps.useDimensionDoor = false;
+	ps.useSyntheticGraphActors = true;
 
 	aiNk->pathfinder->updatePaths(actors, ps);
 }

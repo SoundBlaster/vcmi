@@ -11,9 +11,13 @@
 
 #include "AI/Nullkiller2/Analyzers/ObjectClusterizer.h"
 #include "AI/Nullkiller2/Pathfinding/Actors.h"
+#include "AI/Nullkiller2/Pathfinding/ObjectGraph.h"
+#include "AI/Nullkiller2/Pathfinding/AIPathfinder.h"
+#include "AI/Nullkiller2/Engine/AIMemory.h"
 #include "lib/mapping/MapTopology.h"
 #include "lib/mapObjects/CGHeroInstance.h"
 #include "lib/mapObjects/CGResource.h"
+#include "lib/networkPacks/PacksForClient.h"
 #include "mock/TinyH3MBuilder.h"
 #include "nullkiller2/NullkillerTest.h"
 
@@ -162,3 +166,71 @@ TEST_F(Nullkiller2_ObjectClusterCenter, clusterCenterTreatsOppositeEdgesAsNearby
 		EXPECT_EQ(opposite.calculateCenter(callback.get()), nullptr);
 	}
 }
+
+class Nullkiller2_ObjectGraphSeams : public NullkillerTest, public ::testing::WithParamInterface<std::tuple<std::pair<int3, int3>, int>> {};
+
+TEST_P(Nullkiller2_ObjectGraphSeams, connectsWrappedObjectsAndPreservesOrdinaryHeroValidation)
+{
+	const PlayerColor player(0);
+	auto [coordinates, level] = GetParam();
+	auto [first, second] = coordinates;
+	first.z = second.z = level;
+	const int3 adjacent(
+		first.x == 0 ? 1 : (first.x == 35 ? 34 : first.x),
+		first.y == 0 ? 1 : (first.y == 35 ? 34 : first.y), level);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true)
+		.playerActive(player)
+		.hero({19, 18, 0}, HeroTypeID(0), player)
+		.resource(first, GameResID::GOLD, 1000)
+		.resource(adjacent, GameResID::GOLD, 1000)
+		.resource(second, GameResID::GOLD, 1000);
+	startWithMap(std::move(builder));
+	revealMap(player);
+	const auto resources = findAll<CGResource>();
+	ASSERT_EQ(resources.size(), 3);
+
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	const auto heroID = hero->id;
+	// Keep the removed hero alive until the pathfinder holding it is destroyed.
+	auto heroLifetime = map()->objects.at(heroID.getNum());
+	auto gateway = makeGateway(player);
+	for(const auto * resource : resources)
+		gateway->nullkiller->memory->addVisitableObject(resource);
+	for(const bool toroidal : {false, true})
+	{
+		map()->toroidal = toroidal;
+		NK2AI::ObjectGraph graph;
+		graph.updateGraph(gateway->nullkiller.get());
+		ASSERT_TRUE(graph.hasNodeAt(first));
+		ASSERT_TRUE(graph.hasNodeAt(second));
+		ASSERT_TRUE(graph.hasNodeAt(adjacent));
+		const auto & links = graph.getNode(first).connections;
+		EXPECT_NE(links.find(adjacent), links.end()) << "ordinary adjacent control";
+		EXPECT_EQ(links.find(second) != links.end(), toroidal);
+		// The graph calculator destroys its temporary heroes at the end of updateGraph.
+		EXPECT_EQ(gateway->nullkiller->pathfinder->getStorage(), nullptr);
+	}
+
+	// A subsequent real-hero search must not inherit synthetic-actor permission.
+	map()->toroidal = true;
+	NK2AI::HeroMap<NK2AI::HeroRole> heroes;
+	heroes[hero] = NK2AI::HeroRole::MAIN;
+	gateway->nullkiller->pathfinder->updatePaths(heroes, NK2AI::PathfinderSettings());
+	const int3 destination(19, 18, 0);
+	ASSERT_FALSE(gateway->nullkiller->pathfinder->getPathInfo(destination).empty());
+	RemoveObject removeHero(heroID, player);
+	gameState()->apply(removeHero);
+	EXPECT_TRUE(gateway->nullkiller->pathfinder->getPathInfo(destination).empty());
+}
+
+INSTANTIATE_TEST_SUITE_P(EdgesAndCorners, Nullkiller2_ObjectGraphSeams, ::testing::Combine(::testing::Values(
+	std::pair{int3(0, 10, 0), int3(35, 10, 0)},
+	std::pair{int3(35, 10, 0), int3(0, 10, 0)},
+	std::pair{int3(10, 0, 0), int3(10, 35, 0)},
+	std::pair{int3(10, 35, 0), int3(10, 0, 0)},
+	std::pair{int3(0, 0, 0), int3(35, 35, 0)},
+	std::pair{int3(35, 35, 0), int3(0, 0, 0)},
+	std::pair{int3(0, 35, 0), int3(35, 0, 0)},
+	std::pair{int3(35, 0, 0), int3(0, 35, 0)}), ::testing::Values(0, 1)));

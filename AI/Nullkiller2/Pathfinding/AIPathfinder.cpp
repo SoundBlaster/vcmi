@@ -93,7 +93,7 @@ void AIPathfinder::updatePaths(const HeroMap<HeroRole> & heroes, PathfinderSetti
 	int pass = 0;
 
 	storage->clear();
-	storage->setHeroes(heroes);
+	storage->setHeroes(heroes, pathfinderSettings.useSyntheticGraphActors);
 	storage->setScoutTurnDistanceLimit(pathfinderSettings.scoutTurnDistanceLimit);
 	storage->setMainTurnDistanceLimit(pathfinderSettings.mainTurnDistanceLimit);
 

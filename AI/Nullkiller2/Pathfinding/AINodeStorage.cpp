@@ -217,6 +217,7 @@ EPathAccessibility AINodeStorage::getAccessibility(
 void AINodeStorage::clear()
 {
 	actors.clear();
+	syntheticGraphActors.clear();
 	committedTiles.clear();
 	dimensionDoorCapabilities.clear();
 	heroChainPass = EHeroChainPass::INITIAL;
@@ -1017,9 +1018,12 @@ bool AINodeStorage::isDistanceLimitReached(const PathNodeInfo & source, CDestina
 	return false;
 }
 
-void AINodeStorage::setHeroes(HeroMap<HeroRole> heroes)
+void AINodeStorage::setHeroes(HeroMap<HeroRole> heroes, bool isSyntheticGraphPass)
 {
 	playerID = aiNk->playerID;
+	if(isSyntheticGraphPass)
+		for(const auto & hero : heroes)
+			syntheticGraphActors.insert(hero.first);
 
 	for(auto & hero : heroes)
 	{
@@ -1717,6 +1721,11 @@ bool AINodeStorage::hasCurrentNodes(const int3 & pos) const
 	return !nodes.get(pos).empty();
 }
 
+bool AINodeStorage::isUsableHero(const CGHeroInstance * hero) const
+{
+	return hero && (syntheticGraphActors.contains(hero) || HeroPtr(hero, aiNk->cc.get()).isVerified(false));
+}
+
 void AINodeStorage::calculateChainInfo(std::vector<AIPath> & paths, const int3 & pos, const bool isOnLand) const
 {
 	const auto layer = isOnLand ? EPathfindingLayer::LAND : EPathfindingLayer::SAIL;
@@ -1751,10 +1760,10 @@ void AINodeStorage::calculatePathSummaries(
 			continue;
 		}
 
-		if(HeroPtr heroPtr(node->actor->hero, aiNk->cc.get()); !heroPtr.isVerified(false))
+		if(!isUsableHero(node->actor->hero))
 		{
 #if NK2AI_TRACE_LEVEL >= 1
-			logAi->warn("AINodeStorage::calculateChainInfo Skipping path due to unverified hero: %s", heroPtr.nameOrDefault());
+			logAi->warn("AINodeStorage::calculateChainInfo Skipping path due to unverified hero: %s", node->actor->hero->getNameTextID());
 #endif
 			continue;
 		}
@@ -1794,8 +1803,7 @@ bool AINodeStorage::calculatePathInfo(AIPath & path, const AIPathNode * node) co
 	if(node->action == EPathNodeAction::UNKNOWN || !node->actor || !node->actor->hero)
 		return false;
 
-	HeroPtr heroPtr(node->actor->hero, aiNk->cc.get());
-	if(!heroPtr.isVerified(false))
+	if(!isUsableHero(node->actor->hero))
 		return false;
 
 	path = AIPath();

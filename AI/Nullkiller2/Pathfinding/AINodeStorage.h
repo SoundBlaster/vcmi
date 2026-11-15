@@ -192,6 +192,7 @@ public:
 class AINodeStorage : public INodeStorage
 {
 private:
+	bool isUsableHero(const CGHeroInstance * hero) const;
 	struct AccessibilityInfo
 	{
 		EPathAccessibility value = EPathAccessibility::NOT_SET;
@@ -207,6 +208,7 @@ private:
 	Nullkiller * aiNk; // TODO: Mircea: Replace with &
 	AIPathNodePool nodes;
 	std::vector<std::shared_ptr<ChainActor>> actors;
+	std::set<const CGHeroInstance *> syntheticGraphActors;
 	std::vector<CGPathNode *> heroChain;
 	std::set<int3> committedTiles;
 	std::set<int3> committedTilesInitial;
@@ -315,7 +317,7 @@ public:
 	void calculatePathSummaries(std::vector<AIPathSummary> & summaries, const int3 & pos, bool isOnLand) const;
 	bool calculatePathInfo(AIPath & path, const AIPathSummary & summary) const;
 	bool isTileAccessible(const HeroPtr & heroPtr, const int3 & pos, const EPathfindingLayer layer) const;
-	void setHeroes(HeroMap<HeroRole> heroes);
+	void setHeroes(HeroMap<HeroRole> heroes, bool syntheticGraphActors = false);
 	void setScoutTurnDistanceLimit(uint8_t distanceLimit) { turnDistanceLimit[HeroRole::SCOUT] = distanceLimit; }
 	void setMainTurnDistanceLimit(uint8_t distanceLimit) { turnDistanceLimit[HeroRole::MAIN] = distanceLimit; }
 	void setTownsAndDwellings(

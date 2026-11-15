@@ -29,13 +29,16 @@ struct PathfinderSettings
 	uint8_t mainTurnDistanceLimit;
 	bool allowBypassObjects;
 	bool useDimensionDoor;
+	// ObjectGraphCalculator owns temporary heroes that are not map objects.
+	bool useSyntheticGraphActors;
 
 	PathfinderSettings()
 		:useHeroChain(false),
 		scoutTurnDistanceLimit(MaxTurnDistanceLimit),
 		mainTurnDistanceLimit(MaxTurnDistanceLimit),
 		allowBypassObjects(true),
-		useDimensionDoor(true)
+		useDimensionDoor(true),
+		useSyntheticGraphActors(false)
 	{ }
 };
 
@@ -53,6 +56,7 @@ public:
 	bool calculatePathInfo(AIPath & path, const AIPathSummary & summary) const;
 	bool isTileAccessible(const HeroPtr & hero, const int3 & tile) const;
 	void updatePaths(const HeroMap<HeroRole> & heroes, PathfinderSettings pathfinderSettings);
+	void discardPaths() { storage.reset(); }
 	void updateGraphs(const HeroMap<HeroRole> & heroes, uint8_t mainScanDepth, uint8_t scoutScanDepth);
 	void calculateQuickPathsWithBlocker(std::vector<AIPath> & result, const std::vector<const CGHeroInstance *> & heroes, const int3 & tile);
 

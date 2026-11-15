@@ -38,6 +38,7 @@ private:
 
 public:
 	ObjectGraphCalculator(ObjectGraph * target, const Nullkiller * aiNk);
+	~ObjectGraphCalculator();
 	void setGraphObjects();
 	void calculateConnections();
 	float getNeighborConnectionsCost(const int3 & pos, std::vector<AIPath> & pathCache);
