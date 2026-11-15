@@ -568,3 +568,25 @@ recognized all 40 restored guards, eight initial moves succeeded, and all
 four portal approaches succeeded with forced guard victories. The map also
 passed the checked VMAP round trip. Matching road type does not prove visual
 road continuity or the full pathfinding behavior of the scenario.
+
+For the four blocked targets, the diagnostic assembler now supports
+explicitly relocating selected plain mountains and spruces that had no source
+interactive overlap. Placement avoids other active footprints, water, rock,
+roads, rivers and explicitly reserved destination cells. With the four guard
+cells reserved, both mountains and both spruces found placements and all four
+remaining guards returned to their source-relative entrance positions. One
+mountain moved 13 tiles horizontally and 14 vertically; the effect on routes
+and landscape requires human review, so this is still a diagnostic proposal.
+
+The resulting `draft-stacked/earth-reserved-guard-diagnostic.vmap` has SHA-256
+`58e7b7e6bf94c117d350028757c9cf1c7160bf3107fe435cf003306d3dbd74a6`.
+Compared with the preceding draft, exactly four decorations and four guards
+changed position; their other fields, the header and terrain were unchanged.
+No blocking or interactive pairs were added; eight blocking and four
+interactive pairs were removed. Estimated newly overlapping interactive
+occurrences fell from 168 to 164. In three initialized game states, all 44
+restored guards protected the intended objects, all eight initial hero moves
+and four portal approaches passed, with forced portal-guard victories. The
+checked VMAP round trip and 39 focused Python tests also passed. Other
+overlaps, geographical accuracy, actual battles and long routes remain
+unverified.
