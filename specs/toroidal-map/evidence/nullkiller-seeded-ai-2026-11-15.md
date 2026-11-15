@@ -71,3 +71,18 @@ for the bounded control. The stop condition is polled, so the recorded limit
 may overshoot, and the summary's final-log day is more accurate than its
 last polled day. This does not prove balanced strategy, general AI liveness,
 remote play or any graphical behavior.
+
+## Crossroads seed 4 on 8b680f3
+
+The current macOS arm64 build ran the versioned 36×36 Toroid Crossroads
+scenario with two AI players, seed 4, a local in-process server and a private
+log directory. A hero crossed the horizontal seam successfully. The game had
+not ended by day 1316 when the 120-second limit interrupted it. The log also
+repeatedly reported no worthwhile task. This is one run, without a bounded
+control; it does not establish a permanent deadlock or a topology-specific
+cause. It does not establish graphical or remote-network behavior.
+
+The run summary and logs are under
+`runtime/crossroads-ai-8b680f3-2026-11-15/` on the TB5 build root. The user
+settings file retained SHA-256
+`a04043a03263ce8569341fb84038b5c76d481f5b3f1d615b50b23ee87263a770`.
