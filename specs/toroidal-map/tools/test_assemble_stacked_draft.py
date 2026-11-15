@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from assemble_stacked_draft import assemble, place_object, rotate_cell_art
+from assemble_stacked_draft import assemble, blocking_pairs, place_object, rotate_cell_art
 
 
 def obj(name, kind, x, y, level, mask):
@@ -56,6 +56,33 @@ class StackedDraftTest(unittest.TestCase):
                   "events": [{"position": {"x": 0, "y": 0, "l": 0}}]}
         with self.assertRaisesRegex(ValueError, "Unsupported coordinate reference"):
             assemble(header, [["gr0_"]], [["wt0_"]], [])
+
+    def test_rejoins_fragment_and_moves_whole_objects_including_outside_anchor(self):
+        header = {"mapLevels": {"surface": {"width": 4, "height": 4, "index": 0},
+                                "underground": {"width": 4, "height": 4, "index": 1}},
+                  "players": {"red": {"mainTown": {"x": 3, "y": 1, "l": 1}}}}
+        surface = [["wt0_"] * 4 for _ in range(4)]
+        underground = [["wt0_"] * 4 for _ in range(4)]
+        underground[1][2:] = ["sa1_", "sa2_"]
+        objects = [obj("town", "town", 3, 1, 1, ["AB"]),
+                   obj("outside", "decoration", 4, 1, 1, ["BB"]),
+                   obj("other", "decoration", 0, 3, 1, ["B"])]
+        new_header, rows, moved, report = assemble(header, surface, underground, objects, (3, 1))
+        self.assertEqual(rows[5][2:], ["sa1_", "sa2_"])
+        self.assertEqual((moved[0]["x"], moved[0]["y"]), (3, 5))
+        self.assertEqual((moved[1]["x"], moved[1]["y"]), (0, 5))
+        self.assertEqual((moved[2]["x"], moved[2]["y"]), (3, 0))
+        self.assertEqual(new_header["players"]["red"]["mainTown"], {"x": 3, "y": 5, "l": 0})
+        self.assertEqual(report["east_fragment_objects_moved"], 2)
+        self.assertEqual(report["east_fragment"]["source_cells"], 2)
+        self.assertEqual(underground[1][3], "sa2_")
+
+    def test_collision_analysis_wraps_across_boundaries(self):
+        objects = [obj("a", "x", 0, 1, 0, ["AB"]),
+                   obj("b", "x", 3, 1, 0, ["B"])]
+        pairs, interactions = blocking_pairs(objects, 4, 4)
+        self.assertEqual(pairs, {("a", "b")})
+        self.assertEqual(interactions, [("a", "b")])
 
 
 if __name__ == "__main__":
