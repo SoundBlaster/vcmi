@@ -20,6 +20,8 @@
 #include "../../lib/GameLibrary.h"
 #include "../../lib/IGameSettings.h"
 #include "../../lib/CPlayerState.h"
+#include "../../lib/CStack.h"
+#include "../../lib/battle/BattleAction.h"
 #include "../../lib/battle/BattleInfo.h"
 #include "../../lib/campaign/CampaignState.h"
 #include "../../lib/callback/EditorCallback.h"
@@ -3742,6 +3744,74 @@ TEST_P(ToroidalGuardedDisembarkTest, DisembarkingStartsGuardBattleAndLeavesBoatA
 	EXPECT_EQ(map()->getObject(guardID), nullptr);
 	EXPECT_EQ(hero->visitablePos(), shore);
 	EXPECT_FALSE(hero->inBoat());
+	const auto * boat = map()->getObject(boatId);
+	ASSERT_NE(boat, nullptr);
+	EXPECT_EQ(boat->visitablePos(), water);
+}
+
+TEST_P(ToroidalGuardedDisembarkTest, RetreatFromGuardedShoreLeavesTheBoatAtSea)
+{
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions[GetParam() % directions.size()];
+	const int z = GetParam() / directions.size();
+	const MapTopology topology(36, 36, 2, true);
+	const int3 water(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z);
+	const int3 direction(dx, dy, 0);
+	const auto shore = *topology.canonicalize(water + direction);
+	const auto guardPos = *topology.canonicalize(shore + direction);
+	const auto embarkShore = *topology.canonicalize(water - direction);
+	SCOPED_TRACE(::testing::Message() << "level=" << z << " direction=" << dx << "," << dy);
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.heroGarrison({{CreatureID::ARCHER, 100}})
+		.terrain(water, TerrainId::WATER)
+		.monster(guardPos, CreatureID(27), 1);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	map()->calculateGuardingGreaturePositions();
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	const auto heroId = hero->id;
+	map()->moveObject(heroId, hero->convertFromVisitablePos(embarkShore));
+	const auto guardId = map()->getTile(guardPos).topVisitableObj();
+	auto * guard = dynamic_cast<CGCreature *>(map()->getObject(guardId));
+	ASSERT_NE(guard, nullptr);
+	guard->agression = 127;
+	guard->neverFlees = true;
+	ASSERT_EQ(gameState()->guardingCreaturePosition(shore), guardPos);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(water, BoatId::CASTLE, player);
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(heroId, hero->convertFromVisitablePos(water), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(hero->inBoat());
+	const auto boatId = hero->getBoat()->id;
+	hero->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(heroId, hero->convertFromVisitablePos(shore), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	const auto * observedBattle = gameState()->getBattle(player);
+	ASSERT_NE(observedBattle, nullptr);
+	const auto battleId = observedBattle->getBattleID();
+	auto * battle = gameState()->getBattle(battleId);
+	ASSERT_NE(battle, nullptr);
+	ASSERT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+	const auto stacks = battle->battleGetAllStacks(true);
+	const auto attacker = std::ranges::find_if(stacks, [](const auto * stack) { return stack->unitSide() == BattleSide::ATTACKER; });
+	ASSERT_NE(attacker, stacks.end());
+	battle->activeStack = (*attacker)->unitId();
+	ASSERT_TRUE(handler.battles->makePlayerBattleAction(battleId, player, BattleAction::makeRetreat(BattleSide::ATTACKER)));
+	auto resultDialog = handler.activities->topActivity(player);
+	ASSERT_NE(resultDialog, nullptr);
+	ASSERT_EQ(resultDialog->getType(), ActivityType::BattleDialog);
+	ASSERT_EQ(handler.activities->submitReply(resultDialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	EXPECT_EQ(gameState()->getBattle(player), nullptr);
+	EXPECT_EQ(server.battlesConfirmed, 1);
+	EXPECT_EQ(map()->getObject(heroId), nullptr);
+	const auto * remainingGuard = map()->getObject(guardId);
+	ASSERT_NE(remainingGuard, nullptr);
+	EXPECT_EQ(remainingGuard->visitablePos(), guardPos);
 	const auto * boat = map()->getObject(boatId);
 	ASSERT_NE(boat, nullptr);
 	EXPECT_EQ(boat->visitablePos(), water);
