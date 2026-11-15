@@ -7888,6 +7888,48 @@ TEST_F(HeroMovementTest, HeroCollectsResourcesAcrossEveryToroidalEdgeAndCorner)
 	EXPECT_EQ(gameState()->players.at(player).resources[GameResID::GOLD], goldBefore + 1000);
 }
 
+class ToroidalArtifactPickupTest : public HeroMovementTest, public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(ToroidalArtifactPickupTest, PicksUpArtifactAcrossBoundaryOrInterior)
+{
+	static const std::array<std::pair<int, int>, 8> directions = {{{-1, -1}, {-1, 0}, {-1, 1},
+		{0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+	const auto [dx, dy] = directions.at(GetParam() % directions.size());
+	const int z = (GetParam() / directions.size()) % 2;
+	const bool toroidal = GetParam() < 16;
+	const int3 destination = toroidal
+		? int3(dx < 0 ? 35 : dx > 0 ? 0 : 17, dy < 0 ? 35 : dy > 0 ? 0 : 17, z)
+		: int3(17, 17, z);
+	const int3 origin = toroidal
+		? int3(dx < 0 ? 0 : dx > 0 ? 35 : 17, dy < 0 ? 0 : dy > 0 ? 35 : 17, z)
+		: destination - int3(dx, dy, 0);
+	const PlayerColor player(0);
+	const ArtifactID artifact(7);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(19, 18, 0), HeroTypeID(0), player)
+		.artifact(destination, artifact);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(toroidal);
+	revealMap(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(origin));
+	hero->setMovementPoints(3000);
+	ASSERT_FALSE(hero->hasArt(artifact));
+	const auto objectId = map()->getTile(destination).topVisitableObj();
+	ASSERT_TRUE(objectId.hasValue());
+	ASSERT_NE(dynamic_cast<const CGArtifact *>(map()->getObject(objectId)), nullptr);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	EXPECT_TRUE(hero->hasArt(artifact));
+	EXPECT_EQ(map()->getObject(objectId), nullptr);
+}
+
+INSTANTIATE_TEST_SUITE_P(EdgesAndBoundedControls, ToroidalArtifactPickupTest, ::testing::Range(0, 32));
+
 TEST_F(HeroMovementTest, HeroCapturesMineAcrossToroidalSeam)
 {
 	const PlayerColor player(0);
