@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from assemble_stacked_draft import (assemble, blocking_pairs, place_object, relocate_decorations, replace_gate_pairs,
+from assemble_stacked_draft import (assemble, blocking_pairs, place_object, relocate_decorations, relocate_water_monoliths, replace_gate_pairs,
                                     repair_mine_guards, repair_mountain_interactions, repair_south_guards,
                                     rotate_cell_art, source_gate_pairs)
 
@@ -12,6 +12,59 @@ def obj(name, kind, x, y, level, mask):
 
 
 class StackedDraftTest(unittest.TestCase):
+    def test_assembler_applies_explicit_water_monolith_move(self):
+        header = {"mapLevels": {"surface": {"width": 8, "height": 8, "index": 0},
+                                "underground": {"width": 8, "height": 8, "index": 1}}}
+        surface = [["wt0_"] * 8 for _ in range(8)]
+        underground = [["wt0_"] * 8 for _ in range(8)]
+        portal = obj("water", "monolithTwoWay", 2, 2, 0, ["BAB"])
+        portal["subtype"] = "hotaPortalWaterBlue"
+        portal["template"]["visitableFrom"] = ["---", "+-+", "+++"]
+        _, _, converted, report = assemble(header, surface, underground, [portal],
+                                            relocate_water_monolith=(("water", 5, 5),))
+        self.assertEqual((converted[0]["x"], converted[0]["y"]), (5, 5))
+        self.assertEqual(report["relocated_water_monoliths"],
+                         [{"object": "water", "from": [2, 10], "to": [5, 5]}])
+        self.assertEqual((portal["x"], portal["y"]), (2, 2))
+
+    def test_water_monolith_move_preserves_source_and_requires_clear_approach(self):
+        portal = obj("water", "monolithTwoWay", 2, 2, 0, ["BAB"])
+        portal["subtype"] = "hotaPortalWaterBlue"
+        portal["template"]["visitableFrom"] = ["---", "+-+", "+++"]
+        source = [portal]
+        placed = copy.deepcopy(source)
+        source_rows = [["wt0_"] * 8 for _ in range(8)]
+        rows = copy.deepcopy(source_rows)
+        report = relocate_water_monoliths(source, placed, [source_rows, source_rows], rows, [("water", 5, 5)])
+        self.assertEqual(report, [{"object": "water", "from": [2, 2], "to": [5, 5]}])
+        self.assertEqual((source[0]["x"], source[0]["y"]), (2, 2))
+        self.assertEqual((placed[0]["x"], placed[0]["y"]), (5, 5))
+
+        blocker = obj("rock", "mountain", 4, 5, 0, ["B"])
+        with self.assertRaisesRegex(ValueError, "occupied"):
+            relocate_water_monoliths(source, copy.deepcopy(source) + [blocker], [source_rows, source_rows],
+                                      rows, [("water", 5, 5)])
+        dry = copy.deepcopy(rows)
+        dry[5][4] = "sa0_"
+        with self.assertRaisesRegex(ValueError, "clear water"):
+            relocate_water_monoliths(source, copy.deepcopy(source), [source_rows, source_rows],
+                                      dry, [("water", 5, 5)])
+        no_approach = copy.deepcopy(rows)
+        for x, y in ((3, 5), (5, 5), (3, 6), (4, 6), (5, 6)):
+            if (x, y) not in ((3, 5), (4, 5), (5, 5)):
+                no_approach[y][x] = "sa0_"
+        with self.assertRaisesRegex(ValueError, "no clear water approach"):
+            relocate_water_monoliths(source, copy.deepcopy(source), [source_rows, source_rows],
+                                      no_approach, [("water", 5, 5)])
+        wrong_source = copy.deepcopy(source_rows)
+        wrong_source[2][1] = "sa0_"
+        with self.assertRaisesRegex(ValueError, "Source monolith entrance"):
+            relocate_water_monoliths(source, copy.deepcopy(source), [wrong_source, source_rows],
+                                      rows, [("water", 5, 5)])
+        with self.assertRaisesRegex(ValueError, "outside destination"):
+            relocate_water_monoliths(source, copy.deepcopy(source), [source_rows, source_rows],
+                                      rows, [("water", 8, 5)])
+
     def test_guard_can_return_to_same_road_type_but_not_different_overlay(self):
         source = [obj("building", "arena", 5, 4, 1, ["BBB", "BAB"]),
                   obj("guard", "monster", 5, 5, 1, ["AV"])]
