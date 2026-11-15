@@ -761,3 +761,14 @@ The previously targeted red-player resource plan also passed; the local
 inputs. These are in-process checks, not TCP or GUI play. They establish
 neither a complete server turn (`makeTurn()` does not itself send `EndTurn`)
 nor combat, later days, other players' autonomous turns or full map playability.
+
+The same bounded diagnostic was then run once in a fresh process for each
+of the other seven players, using their own starting hero, normal initial fog
+and movement points. All seven passed without a rejected move: four began a
+battle and were interrupted before combat; three returned from planning
+without combat or pending activities. Their runs used 3–14 movement requests;
+the logged events include blocking dialogs, recruitment and completed visits
+when encountered. The separate logs are `ai-autonomous-player-1.log` through
+`ai-autonomous-player-7.log` in the same TB5 runtime directory. Together with
+the red-player checks, this covers the beginning of autonomous actions for
+all eight starts, not complete server turns or battles for all players.
