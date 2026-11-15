@@ -131,6 +131,44 @@ TEST_F(Nullkiller2_Behaviors_WaterExploration, ownShipyardRouteBuildsBoatToReach
 	EXPECT_TRUE(sailsFromShipyard);
 }
 
+TEST_F(Nullkiller2_Behaviors_WaterExploration, plansBoatFromShipyardAcrossToroidalSeam)
+{
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.name("NK2WrappedShipyardExploration")
+		.playerActive(PLAYER)
+		.hero({8, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 100}})
+		.shipyard({2, 10, 0}, PLAYER);
+	for(int x = 20; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			builder.terrain({x, y, 0}, TerrainId::WATER);
+
+	startWithMap(std::move(builder));
+	shipyard = findAll<CGShipyard>().front();
+	EXPECT_NE(shipyard->shipyardStatus(), IBoatGenerator::GOOD);
+	map()->toroidal = true;
+	setMapVisibility(PLAYER, true);
+	ASSERT_EQ(shipyard->shipyardStatus(), IBoatGenerator::GOOD);
+	ASSERT_EQ(shipyard->bestLocation(), int3(35, 10, 0));
+	gameState()->getPlayerTeam(PLAYER)->fogOfWarMap[int3(27, 10, 0)] = 0;
+	preparePlanning();
+
+	const auto goals = explorationGoals();
+	const bool sailsFromWrappedShipyard = std::ranges::any_of(goals, [this](const auto & goal)
+	{
+		const auto * route = routeOf(goal);
+		if(!route || route->getFirstBlockedAction() || !map()->getTile(route->targetTile()).isWater())
+			return false;
+		return std::ranges::any_of(route->nodes, [](const NK2AI::AIPathNodeInfo & node)
+		{
+			return node.coord == int3(35, 10, 0)
+				&& std::dynamic_pointer_cast<const NK2AI::AIPathfinding::BuildBoatAction>(node.specialAction) != nullptr;
+		});
+	});
+	EXPECT_TRUE(sailsFromWrappedShipyard);
+}
+
 TEST_F(Nullkiller2_Behaviors_WaterExploration, uncapturedShipyardIsVisitedFirst)
 {
 	start(PlayerColor::NEUTRAL);
