@@ -374,6 +374,79 @@ TEST(MapFormat, LegacyH3MCanBeOptedIntoToroidalVmap)
 	EXPECT_EQ(reopened->getTile(int3(8, 8, 0)).terrainType, TerrainId::WATER);
 }
 
+TEST(MapFormat, LoadsExternalLegacyMapForInspection)
+{
+	const char * path = std::getenv("VCMI_INSPECT_LEGACY_H3M");
+	if(!path || !*path)
+		GTEST_SKIP() << "Set VCMI_INSPECT_LEGACY_H3M to a legacy map";
+	std::ifstream file(path, std::ios::binary);
+	ASSERT_TRUE(file.is_open());
+	const std::vector<ui8> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	EditorCallback callback(nullptr);
+	CMapService service;
+	auto map = service.loadMap(bytes.data(), static_cast<int>(bytes.size()), "ExternalInspectionMap", "core", "CP1251", &callback);
+	ASSERT_NE(map, nullptr);
+	callback.setMap(map.get());
+	std::cout << "External map: " << map->width << "x" << map->height << ", levels=" << static_cast<int>(map->levels())
+		<< ", objects=" << map->objects.size() << ", towns=" << map->getAllTowns().size() << std::endl;
+	for(int z = 0; z < map->levels(); ++z)
+	{
+		size_t objects = 0, water = 0, road = 0, river = 0;
+		for(const auto & object : map->objects)
+			if(object && object->anchorPos().z == z)
+				++objects;
+		for(int y = 0; y < map->height; ++y)
+			for(int x = 0; x < map->width; ++x)
+			{
+				const auto & tile = map->getTile(int3(x, y, z));
+				water += tile.isWater();
+				road += tile.hasRoad();
+				river += tile.hasRiver();
+			}
+		std::cout << "Level " << z << ": objects=" << objects << ", water=" << water
+			<< ", road=" << road << ", river=" << river << std::endl;
+	}
+	if(std::getenv("VCMI_INSPECT_VMAP_ROUNDTRIP"))
+	{
+		CMemoryBuffer archive;
+		{
+			CMapSaverJson saver(&archive);
+			saver.saveMap(map);
+		}
+		archive.seek(0);
+		EditorCallback reopenedCallback(nullptr);
+		CMapLoaderJson reader(&archive);
+		auto reopened = reader.loadMap(&reopenedCallback);
+		reopenedCallback.setMap(reopened.get());
+		ASSERT_EQ(reopened->width, map->width);
+		ASSERT_EQ(reopened->height, map->height);
+		ASSERT_EQ(reopened->levels(), map->levels());
+		EXPECT_EQ(reopened->getAllTowns().size(), map->getAllTowns().size());
+		EXPECT_EQ(reopened->instanceNames.size(), map->instanceNames.size());
+		size_t changedObjects = 0, changedTerrain = 0;
+		for(const auto & [name, object] : map->instanceNames)
+		{
+			const auto found = reopened->instanceNames.find(name);
+			if(found == reopened->instanceNames.end() || found->second->anchorPos() != object->anchorPos() || found->second->ID != object->ID)
+				++changedObjects;
+		}
+		for(int z = 0; z < map->levels(); ++z)
+			for(int y = 0; y < map->height; ++y)
+				for(int x = 0; x < map->width; ++x)
+				{
+					const int3 pos(x, y, z);
+					const auto & before = map->getTile(pos);
+					const auto & after = reopened->getTile(pos);
+					if(before.terrainType != after.terrainType || before.roadType != after.roadType || before.riverType != after.riverType)
+						++changedTerrain;
+				}
+		EXPECT_EQ(changedObjects, 0u);
+		EXPECT_EQ(changedTerrain, 0u);
+		std::cout << "VMAP round trip: changed objects=" << changedObjects << ", changed terrain tiles=" << changedTerrain << std::endl;
+	}
+}
+
 TEST(MapFormat, ConvertsExternalLegacyMapWithWrappedFootprints)
 {
 	const char * path = std::getenv("VCMI_TOROID_LEGACY_H3M");
