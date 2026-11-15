@@ -45,6 +45,8 @@ coverage already and does not imply that all of its cases are unimplemented.
   independently reproducible local test copy.
 - [ ] Check land, water and region connectivity and the effects of replacing
   the original underground gates. Document intentional gameplay changes.
+- [ ] Investigate the [water-monolith mismatch](evidence/earth-portal-road-2026-11-15.md):
+  a land entrance selected a water exit and the server rejected the teleport.
 - [ ] Prepare a road that crosses a seam and verify its logical and static
   visual continuity. The current Earth draft's roads do not reach its edges.
 - [ ] Make the demo convenient to launch and play with an isolated profile;

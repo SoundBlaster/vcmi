@@ -472,6 +472,9 @@ tiles are isolated from the existing road network, so the Earth road demo
 remains incomplete. A constrained search for clear connections to existing
 dirt roads on both sides found none; the [road record](evidence/earth-road-seam-2026-11-15.md)
 describes its limits and a positive control.
+An [experimental road to a monolith](evidence/earth-portal-road-2026-11-15.md)
+reached the entrance in a staged graphical game, but the water-monolith exit
+was rejected for a land hero. The adaptation and road appearance remain open.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;
