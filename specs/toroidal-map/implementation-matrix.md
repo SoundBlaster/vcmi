@@ -240,6 +240,10 @@ On the later `ff23f4b` client, Crossroads seed 3 completed with red's victory
 on day 60 after a logged edge crossing. Crossroads seed 4 on an earlier build
 was stopped at day 1316 without a winner; these individual runs do not prove
 general AI progress. See the [seeded comparison](evidence/nullkiller-seeded-ai-2026-11-15.md).
+On the same Crossroads map and seed 4, a bounded control won on day 40 while
+the toroidal run was stopped on day 221 without a winner; both sides were
+still taking actions. This comparison identifies an investigation target,
+not a proven topology-specific AI defect.
 
 After framed-packet support, two current test listeners also negotiated an
 unframed lobby with the original external server, selected a bounded map and

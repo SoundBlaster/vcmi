@@ -119,3 +119,28 @@ refreshed mod-validation checksums; only those changes were restored from a
 pre-run backup after confirming the remaining settings had not changed. The
 game settings retained their prior hash. This run did not launch the separate
 server executable or establish graphical behavior.
+
+## Crossroads seed 4: toroidal and bounded comparison
+
+On the same `85dcfb7` build, two headless in-process AI games were started
+sequentially with seed 4 and a 20-second limit per game. The bounded control
+was generated from the tracked Crossroads VMAP by removing the topology tag
+and changing its major format version to 3. All other archive members were
+byte-identical; the control archive SHA-256 is
+`dcd08e1ec841a85f93946690665ecc5cef74b694019725674e058c86ca06bc7a`.
+The runtime map filenames differed to avoid overwriting another fixture.
+
+The bounded game completed normally with red's victory on day 40. The
+toroidal game was interrupted by its limit during day 221 with no winner;
+both players were still taking turns, buying armies and issuing tasks near
+the end. The stdout contained 5 and 78 respectively of the particular
+`No worthwhile tasks ... ALL_FULL` log line; those are line counts, not
+counts of stuck turns. This single comparison does not establish a permanent
+deadlock, an identical AI trajectory, or a topology-specific defect. Fixed
+game RNG seeds do not control all scheduling or AI decisions.
+
+Logs, the reconstructed byte-identical bounded control and summary are under
+`runtime/crossroads-seed4-comparison-2026-11-15/` on TB5. The temporary map
+installed for the bounded run was removed after verifying its hash; normal
+mod settings were restored after confirming only validation checksums had
+changed, and the game settings retained their earlier hash.
