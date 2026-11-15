@@ -15,6 +15,7 @@
 #include "../../lib/callback/EditorCallback.h"
 #include "../../lib/callback/GameRandomizer.h"
 #include "../../lib/CRandomGenerator.h"
+#include "../../lib/CPlayerState.h"
 #include "../../lib/GameLibrary.h"
 #include "../../lib/mapObjectConstructors/AObjectTypeHandler.h"
 #include "../../lib/mapObjectConstructors/CObjectClassesHandler.h"
@@ -22,6 +23,7 @@
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGCreature.h"
+#include "../../lib/mapObjects/CGResource.h"
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/entities/hero/CHero.h"
 #include "../../lib/gameState/CGameState.h"
@@ -605,6 +607,82 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	state->init(&service, &start, randomizer, progress, false);
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(const char * overlap = std::getenv("VCMI_INSPECT_OVERLAP_RESOURCE"); overlap && *overlap)
+	{
+		std::vector<std::string> names;
+		boost::split(names, overlap, boost::is_any_of(","));
+		ASSERT_EQ(names.size(), 2u);
+		const auto resourceIt = map.instanceNames.find(names[0]);
+		const auto obstacleIt = map.instanceNames.find(names[1]);
+		ASSERT_NE(resourceIt, map.instanceNames.end());
+		ASSERT_NE(obstacleIt, map.instanceNames.end());
+		const auto * resource = dynamic_cast<const CGResource *>(resourceIt->second.get());
+		ASSERT_NE(resource, nullptr);
+		ASSERT_EQ(resource->stacksCount(), 0u);
+		const auto position = resource->visitablePos();
+		ASSERT_TRUE(obstacleIt->second->blockingAt(position));
+		ASSERT_FALSE(state->guardingCreaturePosition(position).isValid());
+		const auto resourceID = resource->resourceID();
+		const auto resourceObjectID = resource->id;
+		const auto amount = resource->getAmount();
+		ASSERT_GT(amount, 0u);
+		CGHeroInstance * hero = nullptr;
+		for(const auto & id : map.getHeroesOnMap())
+			if(auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id)); candidate
+			   && candidate->getOwner().isValidPlayer() && !candidate->isGarrisoned() && !candidate->inBoat())
+			{
+				hero = candidate;
+				break;
+			}
+		ASSERT_NE(hero, nullptr);
+		std::optional<int3> approach;
+		std::optional<int3> departure;
+		for(const auto & direction : int3::getDirs())
+		{
+			const auto candidate = map.getTopology().canonicalize(position + direction);
+			if(candidate && map.getTile(*candidate).isLand() && !map.getTile(*candidate).blocked()
+			   && !map.getTile(*candidate).visitable() && !state->guardingCreaturePosition(*candidate).isValid()
+			   && map.canMoveBetween(*candidate, position))
+			{
+				for(const auto & nextDirection : int3::getDirs())
+				{
+					const auto next = map.getTopology().canonicalize(*candidate + nextDirection);
+					if(next && *next != position && map.getTile(*next).isLand() && !map.getTile(*next).blocked()
+					   && !map.getTile(*next).visitable() && !state->guardingCreaturePosition(*next).isValid()
+					   && map.canMoveBetween(*candidate, *next))
+					{
+						approach = *candidate;
+						departure = *next;
+						break;
+					}
+				}
+				if(approach)
+					break;
+			}
+		}
+		ASSERT_TRUE(approach);
+		ASSERT_TRUE(departure);
+		const auto player = hero->getOwner();
+		state->actingPlayers.insert(player);
+		ChangeObjPos place;
+		place.objid = hero->id;
+		place.nPos = *approach;
+		state->apply(place);
+		hero->setMovementPoints(3000);
+		const auto before = state->players.at(player).resources[resourceID];
+		GameHandlerTestServer server(state, player);
+		CGameHandler handler(server, state);
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(position),
+		                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+		EXPECT_EQ(state->players.at(player).resources[resourceID], before + amount);
+		EXPECT_EQ(map.getObject(resourceObjectID), nullptr);
+		ASSERT_EQ(hero->visitablePos(), *approach);
+		ASSERT_TRUE(obstacleIt->second->blockingAt(position));
+		EXPECT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*departure),
+		                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+		EXPECT_EQ(hero->visitablePos(), *departure);
+		std::cout << "Collected resource from adjacent tile and continued to " << departure->toString() << std::endl;
+	}
 	const char * guardedObjects = std::getenv("VCMI_INSPECT_GUARDED_OBJECTS");
 	if(!guardedObjects || !*guardedObjects)
 		guardedObjects = std::getenv("VCMI_INSPECT_MINE_GUARDS");
