@@ -257,6 +257,67 @@ TEST_P(ToroidalHeroChainTest, plannedFlightCrossesSeamAndLands)
 
 INSTANTIATE_TEST_SUITE_P(AllSeamsAndLevels, ToroidalHeroChainTest, ::testing::Range(0, 16));
 
+class ToroidalAITransientSafetyTest : public NullkillerTest, public ::testing::WithParamInterface<int>
+{
+};
+
+TEST_P(ToroidalAITransientSafetyTest, ReturnsToIslandAfterServerBackedTransit)
+{
+	const int z = GetParam() / 2;
+	const bool flight = GetParam() % 2;
+	const int3 island(0, 18, z), safeWater(30, 18, z), unsafeWater(29, 18, z);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(PLAYER).playerActive(ENEMY)
+		.hero(int3(19, 18, 0), HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID(0), 1}})
+		.hero(int3(20, 20, 0), HeroTypeID(1), ENEMY);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+		{
+			const int3 position(x, y, z);
+			if(position != island && position != int3(18, 18, 0) && position != int3(19, 20, 0))
+				builder.terrain(position, TerrainId::WATER);
+		}
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(PLAYER);
+	auto * hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	map()->moveObject(hero->id, hero->convertFromVisitablePos(island));
+	hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT,
+		flight ? BonusType::FLYING_MOVEMENT : BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+	hero->setMovementPoints(1200);
+	MoveCountingClient client(gameState(), PLAYER);
+	const auto transitLayer = flight ? EPathfindingLayer::AIR : EPathfindingLayer::WATER;
+	for(int x = 35; x >= 30; --x)
+	{
+		const int3 tile(x, 18, z);
+		client.sendRequest(MoveHero({hero->convertFromVisitablePos(tile)}, transitLayer, hero->id, true), PLAYER, false);
+		ASSERT_EQ(hero->visitablePos(), tile);
+	}
+	const auto pointsBefore = hero->movementPointsRemaining();
+	client.sendRequest(MoveHero({hero->convertFromVisitablePos(unsafeWater)}, transitLayer, hero->id, true), PLAYER, false);
+	ASSERT_EQ(hero->visitablePos(), safeWater);
+	ASSERT_EQ(hero->movementPointsRemaining(), pointsBefore);
+	auto callback = makeCallback(PLAYER, &client);
+	auto gateway = makeGateway(callback);
+	const auto move = [&](const int3 & destination)
+	{
+		return withGameStateReadLock([&] { return gateway->moveHeroToTile(destination, NK2AI::HeroPtr(hero, callback.get())); });
+	};
+	const auto requestsBefore = client.movementRequests;
+	EXPECT_EQ(move(unsafeWater), NK2AI::HeroMovementResult::BLOCKED);
+	EXPECT_EQ(client.movementRequests, requestsBefore);
+	EXPECT_EQ(hero->visitablePos(), safeWater);
+	EXPECT_EQ(hero->movementPointsRemaining(), pointsBefore);
+	EXPECT_EQ(move(island), NK2AI::HeroMovementResult::COMPLETE);
+	EXPECT_EQ(hero->visitablePos(), island);
+	EXPECT_EQ(hero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
+	EXPECT_GT(client.movementRequests, requestsBefore);
+}
+
+INSTANTIATE_TEST_SUITE_P(AbilitiesAndLevels, ToroidalAITransientSafetyTest, ::testing::Range(0, 4));
+
 TEST_F(ExecuteHeroChainMovementTest, repeatedIdleChainFailsForReplanning)
 {
 	startGame();
