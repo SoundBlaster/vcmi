@@ -490,11 +490,15 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	EXPECT_EQ(legacy.acceptedVersion, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
 	ASSERT_EQ(server.activeConnections.size(), 3);
 	const auto messagesBefore = host.messages.size();
+	const auto legacyMessagesBefore = legacy.messages.size();
 	LobbyStartGame start;
 	host.codec->sendPack(start);
-	pumpUntil([&] { return host.messages.size() > messagesBefore; });
+	pumpUntil([&] { return host.messages.size() > messagesBefore && legacy.messages.size() > legacyMessagesBefore; });
 	ASSERT_GT(host.messages.size(), messagesBefore) << host.failure;
-	EXPECT_EQ(host.messages.back(), MetaString::createFromTextID("vcmi.server.errors.incompatibleVersion").toString(LIBRARY->staticTexts()));
+	ASSERT_GT(legacy.messages.size(), legacyMessagesBefore) << legacy.failure;
+	const auto expectedMessage = MetaString::createFromTextID("vcmi.server.errors.incompatibleToroidalClient").toString(LIBRARY->staticTexts());
+	EXPECT_EQ(host.messages.back(), expectedMessage);
+	EXPECT_EQ(legacy.messages.back(), expectedMessage);
 	EXPECT_EQ(server.getState(), EServerState::LOBBY);
 	EXPECT_EQ(server.gh, nullptr);
 	EXPECT_FALSE(host.state);

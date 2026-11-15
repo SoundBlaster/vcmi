@@ -378,7 +378,8 @@ bool CVCMIServer::prepareToStartGame()
 	if(!supportsMapTopology(*newGH->gameInfo().getMapHeader()))
 	{
 		logNetwork->error("Cannot start toroidal map with an incompatible client");
-		announceMessage(MetaString::createFromTextID("vcmi.server.errors.incompatibleVersion"));
+		// Older clients do not have this translation key; send resolved text.
+		announceMessage(MetaString::createFromTextID("vcmi.server.errors.incompatibleToroidalClient").toString(LIBRARY->staticTexts()));
 		return false;
 	}
 

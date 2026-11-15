@@ -993,6 +993,7 @@
 	"vcmi.server.errors.campOrMapFile.unknownEntity": "Не удалось загрузить файл! Найден неизвестный объект \"%s\"! Возможно, файл несовместим с текущей версией модов!",
 	"vcmi.server.errors.disconnected": "{Сетевая ошибка}\n\nПодключение к игровому серверу потеряно!",
 	"vcmi.server.errors.existingProcess": "Запущен другой процесс сервера VCMI. Пожалуйста, завершите его перед запуском новой игры.",
+	"vcmi.server.errors.incompatibleToroidalClient": "{Несовместимая версия}\n\nОдин из игроков использует версию, которая не поддерживает замкнутые карты. Для запуска этой карты всем игрокам нужна совместимая версия.",
 	"vcmi.server.errors.modsToDisable": "{Необходимо отключить следующие моды}",
 	"vcmi.server.errors.modsToEnable": "{Требуемые моды для загрузки игры}",
 	"vcmi.server.errors.notAllowed": "Вам запрещено выполнять данное действие!",
