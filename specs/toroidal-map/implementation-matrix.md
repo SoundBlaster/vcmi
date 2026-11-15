@@ -440,6 +440,9 @@ some directions; those cases test rejection rather than battle.
 The [artifact pickup checks](evidence/topology-artifact-pickup-2026-11-15.md)
 cover one artifact type across every seam direction and bounded interior
 controls, on both levels, unguarded and guarded with refusal and forced victory.
+The [visitable shore checks](evidence/topology-visitable-shore-2026-11-15.md)
+cover rejected disembarkation and a clear-shore control in every outward
+direction on both levels, using one synthetic nonblocking event.
 The wrapped guard battle check is recorded in
 [`evidence/topology-guard-battle-2026-11-09.md`](evidence/topology-guard-battle-2026-11-09.md).
 The experimental single-level Earth-map draft and its bounded startup,
