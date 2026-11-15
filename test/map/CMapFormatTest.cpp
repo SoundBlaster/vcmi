@@ -19,6 +19,9 @@
 #include "../../lib/mapObjectConstructors/AObjectTypeHandler.h"
 #include "../../lib/mapObjectConstructors/CObjectClassesHandler.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
+#include "../../lib/mapObjects/CGTownInstance.h"
+#include "../../lib/entities/hero/CHero.h"
+#include "../../lib/spells/CSpell.h"
 #include "../../lib/mapping/CMap.h"
 #include "../../lib/mapping/CMapEditManager.h"
 #include "../../lib/mapping/CMapService.h"
@@ -56,6 +59,29 @@ static JsonNode getFromArchive(CZipLoader & archive, const std::string & archive
 	JsonNode res(reinterpret_cast<const std::byte *>(data.first.get()), data.second, resource.getName());
 
 	return res;
+}
+
+// Demo maps are authored by the test executable, whose registry contains
+// additional test-only heroes and spells. Those are unavailable in the game.
+static void removeTestModEntitiesFromDemo(CMap & map)
+{
+	const auto testSpell = [](SpellID spell) { return spell.toSpell()->getModScope() == "vcmi-test"; };
+	std::erase_if(map.allowedHeroes, [](HeroTypeID hero) { return hero.toHeroType()->getModScope() == "vcmi-test"; });
+	std::erase_if(map.allowedSpells, testSpell);
+	for(const auto & object : map.objects)
+		if(auto * town = dynamic_cast<CGTownInstance *>(object.get()))
+		{
+			std::erase_if(town->possibleSpells, testSpell);
+			std::erase_if(town->obligatorySpells, testSpell);
+		}
+}
+
+static void expectDemoHasNoTestModReferences(CMemoryBuffer & buffer)
+{
+	std::shared_ptr<CIOApi> io(new CProxyROIOApi(&buffer));
+	CZipLoader archive("", "_", io);
+	for(const auto & name : {CMapFormatJson::HEADER_FILE_NAME, CMapFormatJson::OBJECTS_FILE_NAME})
+		EXPECT_EQ(getFromArchive(archive, name).toString().find("vcmi-test:"), std::string::npos) << name;
 }
 
 static void addToArchive(CZipSaver & saver, const JsonNode & data, const std::string & filename)
@@ -662,8 +688,10 @@ TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
 	CMapLoaderH3M loader("ToroidSeamLaboratory", "core", "ASCII", &input);
 	auto map = loader.loadMap(&callback);
 	callback.setMap(map.get());
+	removeTestModEntitiesFromDemo(*map);
 	ASSERT_FALSE(map->toroidal);
 	map->setToroidalAndRebuild(true);
+	map->name = MetaString::createFromRawString("Toroid Seam Demo");
 	for(const auto & object : map->objects)
 		if(object)
 			ASSERT_FALSE(map->hasStaticFootprintAcrossToroidalSeam(*object)) << object->instanceName;
@@ -672,6 +700,7 @@ TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
 		CMapSaverJson saver(&output);
 		saver.saveMap(map);
 	}
+	expectDemoHasNoTestModReferences(output);
 	output.seek(0);
 	EditorCallback reopenedCallback(nullptr);
 	CMapLoaderJson reader(&output);
@@ -718,6 +747,7 @@ TEST(MapFormat, ToroidalBoatDemonstrationFixtureRoundTrips)
 	CMapLoaderH3M loader("ToroidBoatLaboratory", "core", "ASCII", &input);
 	auto map = loader.loadMap(&callback);
 	callback.setMap(map.get());
+	removeTestModEntitiesFromDemo(*map);
 	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
 
 	CRandomGenerator random(12345);
@@ -748,6 +778,7 @@ TEST(MapFormat, ToroidalBoatDemonstrationFixtureRoundTrips)
 		CMapSaverJson saver(&output);
 		saver.saveMap(map);
 	}
+	expectDemoHasNoTestModReferences(output);
 	output.seek(0);
 	EditorCallback reopenedCallback(nullptr);
 	CMapLoaderJson reader(&output);
@@ -793,6 +824,7 @@ TEST(MapFormat, ToroidalOpenWaterCornerFixtureRoundTrips)
 	CMapLoaderH3M loader("ToroidOpenWaterCorner", "core", "ASCII", &input);
 	auto map = loader.loadMap(&callback);
 	callback.setMap(map.get());
+	removeTestModEntitiesFromDemo(*map);
 	map->setToroidalAndRebuild(true, CMap::TopologyRebuildObjects::AllMapObjects);
 
 	CRandomGenerator random(12345);
@@ -827,6 +859,7 @@ TEST(MapFormat, ToroidalOpenWaterCornerFixtureRoundTrips)
 		CMapSaverJson saver(&output);
 		saver.saveMap(map);
 	}
+	expectDemoHasNoTestModReferences(output);
 	output.seek(0);
 	EditorCallback reopenedCallback(nullptr);
 	CMapLoaderJson reader(&output);
@@ -861,8 +894,9 @@ TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 	CMapLoaderH3M loader("ToroidVisualSeams", "core", "ASCII", &input);
 	auto map = loader.loadMap(&callback);
 	callback.setMap(map.get());
+	removeTestModEntitiesFromDemo(*map);
 	map->setToroidalAndRebuild(true);
-	map->name = MetaString::createFromRawString("Toroid Road Axes");
+	map->name = MetaString::createFromRawString("Toroid Roads Demo");
 
 	CRandomGenerator random(12345);
 	auto * editor = map->getEditManager();
@@ -890,6 +924,7 @@ TEST(MapFormat, ToroidalVisualSeamFixtureRoundTrips)
 		CMapSaverJson saver(&output);
 		saver.saveMap(map);
 	}
+	expectDemoHasNoTestModReferences(output);
 	output.seek(0);
 	EditorCallback reopenedCallback(nullptr);
 	CMapLoaderJson reader(&output);
@@ -931,6 +966,7 @@ TEST(MapFormat, ToroidalVisualWrappedTownFixtureRoundTrips)
 	CMapLoaderH3M loader("ToroidVisualWrappedTown", "core", "ASCII", &input);
 	auto map = loader.loadMap(&callback);
 	callback.setMap(map.get());
+	removeTestModEntitiesFromDemo(*map);
 	ASSERT_EQ(map->getAllTowns().size(), 2u);
 	auto * town = map->getObject(map->getAllTowns().back());
 	ASSERT_NE(town, nullptr);
@@ -946,6 +982,7 @@ TEST(MapFormat, ToroidalVisualWrappedTownFixtureRoundTrips)
 		CMapSaverJson saver(&archive);
 		saver.saveMap(map);
 	}
+	expectDemoHasNoTestModReferences(archive);
 	archive.seek(0);
 	EditorCallback reopenedCallback(nullptr);
 	CMapLoaderJson reader(&archive);
