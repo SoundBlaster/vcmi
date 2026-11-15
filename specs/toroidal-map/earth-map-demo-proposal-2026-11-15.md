@@ -550,3 +550,21 @@ portal approaches passed with forced guard victories. Mod requirements and
 the VMAP round trip also passed. The five skipped guards and remaining object
 overlaps still need investigation; these tests do not establish complete
 playability or demonstrate the ordinary battles.
+
+The road case was subsequently checked against the original underground
+terrain: the guard stood on a `pc` road, as does the intended destination.
+The guard repair now permits a road overlay only when the source and target
+have the same terrain and road types; it still rejects rivers and different
+overlays. No terrain or road tile is changed. This moves `monster_11082` to
+its source-relative position at the entrance to `randomTown_11080`, leaving
+four blocked cases. Compared with the preceding draft, exactly that monster's
+coordinates changed; one blocking and interactive pair disappeared and no
+new pairs were added. The estimated new interactive occurrences are 168.
+
+The local output `draft-stacked/earth-road-guard-diagnostic.vmap` has SHA-256
+`313596f80b2bab9364b2710e74bd362023c7777bcb4f10347c883eb19b231419`.
+Thirty-seven focused Python tests passed. In three game-state runs the engine
+recognized all 40 restored guards, eight initial moves succeeded, and all
+four portal approaches succeeded with forced guard victories. The map also
+passed the checked VMAP round trip. Matching road type does not prove visual
+road continuity or the full pathfinding behavior of the scenario.
