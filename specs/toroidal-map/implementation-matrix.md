@@ -439,6 +439,9 @@ guard and portal checks are recorded in
 [the Earth demo proposal](earth-map-demo-proposal-2026-11-15.md). The source
 gates were replaced by paired monoliths with different behavior; remaining
 collisions and geography require review before calling the demo playable.
+The [Earth graphical startup](evidence/earth-gui-hota-bonus-bounds-2026-11-15.md)
+also found and verified a fix for HotA bonus value aliases; it does not accept
+the visual continuity or overall playability of the adapted map.
 These tests cover selected gameplay scenarios, not full acceptance. Add a dated record for each run with:
 scenario ID and requirement row; source commit and dirty-tree identity if any;
 build identity; platform/backend and map/fixture; command or manual steps;

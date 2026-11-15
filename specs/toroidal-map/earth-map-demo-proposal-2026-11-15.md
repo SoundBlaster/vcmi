@@ -98,6 +98,13 @@ fixture mod; it does not demonstrate a full HotA installation.
 The listing does not establish permission to redistribute the map or a
 derivative; investigate the author's terms before publishing either.
 
+The later [graphical startup check](evidence/earth-gui-hota-bonus-bounds-2026-11-15.md)
+loaded the adapted draft with the user's HotA assets and found incompatible
+bonus value names in the mod. The engine now accepts those names as aliases of
+the existing bound types; the repeated startup emitted no corresponding
+validation or parsing errors. The graphical launch was short and is not a
+visual continuity or full-playability acceptance.
+
 ## Candidate placement analysis
 
 The read-only [`tools/analyze_stacked_map.py`](tools/analyze_stacked_map.py)
