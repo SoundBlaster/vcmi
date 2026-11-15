@@ -70,6 +70,35 @@ which packets remain in the original framing for each connection and test
 two or more peers, reconnect, legacy peers, malformed headers and actual TCP.
 No packet envelope or change to negotiation is implemented by this note.
 
+## Planned framed layout
+
+Status: planned; implementation and verification are pending. The first byte
+of each framed packet is `1`, followed by ASCII `TRF` and a four-byte unsigned
+little-endian serialization version. A framed receiver checks all eight bytes
+against its negotiated version before decoding the remaining payload. A legacy
+receiver interprets the first byte as a null packet pointer and rejects it;
+the mixed-layout regression must test both directions and ordinary matching
+packets. The marker is a compatibility discriminator, not authentication.
+
+A new serialization version gates this protocol. The initial greeting, its
+own acknowledgement, and any messages sent before that acknowledgement use
+the existing unframed layout. Once the server has sent the acknowledgement to
+the new connection, it switches that connection to framing before sending its
+next packet; a current client switches after validating its acknowledgement.
+Clients that have already completed the handshake continue using their own
+negotiated framing while observing a later peer's acknowledgement. Servers
+must reject toroidal game start if any connected peer lacks the framed version;
+the current client rejects older tagged servers that could start an unframed
+toroidal game. An untagged older peer may still use a bounded session with the
+prior unframed version.
+
+Verification must cover a two-peer TCP lobby, messages before and after the
+acknowledgement, mixed and malformed headers in both directions, matching
+current and legacy packets, compatibility of bounded sessions, save/reload,
+and the existing toroidal gameplay tests. The feature is not accepted until
+these behaviors are observed; the older local builds are intentionally not
+interoperable for toroidal sessions.
+
 ## Request acknowledgement is not a transaction receipt
 
 `PackageApplied.result` is a server handler result, not a guarantee that a
