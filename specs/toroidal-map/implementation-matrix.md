@@ -156,6 +156,9 @@ complete object-removal sequence remains unverified. See the
 The later [current preview](evidence/topology-preview-ef53b71-2026-11-15.md)
 also exercised a player corner crossing, a battle initiated by Nullkiller, an
 AI corner crossing and the return to the player on a clean demo map.
+[Guarded-shore tests](evidence/topology-guarded-disembark-2026-11-15.md)
+exercise disembarkation across an edge and a corner on both levels, including
+the server battle and forced-victory return with the boat left at sea.
 
 ## Specification evidence discipline
 
