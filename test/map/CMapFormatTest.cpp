@@ -60,6 +60,14 @@
 #include "../mock/TinyH3MBuilder.h"
 #include "../mock/ToroidalDemoMap.h"
 
+#ifdef ENABLE_NULLKILLER2_AI
+#include "../../AI/Nullkiller2/AIGateway.h"
+#include "../../AI/Nullkiller2/Goals/ExecuteHeroChain.h"
+#include "../../lib/callback/CCallback.h"
+#include "../../lib/callback/IClient.h"
+#include "../../lib/networkPacks/PacksForServer.h"
+#endif
+
 static void saveTestMap(CMemoryBuffer & serializeBuffer, const std::string & filename)
 {
 	auto path = VCMIDirs::get().userDataPath() / filename;
@@ -653,6 +661,93 @@ private:
 	GameConnection sender;
 	GameConnection receiver;
 };
+
+#ifdef ENABLE_NULLKILLER2_AI
+class ExternalInspectionAIServer final : public GameHandlerTestServer
+{
+public:
+	ExternalInspectionAIServer(const std::shared_ptr<CGameState> & state, PlayerColor player)
+		: GameHandlerTestServer(state, player), state(state)
+	{
+	}
+
+	void applyPack(CPackForClient & pack) override
+	{
+		if(gateway)
+			if(const auto * removal = dynamic_cast<const RemoveObject *>(&pack))
+				if(const auto * object = state->getObjInstance(removal->objectID))
+					gateway->objectRemoved(object, removal->initiator);
+		GameHandlerTestServer::applyPack(pack);
+		if(gateway)
+			if(const auto * movement = dynamic_cast<const TryMoveHero *>(&pack))
+			{
+				gateway->invalidatePaths();
+				gateway->tileRevealed(movement->fowRevealed);
+				gateway->heroMoved(*movement, false);
+			}
+	}
+
+	void sendPack(CPackForClient & pack, GameConnectionID) override
+	{
+		if(const auto * applied = dynamic_cast<const PackageApplied *>(&pack))
+			response = *applied;
+	}
+
+	NK2AI::AIGateway * gateway = nullptr;
+	std::optional<PackageApplied> response;
+
+private:
+	std::shared_ptr<CGameState> state;
+};
+
+class ExternalInspectionAIClient final : public IClient
+{
+public:
+	ExternalInspectionAIClient(const std::shared_ptr<CGameState> & state, PlayerColor player)
+		: server(state, player), handler(server, state)
+	{
+		state->actingPlayers.insert(player);
+	}
+
+	std::optional<BattleAction> makeSurrenderRetreatDecision(PlayerColor, const BattleID &,
+	                                                        const BattleStateInfoForRetreat &) override
+	{
+		return std::nullopt;
+	}
+
+	int sendRequest(const CPackForServer & request, PlayerColor player, bool) override
+	{
+		request.player = player;
+		request.requestID = ++requestID;
+		if(dynamic_cast<const MoveHero *>(&request))
+			++moves;
+		server.response.reset();
+		auto copy = CMemorySerializer::deepCopy(request);
+		handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, *copy);
+		if(!server.response || server.response->requestID != requestID)
+			throw std::runtime_error("External inspection AI request was not acknowledged");
+		if(dynamic_cast<const MoveHero *>(&request) && !server.response->result)
+			++rejectedMoves;
+		gateway->requestRealized(&*server.response);
+		return requestID;
+	}
+
+	void notify(NK2AI::AIGateway * value)
+	{
+		gateway = value;
+		server.gateway = value;
+	}
+
+	int moves = 0;
+	int rejectedMoves = 0;
+
+private:
+	ExternalInspectionAIServer server;
+	CGameHandler handler;
+	NK2AI::AIGateway * gateway = nullptr;
+	int requestID = 0;
+};
+#endif
 }
 
 TEST(MapFormat, ChecksExternalMapModRequirements)
@@ -720,6 +815,65 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	state->init(&service, &start, randomizer, progress, false);
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+#ifdef ENABLE_NULLKILLER2_AI
+	if(const char * input = std::getenv("VCMI_INSPECT_AI_RESOURCE"); input && *input)
+	{
+		std::vector<std::string> values;
+		boost::split(values, input, boost::is_any_of(","));
+		ASSERT_EQ(values.size(), 2u);
+		const PlayerColor player(std::stoi(values[0]));
+		ASSERT_TRUE(player.isValidPlayer());
+		ASSERT_TRUE(state->players.contains(player));
+		ASSERT_NE(state->getPlayerTeam(player), nullptr);
+		const auto target = map.instanceNames.find(values[1]);
+		ASSERT_NE(target, map.instanceNames.end());
+		const auto position = target->second->visitablePos();
+		const auto * resource = dynamic_cast<const CGResource *>(target->second.get());
+		ASSERT_NE(resource, nullptr);
+		ASSERT_EQ(resource->stacksCount(), 0u);
+		const auto objectID = resource->id;
+		const auto resourceID = resource->resourceID();
+		const auto amount = resource->getAmount();
+		const auto before = state->players.at(player).resources[resourceID];
+		ASSERT_TRUE(map.isInTheMap(position));
+		ASSERT_NE(state->getPlayerTeam(player)->fogOfWarMap[position], 0);
+		std::unique_ptr<ExternalInspectionAIClient> client;
+		if(std::getenv("VCMI_INSPECT_AI_EXECUTE"))
+			client = std::make_unique<ExternalInspectionAIClient>(state, player);
+		auto callback = std::make_shared<CCallback>(state, std::optional<PlayerColor>{player}, client.get());
+		auto gateway = std::make_unique<NK2AI::AIGateway>();
+		gateway->initGameInterface(std::shared_ptr<Environment>(), callback);
+		if(client)
+			client->notify(gateway.get());
+		std::shared_lock lock(CGameState::mutex);
+		auto & ai = *gateway->nullkiller;
+		ai.heroManager->update();
+		NK2AI::PathfinderSettings settings;
+		settings.useHeroChain = false;
+		settings.useDimensionDoor = false;
+		settings.mainTurnDistanceLimit = 1;
+		settings.scoutTurnDistanceLimit = 1;
+		ai.pathfinder->updatePaths(ai.getHeroesForPathfinding(), settings);
+		const auto paths = ai.pathfinder->getPathInfo(position);
+		const auto found = std::ranges::find_if(paths, [&](const auto & path)
+		{
+			return path.targetHero && path.targetHero->getOwner() == player && !path.nodes.empty() && path.turn() == 0;
+		});
+		ASSERT_NE(found, paths.end()) << values[1];
+		std::cout << "Nullkiller planned visible resource " << values[1] << " for player "
+		          << player.getNum() << ", path nodes=" << found->nodes.size() << std::endl;
+		if(client)
+		{
+			ASSERT_GT(amount, 0u);
+			EXPECT_NO_THROW(NK2AI::Goals::ExecuteHeroChain(*found).accept(gateway.get()));
+			EXPECT_GT(client->moves, 0);
+			EXPECT_EQ(client->rejectedMoves, 0);
+			EXPECT_EQ(map.getObject(objectID), nullptr);
+			EXPECT_EQ(state->players.at(player).resources[resourceID], before + amount);
+			std::cout << "Nullkiller executed resource plan in " << client->moves << " movement requests" << std::endl;
+		}
+	}
+#endif
 	if(std::getenv("VCMI_INSPECT_START_RESOURCE_ROUTES"))
 	{
 		std::set<PlayerColor> examined;
