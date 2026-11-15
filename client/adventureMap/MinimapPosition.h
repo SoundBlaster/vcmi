@@ -11,6 +11,22 @@
 #include <cmath>
 #include <cstdint>
 #include <utility>
+#include <vector>
+
+/// Origins of periodic image copies that intersect one minimap axis.
+inline std::vector<int> minimapWrappedIconOrigins(int origin, int length, int period)
+{
+	assert(period > 0);
+	std::vector<int> result;
+	if(length <= 0)
+		return result;
+	std::int64_t start = origin % period;
+	if(start < 0)
+		start += period;
+	for(; start > -static_cast<std::int64_t>(length); start -= period)
+		result.push_back(static_cast<int>(start));
+	return result;
+}
 
 inline int minimapPixelToTile(int pixel, int displayExtent, int mapExtent, bool toroidal)
 {

@@ -103,6 +103,25 @@ TEST(MapTopology, EditorFloodSelectionRespectsTopologyAndBarriers)
 	EXPECT_TRUE(TerrainViewTopology::floodSelection(wrapped, {0, 0, 2}, [](const auto &, const auto &) { return true; }).empty());
 }
 
+TEST(MapTopology, ToroidalMinimapIconCopiesCoverEdges)
+{
+	EXPECT_EQ(minimapWrappedIconOrigins(-1, 7, 144), (std::vector<int>{143, -1}));
+	EXPECT_EQ(minimapWrappedIconOrigins(-2, 8, 144), (std::vector<int>{142, -2}));
+	EXPECT_TRUE(minimapWrappedIconOrigins(0, 0, 3).empty());
+	for(int extent = 1; extent <= 20; ++extent)
+		for(int length = 1; length <= 16; ++length)
+			for(int origin = -2 * extent; origin <= 2 * extent; ++origin)
+			{
+				std::vector<int> actual(extent, 0), expected(extent, 0);
+				for(int pixel = origin; pixel < origin + length; ++pixel)
+					++expected[MapTopology::wrapCoordinate(pixel, extent)];
+				for(int copy : minimapWrappedIconOrigins(origin, length, extent))
+					for(int pixel = std::max(0, copy); pixel < std::min(extent, copy + length); ++pixel)
+						++actual[pixel];
+				EXPECT_EQ(actual, expected) << "extent=" << extent << " origin=" << origin << " length=" << length;
+			}
+}
+
 TEST(MapTopology, ToroidalMinimapClicksAddressTheTileUnderThePixel)
 {
 	EXPECT_EQ(minimapPixelToTile(0, 150, 36, true), 0);

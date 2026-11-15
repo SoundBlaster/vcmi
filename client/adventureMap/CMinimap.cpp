@@ -226,6 +226,7 @@ void CMinimap::showAll(Canvas & to)
 		int3 mapSizes = GAME->interface()->cb->getMapSize();
 
 		Canvas clippedTarget(to, pos);
+		const bool toroidal = GAME->interface()->cb->getMapHeader()->toroidal;
 
 		if (settings["adventure"]["minimapShowHeroes"].Bool())
 		{
@@ -239,11 +240,19 @@ void CMinimap::showAll(Canvas & to)
 					continue;
 
 				heroIcon->setOverlayColor(graphics->playerColors[object->getOwner().getNum()]);
-				clippedTarget.draw(heroIcon, tileToPixels(object->visitablePos()) - heroIcon->dimensions() / 2);
+				const Point origin = tileToPixels(object->visitablePos()) - heroIcon->dimensions() / 2;
+				if(toroidal)
+				{
+					for(int x : minimapWrappedIconOrigins(origin.x, heroIcon->dimensions().x, pos.w))
+						for(int y : minimapWrappedIconOrigins(origin.y, heroIcon->dimensions().y, pos.h))
+							clippedTarget.draw(heroIcon, Point(x, y));
+				}
+				else
+					clippedTarget.draw(heroIcon, origin);
 			}
 		}
 
-		if(GAME->interface()->cb->getMapHeader()->toroidal)
+		if(toroidal)
 		{
 			for(const auto & [x, width] : MapTopology::splitWrappedInterval(screenArea.x, screenArea.w, mapSizes.x))
 				for(const auto & [y, height] : MapTopology::splitWrappedInterval(screenArea.y, screenArea.h, mapSizes.y))

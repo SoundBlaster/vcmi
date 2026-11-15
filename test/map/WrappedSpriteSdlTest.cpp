@@ -90,7 +90,7 @@ TEST(WrappedSpriteSdl, ToroidalMinimapRasterMatchesClickThroughTexture)
 class SoftwareSpriteImage : public CanvasImage
 {
 public:
-	SoftwareSpriteImage() : CanvasImage(Point(96, 96), CanvasScalingPolicy::IGNORE) {}
+	explicit SoftwareSpriteImage(Point size = Point(96, 96)) : CanvasImage(size, CanvasScalingPolicy::IGNORE) {}
 	void prepare() { sprite = toSharedImage(); }
 	void draw(SDL_Surface * target, const Point & position, const Rect * source, int scalingFactor) const override
 	{
@@ -105,6 +105,46 @@ public:
 private:
 	std::shared_ptr<ISharedImage> sprite;
 };
+
+TEST(WrappedSpriteSdl, ToroidalMinimapHeroIconWrapsAcrossEdgesAndCorners)
+{
+	const Point imageSize(7, 8);
+	const Point mapSize(16, 13);
+	auto image = std::make_shared<SoftwareSpriteImage>(imageSize);
+	{
+		auto canvas = image->getCanvas();
+		for(int y = 0; y < imageSize.y; ++y)
+			for(int x = 0; x < imageSize.x; ++x)
+				canvas.drawPoint(Point(x, y), ColorRGBA(x + 1, y + 1, 90, 255));
+	}
+	image->prepare();
+	for(const Point origin : {Point(-1, -2), Point(14, -2), Point(-1, 11), Point(14, 11), Point(4, 3)})
+	{
+		SCOPED_TRACE(::testing::Message() << "origin=" << origin.x << "," << origin.y);
+		CanvasImage minimap(mapSize, CanvasScalingPolicy::IGNORE);
+		{
+			auto canvas = minimap.getCanvas();
+			canvas.drawColor(Rect(0, 0, mapSize.x, mapSize.y), ColorRGBA(0, 0, 0, 255));
+			for(int x : minimapWrappedIconOrigins(origin.x, imageSize.x, mapSize.x))
+				for(int y : minimapWrappedIconOrigins(origin.y, imageSize.y, mapSize.y))
+					canvas.draw(image, Point(x, y));
+		}
+		std::vector<uint8_t> pixels;
+		minimap.readPixelsRGBA(pixels);
+		ASSERT_EQ(pixels.size(), static_cast<size_t>(mapSize.x * mapSize.y * 4));
+		for(int y = 0; y < mapSize.y; ++y)
+			for(int x = 0; x < mapSize.x; ++x)
+			{
+				const int sourceX = MapTopology::wrapCoordinate(x - origin.x, mapSize.x);
+				const int sourceY = MapTopology::wrapCoordinate(y - origin.y, mapSize.y);
+				const auto index = static_cast<size_t>((y * mapSize.x + x) * 4);
+				const bool covered = sourceX < imageSize.x && sourceY < imageSize.y;
+				EXPECT_EQ(pixels[index], covered ? sourceX + 1 : 0);
+				EXPECT_EQ(pixels[index + 1], covered ? sourceY + 1 : 0);
+				EXPECT_EQ(pixels[index + 2], covered ? 90 : 0);
+			}
+	}
+}
 
 TEST(WrappedSpriteSdl, CompositesPeriodicFragmentsOnSoftwareCanvas)
 {
