@@ -106,6 +106,14 @@ test fixtures; this does not yet establish a full AI turn or a graphical
 multiplayer session. See the
 [AI route record](evidence/topology-ai-direct-route-2026-11-09.md).
 
+The later [preview run](evidence/topology-preview-eeb3540-2026-11-15.md)
+completed two Nullkiller2 turns with crossings on both axes, then reloaded an
+autosave and crossed a corner. The compared fog and state were limited to the
+red player's recorded viewport and fields. The separate
+[clean demo fixtures](evidence/demo-test-mod-clean-2026-11-15.md) exclude
+the test-only entities found in the earlier prototype; one was started and
+played through a corner crossing.
+
 A generated legacy H3M defaults to bounded mode and rejects direct crossings
 in all eight directions on both levels; the same steps succeed after an
 explicit in-memory toroidal opt-in. See the
