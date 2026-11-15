@@ -422,9 +422,9 @@ TEST(MapFormat, LoadsExternalLegacyMapForInspection)
 		ASSERT_EQ(reopened->width, map->width);
 		ASSERT_EQ(reopened->height, map->height);
 		ASSERT_EQ(reopened->levels(), map->levels());
-		EXPECT_EQ(reopened->getAllTowns().size(), map->getAllTowns().size());
-		EXPECT_EQ(reopened->instanceNames.size(), map->instanceNames.size());
-		size_t changedObjects = 0, changedTerrain = 0;
+		ASSERT_EQ(reopened->getAllTowns().size(), map->getAllTowns().size());
+		ASSERT_EQ(reopened->instanceNames.size(), map->instanceNames.size());
+		size_t changedObjects = 0, changedTerrain = 0, changedArt = 0, changedBit6 = 0, changedBit7 = 0;
 		for(const auto & [name, object] : map->instanceNames)
 		{
 			const auto found = reopened->instanceNames.find(name);
@@ -440,10 +440,35 @@ TEST(MapFormat, LoadsExternalLegacyMapForInspection)
 					const auto & after = reopened->getTile(pos);
 					if(before.terrainType != after.terrainType || before.roadType != after.roadType || before.riverType != after.riverType)
 						++changedTerrain;
+					if(before.terView != after.terView || (before.extTileFlags & 3) != (after.extTileFlags & 3) ||
+					   (before.hasRoad() && (before.roadDir != after.roadDir || (before.extTileFlags & 48) != (after.extTileFlags & 48))) ||
+					   (before.hasRiver() && (before.riverDir != after.riverDir || (before.extTileFlags & 12) != (after.extTileFlags & 12))))
+						++changedArt;
+					if((before.extTileFlags & 64) != (after.extTileFlags & 64))
+						++changedBit6;
+					if((before.extTileFlags & 128) != (after.extTileFlags & 128))
+						++changedBit7;
 				}
 		EXPECT_EQ(changedObjects, 0u);
 		EXPECT_EQ(changedTerrain, 0u);
-		std::cout << "VMAP round trip: changed objects=" << changedObjects << ", changed terrain tiles=" << changedTerrain << std::endl;
+		EXPECT_EQ(changedArt, 0u);
+		EXPECT_EQ(changedBit7, 0u);
+		std::cout << "VMAP round trip: changed objects=" << changedObjects << ", changed terrain tiles=" << changedTerrain
+			<< ", changed art=" << changedArt << ", changed bit 6=" << changedBit6 << ", changed bit 7=" << changedBit7 << std::endl;
+		if(const char * outputDir = std::getenv("VCMI_INSPECT_VMAP_OUTPUT_DIR"); outputDir && *outputDir)
+		{
+			ASSERT_EQ(changedObjects, 0u);
+			ASSERT_EQ(changedTerrain, 0u);
+			ASSERT_EQ(changedArt, 0u);
+			ASSERT_EQ(changedBit7, 0u);
+			const boost::filesystem::path directory(outputDir);
+			ASSERT_TRUE(boost::filesystem::create_directory(directory)) << "Output directory must not already exist";
+			std::ofstream output((directory / "map.vmap").string(), std::ios::binary);
+			ASSERT_TRUE(output.is_open());
+			output.write(reinterpret_cast<const char *>(archive.getBuffer().data()), archive.getSize());
+			output.close();
+			ASSERT_TRUE(output.good());
+		}
 	}
 }
 
