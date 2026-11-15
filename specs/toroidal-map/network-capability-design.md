@@ -12,8 +12,8 @@ from an unmarked server at or beyond this branch's toroidal version.
 
 The proposed compatibility envelope uses the high 16 bits of the existing
 greeting version as the experimental tag `0x5452`, and the low 16 bits as
-the ordinary serialization version. This changes no packet fields and does
-not change the serialization version used for subsequent packets or saves.
+the ordinary serialization version. The tag itself changes no packet fields. A separate negotiated version now
+enables per-packet framing; file save versions remain independent.
 The tag is a branch-local protocol marker, not a security credential or an
 upstream-reserved namespace. The approach assumes ordinary upstream version
 ordinals remain below 65,536 and requires upstream coordination before
@@ -27,10 +27,9 @@ the tag and the necessary ordinary version. Bounded sessions continue to use
 the negotiated legacy layout. A local client accepts an untagged server below
 the toroidal version, but disconnects from an untagged server at or beyond
 that version because its layout is ambiguous. The current client also rejects
-an older tagged experimental server whose version predates replicated movement
-layers, even for a bounded session: the greeting does not identify the map.
+an older tagged experimental server whose version predates framed packets, even for a bounded session: the greeting does not identify the map.
 The current server may negotiate such a client into a bounded lobby, but its
-toroidal start guard requires the replicated-layer version from every peer.
+toroidal start guard requires the framed-packet version from every peer.
 A previous upstream server's
 existing `min(clientVersion, serverVersion)` greeting negotiation responds to
 the tagged value with its own untagged, lower ordinary version.
@@ -45,7 +44,7 @@ future forks. Packet-level tests,
 server preparation tests and real multi-peer sessions are separate evidence
 requirements.
 
-## Open wire-layout hardening
+## Earlier wire-layout gap
 
 The existing packet reader detects truncated input and unread trailing bytes,
 but these checks do not identify every mismatched layout. On 2026-11-15 the
@@ -68,11 +67,12 @@ when decoding those earlier messages. Multiple existing clients also receive
 the new client's acknowledgement. A transition design must specify exactly
 which packets remain in the original framing for each connection and test
 two or more peers, reconnect, legacy peers, malformed headers and actual TCP.
-No packet envelope or change to negotiation is implemented by this note.
+The subsequent framed implementation below addresses this gap.
 
-## Planned framed layout
+## Framed layout
 
-Status: planned; implementation and verification are pending. The first byte
+Status: implemented experimentally and verified within the scope of the
+[framed protocol evidence](evidence/network-framed-packets-2026-11-15.md). The first byte
 of each framed packet is `1`, followed by ASCII `TRF` and a four-byte unsigned
 little-endian serialization version. A framed receiver checks all eight bytes
 against its negotiated version before decoding the remaining payload. A legacy
@@ -95,9 +95,9 @@ prior unframed version.
 Verification must cover a two-peer TCP lobby, messages before and after the
 acknowledgement, mixed and malformed headers in both directions, matching
 current and legacy packets, compatibility of bounded sessions, save/reload,
-and the existing toroidal gameplay tests. The feature is not accepted until
-these behaviors are observed; the older local builds are intentionally not
-interoperable for toroidal sessions.
+and the existing toroidal gameplay tests. The older local builds are intentionally not interoperable for toroidal
+sessions. Full acceptance remains pending; the evidence record distinguishes
+real TCP tests, local graphical checks, and unverified mixed-version cases.
 
 ## Request acknowledgement is not a transaction receipt
 
