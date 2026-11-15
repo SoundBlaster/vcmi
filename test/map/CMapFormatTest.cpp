@@ -570,6 +570,36 @@ std::shared_ptr<CGameState> reloadExternalInspectionState(const std::shared_ptr<
 		throw std::runtime_error("External inspection save was not fully read");
 	return restored;
 }
+
+std::pair<size_t, size_t> compareExternalInspectionFog(const CGameState & before, const CGameState & after)
+{
+	if(before.getMapSize() != after.getMapSize())
+		throw std::runtime_error("External inspection map dimensions changed");
+	size_t compared = 0, mismatches = 0;
+	const auto size = before.getMapSize();
+	for(const auto & [player, _] : before.players)
+	{
+		if(!player.isValidPlayer())
+			continue;
+		if(!after.players.contains(player))
+			throw std::runtime_error("External inspection player missing after load");
+		const auto * first = before.getPlayerTeam(player);
+		const auto * second = after.getPlayerTeam(player);
+		if(!first || !second)
+			throw std::runtime_error("External inspection team missing after load");
+		if(first->id != second->id)
+			throw std::runtime_error("External inspection player team changed after load");
+		for(int z = 0; z < size.z; ++z)
+			for(int x = 0; x < size.x; ++x)
+				for(int y = 0; y < size.y; ++y)
+				{
+					const int3 pos(x, y, z);
+					mismatches += first->fogOfWarMap[pos] != second->fogOfWarMap[pos];
+					++compared;
+				}
+	}
+	return {compared, mismatches};
+}
 }
 
 TEST(MapFormat, ChecksExternalMapModRequirements)
@@ -696,19 +726,16 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 				ASSERT_NE(restoredHero, nullptr);
 				ASSERT_EQ(restoredHero->visitablePos(), crossing->second);
 				const auto & beforeFog = state->getPlayerTeam(player)->fogOfWarMap;
-				const auto & afterFog = restored->getPlayerTeam(player)->fogOfWarMap;
 				ASSERT_NE(beforeFog[crossing->second], 0);
-				size_t mismatchedFog = 0;
-				for(int x = 0; x < map.width; ++x)
-					for(int y = 0; y < map.height; ++y)
-						mismatchedFog += beforeFog[int3(x, y, 0)] != afterFog[int3(x, y, 0)];
+				const auto [comparedFog, mismatchedFog] = compareExternalInspectionFog(*state, *restored);
+				EXPECT_GT(comparedFog, 0u);
 				EXPECT_EQ(mismatchedFog, 0u);
 				GameHandlerTestServer restoredServer(restored, player);
 				CGameHandler restoredHandler(restoredServer, restored);
 				ASSERT_TRUE(restoredHandler.moveHero(restoredHero->id, restoredHero->convertFromVisitablePos(crossing->first),
 				                                     EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 				ASSERT_EQ(restoredHero->visitablePos(), crossing->first);
-				std::cout << "Restored seam crossing, compared fog tiles=" << map.width * map.height
+				std::cout << "Restored seam crossing, compared player fog cells=" << comparedFog
 				          << ", destination previously visible=" << destinationWasVisible << std::endl;
 			}
 			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(crossing->first),
@@ -792,12 +819,8 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 					ASSERT_NE(restoredHero->getBoat(), nullptr);
 					ASSERT_NE(hero->getBoat(), nullptr);
 					ASSERT_EQ(restoredHero->getBoat()->id, hero->getBoat()->id);
-					const auto & beforeFog = state->getPlayerTeam(player)->fogOfWarMap;
-					const auto & afterFog = restored->getPlayerTeam(player)->fogOfWarMap;
-					size_t mismatchedFog = 0;
-					for(int x = 0; x < map.width; ++x)
-						for(int y = 0; y < map.height; ++y)
-							mismatchedFog += beforeFog[int3(x, y, 0)] != afterFog[int3(x, y, 0)];
+					const auto [comparedFog, mismatchedFog] = compareExternalInspectionFog(*state, *restored);
+					EXPECT_GT(comparedFog, 0u);
 					EXPECT_EQ(mismatchedFog, 0u);
 					GameHandlerTestServer restoredServer(restored, player);
 					CGameHandler restoredHandler(restoredServer, restored);
@@ -808,7 +831,7 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 					                                     EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 					ASSERT_FALSE(restoredHero->inBoat());
 					ASSERT_EQ(restoredHero->visitablePos(), *shore);
-					std::cout << "Restored boat, fog and disembark after seam crossing" << std::endl;
+					std::cout << "Restored boat and disembark, compared player fog cells=" << comparedFog << std::endl;
 				}
 			}
 			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*shore),
