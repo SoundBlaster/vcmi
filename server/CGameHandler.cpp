@@ -1294,7 +1294,7 @@ bool CGameHandler::moveHero(ObjectInstanceID hid, int3 dst, EMovementMode moveme
 		if(source.z != hmpos.z || !int3(0, 0, 0).areNeighbours(gameState().getMap().getTopology().displacement(source, hmpos)))
 			return complainRet("Tiles " + h->pos.toString()+ " and "+ dst.toString() +" are not neighboring!");
 
-		if(gameState().getMap().toroidal && (layer == EPathfindingLayer::LAND || layer == EPathfindingLayer::SAIL || layer == EPathfindingLayer::WATER)
+		if((layer == EPathfindingLayer::LAND || layer == EPathfindingLayer::SAIL || layer == EPathfindingLayer::WATER)
 			&& !pathfinderHelper->canMoveBetween(source, hmpos))
 			return complainRet("Cannot approach the destination from this direction!");
 

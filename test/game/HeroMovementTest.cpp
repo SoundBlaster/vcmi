@@ -7095,10 +7095,6 @@ protected:
 		const auto * node = paths.getNode(destination, EPathfindingLayer::LAND);
 		const bool directRoute = node->reachable() && node->theNodeBefore && node->theNodeBefore->coord == origin;
 		EXPECT_EQ(directRoute, dy <= 0);
-		// Bounded servers historically accept direct requests that their own
-		// pathfinder would not offer. The seam server rejects those requests.
-		if(dy > 0 && !toroidal)
-			return;
 		const auto remaining = hero->movementPointsRemaining();
 		const bool moved = handler.moveHero(heroId, hero->convertFromVisitablePos(destination), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND);
 		if(dy > 0)
