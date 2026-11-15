@@ -1388,6 +1388,30 @@ TEST(ToroidalDemoVmapTest, DecodesExternalUntaggedPrototypeSave)
 	EXPECT_EQ(state->getMap().height, header.height);
 }
 
+TEST_F(ToroidalDemoGameTest, CrossroadsMinesAreReachableByBothPlayers)
+{
+	startWithMap(makeToroidalPlaygroundMap());
+	map()->setToroidalAndRebuild(true);
+	const auto mines = findAll<CGMine>();
+	ASSERT_EQ(mines.size(), 4u);
+	for(const PlayerColor player : {PlayerColor(0), PlayerColor(1)})
+	{
+		revealMap(player);
+		auto * hero = findHeroByOwner(player);
+		ASSERT_NE(hero, nullptr);
+		CPathsInfo paths(gameState()->getMapSize(), hero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
+		CPathfinder pathfinder(*gameState(), config);
+		pathfinder.calculatePaths();
+		for(const auto * mine : mines)
+		{
+			EXPECT_EQ(mine->getOwner(), PlayerColor::NEUTRAL);
+			EXPECT_TRUE(paths.getNode(mine->visitablePos(), EPathfindingLayer::LAND)->reachable())
+				<< "player=" << player.getNum() << " mine=" << mine->visitablePos().toString();
+		}
+	}
+}
+
 TEST_F(ToroidalDemoGameTest, HeroCrossesCornerAndBothEdges)
 {
 	const PlayerColor player(0);

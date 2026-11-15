@@ -461,6 +461,20 @@ TinyH3MBuilder & TinyH3MBuilder::abandonedMine(const int3 & pos, CreatureID guar
 	return *this;
 }
 
+TinyH3MBuilder & TinyH3MBuilder::mine(const int3 & pos, GameResID resource, PlayerColor owner)
+{
+	if(resource.getNum() < 0 || resource.getNum() > GameResID::GOLD)
+		throw std::invalid_argument("TinyH3MBuilder: invalid mine resource");
+	ObjectSpec spec;
+	spec.id = Obj::MINE;
+	spec.subid = MapObjectSubID(resource.getNum());
+	spec.position = pos;
+	spec.owner = owner;
+	spec.templateIndex = registerTemplate(spec.id, spec.subid);
+	registerObject(std::move(spec));
+	return *this;
+}
+
 TinyH3MBuilder & TinyH3MBuilder::scroll(const int3 & pos, SpellID spell)
 {
 	ObjectSpec spec;
@@ -1184,8 +1198,13 @@ void TinyH3MBuilder::writeObjects(TinyH3MWriter & w) const
 				break;
 
 			case Obj::MINE:
+				if(obj.subid.getNum() < 7)
+				{
+					w.writePlayer32(obj.owner);
+					break;
+				}
 				// Mirror of readAbandonedMine
-				assert(obj.subid.getNum() == 7 && "only abandoned mines are supported");
+				assert(obj.subid.getNum() == 7 && "unsupported mine subtype");
 				w.writeUInt32(1 << GameResID::GOLD);                   // allowed resources
 				if(features.levelHOTA5)
 				{

@@ -726,6 +726,82 @@ TEST(MapFormat, AdaptedToroidalDemonstrationFixture)
 	}
 }
 
+TEST(MapFormat, ToroidalCrossroadsScenarioRoundTrips)
+{
+	auto bytes = makeToroidalPlaygroundMap().build();
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderH3M loader("ToroidCrossroads", "core", "ASCII", &input);
+	auto map = loader.loadMap(&callback);
+	callback.setMap(map.get());
+	removeTestModEntitiesFromDemo(*map);
+	map->setToroidalAndRebuild(true);
+
+	CRandomGenerator random(20261115);
+	auto * editor = map->getEditManager();
+	std::vector<int3> terrain, road;
+	for(int dx : {0, 18})
+		for(int x : {33, 34, 35, 0, 1, 2})
+			for(int y = 10; y <= 14; ++y)
+				terrain.emplace_back((x + dx) % 36, (y + dx) % 36, 0);
+	editor->getTerrainSelection().setSelection(terrain);
+	editor->drawTerrain(ETerrainId::DIRT, 0, &random);
+	for(int n = 0; n < 36; ++n)
+		for(int axis : {0, 18})
+		{
+			road.emplace_back(n, axis, 0);
+			road.emplace_back(axis, n, 0);
+		}
+	editor->getTerrainSelection().setSelection(road);
+	editor->drawRoad(RoadId::DIRT_ROAD, &random);
+
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	expectDemoHasNoTestModReferences(output);
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reader(&output);
+	auto reopened = reader.loadMap(&reopenedCallback);
+	reopenedCallback.setMap(reopened.get());
+	ASSERT_TRUE(reopened->toroidal);
+	ASSERT_EQ(reopened->getHeroesOnMap().size(), 2u);
+	ASSERT_EQ(reopened->getAllTowns().size(), 2u);
+	int mines = 0, monsters = 0, resources = 0;
+	for(const auto & object : reopened->objects)
+		if(object)
+		{
+			mines += object->ID == Obj::MINE;
+			monsters += object->ID == Obj::MONSTER;
+			resources += object->ID == Obj::RESOURCE;
+			EXPECT_FALSE(reopened->hasStaticFootprintAcrossToroidalSeam(*object)) << object->instanceName;
+		}
+	EXPECT_EQ(mines, 4);
+	EXPECT_EQ(monsters, 2);
+	EXPECT_EQ(resources, 6);
+	for(int x = 0; x < 36; ++x)
+		for(int y = 0; y < 36; ++y)
+			EXPECT_LE(reopened->getTile(int3(x, y, 0)).visitableObjects.size(), 1u) << x << "," << y;
+	for(const auto & pos : road)
+		EXPECT_EQ(reopened->getTile(pos).getRoadID(), RoadId::DIRT_ROAD) << pos.toString();
+	for(const auto & pos : {int3(35, 12, 0), int3(0, 12, 0), int3(17, 30, 0), int3(18, 30, 0)})
+		EXPECT_EQ(reopened->getTile(pos).getTerrainID(), ETerrainId::DIRT);
+	ASSERT_FALSE(testing::Test::HasFailure());
+	if(const char * outputPath = std::getenv("VCMI_TOROID_CROSSROADS_OUTPUT"))
+	{
+		ASSERT_FALSE(boost::filesystem::exists(outputPath));
+		std::ofstream file(outputPath, std::ios::binary);
+		ASSERT_TRUE(file);
+		file.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+		file.close();
+		ASSERT_TRUE(file);
+	}
+}
+
 TEST(MapFormat, ToroidalBoatDemonstrationFixtureRoundTrips)
 {
 	const PlayerColor red(0), blue(1);

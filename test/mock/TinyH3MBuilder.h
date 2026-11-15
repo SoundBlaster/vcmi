@@ -203,6 +203,8 @@ public:
 
 	/// Abandoned mine producing gold; custom guards need HOTA v5+, NONE keeps the default guards.
 	TinyH3MBuilder & abandonedMine(const int3 & pos, CreatureID guard = CreatureID::NONE, int32_t minAmount = 0, int32_t maxAmount = 0);
+	/// A normal resource mine, neutral by default.
+	TinyH3MBuilder & mine(const int3 & pos, GameResID resource, PlayerColor owner = PlayerColor::NEUTRAL);
 
 	/// Empty Pandora's Box - no message, guards or rewards.
 	TinyH3MBuilder & pandora(const int3 & pos, std::vector<std::pair<CreatureID, uint16_t>> creatures = {});

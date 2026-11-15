@@ -27,3 +27,32 @@ inline TinyH3M::TinyH3MBuilder makeToroidalDemoMap()
 		.resource(int3(35, 1, 0), GameResID::WOOD, 5)
 		.resource(int3(1, 35, 0), GameResID::ORE, 5);
 }
+
+/// A separate, lightly populated two-player scenario; not a balance claim.
+inline TinyH3M::TinyH3MBuilder makeToroidalPlaygroundMap()
+{
+	const PlayerColor red(0), blue(1);
+	return TinyH3M::TinyH3MBuilder(EMapFormat::SOD)
+		.size(36, false)
+		.name("Toroid Crossroads")
+		.description("Two players explore a small map with roads joining the opposite edges and corners.")
+		.playerActive(red).playerActive(blue)
+		.playerMainTown(red, int3(9, 9, 0), false)
+		.playerMainTown(blue, int3(27, 27, 0), false)
+		.town(int3(9, 9, 0), FactionID(0), red)
+		.town(int3(27, 27, 0), FactionID(0), blue)
+		.hero(int3(1, 0, 0), HeroTypeID(0), red)
+		.hero(int3(19, 18, 0), HeroTypeID(1), blue)
+		.resource(int3(35, 35, 0), GameResID::GOLD, 10)
+		.resource(int3(1, 35, 0), GameResID::ORE, 5)
+		.resource(int3(35, 1, 0), GameResID::WOOD, 5)
+		.resource(int3(17, 17, 0), GameResID::GOLD, 10)
+		.resource(int3(19, 17, 0), GameResID::ORE, 5)
+		.resource(int3(17, 19, 0), GameResID::WOOD, 5)
+		.mine(int3(14, 7, 0), GameResID::WOOD)
+		.mine(int3(7, 14, 0), GameResID::ORE)
+		.mine(int3(32, 25, 0), GameResID::WOOD)
+		.mine(int3(25, 32, 0), GameResID::ORE)
+		.monster(int3(13, 12, 0), CreatureID(0), 12)
+		.monster(int3(31, 30, 0), CreatureID(0), 12);
+}
