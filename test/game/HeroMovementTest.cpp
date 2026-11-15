@@ -1433,6 +1433,61 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(redVisibility(*peer->state), fogBeforeFallback);
 	}
 
+	// Place a neutral mine and stage the blue hero beside it across the north
+	// seam. The capture itself is an ordinary request from the remote peer.
+	const int3 minePosition(10, 35, 0), mineOrigin(10, 0, 0);
+	auto mineObject = server.gh->createNewObject(minePosition, Obj::MINE, MapObjectSubID(0));
+	auto * mine = dynamic_cast<CGMine *>(mineObject.get());
+	ASSERT_NE(mine, nullptr);
+	ASSERT_EQ(mine->visitablePos(), minePosition);
+	mine->setOwner(PlayerColor::NEUTRAL);
+	server.gh->newObject(mineObject, blue);
+	const auto mineID = mine->id;
+	server.gh->changeObjPos(blueHero->id, mineOrigin, blue);
+	server.gh->setMovePoints(blueHero->id, 3000);
+	FowTilesType mineArea;
+	for(int dx = -2; dx <= 2; ++dx)
+		for(int dy = -2; dy <= 2; ++dy)
+			mineArea.insert(*topology.canonicalize(minePosition + int3(dx, dy, 0)));
+	server.gh->changeFogOfWar(mineArea, blue, ETileVisibility::REVEALED);
+	pumpUntil([&] {
+		return host.state->getObjInstance(mineID) && guest.state->getObjInstance(mineID)
+			&& host.state->getHero(blueHero->id)->visitablePos() == mineOrigin
+			&& guest.state->getHero(blueHero->id)->visitablePos() == mineOrigin
+			&& host.state->getHero(blueHero->id)->movementPointsRemaining() == 3000
+			&& guest.state->getHero(blueHero->id)->movementPointsRemaining() == 3000
+			&& host.state->isVisibleFor(minePosition, blue) && guest.state->isVisibleFor(minePosition, blue);
+	});
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_NE(peer->state->getObjInstance(mineID), nullptr);
+		ASSERT_EQ(peer->state->getObjInstance(mineID)->getOwner(), PlayerColor::NEUTRAL);
+		ASSERT_EQ(peer->state->getHero(blueHero->id)->visitablePos(), mineOrigin);
+		ASSERT_EQ(peer->state->getHero(blueHero->id)->movementPointsRemaining(), 3000);
+		ASSERT_TRUE(peer->state->isVisibleFor(minePosition, blue));
+	}
+	MoveHero captureMine({blueHero->convertFromVisitablePos(minePosition)}, EPathfindingLayer::LAND, blueHero->id, false);
+	captureMine.player = blue;
+	captureMine.requestID = 81;
+	guest.codec->sendPack(captureMine);
+	pumpUntil([&] {
+		return guest.results.contains(81)
+			&& host.state->getObjInstance(mineID)->getOwner() == blue
+			&& guest.state->getObjInstance(mineID)->getOwner() == blue
+			&& host.state->getHero(blueHero->id)->visitablePos() == minePosition
+			&& guest.state->getHero(blueHero->id)->visitablePos() == minePosition;
+	});
+	ASSERT_TRUE(guest.results.contains(81)) << guest.failure;
+	ASSERT_TRUE(guest.results.at(81)) << testing::PrintToString(guest.systemMessages);
+	ASSERT_EQ(server.gh->gameState().getObjInstance(mineID)->getOwner(), blue);
+	ASSERT_EQ(server.gh->gameState().getHero(blueHero->id)->visitablePos(), minePosition);
+	for(const LobbyPeer * peer : {&host, &guest})
+	{
+		ASSERT_EQ(peer->state->getObjInstance(mineID)->getOwner(), blue);
+		ASSERT_EQ(peer->state->getHero(blueHero->id)->visitablePos(), minePosition);
+		EXPECT_EQ(peer->state->getHero(blueHero->id)->movementPointsRemaining(), server.gh->gameState().getHero(blueHero->id)->movementPointsRemaining());
+	}
+
 	// Save the live TCP game, then start a new lobby and reconnect two fresh
 	// peers through the normal LOAD_GAME path before continuing movement.
 	boost::filesystem::create_directories(directory / "Saves");
@@ -1551,6 +1606,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		EXPECT_EQ(peer->state->getHero(undergroundBlueID)->movementPointsRemaining(), savedUndergroundPoints);
 		EXPECT_EQ(peer->state->players.at(red).resources[GameResID::GOLD], savedGold);
 		EXPECT_EQ(peer->state->getMap().getObject(resourceID), nullptr);
+		ASSERT_NE(peer->state->getObjInstance(mineID), nullptr);
+		EXPECT_EQ(peer->state->getObjInstance(mineID)->getOwner(), blue);
 		EXPECT_EQ(visibility(*peer->state), savedFog);
 	}
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(redHeroID)->visitablePos(), savedRedPosition);
@@ -1561,6 +1618,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	ASSERT_EQ(reloadedServer.gh->gameState().getHero(undergroundBlueID)->movementPointsRemaining(), savedUndergroundPoints);
 	ASSERT_EQ(reloadedServer.gh->gameState().players.at(red).resources[GameResID::GOLD], savedGold);
 	ASSERT_EQ(reloadedServer.gh->gameState().getMap().getObject(resourceID), nullptr);
+	ASSERT_NE(reloadedServer.gh->gameState().getObjInstance(mineID), nullptr);
+	ASSERT_EQ(reloadedServer.gh->gameState().getObjInstance(mineID)->getOwner(), blue);
 	ASSERT_EQ(visibility(reloadedServer.gh->gameState()), savedFog);
 	ASSERT_TRUE(reloadedServer.gh->gameState().actingPlayers.contains(blue));
 	if(const auto activity = reloadedServer.gh->activities->topActivity(blue))
@@ -1575,8 +1634,8 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	}
 	const auto * resumedHero = reloadedServer.gh->gameState().getHero(blueHeroID);
 	ASSERT_NE(resumedHero, nullptr);
-	ASSERT_EQ(resumedHero->visitablePos(), int3(35, 5, 0));
-	const int3 resumedDestination(0, 5, 0);
+	ASSERT_EQ(resumedHero->visitablePos(), minePosition);
+	const int3 resumedDestination = mineOrigin;
 	MoveHero resumeMove({resumedHero->convertFromVisitablePos(resumedDestination)}, EPathfindingLayer::LAND, blueHeroID, false);
 	resumeMove.player = blue;
 	resumeMove.requestID = 42;

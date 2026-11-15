@@ -1,5 +1,26 @@
 # TCP movement and request acknowledgement — 2026-11-10
 
+## Mine ownership and reload — 2026-11-15
+
+The lobby-start test creates a neutral mine at `(10,35,0)` and uses server
+fixture operations to place the blue hero at `(10,0,0)`, grant movement points
+and reveal the surrounding area. A test listener then sends a normal movement
+request over loopback TCP across the north seam. The server and both replicas
+agree on the capture, the hero's position and remaining movement points. The
+test saves the game, connects two fresh listeners through the normal load-game
+path and checks that the reloaded server and both replicas retain blue mine
+ownership. The blue hero then moves back across the same seam.
+
+On macOS arm64, `TcpLobbyStartsToroidalGameForTwoPeers`,
+`HeroCapturesMineAcrossToroidalSeam` and
+`GuardedMineAcrossSeamPreservesVisitThroughBattle` passed three consecutive
+repetitions on the TB5 build from `78ae57c` plus this test change. The XML
+report `runtime/tcp-mine-replication-2026-11-15.xml` contains the final
+repetition. The mine and starting position were staged, and the networked mine
+was unguarded. The guarded battle is a separate server-side test. These checks
+do not establish graphical multiplayer, remote machines, other directions or
+the full state of a multiplayer game.
+
 ## Resource removal and reload — 2026-11-15
 
 The lobby-start test now identifies the gold object at `(35,35,0)` before
