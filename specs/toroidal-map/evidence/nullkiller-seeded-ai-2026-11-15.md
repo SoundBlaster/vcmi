@@ -86,3 +86,24 @@ The run summary and logs are under
 `runtime/crossroads-ai-8b680f3-2026-11-15/` on the TB5 build root. The user
 settings file retained SHA-256
 `a04043a03263ce8569341fb84038b5c76d481f5b3f1d615b50b23ee87263a770`.
+
+## Crossroads seed 3 on ff23f4b
+
+The macOS arm64 client and server were built from `ff23f4b` and the client
+ran a headless in-process game with two AI players and seed 3. The installed
+Crossroads VMAP matched the tracked map SHA-256
+`dc22f9087595505366d7e6c6ff585df4e9b265436a18a2c7d6d539493848735f`.
+The server logged Orrin crossing from anchor `(1,0,0)` to `(36,0,0)` with
+result 1, then red won on day 60. The client exited normally before its
+30-second limit. This is one seed and does not resolve the seed-4 outcome,
+prove general AI support, or verify graphical behavior.
+
+The client binary SHA-256 was
+`f612e1afc0550cacdede291fc373cdd52d751f31d370b530ee75271fb1f9a5f4`.
+The run summary, stdout and detailed client/server trace are in
+`runtime/crossroads-current-ff23f4b-2026-11-15/` on TB5; the detailed log
+SHA-256 is `30b2cd2b0108bea748da96abde79a95f8c923e9a3b486c6891292e2b7cdf02ec`.
+The game refreshed the user's mod-validation checksums. Its original mod
+settings were reconstructed from the pre-load log, checked against the
+pre-run SHA-256, and restored after the process exited; the game settings
+file remained unchanged. The binary emitted the existing linker warnings.

@@ -247,3 +247,10 @@ consecutive runs on macOS arm64; the XML report is
 server and test listeners are in one process over loopback TCP; graphical
 clients, corner sailing, boat persistence in this scenario and remote hosts
 remain unverified. Existing linker warnings were present.
+
+After the test change, the full local suite ran 2,001 tests: 1,995 passed and
+six optional tests were skipped; three tests were disabled. The XML and log
+are `runtime/full-suite-tcp-boat-2026-11-15.{xml,log}` under the TB5 build
+root. The separately run HotA inspection and toroidal-footprint checks above
+used their explicit external fixtures; they are among the optional tests not
+run in this full-suite invocation.
