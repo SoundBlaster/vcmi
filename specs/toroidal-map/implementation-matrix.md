@@ -438,8 +438,8 @@ add both levels, all approach directions and bounded controls, including
 refusal and selected victory or retreat paths. Their approach mask prohibits
 some directions; those cases test rejection rather than battle.
 The [artifact pickup checks](evidence/topology-artifact-pickup-2026-11-15.md)
-cover one unguarded artifact type across every seam direction and on bounded
-interior controls, on both levels.
+cover one artifact type across every seam direction and bounded interior
+controls, on both levels, unguarded and guarded with refusal and forced victory.
 The wrapped guard battle check is recorded in
 [`evidence/topology-guard-battle-2026-11-09.md`](evidence/topology-guard-battle-2026-11-09.md).
 The experimental single-level Earth-map draft and its bounded startup,
