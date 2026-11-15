@@ -20,7 +20,11 @@
 #include "../../lib/mapObjectConstructors/CObjectClassesHandler.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
+#include "../../lib/mapObjects/CGHeroInstance.h"
+#include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/entities/hero/CHero.h"
+#include "../../lib/gameState/CGameState.h"
+#include "../../lib/StartInfo.h"
 #include "../../lib/spells/CSpell.h"
 #include "../../lib/mapping/CMap.h"
 #include "../../lib/mapping/CMapEditManager.h"
@@ -31,6 +35,11 @@
 #include "../../lib/modding/IdentifierResolver.h"
 
 #include "../../lib/VCMIDirs.h"
+#include "../../server/CGameHandler.h"
+#include "../../server/activities/Activity.h"
+#include "../../server/activities/MapActivities.h"
+#include "../../server/activities/ActivityProcessor.h"
+#include "../mock/GameHandlerTestServer.h"
 
 #include "../JsonComparer.h"
 #include "../mock/TinyH3MBuilder.h"
@@ -483,6 +492,149 @@ TEST(MapFormat, LoadsExternalLegacyMapForInspection)
 			ASSERT_TRUE(output.good());
 		}
 	}
+}
+
+namespace
+{
+/// Supplies external VMAP bytes to the normal in-process game-state initializer.
+class ExternalInspectionMapService final : public IMapService
+{
+public:
+	explicit ExternalInspectionMapService(std::vector<ui8> bytes) : bytes(std::move(bytes)) {}
+	std::unique_ptr<CMap> loadMap(const ResourcePath &, IGameInfoCallback * cb) const override
+	{
+		return service.loadMap(bytes.data(), static_cast<int>(bytes.size()), "ExternalGameInspection", "core", "UTF-8", cb);
+	}
+	std::unique_ptr<CMapHeader> loadMapHeader(const ResourcePath &, bool) const override
+	{
+		return service.loadMapHeader(bytes.data(), static_cast<int>(bytes.size()), "ExternalGameInspection", "core", "UTF-8");
+	}
+	std::unique_ptr<CMap> loadMap(const ui8 *, int, const std::string &, const std::string &, const std::string &, IGameInfoCallback * cb) const override
+	{
+		return loadMap(ResourcePath(""), cb);
+	}
+	std::unique_ptr<CMapHeader> loadMapHeader(const ui8 *, int, const std::string &, const std::string &, const std::string &) const override
+	{
+		return loadMapHeader(ResourcePath(""), false);
+	}
+	void saveMap(const std::unique_ptr<CMap> &, boost::filesystem::path) const override
+	{
+		throw std::runtime_error("Unexpected save during external map inspection");
+	}
+private:
+	std::vector<ui8> bytes;
+	CMapService service;
+};
+}
+
+TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
+{
+	const char * path = std::getenv("VCMI_INSPECT_START_VMAP");
+	const char * pairList = std::getenv("VCMI_INSPECT_PORTAL_PAIRS");
+	if(!path || !*path || !pairList || !*pairList)
+		GTEST_SKIP() << "Set VCMI_INSPECT_START_VMAP and VCMI_INSPECT_PORTAL_PAIRS";
+	std::ifstream file(path, std::ios::binary);
+	ASSERT_TRUE(file.is_open());
+	std::vector<ui8> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	ExternalInspectionMapService service(std::move(bytes));
+	auto header = service.loadMapHeader(ResourcePath("inspection"), false);
+	ASSERT_NE(header, nullptr);
+	ASSERT_TRUE(header->toroidal);
+	StartInfo start;
+	start.mapname = "inspection";
+	start.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
+	start.mode = EStartMode::NEW_GAME;
+	for(int index = 0; index < static_cast<int>(header->players.size()); ++index)
+	{
+		const auto & info = header->players[index];
+		if(!info.canHumanPlay && !info.canComputerPlay)
+			continue;
+		auto & player = start.playerInfos[PlayerColor(index)];
+		player.color = PlayerColor(index);
+		player.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(index));
+		player.name = "Inspection";
+		player.castle = info.defaultCastle();
+		player.hero = info.defaultHero();
+		player.bonus = PlayerStartingBonus::GOLD;
+	}
+	auto state = std::make_shared<CGameState>();
+	state->preInit(LIBRARY);
+	GameRandomizer randomizer(*state);
+	Load::ProgressAccumulator progress;
+	state->init(&service, &start, randomizer, progress, false);
+	auto & map = state->getMap();
+	ASSERT_TRUE(map.toroidal);
+	std::vector<std::string> groups;
+	boost::split(groups, pairList, boost::is_any_of(";"));
+	std::set<TeleportChannelID> channels;
+	std::vector<std::pair<const CGMonolith *, const CGMonolith *>> portals;
+	for(const auto & group : groups)
+	{
+		std::vector<std::string> names;
+		boost::split(names, group, boost::is_any_of(","));
+		ASSERT_EQ(names.size(), 2u);
+		auto first = map.instanceNames.find(names[0]);
+		auto second = map.instanceNames.find(names[1]);
+		ASSERT_NE(first, map.instanceNames.end());
+		ASSERT_NE(second, map.instanceNames.end());
+		const auto * a = dynamic_cast<const CGMonolith *>(first->second.get());
+		const auto * b = dynamic_cast<const CGMonolith *>(second->second.get());
+		ASSERT_NE(a, nullptr);
+		ASSERT_NE(b, nullptr);
+		ASSERT_EQ(a->ID, Obj::MONOLITH_TWO_WAY);
+		ASSERT_EQ(b->ID, Obj::MONOLITH_TWO_WAY);
+		ASSERT_EQ(a->channel, b->channel);
+		ASSERT_TRUE(channels.insert(a->channel).second);
+		const auto channel = map.teleportChannels.find(a->channel);
+		ASSERT_NE(channel, map.teleportChannels.end());
+		EXPECT_EQ(channel->second->entrances.size(), 2u);
+		EXPECT_EQ(channel->second->exits.size(), 2u);
+		EXPECT_TRUE(vstd::contains(channel->second->exits, a->id));
+		EXPECT_TRUE(vstd::contains(channel->second->exits, b->id));
+		portals.emplace_back(a, b);
+	}
+	if(std::getenv("VCMI_INSPECT_TRAVERSE_PORTALS"))
+	{
+		CGHeroInstance * hero = nullptr;
+		for(const auto & id : map.getHeroesOnMap())
+		{
+			auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id));
+			if(candidate && candidate->getOwner().isValidPlayer() && !candidate->isGarrisoned() && !candidate->inBoat())
+			{
+				hero = candidate;
+				break;
+			}
+		}
+		ASSERT_NE(hero, nullptr);
+		const auto player = hero->getOwner();
+		state->actingPlayers.insert(player);
+		GameHandlerTestServer server(state, player);
+		CGameHandler handler(server, state);
+		for(const auto & [a, b] : portals)
+			for(const auto & [entrance, exit] : {std::pair(a, b), std::pair(b, a)})
+			{
+				ChangeObjPos place;
+				place.objid = hero->id;
+				place.nPos = entrance->visitablePos();
+				state->apply(place);
+				ASSERT_EQ(hero->visitablePos(), entrance->visitablePos());
+				handler.objectVisited(entrance, hero);
+				const auto dialog = handler.activities->topActivity(player);
+				ASSERT_NE(dialog, nullptr);
+				ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+				const auto teleport = std::dynamic_pointer_cast<TeleportDialogActivity>(dialog);
+				ASSERT_NE(teleport, nullptr);
+				const auto selected = std::ranges::find_if(teleport->td.exits, [&](const auto & item) { return item.first == exit->id; });
+				ASSERT_NE(selected, teleport->td.exits.end());
+				const auto answer = static_cast<ui32>(std::distance(teleport->td.exits.begin(), selected));
+				ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, answer), ReplyOutcome::Accepted);
+				EXPECT_EQ(hero->visitablePos(), exit->visitablePos());
+			}
+		std::cout << "Direct server portal visits checked in both directions" << std::endl;
+	}
+	std::cout << "Initialized external toroidal map: " << map.width << "x" << map.height
+		<< ", checked isolated portal pairs=" << channels.size() << std::endl;
 }
 
 TEST(MapFormat, ConvertsExternalLegacyMapWithWrappedFootprints)
