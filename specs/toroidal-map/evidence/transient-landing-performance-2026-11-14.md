@@ -127,3 +127,55 @@ passed 1,661 tests; four tests were disabled. The test log is
 `runtime/full-suite-landing-early-2026-11-15.log` on TB5. SpecPM validation
 reported no errors or warnings. The build retained existing linker warnings
 about duplicate libraries and absent search directories.
+
+## Distant and unknown landing
+
+The opt-in probe also measures a single search from water at different
+distances from the only land tile. The map is still a revealed 252×252 torus,
+and each timed call allocates its own graph; map construction is excluded.
+These are `PLAYER_ROUTE` searches, not measurements of a server request. On
+the same Mac in a Release build based on `1159bf1`, three iterations in one
+process gave the following ranges of per-iteration medians. Each median uses
+seven timed samples after one warmup:
+
+| Movement points | Distance to land | Result | Median range, ms |
+| ---: | ---: | --- | ---: |
+| 1,200 | 1 | found | 0.31–0.33 |
+| 1,200 | 10 | found | 0.57–0.59 |
+| 1,200 | 20 | none | 0.84–0.86 |
+| 3,000 | 30 | found | 2.59–2.64 |
+| 6,000 | 60 | found | 9.69–9.80 |
+| 6,000 | 100 | none | 9.98–10.09 |
+| 6,000 | 125 | none | 9.96–10.18 |
+
+For a separate start surrounded by a 9×9 revealed water area, with the land
+tile hidden beyond the fog, the result was `UNKNOWN`: median searches ranged
+from 0.48 to 0.53 ms across the three movement budgets and iterations. The
+ordinary test also asserts found, none and unknown results independently of
+the opt-in benchmark. The log and XML are
+`runtime/landing-distant-final-2026-11-15.log` and
+`runtime/landing-distant-final-2026-11-15.xml` on TB5.
+
+The 6,000-point budget is a stress case. These measurements do not establish
+typical game latency, a worst-case bound, frame pacing, or the combined cost
+of all checks in a server movement request.
+
+The probe also requests longer routes from fresh, already calculated path
+graphs. It times only `getPath`, including route-safety checks but excluding
+the initial graph calculation. Three iterations in one process produced these
+ranges of medians, each from five samples after a warmup:
+
+| Movement points | Destination distance | Route result | Median range, ms |
+| ---: | ---: | --- | ---: |
+| 3,000 | 15 | accepted | 3.64–3.76 |
+| 3,000 | 20 | rejected | 4.31–4.43 |
+| 6,000 | 30 | accepted | 25.59–26.08 |
+| 6,000 | 40 | rejected | 27.86–28.06 |
+
+Before route-safety validation, all four destinations were reachable in the
+current turn. A destination 60 tiles away at 6,000 points was already
+unreachable in the raw graph and its immediate rejection does not measure a
+landing search. These are synthetic first requests, not repeated cached
+requests or end-to-end UI timings. The log and XML are
+`runtime/landing-distant-routes-final-2026-11-15.log` and
+`runtime/landing-distant-routes-final-2026-11-15.xml` on TB5.

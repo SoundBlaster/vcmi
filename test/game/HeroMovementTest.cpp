@@ -9023,10 +9023,41 @@ TEST_F(HeroMovementTest, TransientRouteSafetyWorksOnLargeMap)
 	EXPECT_FALSE(paths.getPath(route, destination, EPathfindingLayer::WATER));
 	EXPECT_FALSE(paths.getPathInfo(destination, EPathfindingLayer::WATER)->reachable());
 	EXPECT_TRUE(paths.getPath(route, int3(132, 126, 0), EPathfindingLayer::WATER));
+	EXPECT_EQ(findKnownTransientLanding(*gameState(), hero,
+		PathfinderStart{int3(136, 126, 0), EPathfindingLayer::WATER, 1200}, nullptr, LandingKnowledge::PLAYER_ROUTE), KnownLanding::FOUND);
+	EXPECT_EQ(findKnownTransientLanding(*gameState(), hero,
+		PathfinderStart{int3(146, 126, 0), EPathfindingLayer::WATER, 1200}, nullptr, LandingKnowledge::PLAYER_ROUTE), KnownLanding::NONE);
 
 	// Opt-in timing of the same server-side search, excluding map setup.
 	if(std::getenv("VCMI_TOROID_LANDING_BENCH"))
 	{
+		// Exercise distant and unreachable shores as well as the adjacent-shore
+		// case below. Each sample includes the per-request graph allocation.
+		for(const auto & [points, distance] : {std::pair{1200, 1}, std::pair{1200, 10}, std::pair{1200, 20},
+			std::pair{3000, 10}, std::pair{3000, 30}, std::pair{6000, 20}, std::pair{6000, 60},
+			std::pair{6000, 100}, std::pair{6000, 125}})
+		{
+			std::vector<double> elapsed;
+			std::optional<KnownLanding> expected;
+			for(int sample = 0; sample < 8; ++sample)
+			{
+				const auto before = std::chrono::steady_clock::now();
+				const auto result = findKnownTransientLanding(*gameState(), hero,
+					PathfinderStart{int3(126 + distance, 126, 0), EPathfindingLayer::WATER, points}, nullptr, LandingKnowledge::PLAYER_ROUTE);
+				const auto after = std::chrono::steady_clock::now();
+				ASSERT_NE(result, KnownLanding::UNKNOWN);
+				if(expected)
+					ASSERT_EQ(result, *expected);
+				else
+					expected = result;
+				if(sample > 0)
+					elapsed.push_back(std::chrono::duration<double, std::milli>(after - before).count());
+			}
+			std::ranges::sort(elapsed);
+			std::cout << "Distant landing points=" << points << " distance=" << distance
+				<< " result=" << (*expected == KnownLanding::FOUND ? "found" : "none")
+				<< " median_ms=" << elapsed[elapsed.size() / 2] << " max_ms=" << elapsed.back() << std::endl;
+		}
 		for(const int points : {1200, 3000, 6000})
 		{
 			std::vector<double> elapsed;
@@ -9077,6 +9108,71 @@ TEST_F(HeroMovementTest, TransientRouteSafetyWorksOnLargeMap)
 			std::cout << "Route benchmark points=" << points << " distance=" << distance << " samples=" << elapsed.size()
 				<< " median_ms=" << elapsed[elapsed.size() / 2] << " max_ms=" << elapsed.back()
 				<< " next_median_ms=" << nextElapsed[nextElapsed.size() / 2] << " next_max_ms=" << nextElapsed.back() << std::endl;
+		}
+		// Longer routes can require repeated landing searches before the first
+		// safe prefix is cached; include both accepted and rejected routes.
+		for(const auto & [points, distance] : {std::pair{3000, 15}, std::pair{3000, 20},
+			std::pair{6000, 30}, std::pair{6000, 40}, std::pair{6000, 60}})
+		{
+			std::vector<double> elapsed;
+			std::optional<bool> expected;
+			hero->setMovementPoints(points);
+			for(int sample = 0; sample < 6; ++sample)
+			{
+				CPathsInfo freshPaths(gameState()->getMapSize(), hero);
+				auto freshConfig = std::make_shared<SingleHeroPathfinderConfig>(freshPaths, *gameState(), hero);
+				CPathfinder freshFinder(*gameState(), freshConfig);
+				freshFinder.calculatePaths();
+				if(sample == 0)
+				{
+					const auto * raw = freshPaths.getNode(int3(126 + distance, 126, 0), EPathfindingLayer::WATER);
+					std::cout << "Distant route raw points=" << points << " distance=" << distance
+						<< " reachable=" << raw->reachable() << " turns=" << static_cast<int>(raw->turns) << std::endl;
+				}
+				CGPath selected;
+				const auto before = std::chrono::steady_clock::now();
+				const bool accepted = freshPaths.getPath(selected, int3(126 + distance, 126, 0), EPathfindingLayer::WATER);
+				const auto after = std::chrono::steady_clock::now();
+				if(expected)
+					ASSERT_EQ(accepted, *expected);
+				else
+					expected = accepted;
+				if(sample > 0)
+					elapsed.push_back(std::chrono::duration<double, std::milli>(after - before).count());
+			}
+			std::ranges::sort(elapsed);
+			std::cout << "Distant route points=" << points << " distance=" << distance
+				<< " result=" << (*expected ? "accepted" : "rejected")
+				<< " median_ms=" << elapsed[elapsed.size() / 2] << " max_ms=" << elapsed.back() << std::endl;
+		}
+	}
+	// Known water surrounded by fog, with the island itself hidden. The
+	// visibility-limited search must not use the hidden landing tile.
+	setMapVisibility(player, false);
+	const int3 fogStart(150, 126, 0);
+	for(int dx = -4; dx <= 4; ++dx)
+		for(int dy = -4; dy <= 4; ++dy)
+			gameState()->getPlayerTeam(player)->fogOfWarMap[fogStart + int3(dx, dy, 0)] = 1;
+	EXPECT_EQ(findKnownTransientLanding(*gameState(), hero,
+		PathfinderStart{fogStart, EPathfindingLayer::WATER, 1200}, nullptr, LandingKnowledge::PLAYER_ROUTE), KnownLanding::UNKNOWN);
+	if(std::getenv("VCMI_TOROID_LANDING_BENCH"))
+	{
+		for(const int points : {1200, 3000, 6000})
+		{
+			std::vector<double> elapsed;
+			for(int sample = 0; sample < 8; ++sample)
+			{
+				const auto before = std::chrono::steady_clock::now();
+				const auto result = findKnownTransientLanding(*gameState(), hero,
+					PathfinderStart{fogStart, EPathfindingLayer::WATER, points}, nullptr, LandingKnowledge::PLAYER_ROUTE);
+				const auto after = std::chrono::steady_clock::now();
+				ASSERT_EQ(result, KnownLanding::UNKNOWN);
+				if(sample > 0)
+					elapsed.push_back(std::chrono::duration<double, std::milli>(after - before).count());
+			}
+			std::ranges::sort(elapsed);
+			std::cout << "Fog landing points=" << points << " result=unknown median_ms="
+				<< elapsed[elapsed.size() / 2] << " max_ms=" << elapsed.back() << std::endl;
 		}
 	}
 }
