@@ -1018,6 +1018,23 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		const auto * node = paths.getNode(road, EPathfindingLayer::LAND);
 		std::cout << "Revealed start connectivity seam road at=" << road.toString()
 		          << " reachable=" << node->reachable() << " turns=" << static_cast<int>(node->turns) << std::endl;
+		int reachableTransport = 0;
+		for(const auto & object : map.objects)
+		{
+			if(!object || (object->ID != Obj::SHIPYARD && object->ID != Obj::BOAT))
+				continue;
+			const auto pos = object->visitablePos();
+			const auto * land = paths.getNode(pos, EPathfindingLayer::LAND);
+			const auto * sail = paths.getNode(pos, EPathfindingLayer::SAIL);
+			if(land->reachable() || sail->reachable())
+			{
+				++reachableTransport;
+				std::cout << "Revealed start reachable transport " << object->instanceName
+				          << " at=" << pos.toString() << " land=" << land->reachable()
+				          << " sail=" << sail->reachable() << std::endl;
+			}
+		}
+		std::cout << "Revealed start reachable transport count=" << reachableTransport << std::endl;
 	}
 	if(std::getenv("VCMI_INSPECT_EARTH_SEAM_ROAD"))
 	{
