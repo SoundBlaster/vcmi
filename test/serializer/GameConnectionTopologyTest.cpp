@@ -57,6 +57,11 @@ public:
 			++otherAcknowledgements;
 		if(dynamic_cast<LobbyChatMessage *>(packet.get()))
 			++receivedChats;
+		if(const auto * update = dynamic_cast<const LobbyUpdateMapInfo *>(packet.get()); update && update->mapInfo && update->mapInfo->mapHeader)
+		{
+			mapURI = update->mapInfo->fileURI;
+			mapToroidal = update->mapInfo->mapHeader->toroidal;
+		}
 		const auto * connected = dynamic_cast<const LobbyClientConnected *>(packet.get());
 		if(connected && connected->uuid == uuid)
 		{
@@ -73,6 +78,8 @@ public:
 	int packetsBeforeOwnAcknowledgement = 0;
 	int otherAcknowledgements = 0;
 	int receivedChats = 0;
+	std::string mapURI;
+	std::optional<bool> mapToroidal;
 	std::shared_ptr<INetworkConnection> transport;
 	std::unique_ptr<GameConnection> codec;
 };
@@ -345,6 +352,57 @@ TEST(GameConnectionTopologyTest, TcpConnectionsNegotiateBeforeToroidalStartGuard
 	EXPECT_FALSE(server.supportsMapTopology(map));
 	map.toroidal = false;
 	EXPECT_TRUE(server.supportsMapTopology(map));
+}
+
+TEST(GameConnectionTopologyTest, ConnectsToExternalLegacyServerWithBoundedMap)
+{
+	const auto * portText = std::getenv("VCMI_TOROID_LEGACY_SERVER_PORT");
+	const auto * mapText = std::getenv("VCMI_TOROID_LEGACY_SERVER_MAP");
+	if(!portText || !*portText || !mapText || !*mapText)
+		GTEST_SKIP() << "Set VCMI_TOROID_LEGACY_SERVER_PORT and VCMI_TOROID_LEGACY_SERVER_MAP for an external legacy server";
+	char * end = nullptr;
+	const auto value = std::strtol(portText, &end, 10);
+	ASSERT_TRUE(end && *end == '\0' && value > 0 && value <= 65535);
+	auto network = INetworkHandler::createHandler();
+	LobbyProbe host("legacy-host-probe", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	LobbyProbe guest("legacy-guest-probe", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	const auto pumpUntil = [&](const auto & ready)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+		while(!ready() && host.failure.empty() && guest.failure.empty() && std::chrono::steady_clock::now() < deadline)
+		{
+			network->getContext().restart();
+			network->getContext().poll();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		return ready();
+	};
+	network->connectToRemote(host, "127.0.0.1", static_cast<uint16_t>(value));
+	ASSERT_TRUE(pumpUntil([&] { return host.ack.has_value(); })) << host.failure;
+	EXPECT_TRUE(LobbyTopologyCapability::isSafeServerGreeting(*host.ack));
+	EXPECT_FALSE(host.ack->toroidal);
+	EXPECT_LT(host.ack->version, ESerializationVersion::TOROIDAL_MAP);
+	network->connectToRemote(guest, "127.0.0.1", static_cast<uint16_t>(value));
+	ASSERT_TRUE(pumpUntil([&] { return guest.ack.has_value(); })) << guest.failure;
+	EXPECT_TRUE(LobbyTopologyCapability::isSafeServerGreeting(*guest.ack));
+	EXPECT_FALSE(guest.ack->toroidal);
+	EXPECT_EQ(guest.ack->version, host.ack->version);
+	LobbySetMap select;
+	select.selection.type = ScenarioSelection::EType::MAP;
+	select.selection.fileURI = mapText;
+	host.codec->sendPack(select);
+	ASSERT_TRUE(pumpUntil([&] { return host.mapToroidal && guest.mapToroidal; })) << host.failure << " " << guest.failure;
+	EXPECT_FALSE(*host.mapToroidal);
+	EXPECT_FALSE(*guest.mapToroidal);
+	EXPECT_EQ(host.mapURI, mapText);
+	EXPECT_EQ(host.mapURI, guest.mapURI);
+	LobbyChatMessage chat;
+	chat.playerName = host.uuid;
+	chat.message.appendRawString("legacy protocol remains usable");
+	host.codec->sendPack(chat);
+	ASSERT_TRUE(pumpUntil([&] { return host.receivedChats > 0 && guest.receivedChats > 0; })) << host.failure << " " << guest.failure;
+	EXPECT_TRUE(host.failure.empty());
+	EXPECT_TRUE(guest.failure.empty());
 }
 
 TEST(GameConnectionTopologyTest, RejectsConflictingTopologyWireLayouts)
