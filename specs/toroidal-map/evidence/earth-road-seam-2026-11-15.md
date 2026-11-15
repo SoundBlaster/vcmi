@@ -105,3 +105,37 @@ binary was built from `d8584d1` plus the temporary experiment; the XML is
 afterwards. This result suggests that clearing these particular decorations
 is not sufficient; it does not prove that no connection is possible with
 other terrain, object or route changes.
+
+## Road extension from the existing network
+
+`MapFormat.PreparesEarthConnectedSeamRoad`, added in `4b2ddaa`, creates a
+separate copy of the assembled Earth map. It verifies and removes one
+non-visitable decoration, `cactus_7575`, blocking `(250,425,0)`; checks the
+four proposed cells for land, obstacles, interactive objects and rivers; and
+uses the map editor's road operation to extend the existing road at
+`(2,425,0)` along `(1,425,0)`, `(0,425,0)`, `(251,425,0)` and
+`(250,425,0)`. The opposite endpoint is not connected to a second existing
+road network. The generator verifies bidirectional adjacent movement geometry,
+the existing road and the saved/reopened road types. It requires explicit
+`VCMI_INSPECT_START_VMAP` and `VCMI_EARTH_SEAM_ROAD_OUTPUT` paths, refuses an
+existing output, and does not modify the source.
+
+On macOS arm64, this test passed against the assembled input SHA-256
+`97f5222ab48e5987b58c12643be985e450524488bf042a9f6ae27ab9f03ea1f3`.
+The generated local file `draft-stacked/earth-connected-seam-road-verified.vmap`
+under the TB5 Earth research runtime has SHA-256
+`61f9f042612fb86aa611c64e57b2c2e6ee7a39409cf2b4eeb1fd74b8b00d40b7`.
+Two generated archives had identical member contents, though their archive
+hashes differed. `VCMI_INSPECT_EARTH_SEAM_ROAD` in the existing external-map
+game test initialized the first copy and staged a red hero at the existing
+road. The server moved the hero along the entire five-cell route and back,
+including both seam directions, while consuming movement points; all route
+cells were unguarded in that initialized state. The two converted portal
+pairs also passed the existing initialization check. The test build used
+`a586abb` plus `4b2ddaa`; XML results are `runtime/earth-connected-seam-road-final.xml`
+and `runtime/earth-connected-seam-road-game.xml` under the TB5 build root.
+
+The local Earth profile still points to the previous assembled map. This road
+candidate has not been checked in a graphical client, so its static appearance
+and integration into the playable demo remain open. The staged route does not
+prove a normal starting hero can reach it or that map balance is preserved.
