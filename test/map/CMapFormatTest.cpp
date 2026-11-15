@@ -21,6 +21,7 @@
 #include "../../lib/mapObjects/ObjectTemplate.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
+#include "../../lib/mapObjects/CGCreature.h"
 #include "../../lib/mapObjects/MiscObjects.h"
 #include "../../lib/entities/hero/CHero.h"
 #include "../../lib/gameState/CGameState.h"
@@ -29,6 +30,7 @@
 #include "../../lib/mapping/CMap.h"
 #include "../../lib/mapping/CMapEditManager.h"
 #include "../../lib/mapping/CMapService.h"
+#include "../../lib/mapping/MapTopology.h"
 #include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/mapping/TerrainTile.h"
@@ -36,6 +38,7 @@
 
 #include "../../lib/VCMIDirs.h"
 #include "../../server/CGameHandler.h"
+#include "../../server/battles/BattleProcessor.h"
 #include "../../server/activities/Activity.h"
 #include "../../server/activities/MapActivities.h"
 #include "../../server/activities/ActivityProcessor.h"
@@ -594,7 +597,10 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		EXPECT_TRUE(vstd::contains(channel->second->exits, b->id));
 		portals.emplace_back(a, b);
 	}
-	if(std::getenv("VCMI_INSPECT_TRAVERSE_PORTALS"))
+	const bool directVisits = std::getenv("VCMI_INSPECT_TRAVERSE_PORTALS") != nullptr;
+	const bool approachVisits = std::getenv("VCMI_INSPECT_APPROACH_PORTALS") != nullptr;
+	ASSERT_FALSE(directVisits && approachVisits);
+	if(directVisits || approachVisits)
 	{
 		CGHeroInstance * hero = nullptr;
 		for(const auto & id : map.getHeroesOnMap())
@@ -611,15 +617,69 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		state->actingPlayers.insert(player);
 		GameHandlerTestServer server(state, player);
 		CGameHandler handler(server, state);
+		int battles = 0;
+		int levelUps = 0;
 		for(const auto & [a, b] : portals)
 			for(const auto & [entrance, exit] : {std::pair(a, b), std::pair(b, a)})
 			{
+				SCOPED_TRACE(entrance->instanceName + " -> " + exit->instanceName);
+				int3 startPosition = entrance->visitablePos();
+				if(approachVisits)
+				{
+					std::optional<int3> approach;
+					for(const auto & direction : int3::getDirs())
+					{
+						const auto candidate = map.getTopology().canonicalize(entrance->visitablePos() + direction);
+						if(candidate && map.getTile(*candidate).isLand() && !map.getTile(*candidate).blocked()
+							&& !map.getTile(*candidate).visitable() && map.canMoveBetween(*candidate, entrance->visitablePos()))
+						{
+							approach = candidate;
+							break;
+						}
+					}
+					ASSERT_TRUE(approach) << "No free neighboring approach to " << entrance->instanceName;
+					startPosition = *approach;
+					const auto guard = state->guardingCreaturePosition(entrance->visitablePos());
+					if(map.isInTheMap(guard))
+						for(const auto & id : map.getTile(guard).visitableObjects)
+							if(auto * creature = dynamic_cast<CGCreature *>(map.getObject(id)))
+							{
+								// Keep the test deterministic if the guard would otherwise offer to flee or join.
+								creature->agression = 127;
+								creature->neverFlees = true;
+							}
+				}
 				ChangeObjPos place;
 				place.objid = hero->id;
-				place.nPos = entrance->visitablePos();
+				place.nPos = startPosition;
 				state->apply(place);
-				ASSERT_EQ(hero->visitablePos(), entrance->visitablePos());
-				handler.objectVisited(entrance, hero);
+				ASSERT_EQ(hero->visitablePos(), startPosition);
+				if(approachVisits)
+				{
+					hero->setMovementPoints(3000);
+					ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(entrance->visitablePos()),
+					                             EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+					if(state->getBattle(player))
+					{
+						++battles;
+						handler.battles->cheatBattleVictory(player);
+						const auto result = handler.activities->topActivity(player);
+						ASSERT_NE(result, nullptr);
+						ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
+						ASSERT_EQ(handler.activities->submitReply(result->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+					}
+					for(int limit = 0; limit < 16; ++limit)
+					{
+						const auto prompt = handler.activities->topActivity(player);
+						if(!prompt || (prompt->getType() != ActivityType::HeroLevelUpDialog
+						               && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+							break;
+						++levelUps;
+						ASSERT_EQ(handler.activities->submitReply(prompt->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+					}
+				}
+				else
+					handler.objectVisited(entrance, hero);
 				const auto dialog = handler.activities->topActivity(player);
 				ASSERT_NE(dialog, nullptr);
 				ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
@@ -631,7 +691,14 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 				ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, answer), ReplyOutcome::Accepted);
 				EXPECT_EQ(hero->visitablePos(), exit->visitablePos());
 			}
-		std::cout << "Direct server portal visits checked in both directions" << std::endl;
+		std::cout << (approachVisits ? "Approach and portal visits" : "Direct server portal visits")
+			<< " checked in both directions; forced guard victories=" << battles
+			<< ", level-up choices=" << levelUps << std::endl;
+		if(std::getenv("VCMI_INSPECT_REQUIRE_ALL_GUARDS"))
+		{
+			ASSERT_TRUE(approachVisits);
+			EXPECT_EQ(battles, 2 * portals.size());
+		}
 	}
 	std::cout << "Initialized external toroidal map: " << map.width << "x" << map.height
 		<< ", checked isolated portal pairs=" << channels.size() << std::endl;
