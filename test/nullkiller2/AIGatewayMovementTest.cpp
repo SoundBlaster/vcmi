@@ -707,6 +707,84 @@ TEST_F(Nullkiller2_AIGateway, plansDimensionDoorLandingAcrossToroidalSeam)
 	}
 }
 
+TEST_F(Nullkiller2_AIGateway, dimensionDoorSeamPlanningUsesVisibleGuardInformation)
+{
+	const int3 destination(35, 10, 0), guardPosition(0, 9, 0);
+	overrideSettingBeforeInit(EGameSettings::SPELLS_DIMENSION_DOOR_TRIGGERS_GUARDS, true);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false)
+		.playerActive(PLAYER)
+		.hero({8, 10, 0}, HeroTypeID(0), PLAYER)
+		.heroGarrison({{CreatureID::ARCHER, 1}})
+		.heroPrimary(10, 10, 10, 50)
+		.heroSecondarySkills({{SecondarySkill::AIR_MAGIC, 3}})
+		.heroEquipped({{ArtifactPosition::SPELLBOOK, ArtifactID::SPELLBOOK}})
+		.heroSpells({SpellID(8)})
+		.monster(guardPosition, CreatureID(27), 1000);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	hero = findHeroByOwner(PLAYER);
+	ASSERT_NE(hero, nullptr);
+	hero->mana = 200;
+	hero->setMovementPoints(300);
+	const int3 origin = hero->visitablePos();
+	for(int dx = -1; dx <= 1; ++dx)
+		for(int dy = -1; dy <= 1; ++dy)
+			if(dx || dy)
+				map()->getTile(origin + int3(dx, dy, 0)).terrainType = TerrainId::ROCK;
+
+	setMapVisibility(PLAYER, false);
+	auto * team = gameState()->getPlayerTeam(PLAYER);
+	team->fogOfWarMap[origin] = 1;
+	const auto planCast = [&]() -> std::optional<std::tuple<float, uint64_t, uint64_t>>
+	{
+		client = std::make_unique<ScriptedMovementClient>(gameState());
+		callback = makeCallback(PLAYER, client.get());
+		gateway = makeGateway(callback);
+		client->notify(*gateway);
+		const auto paths = withGameStateReadLock([&]
+		{
+			NK2AI::HeroMap<NK2AI::HeroRole> heroes;
+			heroes[hero] = NK2AI::HeroRole::MAIN;
+			NK2AI::PathfinderSettings settings;
+			settings.useHeroChain = false;
+			settings.useDimensionDoor = true;
+			gateway->nullkiller->pathfinder->updatePaths(heroes, settings);
+			return gateway->nullkiller->pathfinder->getPathInfo(destination);
+		});
+		for(const auto & path : paths)
+		{
+			if(path.turn() == 0 && std::ranges::any_of(path.nodes, [](const auto & node)
+			{
+				return dynamic_cast<const NK2AI::AIPathfinding::DimensionDoorAction *>(node.specialAction.get()) != nullptr;
+			}))
+				return std::make_tuple(path.movementCost(), path.getPathDanger(), path.armyLoss);
+		}
+		return std::nullopt;
+	};
+
+	EXPECT_FALSE(planCast()) << "an entirely hidden destination has no pathfinding node";
+	team->fogOfWarMap[destination] = 1;
+	ASSERT_TRUE(callback->isTileGuardedUnchecked(destination));
+	ASSERT_TRUE(callback->getGuardingCreatures(destination).empty());
+	const auto hiddenGuardPlan = planCast();
+	ASSERT_TRUE(hiddenGuardPlan) << "a hidden guard must not be used as known danger";
+	team->fogOfWarMap[guardPosition] = 1;
+	ASSERT_FALSE(callback->getGuardingCreatures(destination).empty());
+	EXPECT_FALSE(planCast()) << "a visible overwhelming guard makes the landing unsafe";
+
+	team->fogOfWarMap[guardPosition] = 0;
+	const auto * guard = map()->getObject(map()->getTile(guardPosition).topVisitableObj());
+	ASSERT_NE(guard, nullptr);
+	GameHandlerTestServer server(gameState(), PLAYER);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.removeObject(guard, PLAYER));
+	ASSERT_FALSE(callback->isTileGuardedUnchecked(destination));
+	EXPECT_EQ(planCast(), hiddenGuardPlan) << "a hidden guard must not change cost, danger or loss";
+	team->fogOfWarMap[destination] = 0;
+	EXPECT_FALSE(planCast()) << "the hidden landing remains unavailable without the guard";
+}
+
 TEST_F(Nullkiller2_AIGateway, startupRecognizesHeroNearTownAcrossSeam)
 {
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);

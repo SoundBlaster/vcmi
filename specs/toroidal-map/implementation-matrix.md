@@ -135,6 +135,12 @@ Known teleport channel endpoints in enemy threat planning now also use the
 AI's perspective, with bounded and toroidal danger-map checks; see the
 [teleport observer record](evidence/nullkiller-teleport-observer-2026-11-15.md).
 
+For one Dimension Door landing across a seam, a hidden guard and no guard
+produce matching first-plan cost, danger and loss; revealing an overwhelming
+guard prevents the plan. The separate hidden destination is not planned in
+either case. The [guard and fog record](evidence/nullkiller-dimension-door-guard-fog-2026-11-15.md)
+describes the unchecked guard query and the limits of this comparison.
+
 The later [preview run](evidence/topology-preview-eeb3540-2026-11-15.md)
 completed two Nullkiller2 turns with crossings on both axes, then reloaded an
 autosave and crossed a corner. The compared fog and state were limited to the
