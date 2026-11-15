@@ -300,7 +300,7 @@ eight initial heroes made a short server move, and the engine recognized 44
 repositioned guards. Artificially positioned heroes crossed each axis of the
 actual draft in both directions on land and with a test boat; diagonal
 disembarkation also crossed both axes at the corners. An in-process game-state
-save/load retained hero position and the moving team's full-map fog after a
+save/load retained hero position and all eight players' team fog views after a
 previously hidden destination was revealed on each land seam; a separate
 game-state load retained the boat and allowed sailing back and disembarking.
 Four replacement portal approaches were tested with forced battle victories.

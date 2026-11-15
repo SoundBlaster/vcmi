@@ -663,3 +663,10 @@ disembarked on the original shore. Both axes passed three runs, and the land
 save test passed again after sharing the save/load helper. As above, the hero
 and boat were set up artificially and the full server/UI session was not
 saved or reloaded.
+
+The fog comparison was then expanded to all eight valid players: on each
+land and sailing save it checked team identity and 1,161,216 player-cell
+values after loading. Both axes passed three runs for each movement mode,
+and the checks passed once more with explicit team-identity validation.
+Players sharing a team contribute repeated views to that total; this is a
+game-state comparison, not proof of fog delivery to network clients.
