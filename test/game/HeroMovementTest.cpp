@@ -532,6 +532,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 		.hero(int3(1, 5, 0), HeroTypeID(1), blue)
 		.hero(int3(1, 0, 1), HeroTypeID(2), blue)
 		.terrain(int3(35, 4, 0), TerrainId::ROCK)
+		.resource(int3(20, 10, 0), GameResID::GOLD, 1)
 		.resource(int3(35, 35, 0), GameResID::GOLD, 10);
 	for(int x = 0; x <= 2; ++x)
 		for(int y = 33; y <= 35; ++y)
@@ -783,6 +784,91 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	const auto heroes = server.gh->gameState().getHeroes(red);
 	ASSERT_EQ(heroes.size(), 1);
 	const auto * hero = heroes.front();
+	// Give an existing resource a blocking-only synthetic appearance in each
+	// state, then move it through the real server and TCP packet stream.
+	const int3 blockerHome(20, 10, 0), blockedSeam(35, 0, 0);
+	auto & authoritativeState = const_cast<CGameState &>(server.gh->gameState());
+	const auto blockerId = authoritativeState.getMap().getTile(blockerHome).topVisitableObj();
+	ASSERT_TRUE(blockerId.hasValue());
+	const std::string blockerText = R"({ "animation": "test.def", "visitableFrom": [], "mask": [ "B" ] })";
+	JsonNode blockerDefinition(blockerText.data(), blockerText.size(), "TcpMovingBlocker");
+	auto blockerAppearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver blockerResolver(*LIBRARY->identifiers());
+	blockerAppearance->readJson(blockerDefinition, blockerResolver, false);
+	std::array<CGameState *, 3> states{&authoritativeState, host.state.get(), guest.state.get()};
+	std::array<std::shared_ptr<const ObjectTemplate>, 3> originalAppearances;
+	for(size_t i = 0; i < states.size(); ++i)
+	{
+		auto & state = *states[i];
+		auto * object = state.getObjInstance(blockerId);
+		ASSERT_NE(object, nullptr);
+		originalAppearances[i] = object->appearance;
+		state.getMap().hideObject(object);
+		object->appearance = blockerAppearance;
+		state.getMap().showObject(object);
+		const auto * replicaHero = state.getHero(hero->id);
+		CPathsInfo paths(state.getMapSize(), replicaHero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, state, replicaHero);
+		CPathfinder(state, config).calculatePaths();
+		const auto * node = paths.getNode(blockedSeam, EPathfindingLayer::LAND);
+		ASSERT_TRUE(node->reachable());
+		ASSERT_NE(node->theNodeBefore, nullptr);
+		ASSERT_EQ(node->theNodeBefore->coord, int3(0, 0, 0));
+	}
+	server.gh->changeObjPos(blockerId, blockedSeam, red);
+	pumpUntil([&] {
+		return host.state->getObjInstance(blockerId)->anchorPos() == blockedSeam
+			&& guest.state->getObjInstance(blockerId)->anchorPos() == blockedSeam;
+	});
+	for(auto * state : states)
+	{
+		ASSERT_EQ(state->getObjInstance(blockerId)->anchorPos(), blockedSeam);
+		ASSERT_TRUE(state->getMap().getTile(blockedSeam).blocked());
+		const auto * replicaHero = state->getHero(hero->id);
+		CPathsInfo paths(state->getMapSize(), replicaHero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, replicaHero);
+		CPathfinder(*state, config).calculatePaths();
+		EXPECT_FALSE(paths.getNode(blockedSeam, EPathfindingLayer::LAND)->reachable());
+	}
+	const auto pointsBeforeBlock = hero->movementPointsRemaining();
+	MoveHero staleSeamMove({hero->convertFromVisitablePos(blockedSeam)}, EPathfindingLayer::LAND, hero->id, false);
+	staleSeamMove.player = red;
+	staleSeamMove.requestID = 80;
+	host.codec->sendPack(staleSeamMove);
+	pumpUntil([&] { return host.results.contains(80) && host.failedMoves.contains(hero->id) && guest.failedMoves.contains(hero->id); });
+	ASSERT_TRUE(host.results.contains(80)) << host.failure;
+	ASSERT_TRUE(host.failedMoves.contains(hero->id));
+	ASSERT_TRUE(guest.failedMoves.contains(hero->id));
+	EXPECT_FALSE(host.results.at(80));
+	for(const auto * state : states)
+	{
+		EXPECT_EQ(state->getHero(hero->id)->visitablePos(), int3(0, 0, 0));
+		EXPECT_EQ(state->getHero(hero->id)->movementPointsRemaining(), pointsBeforeBlock);
+	}
+	host.failedMoves.erase(hero->id);
+	guest.failedMoves.erase(hero->id);
+	server.gh->changeObjPos(blockerId, blockerHome, red);
+	pumpUntil([&] {
+		return host.state->getObjInstance(blockerId)->anchorPos() == blockerHome
+			&& guest.state->getObjInstance(blockerId)->anchorPos() == blockerHome;
+	});
+	for(size_t i = 0; i < states.size(); ++i)
+	{
+		auto & state = *states[i];
+		auto * object = state.getObjInstance(blockerId);
+		ASSERT_EQ(object->anchorPos(), blockerHome);
+		state.getMap().hideObject(object);
+		object->appearance = originalAppearances[i];
+		state.getMap().showObject(object);
+		const auto * replicaHero = state.getHero(hero->id);
+		CPathsInfo paths(state.getMapSize(), replicaHero);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, state, replicaHero);
+		CPathfinder(state, config).calculatePaths();
+		const auto * node = paths.getNode(blockedSeam, EPathfindingLayer::LAND);
+		ASSERT_TRUE(node->reachable());
+		ASSERT_NE(node->theNodeBefore, nullptr);
+		EXPECT_EQ(node->theNodeBefore->coord, int3(0, 0, 0));
+	}
 	const auto goldBefore = server.gh->gameState().players.at(red).resources[GameResID::GOLD];
 	const int3 destination(35, 35, 0);
 	const auto resourceID = server.gh->gameState().getMap().getTile(destination).topVisitableObj();

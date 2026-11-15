@@ -111,8 +111,10 @@ it does not establish graphical continuity after an actual terrain edit.
 After a path is calculated, the server rejects an on-foot step if a synthetic
 blocking object is moved onto its destination across any edge or corner on
 either level. The step works after the object is moved away; see the
-[stale-step record](evidence/stale-seam-blocker-2026-11-15.md). GUI path
-invalidation, TCP delivery and other kinds of obstruction are not covered.
+[stale-step record](evidence/stale-seam-blocker-2026-11-15.md). A westward
+case also verifies TCP delivery, fresh route searches and failed-step state
+agreement on two replicas. GUI path invalidation and other kinds of
+obstruction are not covered by these checks.
 
 Two graphical clients on one Mac also joined a loopback lobby, started the
 demo map, executed a corner crossing, transferred the turn, moved the second

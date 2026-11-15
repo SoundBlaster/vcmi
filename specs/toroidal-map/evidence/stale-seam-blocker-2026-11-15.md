@@ -12,12 +12,28 @@ cost.
 
 This checks server revalidation after an in-process state change and one kind
 of blocker. The test uses a resource object with a synthetic blocking-only
-appearance; it does not represent a particular mod, a TCP delivery, GUI path
-invalidation, Flight or Water Walk, hidden terrain, or another hero blocking
-the destination. It does not establish seamless animation.
+appearance; it does not represent a particular mod, GUI path invalidation,
+Flight or Water Walk, hidden terrain, or another hero blocking the
+destination. It does not establish seamless animation.
+
+`ToroidalDemoVmapTest.TcpLobbyStartsToroidalGameForTwoPeers` now additionally
+starts with another resource object, installs the same synthetic blocking-only
+appearance independently in the server and both replica states, and confirms
+that all three find the direct westward route from `(0,0,0)` initially. The
+server moves that object to `(35,0,0)` and the two peers receive the actual
+`ChangeObjPos` over loopback TCP. Fresh pathfinding on all three states then
+rejects the blocked cell. The host sends the stale move over TCP; the server
+rejects it and both replicas receive the failed movement packet and retain
+position and points. The object is moved home over TCP, its original
+appearances are restored locally, and fresh searches again find the direct
+route. This uses in-process non-graphical listeners; it does not test GUI
+cache invalidation, other directions over TCP, or remote hosts.
 
 On macOS arm64, `vcmitest` built from `9af481b` plus this test. The new test,
 the prior movement/guard-cache cases, and the Water Walk route-agreement case
 passed: 11 tests total. The report is
 `runtime/stale-seam-blocker-regression-2026-11-15.xml` under the TB5 build root.
 The build emitted duplicate-library and missing Conan search-path warnings.
+The two stale-step tests including the TCP extension passed three successive
+runs on `19b0e37` plus the extension. The report is
+`runtime/tcp-stale-seam-final-2026-11-15.xml` under the same build root.
