@@ -137,3 +137,30 @@ remains disabled and is not counted among those passes.
 The full local suite subsequently passed 1,530 tests with no skips, including
 the optional older save, VMAP and Complete-map fixtures; four tests remain
 disabled. Its TB5 log is `runtime/full-suite-tcp-save-reload-2026-11-14.log`.
+
+## Two levels after TCP save and reload
+
+The TCP lobby fixture now creates both map levels and a second blue hero in
+the underground. The server reveals different underground cells for red and
+blue with ordinary fog packets. The fixture compares every fog cell for both
+teams on both levels between the server and both replicas at selected surface
+movement checkpoints, save and new-lobby reload. It also checks the underground
+hero's position and movement points survive the disk save on the reloaded
+server and both peers.
+
+After reconnecting, blue moves its surface hero across an edge, then sends a
+separate underground corner move from `(0,0,1)` to `(35,35,1)`. The server
+accepts the request, and both peers agree on the underground hero's position,
+remaining movement points and both teams' full fog. The test separately
+asserts that red's fog on both levels and blue's surface fog do not change
+when the underground hero moves. The selected initial underground reveals are
+test setup, not movement-generated sight.
+
+The extended TCP scenario, the server disk-save/replica scenario, and 15
+enabled `GameConnectionTopologyTest` cases passed three consecutive runs on
+macOS arm64: 17 tests per run. Results are
+`runtime/tcp-underground-reload-2026-11-15.{log,xml}` under the TB5 VCMI
+build root. The client listeners, lobby configuration and servers remain in
+one process communicating over loopback TCP. This is not a remote-host or
+graphical-client test, an audit of every state field, or evidence of packet
+confidentiality. The test build retained existing linker warnings.
