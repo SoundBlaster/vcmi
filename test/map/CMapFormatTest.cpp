@@ -990,6 +990,45 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_FALSE(state->players.at(PlayerColor(*aiSlot)).isHuman());
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_EARTH_SEAM_ROAD"))
+	{
+		const PlayerColor player(0);
+		CGHeroInstance * hero = nullptr;
+		for(const auto & id : map.getHeroesOnMap())
+			if(auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id)); candidate && candidate->getOwner() == player)
+			{
+				hero = candidate;
+				break;
+			}
+		ASSERT_NE(hero, nullptr);
+		const std::vector<int3> route = {{2, 425, 0}, {1, 425, 0}, {0, 425, 0}, {251, 425, 0}, {250, 425, 0}};
+		for(const auto & pos : route)
+		{
+			ASSERT_NE(map.getTile(pos).getRoadID(), RoadId::NO_ROAD) << pos.toString();
+			ASSERT_FALSE(state->guardingCreaturePosition(pos).isValid()) << pos.toString();
+		}
+		ChangeObjPos place;
+		place.objid = hero->id;
+		place.nPos = route.front();
+		state->apply(place);
+		ASSERT_EQ(hero->visitablePos(), route.front());
+		hero->setMovementPoints(3000);
+		state->actingPlayers.insert(player);
+		ExternalInspectionReplicaServer server(state, player);
+		CGameHandler handler(server, state);
+		for(size_t index = 1; index < route.size(); ++index)
+		{
+			const auto points = hero->movementPointsRemaining();
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(route[index]), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+			ASSERT_EQ(hero->visitablePos(), route[index]);
+			EXPECT_LT(hero->movementPointsRemaining(), points);
+		}
+		for(size_t index = route.size() - 1; index > 0; --index)
+		{
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(route[index - 1]), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+			ASSERT_EQ(hero->visitablePos(), route[index - 1]);
+		}
+	}
 	if(std::getenv("VCMI_INSPECT_WATER_PORTAL"))
 	{
 		const PlayerColor player(0);
@@ -2686,6 +2725,75 @@ TEST(MapFormat, PreparesExternalToroidalSeamRoad)
 	out.close();
 	ASSERT_TRUE(out);
 	std::cout << "Seam road row=" << road.front().y << " tiles=" << road.size() << std::endl;
+}
+
+TEST(MapFormat, PreparesEarthConnectedSeamRoad)
+{
+	const char * inputPath = std::getenv("VCMI_INSPECT_START_VMAP");
+	const char * outputPath = std::getenv("VCMI_EARTH_SEAM_ROAD_OUTPUT");
+	if(!inputPath || !*inputPath || !outputPath || !*outputPath)
+		GTEST_SKIP() << "Set VCMI_INSPECT_START_VMAP and VCMI_EARTH_SEAM_ROAD_OUTPUT";
+	ASSERT_FALSE(boost::filesystem::exists(outputPath));
+	std::ifstream file(inputPath, std::ios::binary);
+	ASSERT_TRUE(file);
+	std::vector<ui8> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	CMemoryBuffer input;
+	input.write(bytes.data(), static_cast<si64>(bytes.size()));
+	input.seek(0);
+	EditorCallback callback(nullptr);
+	CMapLoaderJson reader(&input);
+	auto map = reader.loadMap(&callback);
+	ASSERT_NE(map, nullptr);
+	callback.setMap(map.get());
+	ASSERT_TRUE(map->toroidal);
+	ASSERT_EQ(map->width, 252);
+	ASSERT_EQ(map->height, 576);
+	const auto cactus = map->instanceNames.find("cactus_7575");
+	ASSERT_NE(cactus, map->instanceNames.end());
+	ASSERT_FALSE(cactus->second->isVisitable());
+	ASSERT_TRUE(vstd::contains(map->getTile(int3(250, 425, 0)).blockingObjects, cactus->second->id));
+	map->removeObject(cactus->second->id);
+	const std::vector<int3> road = {{250, 425, 0}, {251, 425, 0}, {0, 425, 0}, {1, 425, 0}};
+	for(const auto & pos : road)
+	{
+		const auto & tile = map->getTile(pos);
+		ASSERT_TRUE(tile.isLand()) << pos.toString();
+		ASSERT_FALSE(tile.blocked()) << pos.toString();
+		ASSERT_FALSE(tile.visitable()) << pos.toString();
+		ASSERT_EQ(tile.getRiverID(), RiverId::NO_RIVER) << pos.toString();
+	}
+	ASSERT_NE(map->getTile(int3(2, 425, 0)).getRoadID(), RoadId::NO_ROAD);
+	ASSERT_TRUE(map->canMoveBetween(road.back(), int3(2, 425, 0)));
+	ASSERT_TRUE(map->canMoveBetween(int3(2, 425, 0), road.back()));
+	for(size_t i = 1; i < road.size(); ++i)
+	{
+		ASSERT_TRUE(map->canMoveBetween(road[i - 1], road[i]));
+		ASSERT_TRUE(map->canMoveBetween(road[i], road[i - 1]));
+	}
+	CRandomGenerator random(12345);
+	auto * editor = map->getEditManager();
+	editor->getTerrainSelection().setSelection(road);
+	editor->drawRoad(RoadId::DIRT_ROAD, &random);
+	CMemoryBuffer output;
+	{
+		CMapSaverJson saver(&output);
+		saver.saveMap(map);
+	}
+	output.seek(0);
+	EditorCallback reopenedCallback(nullptr);
+	CMapLoaderJson reopenedReader(&output);
+	auto reopened = reopenedReader.loadMap(&reopenedCallback);
+	ASSERT_NE(reopened, nullptr);
+	ASSERT_TRUE(reopened->toroidal);
+	for(const auto & pos : road)
+		ASSERT_EQ(reopened->getTile(pos).getRoadID(), RoadId::DIRT_ROAD) << pos.toString();
+	ASSERT_EQ(reopened->instanceNames.count("cactus_7575"), 0u);
+	std::ofstream out(outputPath, std::ios::binary);
+	ASSERT_TRUE(out);
+	out.write(reinterpret_cast<const char *>(output.getBuffer().data()), output.getSize());
+	out.close();
+	ASSERT_TRUE(out);
 }
 
 TEST(MapFormat, PreparesEarthPortalRoadFixture)
