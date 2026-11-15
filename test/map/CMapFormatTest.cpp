@@ -35,6 +35,7 @@
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/mapping/TerrainTile.h"
 #include "../../lib/modding/IdentifierResolver.h"
+#include "../../lib/modding/CModHandler.h"
 #include "../../lib/pathfinder/CPathfinder.h"
 #include "../../lib/pathfinder/PathfinderOptions.h"
 
@@ -451,6 +452,13 @@ TEST(MapFormat, LoadsExternalLegacyMapForInspection)
 		ASSERT_EQ(reopened->levels(), map->levels());
 		ASSERT_EQ(reopened->getAllTowns().size(), map->getAllTowns().size());
 		ASSERT_EQ(reopened->instanceNames.size(), map->instanceNames.size());
+		ASSERT_EQ(reopened->mods.size(), map->mods.size());
+		for(const auto & [name, info] : map->mods)
+		{
+			const auto found = reopened->mods.find(name);
+			ASSERT_NE(found, reopened->mods.end()) << name;
+			EXPECT_EQ(found->second.version, info.version) << name;
+		}
 		size_t changedObjects = 0, changedTerrain = 0, changedArt = 0, changedBit6 = 0, changedBit7 = 0;
 		for(const auto & [name, object] : map->instanceNames)
 		{
@@ -532,6 +540,33 @@ private:
 };
 }
 
+TEST(MapFormat, ChecksExternalMapModRequirements)
+{
+	const char * path = std::getenv("VCMI_INSPECT_START_VMAP");
+	if(!path || !*path)
+		GTEST_SKIP() << "Set VCMI_INSPECT_START_VMAP";
+	std::ifstream file(path, std::ios::binary);
+	ASSERT_TRUE(file.is_open());
+	std::vector<ui8> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	ExternalInspectionMapService service(std::move(bytes));
+	const auto header = service.loadMapHeader(ResourcePath("inspection"), false);
+	ASSERT_NE(header, nullptr);
+	const auto missing = CMapService::verifyMapHeaderMods(*header);
+	std::cout << "Declared map mods=" << header->mods.size() << ", missing=" << missing.size() << std::endl;
+	for(const auto & [name, _] : missing)
+		std::cout << "Missing map mod: " << name << std::endl;
+	if(std::getenv("VCMI_INSPECT_EXPECT_NO_MISSING_MODS"))
+		EXPECT_TRUE(missing.empty());
+	if(const char * expected = std::getenv("VCMI_INSPECT_EXPECT_MISSING_MODS"); expected && *expected)
+	{
+		std::vector<std::string> names;
+		boost::split(names, expected, boost::is_any_of(","));
+		for(const auto & name : names)
+			EXPECT_TRUE(missing.contains(name)) << name;
+	}
+}
+
 TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 {
 	const char * path = std::getenv("VCMI_INSPECT_START_VMAP");
@@ -570,6 +605,24 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	state->init(&service, &start, randomizer, progress, false);
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_MOD_SCOPES"))
+	{
+		std::map<std::string, size_t> objectScopes;
+		std::map<std::string, size_t> terrainScopes;
+		for(const auto & object : map.objects)
+			if(object)
+				++objectScopes[object->getObjectHandler()->getModScope()];
+		for(int z = 0; z < state->getMapSize().z; ++z)
+			for(int x = 0; x < map.width; ++x)
+				for(int y = 0; y < map.height; ++y)
+					++terrainScopes[map.getTile(int3(x, y, z)).getTerrain()->getModScope()];
+		for(const auto & mod : LIBRARY->modh->getActiveMods())
+			std::cout << "Active mod: " << mod << std::endl;
+		for(const auto & [scope, count] : objectScopes)
+			std::cout << "Object handler scope: " << scope << " count=" << count << std::endl;
+		for(const auto & [scope, count] : terrainScopes)
+			std::cout << "Terrain scope: " << scope << " count=" << count << std::endl;
+	}
 	if(std::getenv("VCMI_INSPECT_START_ROUTES"))
 	{
 		std::set<PlayerColor> examined;
