@@ -142,6 +142,8 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			generator.getZonePlacer()->setExperimentalSeamAdjacencies({{3, 4}});
 		else
 			generator.getZonePlacer()->setExperimentalSeamAdjacencies({{2, 3}, {2, 4}});
+		if(std::getenv("VCMI_RMG_RESERVE_SEAM_APPROACHES"))
+			generator.getZonePlacer()->enableExperimentalSeamApproaches();
 	}
 	std::vector<int> zones;
 	auto map = generator.generateWithZoneObserver([&](const RmgMap & generated)
@@ -152,6 +154,11 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	});
 	ASSERT_NE(map, nullptr);
 	ASSERT_EQ(zones.size(), static_cast<size_t>(map->width * map->height));
+	if(std::getenv("VCMI_RMG_RESERVE_SEAM_APPROACHES"))
+		for(const auto & approach : generator.getZonePlacer()->getExperimentalSeamApproaches())
+			std::cout << "Reserved seam approach " << approach.zoneA << "-" << approach.zoneB << " "
+			          << approach.guardTile.toString() << " " << approach.sameSideApproach.toString() << " "
+			          << approach.oppositeApproach.toString() << std::endl;
 	if(std::getenv("VCMI_RMG_TRACE_CONNECTIONS"))
 	{
 		auto traces = generator.getGuardedDirectConnectionTrace();
@@ -196,6 +203,15 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	// Use the engine's occupancy and guard lookup, including wrapped guards.
 	// This is a conservative static filter, not a hero pathfinder.
 	map->setToroidalAndRebuild(true);
+	if(std::getenv("VCMI_RMG_RESERVE_SEAM_APPROACHES"))
+		for(const auto & approach : generator.getZonePlacer()->getExperimentalSeamApproaches())
+			for(const auto & pos : {approach.guardTile, approach.sameSideApproach, approach.oppositeApproach})
+			{
+				const auto & tile = map->getTile(pos);
+				std::cout << "Reserved tile state " << pos.toString() << " land=" << tile.isLand()
+				          << " blocked=" << tile.blocked() << " visitable=" << tile.visitable()
+				          << " road=" << tile.hasRoad() << " guarded=" << map->guardingCreaturePosition(pos).isValid() << std::endl;
+			}
 	std::ofstream grid(std::string(output) + ".walk");
 	ASSERT_TRUE(grid.good());
 	std::vector<bool> walkable(map->width * map->height);
@@ -293,6 +309,14 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			std::optional<int3> interior;
 			for(const auto & candidate : contacts)
 			{
+				const auto & reservations = generator.getZonePlacer()->getExperimentalSeamApproaches();
+				const bool useReservation = std::getenv("VCMI_RMG_RESERVE_SEAM_APPROACHES") != nullptr;
+				const auto planned = std::ranges::find_if(reservations, [&](const auto & item)
+				{
+					return item.zoneA == intendedSeamEdges[guardIndex].first && item.zoneB == intendedSeamEdges[guardIndex].second;
+				});
+				if(useReservation && (planned == reservations.end() || candidate.first != planned->guardTile || candidate.second != planned->oppositeApproach))
+					continue;
 				const bool connectsStartAndTreasure =
 					(candidate.firstZone >= 1 && candidate.firstZone <= 2 && candidate.secondZone >= 3 && candidate.secondZone <= 4)
 					|| (candidate.secondZone >= 1 && candidate.secondZone <= 2 && candidate.firstZone >= 3 && candidate.firstZone <= 4);
@@ -310,6 +334,8 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 				{
 					const auto approach = map->getTopology().canonicalize(candidate.first + direction);
 					if(!approach || *approach == candidate.second || zones[approach->y * map->width + approach->x] != candidate.firstZone)
+						continue;
+					if(useReservation && *approach != planned->sameSideApproach)
 						continue;
 					const auto & tile = map->getTile(*approach);
 					if(!tile.isLand() || !tile.entrableTerrain() || tile.blocked() || tile.visitable()
@@ -358,6 +384,12 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			          << " between zones " << crossing->firstZone << " and " << crossing->secondZone << std::endl;
 			}
 		}
+		const bool closeAllZoneContacts = std::getenv("VCMI_RMG_CLOSE_ALL_ZONE_CONTACTS") != nullptr;
+		if(closeAllZoneContacts)
+			contacts = rmg::findUnguardedZoneContacts(*map, [&](const int3 & tile)
+			{
+				return zones[tile.y * map->width + tile.x];
+			}, false);
 		for(const auto & contact : contacts)
 			for(const auto & pos : {contact.first, contact.second})
 				if(map->getTile(pos).visitable() || map->getTile(pos).hasRoad())
@@ -378,10 +410,10 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			placed += objects.size();
 			ASSERT_TRUE(map->getTile(pos).blocked()) << "No strict obstacle covers " << pos.toString();
 		}
-		const auto remaining = rmg::findUnguardedSeamContacts(*map, [&](const int3 & tile)
+		const auto remaining = rmg::findUnguardedZoneContacts(*map, [&](const int3 & tile)
 		{
 			return zones[tile.y * map->width + tile.x];
-		});
+		}, !closeAllZoneContacts);
 		std::cout << "Experimental barriers placed: " << placed << ", remaining unguarded contacts: " << remaining.size() << std::endl;
 		EXPECT_TRUE(remaining.empty());
 		CMemoryBuffer closedBuffer;
@@ -413,10 +445,10 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			          << ' ' << opposite.x << ' ' << opposite.y << '\n';
 		guardFile.close();
 		ASSERT_TRUE(guardFile.good());
-		const auto afterReload = rmg::findUnguardedSeamContacts(*closedMap, [&](const int3 & tile)
+		const auto afterReload = rmg::findUnguardedZoneContacts(*closedMap, [&](const int3 & tile)
 		{
 			return zones[tile.y * closedMap->width + tile.x];
-		});
+		}, !closeAllZoneContacts);
 		EXPECT_TRUE(afterReload.empty()) << "Unguarded contacts after save and reload: " << afterReload.size();
 		if(std::getenv("VCMI_RMG_AUDIT_ALL_ZONE_CONTACTS"))
 		{

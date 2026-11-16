@@ -49,6 +49,17 @@ public:
 	/// not create or guard a passage.
 	/// The ordinary generator never sets it.
 	void setExperimentalSeamAdjacencies(std::vector<std::pair<TRmgTemplateZoneId, TRmgTemplateZoneId>> edges);
+	struct ExperimentalSeamApproach
+	{
+		TRmgTemplateZoneId zoneA;
+		TRmgTemplateZoneId zoneB;
+		int3 guardTile;
+		int3 sameSideApproach;
+		int3 oppositeApproach;
+	};
+	void enableExperimentalSeamApproaches();
+	void reserveExperimentalSeamApproaches();
+	const std::vector<ExperimentalSeamApproach> & getExperimentalSeamApproaches() const;
 
 	const TDistanceMap & getDistanceMap();
 	
@@ -105,4 +116,6 @@ private:
 	std::set<TRmgTemplateZoneId> lastSwappedZones;
 	RmgMap & map;
 	std::vector<std::pair<TRmgTemplateZoneId, TRmgTemplateZoneId>> experimentalSeamAdjacencies;
+	bool experimentalReserveSeamApproaches = false;
+	std::vector<ExperimentalSeamApproach> experimentalSeamApproaches;
 };

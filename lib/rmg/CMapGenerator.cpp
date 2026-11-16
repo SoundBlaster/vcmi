@@ -396,6 +396,8 @@ void CMapGenerator::fillZones()
 		it.second->initModificators();
 		Progress::Progress::step();
 	}
+	// Experimental only; the ordinary generator leaves this disabled.
+	placer->reserveExperimentalSeamApproaches();
 
 	std::vector<std::shared_ptr<Zone>> treasureZones;
 

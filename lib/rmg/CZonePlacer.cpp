@@ -21,9 +21,11 @@
 #include "CMapGenOptions.h"
 #include "CRmgTemplate.h"
 #include "RmgMap.h"
+#include "RmgPath.h"
 #include "Zone.h"
 #include "Functions.h"
 #include "PenroseTiling.h"
+#include "modificators/ObjectManager.h"
 
 #include <vstd/RNG.h>
 
@@ -61,6 +63,78 @@ void CZonePlacer::setExperimentalSeamAdjacencies(std::vector<std::pair<TRmgTempl
 	std::ranges::sort(edges);
 	edges.erase(std::unique(edges.begin(), edges.end()), edges.end());
 	experimentalSeamAdjacencies = std::move(edges);
+}
+
+void CZonePlacer::enableExperimentalSeamApproaches()
+{
+	experimentalReserveSeamApproaches = true;
+}
+
+const std::vector<CZonePlacer::ExperimentalSeamApproach> & CZonePlacer::getExperimentalSeamApproaches() const
+{
+	return experimentalSeamApproaches;
+}
+
+void CZonePlacer::reserveExperimentalSeamApproaches()
+{
+	if(!experimentalReserveSeamApproaches)
+		return;
+	experimentalSeamApproaches.clear();
+	std::set<int3> reserved;
+	for(const auto & [a, b] : experimentalSeamAdjacencies)
+	{
+		bool found = false;
+		auto tryCandidate = [&](const int3 & first, const int3 & other, const int3 & inner)
+		{
+			const auto firstZone = map.getZoneID(first);
+			const auto otherZone = map.getZoneID(other);
+			if(!((firstZone == a && otherZone == b) || (firstZone == b && otherZone == a))
+			   || map.getZoneID(inner) != firstZone || reserved.contains(first) || reserved.contains(other)
+			   || reserved.contains(inner) || !map.isPossible(first) || !map.isPossible(other) || !map.isPossible(inner))
+				return false;
+			auto & own = *map.getZones().at(firstZone);
+			auto & opposite = *map.getZones().at(otherZone);
+			auto ownArea = own.areaForRoads();
+			auto oppositeArea = opposite.areaForRoads();
+			rmg::Path ownPath(ownArea), innerPath(ownArea), oppositePath(oppositeArea);
+			ownPath.connect(own.freePaths().get());
+			innerPath.connect(own.freePaths().get());
+			oppositePath.connect(opposite.freePaths().get());
+			ownPath = ownPath.search(first, true);
+			innerPath = innerPath.search(inner, true);
+			oppositePath = oppositePath.search(other, true);
+			if(!ownPath.valid() || !innerPath.valid() || !oppositePath.valid())
+				return false;
+			own.connectPath(ownPath);
+			own.connectPath(innerPath);
+			opposite.connectPath(oppositePath);
+			// Keep later object placement away from both sides of the planned
+			// passage. Coordinates on each side are recorded separately because
+			// the existing distance field is rectangular, not toroidal.
+			for(const auto & [id, nearbyZone] : map.getZones())
+			{
+				if(nearbyZone->getPos().z != first.z)
+					continue;
+				if(auto * manager = nearbyZone->getModificator<ObjectManager>())
+					for(const auto & point : {first, inner, other})
+						manager->updateDistances(point);
+			}
+			reserved.insert(first);
+			reserved.insert(other);
+			reserved.insert(inner);
+			experimentalSeamApproaches.push_back({a, b, first, inner, other});
+			return true;
+		};
+		for(int z = 0; z < map.levels() && !found; ++z)
+		{
+			for(int y = 1; y + 1 < height && !found; ++y)
+				found = tryCandidate(int3(0, y, z), int3(width - 1, y, z), int3(1, y, z));
+			for(int x = 1; x + 1 < width && !found; ++x)
+				found = tryCandidate(int3(x, 0, z), int3(x, height - 1, z), int3(x, 1, z));
+		}
+		if(!found)
+			throw rmgException("Could not reserve experimental seam approach " + std::to_string(a) + "-" + std::to_string(b));
+	}
 }
 
 int3 CZonePlacer::cords(const float3 & f) const
