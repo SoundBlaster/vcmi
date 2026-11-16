@@ -129,6 +129,29 @@ so no before/after minimap screenshot or actual refresh call was observed.
 This proves the capture and delivered ownership update for this staged case;
 it does **not** prove that the GUI repainted either side of the minimap.
 
+## Graphical minimap update after capture
+
+The same blue-town fixture was run again in a separate local profile using
+the current macOS arm64 graphical client, whose window identified build
+`1.8.0.f44cd5a`. The human red hero went north from `(34,5,0)` to
+`(34,4,0)` and spent 100 movement points; the client then returned from the
+town screen to the adventure map. Two static screenshots of this client's
+window show the town's blue minimap cells at both the left and right edges
+before the visit and red cells at both edges afterwards. The server/client
+log also records the owner update; no forced battle result was used.
+
+The diagnostic command socket used a private directory and the two window
+captures used macOS `screencapture -l` because Computer Use did not select
+the directly launched SDL process. The images and observation are retained
+under `runtime/minimap-capture-window-2026-11-16/` on TB5:
+
+- `before.png`: SHA-256 `be95e1fd100f98a873b63ecfa772717655010e5daa6b59ae1167c4b1d665ae85`.
+- `after.png`: SHA-256 `cdd3481e0d05831c3a56575e227e8830121dbdd032ac59354a942b26073569ae`.
+
+This is a visual check of one wrapped town and the current local rendering
+configuration. It does not establish behavior for every object, map size,
+visibility state, rendering backend or movement animation.
+
 The synthetic `HeroMovementTest.SpecialTerrainCoversOppositeCornerOnToroidalMap`
 places a 2×2 `CGTerrainPatch` across a corner and calls the actual game-state
 special-battlefield lookup. It finds the patch at the opposite corner in
