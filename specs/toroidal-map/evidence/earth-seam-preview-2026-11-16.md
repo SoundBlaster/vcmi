@@ -13,9 +13,19 @@ on macOS arm64 with XML at
 `runtime/earth-mine-overlap-2026-11-16/preview-road.xml` on TB5.
 
 The local preview profile now uses this regenerated map. Its previous map is
-preserved as `earth-seam-preview-before-mine-2026-11-16.vmap.bak`. This new
-preview has not been graphically launched or visually assessed; previous
-graphical observations below apply to earlier builds of the preview.
+preserved as `earth-seam-preview-before-mine-2026-11-16.vmap.bak`.
+
+An isolated macOS arm64 graphical run then loaded a copy of the current
+preview and started a human-controlled hero at `(0,425,0)` with 1,500
+movement points. A single diagnostic `shortcut west` was accepted, and the
+observation channel recorded the hero at `(251,425,0)` with 1,425 points.
+The client was terminated after the check. The actual map hash matched the
+preview hash above; the client executable hash was
+`648a34db3b016da87f87522ee64c2a6895ee0b406347726a71e560602b998c61` and
+its version stamp was `8e80ec5`. The log and observation are under
+`runtime/earth-mine-preview-gui-2026-11-16/` on TB5. This check does not
+assess visual smoothness or establish a clean shutdown. Previous graphical
+observations below apply to earlier builds of the preview.
 
 `tools/stage_earth_seam_road.py` accepts the current source-checked Earth
 demo in addition to its earlier fixture. It creates a separate map with red
