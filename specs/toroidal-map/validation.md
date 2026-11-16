@@ -84,3 +84,13 @@ including range expansion and invalid ranges. This is an identifier check:
 it neither judges evidence sufficiency nor changes implementation or
 acceptance status. The new script and tests were present as uncommitted
 changes when these checks ran.
+
+## Repeat after Earth whirlpool repair
+
+On 2026-11-16 at `0a6e138`, `specpm validate . --json` reported `valid`
+with zero errors and warnings. Python bytecode was disabled and `TMPDIR` was
+set to the verified TB5 build root's `runtime` directory. The traceability
+checker reported 18 requirements with no missing or unknown IDs and 29
+scenarios with no undefined or unmapped IDs; its two focused tests passed.
+These checks cover package structure and identifier consistency, not the
+sufficiency of gameplay evidence or user acceptance.
