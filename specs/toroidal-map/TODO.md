@@ -101,6 +101,8 @@ demo preparation reviewable as separate changes where practical.
   keep third-party map and game assets outside the repository unless their
   distribution rights have been established. The [current draft starts
   through the human scenario list and accepts a first move](evidence/earth-human-start-2026-11-15.md);
+  a [direct original-start launcher](evidence/earth-human-start-2026-11-15.md#direct-launch-from-the-original-start)
+  also starts the map for a human in an isolated test profile;
   the [seam preview](evidence/earth-seam-preview-2026-11-16.md#direct-human-preview-launch)
   also starts directly for a human. Finder execution and an unassisted route
   to the seam remain unverified.

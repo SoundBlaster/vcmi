@@ -37,3 +37,19 @@ stopped after the observation, not cleanly shut down through the game UI.
 This establishes the updated map's ordinary scenario-list startup and first
 human-controlled move, not the complete route to the seam, graphical animation
 or Finder execution of the launcher.
+
+## Direct launch from the original start
+
+On 2026-11-16, a separate `Start Earth Direct.command` was prepared in the
+local Earth demo profile. It starts the current demo map via `--preview-map`,
+leaving the existing menu-based launcher intact. The launcher was copied into
+an isolated profile with linked game data, mods and the same map, and separate
+settings, saves and logs. Invoked from `/Users/egor` on macOS arm64, the
+`7c42081` client loaded the map; logs identified red as human. The observation
+record reported a 252×576 toroidal map and selected red hero `7305` at its
+original visitable position `(164,353,0)`, with 1,560 movement points.
+The test process was force-stopped after observation. This verifies a shell
+invocation of a copy of the launcher, not Finder double-click, clean shutdown,
+continuous animation, or a complete playthrough. The isolated record is
+`runtime/earth-direct-qa-2026-11-16/observe.jsonl` under the TB5 build root.
+The launcher, game assets and third-party map remain local on TB5.
