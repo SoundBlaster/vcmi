@@ -132,6 +132,38 @@ XML: `runtime/earth-overlap-town-capture-final-2026-11-16.xml` on TB5. This
 exercises one staged attack and forced outcome, not normal access from the
 red starting region, battle balance, an unoccupied visit or other towns.
 
+## Mine approach repaired
+
+On the whirlpool-repaired draft, six mines with new interactive-mask overlap
+were inspected independently in initialized games with HotA. A staged hero
+found a path and the server accepted a move to `mine_10910`, `mine_12118`,
+`mine_10775`, `mine_10773`, and `mine_12126`; the first opened a battle. This
+checks one local approach per mine, not capture, normal travel from a start,
+other directions, or all possible randomized states. Logs are in
+`runtime/earth-mine-overlap-2026-11-16/` on TB5.
+
+At `mine_11513`'s visitable cell `(247,422,0)`, the local staging check found
+no free nonvisitable land neighbor: its footprint, `reef_6743` and a guard
+occupy the surrounding cells. This does not prove every conceivable route is
+blocked. Removing the reef in memory opened `(248,423,0)` and a server move
+to the mine triggered a battle. The reproducible road-preparation step now
+removes that nonvisitable reef at its expected `(248,424,0)` anchor and
+checks that the mine and guard remain. It does not change their positions or
+remove the guard.
+
+The assembled `earth-mine-access-2026-11-16.vmap` has SHA-256
+`4b3c264a4cd7f9580c7161da572f9e1a06ebb3a26aef368ff3d9f95e7b3f8832`.
+Compared to `earth-whirlpool-repair-2026-11-16.vmap`, only `objects.json`
+differs, and its only decoded object change is removal of `reef_6743`. On the
+saved map, an engine check staged the hero at `(248,423,0)`, used the normal
+pathfinder and server movement, then forced a victory and checked the mine's
+owner. The test passed on macOS arm64; the XML is
+`runtime/earth-mine-overlap-2026-11-16/repaired-capture.xml`. The original
+source and previous draft remain unchanged. The local Earth demo profile now
+points to the repaired draft; the separate seam preview still uses the prior
+whirlpool-repaired map. Normal access from a starting town, battle balance and
+graphical presentation of this mine remain unverified.
+
 ## Seam monolith approach repaired
 
 In the earlier draft, `monolithTwoWay_11148` at `(1,285,0)` had no adjacent

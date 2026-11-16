@@ -93,6 +93,8 @@ demo preparation reviewable as separate changes where practical.
   play. A [blocked seam monolith approach was opened](evidence/earth-object-overlap-audit-2026-11-15.md#seam-monolith-approach-repaired)
   by removing a decoration; a server route from the original hero reached it
   with forced wins and other test-only changes.
+  A [mine approach was opened](evidence/earth-object-overlap-audit-2026-11-15.md#mine-approach-repaired)
+  by removing a reef; a staged server visit captured it after a forced battle.
   An [autonomous AI run exposed a misplaced whirlpool](evidence/earth-autonomous-whirlpool-2026-11-16.md):
   the recipe now puts all six exits on water and a staged server check reaches
   each by boat. A complete post-fix AI game remains unverified.
