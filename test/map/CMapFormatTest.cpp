@@ -247,6 +247,10 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 		if(std::getenv("VCMI_RMG_TRY_GUARD"))
 		{
 			const int requestedGuards = std::getenv("VCMI_RMG_TRY_TWO_GUARDS") ? 2 : 1;
+			// These are additional edges, independent of the template's inland
+			// connections between the same pairs. This is test data, not yet a
+			// supported template field or a balanced two-player layout.
+			const std::array<std::pair<int, int>, 2> intendedSeamEdges = {{{2, 3}, {2, 4}}};
 			int selectedStart = -1;
 			std::set<int> selectedTreasures;
 			for(int guardIndex = 0; guardIndex < requestedGuards; ++guardIndex)
@@ -262,7 +266,8 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 				const int treasureZone = std::max(candidate.firstZone, candidate.secondZone);
 				const auto & first = map->getTile(candidate.first);
 				const auto & second = map->getTile(candidate.second);
-				if(!connectsStartAndTreasure || (selectedStart != -1 && startZone != selectedStart) || selectedTreasures.contains(treasureZone)
+				if(!connectsStartAndTreasure || (requestedGuards == 2 && std::make_pair(startZone, treasureZone) != intendedSeamEdges[guardIndex])
+				   || (selectedStart != -1 && startZone != selectedStart) || selectedTreasures.contains(treasureZone)
 				   || protectedCells.contains(candidate.first) || protectedCells.contains(candidate.second)
 				   || !candidate.firstToSecond || !candidate.secondToFirst || first.visitable() || second.visitable()
 				   || first.hasRoad() || second.hasRoad())
@@ -285,7 +290,9 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 					break;
 				}
 			}
-			ASSERT_TRUE(crossing.has_value()) << "No candidate seam crossing with a clear approach";
+			ASSERT_TRUE(crossing.has_value()) << "No candidate seam crossing with a clear approach for intended edge "
+				<< (requestedGuards == 2 ? intendedSeamEdges[guardIndex].first : -1) << "-"
+				<< (requestedGuards == 2 ? intendedSeamEdges[guardIndex].second : -1);
 			selectedStart = std::min(crossing->firstZone, crossing->secondZone);
 			selectedTreasures.insert(std::max(crossing->firstZone, crossing->secondZone));
 			const CreatureID creature(0);

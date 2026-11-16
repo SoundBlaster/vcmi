@@ -92,3 +92,25 @@ while constructing the zone graph, preserve intended inland connections and prev
 maintain zone and path invariants, and fail explicitly when it cannot satisfy
 the contract. It must then validate both players' actual routes, armies and
 rewards across multiple generated maps.
+
+## Explicit additional seam edges
+
+Following the map author's clarified model, the test-only two-guard trial now
+specifies seam edges `2–3` and `2–4` before searching for positions. Both
+pairs also have ordinary inland edges in the original fixture; the seam
+edges are additional, not replacements. These declarations currently live
+in the test code, not in the template schema or generator implementation.
+
+On one local run the first generated map lacked a suitable `2–4` crossing,
+and the second placed both requested guards and six obstacles. The static
+seam audit found no remaining unguarded inter-zone contacts after save and
+reload. The saved map's SHA-256 is
+`9bd32b64764e3913114191de37b5264c40eaaddc36c37f318fc7b3cd4f410b4e`.
+Server movement started battles from both sides of both new guards. With full
+visibility and artificially increased movement, one starting hero followed
+paths of 42 and 30 nodes to them. The other start did not have a path to
+either new guard before battles. Four candidate original guards remained
+reachable from their respective nearby starts in a diagnostic pathfinder
+check, but their identity as the original template edges and preservation of
+every original route were not established. No balance claim follows from
+these measurements, and two attempts do not estimate the success rate.
