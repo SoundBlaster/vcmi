@@ -76,8 +76,12 @@ demo preparation reviewable as separate changes where practical.
   routes and guards. The [initial Jebus Cross probe](evidence/jebus-cross-seam-probe-2026-11-16.md)
   identifies static candidate seam links. A [two-route experiment](evidence/two-route-template-2026-11-16.md)
   captures generation-time zone IDs and finds unguarded seam transitions.
-  Add guarded seam placement and actual hero-route validation; establish
-  deterministic inputs and measure player fairness.
+  Test-only guarded seam placement, obstacle closure, save/reload and server
+  approaches have been exercised on one map. The existing inland passages
+  remain and trial placement is unreliable. Implement seam-aware intended
+  connections in the generator, prevent unwanted exits without disconnecting
+  zones, validate routes for both players and measure fairness over multiple
+  maps; establish reproducible inputs.
 - [ ] Implement continuous toroidal map-editor navigation, including terrain,
   object layers, selection and brush input across both axes and corners.
   The minimap must show the coordinate-reference rectangle and all wrapped

@@ -53,3 +53,41 @@ next step is to use this zone/guard information to reject unintended seam
 contacts, then generate explicit guarded crossings on both routes and verify
 them with player pathfinding and server movement. Merely blocking every seam
 would defeat the desired two-direction gameplay.
+
+## Guard and obstacle trial
+
+The test-only trial now attempts to reserve two guarded crossings for one
+starting zone, place actual blocking objects on remaining unguarded seam
+contacts, and reload the resulting toroidal VMAP. A successful local sample
+had two guards, four obstacle placements and no remaining contacts reported
+by the static seam audit. Its VMAP SHA-256 is
+`765467cdcdfdefc210165f5b7e7e20f47d48a092e4698808580090f2ff7b99d5`;
+its guard-coordinate sidecar hash is
+`a3828a0aa7858f154759454bfda29a4edcd10107e26d51d4f4c8b646079f1aa5`.
+These local artifacts use test content and are not a release map.
+
+After reload, server movement started the expected battle when approaching
+each guard from either side. With fog revealed and movement artificially
+increased, one starting hero followed server-executed paths of 42 and 28
+nodes to the two guards. This proves those particular approaches work, not
+that both players have equivalent routes or that all bypasses are closed.
+The original inland connections remain, so the added guards do not establish
+the requested two-exit design. Obstacles are not yet proven to preserve all
+interior routes. Guard selection in this trial is a fixed creature and an
+approximate strength target, not the generator's normal balance algorithm.
+
+Ten independent trial runs with the same requested seed produced one
+successful placement; nine reported that no suitable seam crossing with a
+clear approach was found. This sample is too small to estimate a general
+success rate. The multithreaded generator did not yield the same layout on
+each run, and the precise source of variation has not been isolated.
+Diagnostic path and army measurements for candidate original guards vary;
+the candidate-to-template-connection mapping and fairness are not verified.
+
+The audit and obstacle planner are reusable code, but generation and guard
+placement above are opt-in test instrumentation, not a supported generator
+feature. A complete implementation must select intended seam connections
+while constructing the zone graph, prevent extra inland and wrapped exits,
+maintain zone and path invariants, and fail explicitly when it cannot satisfy
+the contract. It must then validate both players' actual routes, armies and
+rewards across multiple generated maps.
