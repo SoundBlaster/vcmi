@@ -62,6 +62,7 @@
 #include "../../lib/pathfinder/PathfinderOptions.h"
 #include "../../lib/pathfinder/TransientLanding.h"
 #include "../../lib/rmg/CMapGenOptions.h"
+#include "../../lib/rmg/ToroidalSeamAudit.h"
 #include "../../lib/serializer/CMemorySerializer.h"
 #include "../../lib/serializer/CLoadFile.h"
 #include "../../lib/serializer/CSaveFile.h"
@@ -3973,6 +3974,32 @@ TEST_F(HeroMovementTest, MonsterOnSeamGuardsBothSidesAndDiagonalApproaches)
 			EXPECT_TRUE(std::ranges::any_of(guards, [&](const auto * guard) { return guard->visitablePos() == monster; }))
 				<< tile->toString();
 		}
+}
+
+TEST_F(HeroMovementTest, ToroidalSeamAuditFindsUnguardedEdgesAndCornersButExcludesGuards)
+{
+	const PlayerColor player(0);
+	const int3 guard(35, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.monster(guard, CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	const auto zones = [](const int3 & tile) { return tile.x < 18 ? 1 : 2; };
+	EXPECT_THROW(rmg::findUnguardedSeamContacts(*map(), zones), std::invalid_argument);
+	map()->setToroidalAndRebuild(true);
+	auto contacts = rmg::findUnguardedSeamContacts(*map(), zones);
+	const auto has = [&](const int3 & a, const int3 & b)
+	{
+		return std::ranges::any_of(contacts, [&](const auto & contact)
+		{
+			return ((contact.first == a && contact.second == b) || (contact.first == b && contact.second == a))
+				&& contact.firstToSecond && contact.secondToFirst;
+		});
+	};
+	EXPECT_TRUE(has(int3(0, 5, 0), int3(35, 5, 0)));
+	EXPECT_TRUE(has(int3(0, 0, 0), int3(35, 35, 0)));
+	EXPECT_FALSE(has(int3(0, 18, 0), int3(35, 18, 0)));
+	EXPECT_FALSE(has(int3(0, 17, 0), int3(35, 17, 0)));
 }
 
 TEST_F(HeroMovementTest, GuardListIncludesEachMonsterOnlyOnce)

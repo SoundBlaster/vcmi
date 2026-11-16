@@ -47,6 +47,7 @@
 #include "../../lib/rmg/CMapGenerator.h"
 #include "../../lib/rmg/CRmgTemplateStorage.h"
 #include "../../lib/rmg/RmgMap.h"
+#include "../../lib/rmg/ToroidalSeamAudit.h"
 #include "../../lib/bonuses/Bonus.h"
 #include "../../lib/serializer/CMemorySerializer.h"
 #include "../../lib/serializer/CLoadFile.h"
@@ -191,6 +192,20 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	seams.close();
 	ASSERT_TRUE(seams.good());
 	std::cout << "Bidirectional unguarded seam transitions between generated zones: " << candidateCount << std::endl;
+	const auto contacts = rmg::findUnguardedSeamContacts(*map, [&](const int3 & tile)
+	{
+		return zones[tile.y * map->width + tile.x];
+	});
+	std::ofstream audit(std::string(output) + ".audit");
+	ASSERT_TRUE(audit.good());
+	for(const auto & contact : contacts)
+		audit << contact.firstZone << ' ' << contact.secondZone << ' '
+		      << contact.first.x << ' ' << contact.first.y << ' '
+		      << contact.second.x << ' ' << contact.second.y << ' '
+		      << contact.firstToSecond << ' ' << contact.secondToFirst << '\n';
+	audit.close();
+	ASSERT_TRUE(audit.good());
+	std::cout << "Potential unguarded cross-zone contacts, including nonblocking visitables: " << contacts.size() << std::endl;
 }
 
 #ifdef ENABLE_NULLKILLER2_AI

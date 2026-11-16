@@ -1,0 +1,72 @@
+/*
+ * ToroidalSeamAudit.h, part of VCMI engine
+ *
+ * Authors: listed in file AUTHORS in main folder
+ * License: GNU General Public License v2.0 or later
+ */
+#pragma once
+
+#include "../mapping/CMap.h"
+#include "../mapping/MapTopology.h"
+#include "../mapping/TerrainTile.h"
+
+namespace rmg
+{
+struct SeamContact
+{
+	int3 first;
+	int3 second;
+	int firstZone;
+	int secondZone;
+	bool firstToSecond;
+	bool secondToFirst;
+};
+
+/// Identify possible unguarded ground contacts between distinct zones.
+/// This is a static audit, not a replacement for player pathfinding: it does
+/// not model visits, fog, boats, spells or changes to guards. Nonblocking
+/// visitable objects remain candidates rather than being silently excluded.
+template<class ZoneAt>
+std::vector<SeamContact> findUnguardedSeamContacts(const CMap & map, ZoneAt zoneAt)
+{
+	if(!map.toroidal)
+		throw std::invalid_argument("seam audit requires toroidal topology");
+	std::vector<SeamContact> result;
+	std::set<std::pair<size_t, size_t>> seen;
+	const auto index = [&](const int3 & p)
+	{
+		return (static_cast<size_t>(p.z) * map.height + p.y) * map.width + p.x;
+	};
+	const auto eligible = [&](const int3 & p)
+	{
+		const auto & tile = map.getTile(p);
+		return tile.isLand() && tile.entrableTerrain() && !tile.blocked()
+			&& !map.guardingCreaturePosition(p).isValid();
+	};
+	const auto topology = map.getTopology();
+	for(int z = 0; z < map.levels(); ++z)
+		for(int y = 0; y < map.height; ++y)
+			for(int x = 0; x < map.width; ++x)
+			{
+				if(x != 0 && x != map.width - 1 && y != 0 && y != map.height - 1)
+					continue;
+				const int3 first(x, y, z);
+				if(!eligible(first))
+					continue;
+				for(const auto & direction : int3::getDirs())
+				{
+					const int3 raw = first + direction;
+					if(map.isInTheMap(raw))
+						continue;
+					const auto second = topology.canonicalize(raw);
+					if(!second || index(first) >= index(*second) || zoneAt(first) == zoneAt(*second) || !eligible(*second))
+						continue;
+					const bool forward = map.canMoveBetween(first, *second);
+					const bool backward = map.canMoveBetween(*second, first);
+					if((forward || backward) && seen.emplace(index(first), index(*second)).second)
+						result.push_back({first, *second, zoneAt(first), zoneAt(*second), forward, backward});
+				}
+			}
+	return result;
+}
+}
