@@ -14,7 +14,9 @@ channel and game-window screenshots, the hero moved south, selected and
 followed a path to an ore pile, raising the ore count from 20 to 26. The hero
 then approached the adjacent ore pit; the running game's log recorded the
 visit and the capture dialog promising two ore per day. The dialog was
-acknowledged. The last observed hero position before acknowledgment was
+sent an acknowledgment shortcut. A later screenshot showed the dialog still
+open; clicking its confirmation button closed it. The last observed hero
+position before the button click was
 `(27,88,0)`, with 537 movement points.
 
 The map, isolated profile, logs, observation stream and window captures are
@@ -25,3 +27,19 @@ not verify a seam crossing, battle, opponent turn, a complete day, balance,
 or terrain animation and seam appearance. Computer Use did not enumerate the
 directly launched client; the window was captured by its macOS window ID and
 input was delivered through the explicitly enabled diagnostic socket.
+
+## Reached the southern edge
+
+The same game was continued through day 3 using the diagnostic GUI channel.
+The hero travelled around lakes and mountains from `(27,88,0)` to `(14,107,0)`
+on the 108×108 map, reaching its southernmost coordinate with 219 movement
+points. The daily ore total rose from 26 to 28 and then to 30. A subsequent
+south shortcut was accepted for dispatch but left both the position and
+movement points unchanged. Mountains were visible immediately across this
+part of the seam; this observation alone does not determine the exact cause
+of the rejected move. The hero did not cross the seam in this session.
+
+The targeted window screenshot is `south-edge.png` in the local TB5 profile.
+The viewport and minimap showed map content on both sides of the coordinate
+boundary. This single still image does not verify continuous animation, the
+quality of terrain joins or a guarded seam passage.
