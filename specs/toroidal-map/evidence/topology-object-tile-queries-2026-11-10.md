@@ -105,6 +105,30 @@ static seam objects and updates selection-outline geometry; see the
 [VMAP](topology-wrapped-footprint-vmap-2026-11-10.md) and
 [selection geometry](topology-editor-object-selection-2026-11-10.md) records.
 
+## Capturing a wrapped town
+
+On 2026-11-16, the existing 36×36 wrapped-town fixture was copied locally.
+For this test only, the blue town at anchor `(0,4,0)` retained its wrapped
+footprint but had its fort removed; the red hero was staged with visitable
+position `(34,5,0)`, adjacent to its entrance. The obsolete blue main-town
+reference was removed from the local test header. The test map's SHA-256 is
+`ce515784ab1b53f817b1f327bd615594c6cf56b2c32e13d9ed287e0b68bf2211`.
+
+In an isolated macOS arm64 graphical session using the HotA profile, a
+`north` diagnostic shortcut moved the selected red hero from `(34,5,0)` to
+`(34,4,0)` with movement points `1560 → 1460`. No battle or forced result was
+used. The client trace recorded `SetObjectProperty`, the town bonus moving
+from blue to red, and `HeroVisitCastle`. Observation and client logs are
+under `runtime/minimap-capture-qa-2026-11-16/` on TB5. The test VMAP also
+produced unresolved test-spell identifier warnings during initialization.
+
+The first test fixture used an invalid serialized `neutral` owner and was
+discarded; the successful run used the original blue owner. Computer Use did
+not recognize the directly launched SDL binary as a selectable application,
+so no before/after minimap screenshot or actual refresh call was observed.
+This proves the capture and delivered ownership update for this staged case;
+it does **not** prove that the GUI repainted either side of the minimap.
+
 The synthetic `HeroMovementTest.SpecialTerrainCoversOppositeCornerOnToroidalMap`
 places a 2×2 `CGTerrainPatch` across a corner and calls the actual game-state
 special-battlefield lookup. It finds the patch at the opposite corner in
