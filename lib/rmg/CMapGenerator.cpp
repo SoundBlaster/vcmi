@@ -128,6 +128,25 @@ std::unique_ptr<CMap> CMapGenerator::generate()
 	return generateWithZoneObserver({});
 }
 
+void CMapGenerator::enableGuardedDirectConnectionTrace()
+{
+	traceGuardedDirectConnections = true;
+}
+
+void CMapGenerator::recordGuardedDirectConnection(int id, TRmgTemplateZoneId zoneA, TRmgTemplateZoneId zoneB, const int3 & position)
+{
+	if(!traceGuardedDirectConnections)
+		return;
+	std::lock_guard lock(guardedDirectConnectionTraceMutex);
+	guardedDirectConnectionTrace.push_back({id, zoneA, zoneB, position});
+}
+
+std::vector<CMapGenerator::GuardedDirectConnectionTrace> CMapGenerator::getGuardedDirectConnectionTrace() const
+{
+	std::lock_guard lock(guardedDirectConnectionTraceMutex);
+	return guardedDirectConnectionTrace;
+}
+
 std::unique_ptr<CMap> CMapGenerator::generateWithZoneObserver(const std::function<void(const RmgMap &)> & observer)
 {
 	Load::Progress::reset();

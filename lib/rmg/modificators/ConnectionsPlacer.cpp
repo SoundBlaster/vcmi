@@ -306,6 +306,7 @@ void ConnectionsPlacer::selfSideDirectConnection(const rmg::ZoneConnection & con
 					rmg::Object monster(monsterType);
 					monster.setPosition(guardPos);
 					manager.placeObject(monster, false, true);
+					generator.recordGuardedDirectConnection(connection.getId(), connection.getZoneA(), connection.getZoneB(), monster.getVisitablePosition());
 					//Place objects away from the monster in the other zone, too
 					otherZone->getModificator<ObjectManager>()->updateDistances(monster);
 				}

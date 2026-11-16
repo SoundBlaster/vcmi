@@ -127,6 +127,8 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	EditorCallback callback(nullptr);
 	const char * seedValue = std::getenv("VCMI_RMG_PROBE_SEED");
 	CMapGenerator generator(options, &callback, seedValue ? std::stoi(seedValue) : 12345);
+	if(std::getenv("VCMI_RMG_TRACE_CONNECTIONS"))
+		generator.enableGuardedDirectConnectionTrace();
 	if(std::getenv("VCMI_RMG_TRY_INVALID_SEAM_PLACEMENT"))
 	{
 		generator.getZonePlacer()->setExperimentalSeamAdjacencies({{2, 999}});
@@ -150,6 +152,22 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	});
 	ASSERT_NE(map, nullptr);
 	ASSERT_EQ(zones.size(), static_cast<size_t>(map->width * map->height));
+	if(std::getenv("VCMI_RMG_TRACE_CONNECTIONS"))
+	{
+		auto traces = generator.getGuardedDirectConnectionTrace();
+		std::ranges::sort(traces, {}, &CMapGenerator::GuardedDirectConnectionTrace::connectionId);
+		std::ofstream traceFile(std::string(output) + ".connections");
+		ASSERT_TRUE(traceFile.good());
+		for(const auto & trace : traces)
+		{
+			traceFile << trace.connectionId << ' ' << trace.zoneA << ' ' << trace.zoneB << ' '
+			          << trace.guardPosition.x << ' ' << trace.guardPosition.y << ' ' << trace.guardPosition.z << '\n';
+			std::cout << "Original guarded connection " << trace.connectionId << " zones " << trace.zoneA << "-" << trace.zoneB
+			          << " guard " << trace.guardPosition.toString() << std::endl;
+		}
+		traceFile.close();
+		ASSERT_TRUE(traceFile.good());
+	}
 	callback.setMap(map.get());
 	CMemoryBuffer buffer;
 	{
@@ -1426,17 +1444,39 @@ TEST(MapFormat, StartingHeroCanReachEachGeneratedSeamGuard)
 	const char * base = std::getenv("VCMI_RMG_GUARD_TEST_BASE");
 	if(!base || !*base)
 		GTEST_SKIP() << "Set VCMI_RMG_GUARD_TEST_BASE to a two-guard trial's original output path";
-	std::ifstream guardFile(std::string(base) + ".guards");
-	ASSERT_TRUE(guardFile.good());
-	std::vector<int3> guards;
-	int gx, gy, ax, ay, bx, by;
-	while(guardFile >> gx >> gy >> ax >> ay >> bx >> by)
-		guards.emplace_back(gx, gy, 0);
-	ASSERT_EQ(guards.size(), 2u);
+	std::vector<std::pair<int3, int>> targets;
+	if(std::getenv("VCMI_RMG_TEST_ORIGINAL_GUARDS"))
+	{
+		std::ifstream traceFile(std::string(base) + ".connections");
+		ASSERT_TRUE(traceFile.good());
+		const std::map<int, std::pair<int, int>> expectedEdges = {{0, {1, 3}}, {1, {2, 3}}, {2, {1, 4}}, {3, {2, 4}}};
+		std::set<int> seenEdges;
+		int id, zoneA, zoneB, x, y, z;
+		while(traceFile >> id >> zoneA >> zoneB >> x >> y >> z)
+		{
+			ASSERT_TRUE(expectedEdges.contains(id));
+			ASSERT_TRUE(seenEdges.insert(id).second) << "Duplicate edge " << id;
+			EXPECT_EQ(std::make_pair(std::min(zoneA, zoneB), std::max(zoneA, zoneB)), expectedEdges.at(id));
+			const int startZone = zoneA <= 2 ? zoneA : zoneB;
+			ASSERT_GE(startZone, 1);
+			ASSERT_LE(startZone, 2);
+			targets.emplace_back(int3(x, y, z), startZone - 1);
+		}
+		ASSERT_EQ(targets.size(), 4u) << "All four original edges must be directly guarded";
+	}
+	else
+	{
+		std::ifstream guardFile(std::string(base) + ".guards");
+		ASSERT_TRUE(guardFile.good());
+		int gx, gy, ax, ay, bx, by;
+		while(guardFile >> gx >> gy >> ax >> ay >> bx >> by)
+			targets.emplace_back(int3(gx, gy, 0), -1);
+		ASSERT_EQ(targets.size(), 2u);
+	}
 	std::ifstream mapFile(std::string(base) + ".closed.vmap", std::ios::binary);
 	ASSERT_TRUE(mapFile.good());
 	const std::vector<ui8> bytes((std::istreambuf_iterator<char>(mapFile)), std::istreambuf_iterator<char>());
-	for(const auto & guardPos : guards)
+	for(const auto & [guardPos, expectedOwner] : targets)
 	{
 		SCOPED_TRACE(guardPos.toString());
 		ExternalInspectionMapService service(bytes);
@@ -1472,6 +1512,8 @@ TEST(MapFormat, StartingHeroCanReachEachGeneratedSeamGuard)
 		{
 			auto * hero = dynamic_cast<CGHeroInstance *>(map.getObject(id));
 			if(!hero || !hero->getOwner().isValidPlayer() || hero->isGarrisoned() || hero->inBoat())
+				continue;
+			if(expectedOwner >= 0 && hero->getOwner().getNum() != expectedOwner)
 				continue;
 			for(int x = 0; x < map.width; ++x)
 				for(int y = 0; y < map.height; ++y)

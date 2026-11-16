@@ -67,6 +67,19 @@ public:
 	/// The observer must not retain references to the temporary RmgMap.
 	std::unique_ptr<CMap> generateWithZoneObserver(const std::function<void(const RmgMap &)> & observer);
 
+	/// Optional diagnostic trace of original directly guarded template edges.
+	/// Enable before generation and read only after generation has finished.
+	struct GuardedDirectConnectionTrace
+	{
+		int connectionId;
+		TRmgTemplateZoneId zoneA;
+		TRmgTemplateZoneId zoneB;
+		int3 guardPosition;
+	};
+	void enableGuardedDirectConnectionTrace();
+	void recordGuardedDirectConnection(int id, TRmgTemplateZoneId zoneA, TRmgTemplateZoneId zoneB, const int3 & position);
+	std::vector<GuardedDirectConnectionTrace> getGuardedDirectConnectionTrace() const;
+
 	/// Next unused two-way monolith subtype. Thread-safe; called from the parallel connection-placement phase.
 	int getNextMonlithIndex();
 
@@ -99,6 +112,9 @@ private:
 	std::shared_ptr<CZonePlacer> placer;
 
 	std::vector<rmg::ZoneConnection> connectionsLeft;
+	bool traceGuardedDirectConnections = false;
+	std::vector<GuardedDirectConnectionTrace> guardedDirectConnectionTrace;
+	mutable std::mutex guardedDirectConnectionTraceMutex;
 	
 	int monolithIndex;
 	std::mutex monolithIndexMutex;
