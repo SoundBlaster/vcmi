@@ -30,6 +30,12 @@ independent 36 by 36 bounded control with no topology field: repeated Left
 and Up at its north-west limit and Right and Down at its south-east limit did
 not wrap its viewport, which remained one rectangle on the minimap.
 
+The same reopened toroidal fixture was used to drag the multi-cell `town_0`
+west across the seam. Its rendered position and minimap marker moved. The
+saved archive records its anchor moving from (2, 8) to (34, 8), and the red
+player's main-town reference changed to (34, 8) as well. This checks one town
+and one seam; the resulting map was not started in the game in this check.
+
 An attempt to drag a new decoration from the object browser onto a repeated
 portion did not create an object; the automation gesture selected the browser
 item instead. This does not distinguish an input automation limitation from an
@@ -41,7 +47,7 @@ After the interactive session, a subsequent launch stalled in the macOS dynamic
 loader while opening a file; this does not establish an editor deadlock.
 
 These are discrete observations, not a continuous video or proof of smooth
-animation. Other corners and directions, object placement and multi-tile
-object moves, selection variants, redo and broader bounded-map behavior still
+animation. Other corners and directions, object placement and additional
+multi-tile object moves, selection variants, redo and broader bounded-map behavior still
 require verification. This record does not establish full
 conformance to `editor_toroidal_navigation`.
