@@ -66,3 +66,9 @@ limits, enabled objects, mods and conversion fidelity.
 
 No specific random generator, HotA import or Jebus Outcast profile is claimed
 as supported until those behaviors have been implemented and demonstrated.
+
+An initial [Jebus Cross seam probe](evidence/jebus-cross-seam-probe-2026-11-16.md)
+generates a map and compares a conservative engine-derived occupancy grid. It
+finds candidate seam shortcuts; it does not yet correlate template zone IDs
+or establish actual hero routes. Repeating one seed produced different grids
+under the local multithreaded generator configuration.

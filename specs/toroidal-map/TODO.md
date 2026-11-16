@@ -72,6 +72,10 @@ demo preparation reviewable as separate changes where practical.
 
 ## 4. Earth demo and authoring
 
+- [ ] Compare generated template-zone connections with actual toroidal hero
+  routes and guards. The [initial Jebus Cross probe](evidence/jebus-cross-seam-probe-2026-11-16.md)
+  identifies static candidate seam links, but does not retain zone IDs or prove
+  hero routes. Capture generation-time zones and establish deterministic inputs.
 - [ ] Implement continuous toroidal map-editor navigation, including terrain,
   object layers, selection and brush input across both axes and corners.
   The minimap must show the coordinate-reference rectangle and all wrapped
