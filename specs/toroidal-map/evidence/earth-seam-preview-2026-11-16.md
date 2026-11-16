@@ -3,13 +3,16 @@
 `tools/stage_earth_seam_road.py` accepts the current source-checked Earth
 demo in addition to its earlier fixture. It creates a separate map with red
 hero `randomHero_7305` moved from anchor `(165,353,0)` to `(1,425,0)` and
-changes the scenario name to `Earth Seam Road QA`. The current preview's
+changes the scenario name to `Earth Seam Road QA`. The initial preview's
 SHA-256 is `057ab6f2363d1d86e06fb24faba924b8f56c91b0c19145a7bfd5565ec146df7f`;
 its input is the demo SHA-256
 `67640eefaa91e9efcf04315bef66197d834e662652bd25bd10f234391c43e5a8`.
 Decoded object comparison found only the hero changed; the header and terrain
 archive members are identical, and the localized scenario name differs.
 The tool rejected a different input and refused to overwrite the preview.
+The later [repaired preview](earth-object-overlap-audit-2026-11-15.md#seam-monolith-approach-repaired)
+has a different SHA-256 and replaces it in the local launch profile; the
+initial map remains available as a rollback copy.
 
 The local profile is `runtime/earth-seam-preview-2026-11-16/` under the TB5
 build root. It links the local game data and mods but has separate map,

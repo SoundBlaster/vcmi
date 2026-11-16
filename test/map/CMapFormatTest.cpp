@@ -1037,6 +1037,14 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		const auto target = first->visitablePos();
 		std::cout << "Bank entrances first=" << target.toString()
 		          << " second=" << second->visitablePos().toString() << std::endl;
+		GameHandlerTestServer server(state, hero->getOwner());
+		CGameHandler handler(server, state);
+		if(std::getenv("VCMI_INSPECT_EARTH_REMOVE_OVERLAP_EARLY"))
+		{
+			ASSERT_NE(std::getenv("VCMI_INSPECT_EARTH_BANK_VISIT"), nullptr);
+			ASSERT_FALSE(std::getenv("VCMI_INSPECT_EARTH_REMOVE_OVERLAP_OBSTACLE"));
+			ASSERT_TRUE(handler.removeObject(second, hero->getOwner()));
+		}
 		std::optional<int3> origin;
 		for(const auto & dir : int3::getDirs())
 		{
@@ -1048,7 +1056,32 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 				break;
 			}
 		}
+		if(!origin)
+			for(const auto & dir : int3::getDirs())
+			{
+				const auto candidate = map.getTopology().canonicalize(target + dir);
+				if(!candidate)
+					continue;
+				const auto & tile = map.getTile(*candidate);
+				std::cout << "Overlap neighbor=" << candidate->toString() << " land=" << tile.isLand()
+				          << " blocked=" << tile.blocked() << " visitable=" << tile.visitable();
+				for(const auto & id : tile.blockingObjects)
+					if(const auto * object = map.getObject(id))
+						std::cout << " blocker=" << object->instanceName;
+				std::cout << std::endl;
+			}
 		ASSERT_TRUE(origin.has_value());
+		if(std::getenv("VCMI_INSPECT_EARTH_REMOVE_OVERLAP_EARLY"))
+			for(const auto & dir : int3::getDirs())
+			{
+				const auto neighbor = map.getTopology().canonicalize(*origin + dir);
+				if(!neighbor)
+					continue;
+				const auto & tile = map.getTile(*neighbor);
+				std::cout << "Opened approach neighbor=" << neighbor->toString() << " land=" << tile.isLand()
+				          << " blocked=" << tile.blocked() << " visitable=" << tile.visitable()
+				          << " move=" << map.canMoveBetween(*neighbor, *origin) << std::endl;
+			}
 		ChangeObjPos place;
 		place.objid = hero->id;
 		place.nPos = *origin;
@@ -1065,8 +1098,6 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		std::cout << "Bank origin=" << origin->toString()
 		          << " target blocked=" << map.getTile(target).blocked()
 		          << " reachable before removal=" << reachable() << std::endl;
-		GameHandlerTestServer server(state, hero->getOwner());
-		CGameHandler handler(server, state);
 		if(std::getenv("VCMI_INSPECT_EARTH_BANK_VISIT"))
 		{
 			std::optional<ArtifactID> expectedArtifact;
@@ -1108,6 +1139,12 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 							EXPECT_EQ(map.getObject(targetId), nullptr);
 						if(expectedArtifact)
 							EXPECT_TRUE(hero->hasArt(*expectedArtifact));
+						if(std::getenv("VCMI_INSPECT_EARTH_EXPECT_TELEPORT"))
+						{
+							const auto activity = handler.activities->topActivity(hero->getOwner());
+							ASSERT_NE(activity, nullptr);
+							EXPECT_EQ(activity->getType(), ActivityType::TeleportDialog);
+						}
 					}
 					else
 					{
@@ -3402,7 +3439,8 @@ TEST(MapFormat, PreparesEarthConnectedSeamRoad)
 	ASSERT_TRUE(vstd::contains(map->getTile(int3(250, 425, 0)).blockingObjects, cactus->second->id));
 	map->removeObject(cactus->second->id);
 	for(const auto & [name, anchor] : std::array{
-		std::pair{"yuccaTrees_7568", int3(251, 430, 0)}, std::pair{"mountain_7569", int3(1, 431, 0)}})
+		std::pair{"yuccaTrees_7568", int3(251, 430, 0)}, std::pair{"mountain_7569", int3(1, 431, 0)},
+		std::pair{"deadVegetation_9592", int3(2, 285, 0)}})
 	{
 		const auto decoration = map->instanceNames.find(name);
 		ASSERT_NE(decoration, map->instanceNames.end()) << name;
@@ -3447,6 +3485,9 @@ TEST(MapFormat, PreparesEarthConnectedSeamRoad)
 	ASSERT_EQ(reopened->instanceNames.count("cactus_7575"), 0u);
 	ASSERT_EQ(reopened->instanceNames.count("yuccaTrees_7568"), 0u);
 	ASSERT_EQ(reopened->instanceNames.count("mountain_7569"), 0u);
+	ASSERT_EQ(reopened->instanceNames.count("deadVegetation_9592"), 0u);
+	ASSERT_EQ(reopened->instanceNames.count("monolithTwoWay_11148"), 1u);
+	ASSERT_EQ(reopened->instanceNames.count("randomResource_11819"), 1u);
 	ASSERT_EQ(reopened->instanceNames.count("randomMonsterLevel3_6689"), 1u);
 	std::ofstream out(outputPath, std::ios::binary);
 	ASSERT_TRUE(out);

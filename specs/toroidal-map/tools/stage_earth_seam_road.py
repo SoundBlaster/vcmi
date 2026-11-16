@@ -15,6 +15,8 @@ def stage(source, output):
         "f87b9ec936d3056a0aeaade05ece6bddd9ca0a24840ad1963c37047e2ad5c52b",
         # Integrated Earth draft with a guarded route from the starting area.
         "20c6b4c4abb50a2f1d20e0f39053d90c47680e01654711b2fb24901453ef11b1",
+        # Same draft with an accessible approach to monolithTwoWay_11148.
+        "d26eea5dc3c80036502ba23401b5c29a7dc9b7b75bb205c080cb1d4d4305f89a",
     }
     with ZipFile(source) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}

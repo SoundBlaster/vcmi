@@ -90,7 +90,9 @@ demo preparation reviewable as separate changes where practical.
 - [x] Investigate the [water-monolith mismatch](evidence/earth-portal-road-2026-11-15.md):
   restore the misplaced entrance to water in the demo preparation recipe.
 - [ ] Address remaining placement and collision problems if they affect demo
-  play. [All three water-monolith exits and one graphical route](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits)
+  play. A [blocked seam monolith approach was opened](evidence/earth-object-overlap-audit-2026-11-15.md#seam-monolith-approach-repaired)
+  by removing a decoration; access from a starting town is not established.
+  [All three water-monolith exits and one graphical route](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits)
   are checked from the relocated entrance; exhaustive reverse-route checks
   are deferred unless a defect or a demo requirement warrants them.
 - [x] Prepare a road that crosses a seam and verify its logical and static

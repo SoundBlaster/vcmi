@@ -321,12 +321,18 @@ player fog across the tested land and sea seams; no TCP transport was used.
 Four replacement portal approaches were tested with forced battle victories.
 The [overlap audit](evidence/earth-object-overlap-audit-2026-11-15.md)
 reported 161 newly overlapping pairs involving an interactive mask on an
-earlier draft; these are candidates, not confirmed defects. On the current
+earlier draft; these are candidates, not confirmed defects. On the preceding
 demo, a separate serialized-mask and initialized-engine scan found no shared
 visitable cells between distinct non-hero, non-boat objects. It did not rule
 out obstruction by noninteractive footprints. Wider terrain, object moves,
 mod dependencies and distribution rights remain incompletely assessed; the
 checks do not establish a fully playable or accepted demo.
+
+The current local Earth draft additionally [opens one monolith approach](evidence/earth-object-overlap-audit-2026-11-15.md#seam-monolith-approach-repaired)
+by removing a noninteractive decoration. A staged server visit, the earlier
+start-to-gate route and a graphical seam step passed on that revised map or
+its corresponding preview; access from the start and visual acceptance
+remain open.
 
 The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)
 also covers boat embarkation and disembarkation across one edge with two

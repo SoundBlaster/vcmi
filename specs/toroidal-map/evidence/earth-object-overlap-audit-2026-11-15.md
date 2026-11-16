@@ -122,3 +122,48 @@ tile was instead topped by `randomHero_11991`. The test did not remove that
 hero or attempt a battle or exchange, so it does not establish that the
 flowers block the town or that an unoccupied visit works. No changes were made
 to the map for these checks.
+
+## Seam monolith approach repaired
+
+In the earlier draft, `monolithTwoWay_11148` at `(1,285,0)` had no adjacent
+free, nonvisitable land tile in the initialized state. Neighboring cells were
+occupied by `deadVegetation_9592`, `mountain_9590`, a monster or a resource;
+the diagnostic therefore could not stage a hero beside it. This alone does not
+prove it was unreachable after clearing an interactive object, by boat, or by
+teleporting into it. In an in-memory experiment removing only the vegetation
+opened `(0,285,0)`; from there normal server movement opened the teleport
+dialog. Its adjacent `(0,284,0)` was free land and `(251,285,0)` was water;
+actual travel to the approach from a starting town was not tested.
+
+The reproducible preparation now removes that one nonvisitable decoration,
+checking its expected anchor. Reassembling from the unchanged converted
+source produced `earth-portal-approach-2026-11-16.vmap`, SHA-256
+`f8add693e77bed3ee423481f9ecbb81ed9e8ddb75ecbc0d6161ca006c60e33b5`.
+Against the previous demo, archive members other than `objects.json` were
+byte-identical; decoded objects differed only by removal of
+`deadVegetation_9592`. The monster, resource, mountains and monolith remain.
+
+On the saved repaired map, a staged hero at `(0,285,0)` reached the monolith
+and opened its teleport dialog; similarly staged checks opened dialogs at
+`monolithTwoWay_6730` and `monolithTwoWay_11110` despite their decoration
+overlaps. These three checks passed on macOS arm64 using `655a7d7` plus the
+inspection and recipe changes; XML is
+`runtime/portal-repaired-monolithTwoWay_{11148,6730,11110}-2026-11-16.xml`
+on TB5. The earlier start-to-road-to-gate server route also passed on the
+repaired map under its previously stated forced-victory and visibility
+conditions: `runtime/earth-repaired-start-route-2026-11-16.{log,xml}`.
+No graphical visit, choice of this monolith's destination, normal approach
+from a start, or general overlap correctness is claimed.
+
+The local demo profile now links to the repaired map; its prior map remains
+on TB5. A separate seam preview generated from the repaired map has SHA-256
+`581371aac879827ed86d14ff7283c48ce2b53d07e43f61baf60e6dd200638c2f` and
+initialized with its portal pairs. Compared with the repaired demo its only
+changed object is the staged red hero; the scenario text also changes. The
+previous preview is retained next to the profile as
+`earth-seam-preview-before-portal-repair.vmap`. In an isolated profile the
+graphical client loaded the new preview and a human-controlled hero crossed
+west from `(0,425,0)` to `(251,425,0)`, spending 75 movement points. The
+observation is `runtime/earth-move-ack-qa-2026-11-16/observe-portal-fix.jsonl`
+on TB5; the client was force-stopped. This is not a graphical visit to the
+repaired monolith or the user's visual acceptance.
