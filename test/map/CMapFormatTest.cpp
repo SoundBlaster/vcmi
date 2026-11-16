@@ -1308,6 +1308,7 @@ TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
 			auto & map = state->getMap();
 			if(guardPos == guards.front()[0] && approach == guards.front()[1])
 			{
+				bool anyStartingHeroReachesBoth = false;
 				for(const auto & id : map.getHeroesOnMap())
 				{
 					auto * startingHero = dynamic_cast<CGHeroInstance *>(map.getObject(id));
@@ -1320,9 +1321,11 @@ TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
 					CPathsInfo paths(state->getMapSize(), startingHero);
 					auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, startingHero);
 					CPathfinder(*state, config).calculatePaths();
+					bool reachesBoth = true;
 					for(const auto & trial : guards)
 					{
 						const auto * node = paths.getPathInfo(trial[0], EPathfindingLayer::LAND);
+						reachesBoth = reachesBoth && node->reachable();
 						std::cout << "Starting player=" << startingHero->getOwner().getNum()
 						          << " hero=" << startingHero->visitablePos().toString()
 						          << " guard=" << trial[0].toString() << " reachable=" << node->reachable();
@@ -1330,7 +1333,9 @@ TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
 							std::cout << " turns=" << static_cast<int>(node->turns) << " cost=" << node->cost << " movement=" << node->moveRemains;
 						std::cout << std::endl;
 					}
+					anyStartingHeroReachesBoth = anyStartingHeroReachesBoth || reachesBoth;
 				}
+				EXPECT_TRUE(anyStartingHeroReachesBoth) << "Neither starting hero can reach both seam guards";
 			}
 			CGHeroInstance * hero = nullptr;
 			for(const auto & id : map.getHeroesOnMap())
@@ -1360,6 +1365,98 @@ TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
 			ASSERT_NE(guard, nullptr);
 			EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
 		}
+}
+
+TEST(MapFormat, StartingHeroCanReachEachGeneratedSeamGuard)
+{
+	const char * base = std::getenv("VCMI_RMG_GUARD_TEST_BASE");
+	if(!base || !*base)
+		GTEST_SKIP() << "Set VCMI_RMG_GUARD_TEST_BASE to a two-guard trial's original output path";
+	std::ifstream guardFile(std::string(base) + ".guards");
+	ASSERT_TRUE(guardFile.good());
+	std::vector<int3> guards;
+	int gx, gy, ax, ay, bx, by;
+	while(guardFile >> gx >> gy >> ax >> ay >> bx >> by)
+		guards.emplace_back(gx, gy, 0);
+	ASSERT_EQ(guards.size(), 2u);
+	std::ifstream mapFile(std::string(base) + ".closed.vmap", std::ios::binary);
+	ASSERT_TRUE(mapFile.good());
+	const std::vector<ui8> bytes((std::istreambuf_iterator<char>(mapFile)), std::istreambuf_iterator<char>());
+	for(const auto & guardPos : guards)
+	{
+		SCOPED_TRACE(guardPos.toString());
+		ExternalInspectionMapService service(bytes);
+		auto header = service.loadMapHeader(ResourcePath("inspection"), false);
+		ASSERT_NE(header, nullptr);
+		StartInfo start;
+		start.mapname = "inspection";
+		start.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
+		start.mode = EStartMode::NEW_GAME;
+		for(int index = 0; index < static_cast<int>(header->players.size()); ++index)
+		{
+			const auto & info = header->players[index];
+			if(!info.canHumanPlay && !info.canComputerPlay)
+				continue;
+			auto & player = start.playerInfos[PlayerColor(index)];
+			player.color = PlayerColor(index);
+			player.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(index));
+			player.name = "Inspection";
+			player.castle = info.defaultCastle();
+			player.hero = info.defaultHero();
+			player.bonus = PlayerStartingBonus::GOLD;
+		}
+		auto state = std::make_shared<CGameState>();
+		state->preInit(LIBRARY);
+		GameRandomizer randomizer(*state);
+		randomizer.setSeed(12345);
+		Load::ProgressAccumulator progress;
+		state->init(&service, &start, randomizer, progress, false);
+		auto & map = state->getMap();
+		CGHeroInstance * selected = nullptr;
+		CGPath route;
+		for(const auto & id : map.getHeroesOnMap())
+		{
+			auto * hero = dynamic_cast<CGHeroInstance *>(map.getObject(id));
+			if(!hero || !hero->getOwner().isValidPlayer() || hero->isGarrisoned() || hero->inBoat())
+				continue;
+			for(int x = 0; x < map.width; ++x)
+				for(int y = 0; y < map.height; ++y)
+					state->getPlayerTeam(hero->getOwner())->fogOfWarMap[int3(x, y, 0)] = 1;
+			hero->setMovementPoints(30000);
+			CPathsInfo paths(state->getMapSize(), hero);
+			auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
+			CPathfinder(*state, config).calculatePaths();
+			if(paths.getPath(route, guardPos, EPathfindingLayer::LAND))
+			{
+				selected = hero;
+				break;
+			}
+		}
+		ASSERT_NE(selected, nullptr);
+		ASSERT_GE(route.nodes.size(), 2u);
+		const auto owner = selected->getOwner();
+		state->actingPlayers.insert(owner);
+		GameHandlerTestServer server(state, owner);
+		CGameHandler handler(server, state);
+		const auto * guard = dynamic_cast<const CArmedInstance *>(map.getObject(map.getTile(guardPos).topVisitableObj()));
+		ASSERT_NE(guard, nullptr);
+		std::cout << "Executing " << route.nodes.size() - 1 << " steps from " << selected->visitablePos().toString()
+		          << " to guard " << guardPos.toString() << " for player " << owner.getNum() << std::endl;
+		for(size_t index = route.nodes.size() - 1; index > 0; --index)
+		{
+			const auto pos = route.nodes[index - 1].coord;
+			ASSERT_TRUE(handler.moveHero(selected->id, selected->convertFromVisitablePos(pos), EMovementMode::STANDARD, false, owner, EPathfindingLayer::LAND));
+			if(const auto * battle = state->getBattle(owner))
+			{
+				EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard) << "Unexpected earlier battle at " << pos.toString();
+				break;
+			}
+			ASSERT_EQ(handler.activities->topActivity(owner), nullptr) << "Unexpected activity at " << pos.toString();
+		}
+		const auto * battle = state->getBattle(owner);
+		ASSERT_NE(battle, nullptr);
+		EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+	}
 }
 
 TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
