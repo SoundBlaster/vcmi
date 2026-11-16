@@ -206,6 +206,11 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	audit.close();
 	ASSERT_TRUE(audit.good());
 	std::cout << "Potential unguarded cross-zone contacts, including nonblocking visitables: " << contacts.size() << std::endl;
+	const auto closurePlan = rmg::planSeamClosures(contacts, {});
+	ASSERT_TRUE(closurePlan.has_value());
+	for(const auto & contact : contacts)
+		EXPECT_TRUE(closurePlan->contains(contact.first) || closurePlan->contains(contact.second));
+	std::cout << "Candidate cells for closing these contacts: " << closurePlan->size() << std::endl;
 }
 
 #ifdef ENABLE_NULLKILLER2_AI

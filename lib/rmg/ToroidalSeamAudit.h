@@ -10,6 +10,13 @@
 #include "../mapping/MapTopology.h"
 #include "../mapping/TerrainTile.h"
 
+#include <algorithm>
+#include <map>
+#include <optional>
+#include <set>
+#include <stdexcept>
+#include <vector>
+
 namespace rmg
 {
 struct SeamContact
@@ -68,5 +75,43 @@ std::vector<SeamContact> findUnguardedSeamContacts(const CMap & map, ZoneAt zone
 				}
 			}
 	return result;
+}
+
+/// Plan a set of contact endpoints to block while preserving protected cells.
+/// The result covers all supplied edges, but does not modify a map or prove
+/// that the selected cells can be covered by obstacles without cutting routes.
+inline std::optional<std::set<int3>> planSeamClosures(
+	const std::vector<SeamContact> & contacts, const std::set<int3> & protectedCells)
+{
+	std::set<int3> blocked;
+	for(const auto & contact : contacts)
+	{
+		const bool firstProtected = protectedCells.contains(contact.first);
+		const bool secondProtected = protectedCells.contains(contact.second);
+		if(firstProtected && secondProtected)
+			return std::nullopt;
+		if(firstProtected)
+			blocked.insert(contact.second);
+		if(secondProtected)
+			blocked.insert(contact.first);
+	}
+	while(true)
+	{
+		std::map<int3, size_t> degree;
+		for(const auto & contact : contacts)
+		{
+			if(blocked.contains(contact.first) || blocked.contains(contact.second))
+				continue;
+			++degree[contact.first];
+			++degree[contact.second];
+		}
+		if(degree.empty())
+			return blocked;
+		const auto best = std::max_element(degree.begin(), degree.end(), [](const auto & a, const auto & b)
+		{
+			return a.second < b.second;
+		});
+		blocked.insert(best->first);
+	}
 }
 }

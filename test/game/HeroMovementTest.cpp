@@ -4002,6 +4002,23 @@ TEST_F(HeroMovementTest, ToroidalSeamAuditFindsUnguardedEdgesAndCornersButExclud
 	EXPECT_FALSE(has(int3(0, 17, 0), int3(35, 17, 0)));
 }
 
+TEST_F(HeroMovementTest, SeamClosurePlanPreservesProtectedCellsAndCoversDiagonalContacts)
+{
+	const int3 left(0, 4, 0), right(35, 4, 0), diagonal(35, 5, 0), corner(0, 0, 0), opposite(35, 35, 0);
+	const std::vector<rmg::SeamContact> contacts = {
+		{left, right, 1, 2, true, true},
+		{left, diagonal, 1, 2, true, true},
+		{corner, opposite, 1, 2, true, true}
+	};
+	const std::set<int3> protectedCells{left, corner};
+	const auto plan = rmg::planSeamClosures(contacts, protectedCells);
+	ASSERT_TRUE(plan.has_value());
+	EXPECT_EQ(*plan, (std::set<int3>{right, diagonal, opposite}));
+	for(const auto & contact : contacts)
+		EXPECT_TRUE(plan->contains(contact.first) || plan->contains(contact.second));
+	EXPECT_FALSE(rmg::planSeamClosures(contacts, {left, right}).has_value());
+}
+
 TEST_F(HeroMovementTest, GuardListIncludesEachMonsterOnlyOnce)
 {
 	const PlayerColor player(0);
