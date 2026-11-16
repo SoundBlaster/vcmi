@@ -43,6 +43,8 @@
 #include "../../lib/modding/CModHandler.h"
 #include "../../lib/pathfinder/CPathfinder.h"
 #include "../../lib/pathfinder/PathfinderOptions.h"
+#include "../../lib/pathfinder/TransientLanding.h"
+#include "../../lib/bonuses/Bonus.h"
 #include "../../lib/serializer/CMemorySerializer.h"
 #include "../../lib/serializer/CLoadFile.h"
 #include "../../lib/serializer/CSaveFile.h"
@@ -1013,6 +1015,42 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 				}
 		std::cout << "Shared non-hero visitable tiles=" << shared << std::endl;
 		EXPECT_EQ(shared, 0);
+	}
+	if(std::getenv("VCMI_INSPECT_EARTH_LANDING_PERFORMANCE"))
+	{
+		const auto entry = map.instanceNames.find("randomHero_7305");
+		ASSERT_NE(entry, map.instanceNames.end());
+		auto * hero = dynamic_cast<CGHeroInstance *>(entry->second.get());
+		ASSERT_NE(hero, nullptr);
+		auto * team = state->getPlayerTeam(hero->getOwner());
+		ASSERT_NE(team, nullptr);
+		for(int x = 0; x < map.width; ++x)
+			for(int y = 0; y < map.height; ++y)
+				team->fogOfWarMap[int3(x, y, 0)] = 1;
+		const int3 start(239, 425, 0);
+		ASSERT_FALSE(map.getTile(start).isLand());
+		hero->addNewBonus(std::make_shared<Bonus>(BonusDuration::PERMANENT, BonusType::WATER_WALKING, BonusSource::OTHER, 0, BonusSourceID()));
+		for(const int points : {1200, 3000, 6000})
+		{
+			std::vector<double> samples;
+			std::optional<KnownLanding> expected;
+			for(int sample = 0; sample < 8; ++sample)
+			{
+				const auto before = std::chrono::steady_clock::now();
+				const auto result = findKnownTransientLanding(*state, hero, PathfinderStart{start, EPathfindingLayer::WATER, points}, nullptr, LandingKnowledge::PLAYER_ROUTE);
+				const auto after = std::chrono::steady_clock::now();
+				if(expected)
+					ASSERT_EQ(result, *expected);
+				else
+					expected = result;
+				if(sample > 0)
+					samples.push_back(std::chrono::duration<double, std::milli>(after - before).count());
+			}
+			std::ranges::sort(samples);
+			ASSERT_EQ(*expected, KnownLanding::FOUND);
+			std::cout << "Earth landing points=" << points << " result=" << static_cast<int>(*expected)
+			          << " median_ms=" << samples[samples.size() / 2] << " max_ms=" << samples.back() << std::endl;
+		}
 	}
 	if(std::getenv("VCMI_INSPECT_EARTH_BANK_OVERLAP"))
 	{

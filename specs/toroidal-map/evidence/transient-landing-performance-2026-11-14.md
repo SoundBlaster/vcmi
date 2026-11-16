@@ -179,3 +179,23 @@ landing search. These are synthetic first requests, not repeated cached
 requests or end-to-end UI timings. The log and XML are
 `runtime/landing-distant-routes-final-2026-11-15.log` and
 `runtime/landing-distant-routes-final-2026-11-15.xml` on TB5.
+
+## Selected water tile on Earth
+
+On 2026-11-16, the opt-in `VCMI_INSPECT_EARTH_LANDING_PERFORMANCE` check
+initialized the current 252×576 Earth demo, SHA-256
+`f8add693e77bed3ee423481f9ecbb81ed9e8ddb75ecbc0d6161ca006c60e33b5`, with
+its HotA profile. It revealed the surface, gave the red hero Water Walk in
+memory and searched from the water tile `(239,425,0)` using `PLAYER_ROUTE`.
+Map initialization and fog preparation were outside the timing; each call
+allocated its normal search graph. For movement budgets 1,200, 3,000 and
+6,000, all searches returned `FOUND`. Three independent processes, each
+discarding one warmup and timing seven searches per budget, yielded median
+ranges of 0.731–0.751 ms, 0.715–0.722 ms and 0.714–0.724 ms respectively.
+
+All three checks passed on macOS arm64 with a Release test build based on
+`6bdaab7` plus the diagnostic. XML:
+`runtime/earth-landing-performance-final-{1,2,3}-2026-11-16.xml` on TB5.
+This measures one selected candidate and one search, not a full server move,
+frame time, multiplayer contention, fog-limited play or a worst-case bound.
+It does not justify removing the performance limitation for other routes.
