@@ -1290,6 +1290,22 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 				          << " hero=" << hero->visitablePos().toString()
 				          << " activity=" << (handler.activities->topActivity(hero->getOwner()) != nullptr) << std::endl;
 			}
+			if(std::getenv("VCMI_INSPECT_EARTH_CAPTURE_MINE"))
+			{
+				ASSERT_NE(state->getBattle(hero->getOwner()), nullptr);
+				handler.battles->cheatBattleVictory(hero->getOwner());
+				for(int limit = 0; limit < 16; ++limit)
+				{
+					const auto prompt = handler.activities->topActivity(hero->getOwner());
+					if(!prompt || (prompt->getType() != ActivityType::BattleDialog && prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+						break;
+					ASSERT_EQ(handler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+				}
+				const auto * mine = dynamic_cast<const CGMine *>(map.getObject(targetId));
+				ASSERT_NE(mine, nullptr);
+				EXPECT_EQ(mine->getOwner(), hero->getOwner());
+				std::cout << "Mine after forced battle owner=" << mine->getOwner().getNum() << std::endl;
+			}
 			if(std::getenv("VCMI_INSPECT_EARTH_OVERLAP_BUILD_BOAT"))
 			{
 				ASSERT_EQ(hero->visitablePos(), target);
@@ -3630,7 +3646,7 @@ TEST(MapFormat, PreparesEarthConnectedSeamRoad)
 	map->removeObject(cactus->second->id);
 	for(const auto & [name, anchor] : std::array{
 		std::pair{"yuccaTrees_7568", int3(251, 430, 0)}, std::pair{"mountain_7569", int3(1, 431, 0)},
-		std::pair{"deadVegetation_9592", int3(2, 285, 0)}})
+		std::pair{"deadVegetation_9592", int3(2, 285, 0)}, std::pair{"reef_6743", int3(248, 424, 0)}})
 	{
 		const auto decoration = map->instanceNames.find(name);
 		ASSERT_NE(decoration, map->instanceNames.end()) << name;
@@ -3676,6 +3692,9 @@ TEST(MapFormat, PreparesEarthConnectedSeamRoad)
 	ASSERT_EQ(reopened->instanceNames.count("yuccaTrees_7568"), 0u);
 	ASSERT_EQ(reopened->instanceNames.count("mountain_7569"), 0u);
 	ASSERT_EQ(reopened->instanceNames.count("deadVegetation_9592"), 0u);
+	ASSERT_EQ(reopened->instanceNames.count("reef_6743"), 0u);
+	ASSERT_EQ(reopened->instanceNames.count("mine_11513"), 1u);
+	ASSERT_EQ(reopened->instanceNames.count("randomMonsterLevel5_11517"), 1u);
 	ASSERT_EQ(reopened->instanceNames.count("monolithTwoWay_11148"), 1u);
 	ASSERT_EQ(reopened->instanceNames.count("randomResource_11819"), 1u);
 	ASSERT_EQ(reopened->instanceNames.count("randomMonsterLevel3_6689"), 1u);
