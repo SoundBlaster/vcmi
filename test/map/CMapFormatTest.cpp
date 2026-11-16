@@ -36,6 +36,7 @@
 #include "../../lib/mapping/CMapEditManager.h"
 #include "../../lib/mapping/CMapService.h"
 #include "../../lib/mapping/MapTopology.h"
+#include "../../lib/mapping/ObstacleProxy.h"
 #include "../../lib/mapping/MapFormatH3M.h"
 #include "../../lib/mapping/MapFormatJson.h"
 #include "../../lib/mapping/TerrainTile.h"
@@ -72,6 +73,32 @@
 
 #include <condition_variable>
 #include <thread>
+
+namespace
+{
+// Experimental placement is deliberately restricted to planned empty cells.
+class StrictSeamObstacleTrial : public ObstacleProxy
+{
+public:
+	StrictSeamObstacleTrial(const CMap & map, const std::set<int3> & allowed) : map(map), allowed(allowed) {}
+	bool isInTheMap(const int3 & p) override { return map.isInTheMap(p); }
+	bool isProhibited(const rmg::Area & area) const override
+	{
+		for(const auto & pos : area.getTiles())
+		{
+			if(!allowed.contains(pos))
+				return true;
+			const auto & tile = map.getTile(pos);
+			if(tile.blocked() || tile.visitable() || tile.hasRoad())
+				return true;
+		}
+		return false;
+	}
+private:
+	const CMap & map;
+	const std::set<int3> & allowed;
+};
+}
 
 // Explicitly enabled local diagnostic; generation depends on installed game data.
 TEST(RandomTemplateProbe, GenerateTemplate)
@@ -211,6 +238,58 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	for(const auto & contact : contacts)
 		EXPECT_TRUE(closurePlan->contains(contact.first) || closurePlan->contains(contact.second));
 	std::cout << "Candidate cells for closing these contacts: " << closurePlan->size() << std::endl;
+	if(std::getenv("VCMI_RMG_TRY_CLOSURES"))
+	{
+		std::set<int3> protectedCells;
+		for(const auto & contact : contacts)
+			for(const auto & pos : {contact.first, contact.second})
+				if(map->getTile(pos).visitable() || map->getTile(pos).hasRoad())
+					protectedCells.insert(pos);
+		const auto strictPlan = rmg::planSeamClosures(contacts, protectedCells);
+		ASSERT_TRUE(strictPlan.has_value()) << "A contact has two protected endpoints";
+		CRandomGenerator obstacleRandom(12345);
+		size_t placed = 0;
+		for(const auto & pos : *strictPlan)
+		{
+			if(map->getTile(pos).blocked())
+				continue;
+			StrictSeamObstacleTrial placer(*map, *strictPlan);
+			placer.collectPossibleObstacles(map->getTile(pos).getTerrainID());
+			placer.addBlockedTile(pos);
+			const auto objects = placer.createObstacles(obstacleRandom, map->cb);
+			placer.finalInsertion(map->getEditManager(), objects);
+			placed += objects.size();
+			ASSERT_TRUE(map->getTile(pos).blocked()) << "No strict obstacle covers " << pos.toString();
+		}
+		const auto remaining = rmg::findUnguardedSeamContacts(*map, [&](const int3 & tile)
+		{
+			return zones[tile.y * map->width + tile.x];
+		});
+		std::cout << "Experimental barriers placed: " << placed << ", remaining unguarded contacts: " << remaining.size() << std::endl;
+		EXPECT_TRUE(remaining.empty());
+		CMemoryBuffer closedBuffer;
+		{
+			CMapSaverJson closedSaver(&closedBuffer);
+			closedSaver.saveMap(map);
+		}
+		closedBuffer.seek(0);
+		EditorCallback closedCallback(nullptr);
+		CMapLoaderJson closedLoader(&closedBuffer);
+		auto closedMap = closedLoader.loadMap(&closedCallback);
+		ASSERT_NE(closedMap, nullptr);
+		closedCallback.setMap(closedMap.get());
+		ASSERT_TRUE(closedMap->toroidal);
+		const auto afterReload = rmg::findUnguardedSeamContacts(*closedMap, [&](const int3 & tile)
+		{
+			return zones[tile.y * closedMap->width + tile.x];
+		});
+		EXPECT_TRUE(afterReload.empty()) << "Unguarded contacts after save and reload: " << afterReload.size();
+		std::ofstream closedFile(std::string(output) + ".closed.vmap", std::ios::binary);
+		ASSERT_TRUE(closedFile.good());
+		closedFile.write(reinterpret_cast<const char *>(closedBuffer.getBuffer().data()), closedBuffer.getSize());
+		closedFile.close();
+		ASSERT_TRUE(closedFile.good());
+	}
 }
 
 #ifdef ENABLE_NULLKILLER2_AI
