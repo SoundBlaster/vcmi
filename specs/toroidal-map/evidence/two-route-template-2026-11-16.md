@@ -203,3 +203,8 @@ are adjacent, so features can continue across the seam without being mirror
 images; corners involve both axes. This experiment reserves movement paths
 only. It does not yet generate matching terrain, roads or rivers across those
 edges, nor has its visual result been reviewed.
+
+The seed-3 sample was subsequently opened in an isolated real client and
+played through an ore pickup and ore-pit capture in the starting zone; see
+the [human play record](two-route-human-play-2026-11-16.md). Seam gameplay
+and visual continuity were not reached in that run.
