@@ -3810,7 +3810,8 @@ TEST(TeleportAnswerTracker, OnlyTheCurrentQuestionsRequestCanReleaseTheRoute)
 	TeleportAnswerTracker tracker;
 	using Result = TeleportAnswerTracker::Result;
 	const QuestionID first(10), second(11), unrelated(12);
-	tracker.begin(first);
+	const ObjectInstanceID hero(20), otherHero(21);
+	tracker.begin(first, hero);
 	tracker.sent(unrelated, 1);
 	EXPECT_EQ(tracker.consume(1, true), Result::UNRELATED);
 	EXPECT_TRUE(tracker.waiting());
@@ -3820,11 +3821,22 @@ TEST(TeleportAnswerTracker, OnlyTheCurrentQuestionsRequestCanReleaseTheRoute)
 	EXPECT_EQ(tracker.consume(2, false), Result::STOP);
 	EXPECT_FALSE(tracker.waiting());
 	EXPECT_EQ(tracker.consume(2, false), Result::UNRELATED);
-	tracker.begin(second);
+	tracker.begin(second, hero);
 	tracker.sent(second, 3);
 	EXPECT_EQ(tracker.consume(2, true), Result::UNRELATED);
 	EXPECT_TRUE(tracker.waiting());
-	EXPECT_EQ(tracker.consume(3, true), Result::CONTINUE);
+	tracker.teleported(otherHero);
+	EXPECT_EQ(tracker.consume(3, true), Result::STOP); // accepted but not yet moved
+	EXPECT_FALSE(tracker.waiting());
+	tracker.begin(second, hero);
+	tracker.sent(second, 4);
+	tracker.teleported(hero);
+	EXPECT_EQ(tracker.consume(4, true), Result::CONTINUE);
+	EXPECT_FALSE(tracker.waiting());
+	tracker.begin(second, hero);
+	tracker.sent(second, 5);
+	tracker.teleported(hero);
+	EXPECT_EQ(tracker.consume(5, false), Result::STOP); // rejected after an effect
 	EXPECT_FALSE(tracker.waiting());
 }
 

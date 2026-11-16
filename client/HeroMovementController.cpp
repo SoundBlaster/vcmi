@@ -87,7 +87,7 @@ void HeroMovementController::showTeleportDialog(const CGHeroInstance * hero, Tel
 	// Check whether hero that has entered teleporter has paths that goes through teleporter and select appropriate exit
 	// othervice, ask server to select one randomly by sending invalid (-1) value as answer
 	assert(!teleportAnswer.waiting());
-	teleportAnswer.begin(questionID);
+	teleportAnswer.begin(questionID, hero->id);
 
 	if(!GAME->interface()->localState->hasPath(hero))
 	{
@@ -160,6 +160,8 @@ void HeroMovementController::onTryMoveHero(const CGHeroInstance * hero, const Tr
 {
 	// Server initiated movement -> start movement animation
 	// Note that this movement is not necessarily of owned heroes - other players movement will also pass through this method
+	if(details.result == TryMoveHero::TELEPORTATION)
+		teleportAnswer.teleported(hero->id);
 
 	if(details.result == TryMoveHero::EMBARK || details.result == TryMoveHero::DISEMBARK)
 	{
@@ -239,8 +241,9 @@ void HeroMovementController::onQuestionAnswerApplied(int requestID, bool accepte
 
 	if(result == TeleportAnswerTracker::Result::STOP)
 	{
-		// The response is not transactional. Keep any authoritative updates,
-		// but do not send more steps on a route whose teleport answer failed.
+		// A positive response can merely queue the answer behind another
+		// activity. Never resume until the server has actually moved the hero.
+		// A negative response can also follow partial authoritative updates.
 		requestMovementAbort();
 		return;
 	}

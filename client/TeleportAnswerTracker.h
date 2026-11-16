@@ -15,15 +15,26 @@ class TeleportAnswerTracker
 	mutable std::mutex mutex;
 	std::optional<QuestionID> question;
 	std::optional<int> request;
+	std::optional<ObjectInstanceID> hero;
+	bool teleportObserved = false;
 
 public:
 	enum class Result { UNRELATED, CONTINUE, STOP };
 
-	void begin(QuestionID id)
+	void begin(QuestionID id, ObjectInstanceID heroID)
 	{
 		std::lock_guard lock(mutex);
 		question = id;
+		hero = heroID;
 		request.reset();
+		teleportObserved = false;
+	}
+
+	void teleported(ObjectInstanceID heroID)
+	{
+		std::lock_guard lock(mutex);
+		if(question && hero && *hero == heroID)
+			teleportObserved = true;
 	}
 
 	void sent(QuestionID id, int requestID)
@@ -38,9 +49,12 @@ public:
 		std::lock_guard lock(mutex);
 		if(!request || *request != requestID)
 			return Result::UNRELATED;
+		const bool canContinue = accepted && teleportObserved;
 		question.reset();
 		request.reset();
-		return accepted ? Result::CONTINUE : Result::STOP;
+		hero.reset();
+		teleportObserved = false;
+		return canContinue ? Result::CONTINUE : Result::STOP;
 	}
 
 	bool waiting() const

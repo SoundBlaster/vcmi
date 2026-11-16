@@ -2692,13 +2692,24 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGatePairedAcrossToroidalSeam)
 	auto * hero = findHeroByOwner(player);
 	ASSERT_NE(hero, nullptr);
 	hero->setMovementPoints(3000);
-	GameHandlerTestServer server(gameState(), player);
+	TeleportMovementTestServer server(gameState(), player);
 	CGameHandler handler(server, gameState());
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(surface->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	auto dialog = handler.activities->topActivity(player);
 	ASSERT_NE(dialog, nullptr);
 	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
-	ASSERT_EQ(handler.activities->submitReply(dialog->getActiveQuestionID(), player, 0), ReplyOutcome::Accepted);
+	// A later activity can temporarily cover a teleport dialog. The server
+	// acknowledges the answer before the covered teleport actually runs.
+	auto blocker = std::make_shared<TestActivity>(&handler, player, ActivityType::MapObjectVisit);
+	handler.activities->addActivity(blocker);
+	QuestionAnswer answer(dialog->getActiveQuestionID(), 0);
+	answer.player = player;
+	answer.requestID = 73;
+	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, answer);
+	ASSERT_EQ(server.lastReplyResult, true);
+	EXPECT_EQ(hero->visitablePos(), surface->visitablePos());
+	EXPECT_EQ(handler.activities->topActivity(player), blocker);
+	blocker->finish();
 	EXPECT_EQ(hero->visitablePos(), across->visitablePos());
 	hero->setMovementPoints(3000);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(34, 5, 1)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
