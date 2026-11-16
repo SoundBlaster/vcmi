@@ -63,6 +63,9 @@ public:
 	const CMapGenOptions& getMapGenOptions() const;
 	
 	std::unique_ptr<CMap> generate();
+	/// Observe the completed zone assignment before generation state is discarded.
+	/// The observer must not retain references to the temporary RmgMap.
+	std::unique_ptr<CMap> generateWithZoneObserver(const std::function<void(const RmgMap &)> & observer);
 
 	/// Next unused two-way monolith subtype. Thread-safe; called from the parallel connection-placement phase.
 	int getNextMonlithIndex();

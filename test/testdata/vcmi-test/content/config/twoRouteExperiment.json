@@ -1,0 +1,41 @@
+{
+	"Two Route Experiment" :
+	{
+		"description" : "Experimental two-player ring graph; not a toroidal generator.",
+		"minSize" : "l", "maxSize" : "xl",
+		"players" : "2",
+		"allowedWaterContent" : ["none"],
+		"bannedSpells" : ["fly", "dimensionDoor", "waterWalk"],
+		"bannedArtifacts" : ["angelWings", "bootsOfLevitation"],
+		"zones" :
+		{
+			"1" : {
+				"type" : "playerStart", "size" : 30, "owner" : 1,
+				"playerTowns" : { "castles" : 1 },
+				"monsters" : "weak",
+				"mines" : { "wood" : 2, "ore" : 2, "gold" : 1 },
+				"treasure" : [ { "min" : 1000, "max" : 4000, "density" : 8 } ]
+			},
+			"2" : {
+				"type" : "playerStart", "size" : 30, "owner" : 2,
+				"playerTowns" : { "castles" : 1 },
+				"monsters" : "weak", "minesLikeZone" : 1, "treasureLikeZone" : 1
+			},
+			"3" : {
+				"type" : "treasure", "size" : 30, "monsters" : "normal",
+				"mines" : { "gold" : 1 },
+				"treasure" : [ { "min" : 3000, "max" : 9000, "density" : 6 } ]
+			},
+			"4" : {
+				"type" : "treasure", "size" : 30, "monsters" : "normal",
+				"minesLikeZone" : 3, "treasureLikeZone" : 3
+			}
+		},
+		"connections" : [
+			{ "a" : "1", "b" : "3", "guard" : 12000 },
+			{ "a" : "3", "b" : "2", "guard" : 12000 },
+			{ "a" : "1", "b" : "4", "guard" : 12000 },
+			{ "a" : "4", "b" : "2", "guard" : 12000 }
+		]
+	}
+}

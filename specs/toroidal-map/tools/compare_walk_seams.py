@@ -9,12 +9,14 @@ from collections import deque
 import json
 
 
-def compare(rows):
+def compare(rows, zones=None):
     if not rows or not rows[0] or any(len(row) != len(rows[0]) for row in rows):
         raise ValueError("grid must be nonempty and rectangular")
     if any(c not in ".#" for row in rows for c in row):
         raise ValueError("grid contains an unexpected cell")
     h, w = len(rows), len(rows[0])
+    if zones is not None and (len(zones) != h or any(len(row) != w for row in zones)):
+        raise ValueError("zone grid dimensions differ from walk grid")
     labels = {}
     sizes = []
     for y in range(h):
@@ -36,6 +38,7 @@ def compare(rows):
                             queue.append((nx, ny))
             sizes.append(size)
     links = {}
+    zone_links = {}
     for (x, y), source in labels.items():
         if x not in (0, w - 1) and y not in (0, h - 1):
             continue
@@ -48,19 +51,38 @@ def compare(rows):
                     continue
                 target_pos = (raw_x % w, raw_y % h)
                 target = labels.get(target_pos)
-                if target is None or target == source:
+                if target is None:
+                    continue
+                if zones is not None:
+                    first, second = zones[y][x], zones[target_pos[1]][target_pos[0]]
+                    if first != second:
+                        pair = tuple(sorted((first, second)))
+                        zone_links.setdefault(pair, {"zones": pair,
+                                                    "example": [[x, y], list(target_pos)],
+                                                    "directed_edges": 0})
+                        zone_links[pair]["directed_edges"] += 1
+                if target == source:
                     continue
                 pair = tuple(sorted((source, target)))
                 links.setdefault(pair, {"components": pair,
                                         "sizes": [sizes[i] for i in pair],
                                         "example": [[x, y], list(target_pos)]})
-    return {"width": w, "height": h, "components": len(sizes),
-            "eligible_cells": len(labels), "seam_links": list(links.values())}
+    result = {"width": w, "height": h, "components": len(sizes),
+              "eligible_cells": len(labels), "seam_links": list(links.values())}
+    if zones is not None:
+        result["zone_seam_links"] = list(zone_links.values())
+    return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("grid")
+    parser.add_argument("--zones", help="generation-time zone IDs, space-separated per row")
     args = parser.parse_args()
     with open(args.grid, encoding="utf-8") as stream:
-        print(json.dumps(compare([line.rstrip("\n") for line in stream]), indent=2))
+        rows = [line.rstrip("\n") for line in stream]
+    zones = None
+    if args.zones:
+        with open(args.zones, encoding="utf-8") as stream:
+            zones = [[int(value) for value in line.split()] for line in stream]
+    print(json.dumps(compare(rows, zones), indent=2))

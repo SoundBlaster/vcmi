@@ -46,6 +46,7 @@
 #include "../../lib/pathfinder/TransientLanding.h"
 #include "../../lib/rmg/CMapGenerator.h"
 #include "../../lib/rmg/CRmgTemplateStorage.h"
+#include "../../lib/rmg/RmgMap.h"
 #include "../../lib/bonuses/Bonus.h"
 #include "../../lib/serializer/CMemorySerializer.h"
 #include "../../lib/serializer/CLoadFile.h"
@@ -72,18 +73,20 @@
 #include <thread>
 
 // Explicitly enabled local diagnostic; generation depends on installed game data.
-TEST(RandomTemplateProbe, GenerateJebusCross)
+TEST(RandomTemplateProbe, GenerateTemplate)
 {
 	const char * output = std::getenv("VCMI_RMG_PROBE_OUTPUT");
 	if(!output)
 		GTEST_SKIP() << "Set VCMI_RMG_PROBE_OUTPUT to generate a local diagnostic map";
-	const auto * tpl = LIBRARY->tplh->getTemplate("vcmi:Jebus Cross");
+	const char * templateName = std::getenv("VCMI_RMG_PROBE_TEMPLATE");
+	const bool twoRoute = templateName && std::string(templateName) == "vcmi-test:Two Route Experiment";
+	const auto * tpl = LIBRARY->tplh->getTemplate(templateName ? templateName : "vcmi:Jebus Cross");
 	ASSERT_NE(tpl, nullptr);
 	CMapGenOptions options;
 	options.setWidth(108);
 	options.setHeight(108);
 	options.setLevels(1);
-	options.setHumanOrCpuPlayerCount(4);
+	options.setHumanOrCpuPlayerCount(twoRoute ? 2 : 4);
 	options.setCompOnlyPlayerCount(0);
 	options.setTeamCount(0);
 	options.setCompOnlyTeamCount(0);
@@ -92,8 +95,15 @@ TEST(RandomTemplateProbe, GenerateJebusCross)
 	ASSERT_TRUE(options.checkOptions());
 	EditorCallback callback(nullptr);
 	CMapGenerator generator(options, &callback, 12345);
-	auto map = generator.generate();
+	std::vector<int> zones;
+	auto map = generator.generateWithZoneObserver([&](const RmgMap & generated)
+	{
+		for(int y = 0; y < generated.height(); ++y)
+			for(int x = 0; x < generated.width(); ++x)
+				zones.push_back(generated.getZoneID(int3(x, y, 0)));
+	});
 	ASSERT_NE(map, nullptr);
+	ASSERT_EQ(zones.size(), static_cast<size_t>(map->width * map->height));
 	callback.setMap(map.get());
 	CMemoryBuffer buffer;
 	{
@@ -107,6 +117,13 @@ TEST(RandomTemplateProbe, GenerateJebusCross)
 	ASSERT_NE(reloaded, nullptr);
 	EXPECT_EQ(reloaded->width, 108);
 	EXPECT_EQ(reloaded->height, 108);
+	if(twoRoute)
+	{
+		for(const auto * spell : {"core:fly", "core:dimensionDoor", "core:waterWalk"})
+			EXPECT_FALSE(reloaded->allowedSpells.count(SpellID(SpellID::decode(spell)))) << spell;
+		for(const auto * artifact : {"core:angelWings", "core:bootsOfLevitation"})
+			EXPECT_FALSE(reloaded->allowedArtifact.count(ArtifactID(ArtifactID::decode(artifact)))) << artifact;
+	}
 	std::ofstream out(output, std::ios::binary);
 	ASSERT_TRUE(out.good());
 	out.write(reinterpret_cast<const char *>(buffer.getBuffer().data()), buffer.getSize());
@@ -114,9 +131,10 @@ TEST(RandomTemplateProbe, GenerateJebusCross)
 	ASSERT_TRUE(out.good());
 	// Use the engine's occupancy and guard lookup, including wrapped guards.
 	// This is a conservative static filter, not a hero pathfinder.
-	map->toroidal = true;
+	map->setToroidalAndRebuild(true);
 	std::ofstream grid(std::string(output) + ".walk");
 	ASSERT_TRUE(grid.good());
+	std::vector<bool> walkable(map->width * map->height);
 	for(int y = 0; y < map->height; ++y)
 	{
 		for(int x = 0; x < map->width; ++x)
@@ -125,12 +143,54 @@ TEST(RandomTemplateProbe, GenerateJebusCross)
 			const auto & tile = map->getTile(pos);
 			const bool clear = tile.isLand() && tile.entrableTerrain() && !tile.blocked() && !tile.visitable()
 				&& map->guardingCreaturePosition(pos).x < 0;
+			walkable[y * map->width + x] = clear;
 			grid << (clear ? '.' : '#');
 		}
 		grid << '\n';
 	}
 	grid.close();
 	ASSERT_TRUE(grid.good());
+	std::ofstream zoneFile(std::string(output) + ".zones");
+	ASSERT_TRUE(zoneFile.good());
+	for(int y = 0; y < map->height; ++y)
+	{
+		for(int x = 0; x < map->width; ++x)
+			zoneFile << (x ? " " : "") << zones[y * map->width + x];
+		zoneFile << '\n';
+	}
+	zoneFile.close();
+	ASSERT_TRUE(zoneFile.good());
+	std::ofstream seams(std::string(output) + ".seams");
+	ASSERT_TRUE(seams.good());
+	int candidateCount = 0;
+	for(int y = 0; y < map->height; ++y)
+		for(int x = 0; x < map->width; ++x)
+		{
+			const int sourceIndex = y * map->width + x;
+			if(!walkable[sourceIndex])
+				continue;
+			for(int dy = -1; dy <= 1; ++dy)
+				for(int dx = -1; dx <= 1; ++dx)
+				{
+					if((dx == 0 && dy == 0) || (x + dx >= 0 && x + dx < map->width && y + dy >= 0 && y + dy < map->height))
+						continue;
+					const int3 source(x, y, 0);
+					const auto target = map->getTopology().canonicalize(source + int3(dx, dy, 0));
+					if(!target)
+						continue;
+					const int targetIndex = target->y * map->width + target->x;
+					if(sourceIndex >= targetIndex || !walkable[targetIndex] || zones[sourceIndex] == zones[targetIndex])
+						continue;
+					if(!map->canMoveBetween(source, *target) || !map->canMoveBetween(*target, source))
+						continue;
+					seams << zones[sourceIndex] << ' ' << zones[targetIndex] << ' '
+					      << x << ' ' << y << ' ' << target->x << ' ' << target->y << '\n';
+					++candidateCount;
+				}
+		}
+	seams.close();
+	ASSERT_TRUE(seams.good());
+	std::cout << "Bidirectional unguarded seam transitions between generated zones: " << candidateCount << std::endl;
 }
 
 #ifdef ENABLE_NULLKILLER2_AI

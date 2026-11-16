@@ -3952,6 +3952,29 @@ TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)
 	EXPECT_FALSE(guards(int3(0, 0, 0), int3(35, 35, 0)));
 }
 
+TEST_F(HeroMovementTest, MonsterOnSeamGuardsBothSidesAndDiagonalApproaches)
+{
+	const PlayerColor player(0);
+	const int3 monster(35, 18, 0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player)
+		.monster(monster, CreatureID(0), 10);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	map()->calculateGuardingGreaturePositions();
+	for(int dy = -1; dy <= 1; ++dy)
+		for(int dx = -1; dx <= 1; ++dx)
+		{
+			if(dx == 0 && dy == 0)
+				continue;
+			const auto tile = map()->getTopology().canonicalize(monster + int3(dx, dy, 0));
+			ASSERT_TRUE(tile.has_value());
+			const auto guards = gameState()->guardingCreatures(*tile);
+			EXPECT_TRUE(std::ranges::any_of(guards, [&](const auto * guard) { return guard->visitablePos() == monster; }))
+				<< tile->toString();
+		}
+}
+
 TEST_F(HeroMovementTest, GuardListIncludesEachMonsterOnlyOnce)
 {
 	const PlayerColor player(0);

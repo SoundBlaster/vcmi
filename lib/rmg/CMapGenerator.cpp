@@ -125,6 +125,11 @@ void CMapGenerator::initQuestArtsRemaining()
 
 std::unique_ptr<CMap> CMapGenerator::generate()
 {
+	return generateWithZoneObserver({});
+}
+
+std::unique_ptr<CMap> CMapGenerator::generateWithZoneObserver(const std::function<void(const RmgMap &)> & observer)
+{
 	Load::Progress::reset();
 	Load::Progress::setupStepsTill(5, 30);
 	try
@@ -139,6 +144,8 @@ std::unique_ptr<CMap> CMapGenerator::generate()
 		map->addModificators();
 		Load::Progress::step(3);
 		fillZones();
+		if(observer)
+			observer(*map);
 		//updated guarded tiles will be calculated in CGameState::initMapObjects()
 		map->getZones().clear();
 
