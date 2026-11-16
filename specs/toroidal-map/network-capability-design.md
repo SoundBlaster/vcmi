@@ -108,3 +108,12 @@ an accepted prefix. See the [acknowledgement review](evidence/topology-acknowled
 for the tested scope and bounded-map compatibility implications. Any future
 agent interface must define its own action outcome and state-observation
 semantics rather than inferring atomicity from this boolean.
+
+For `TOROIDAL_TELEPORT_RESOLUTION` peers, a toroidal server sends the existing
+`QuestionResolved` packet after completing the teleport activity callback.
+The client correlates it with both the answer acknowledgement and the actual
+hero movement. This is a negotiated behavioral guarantee, not a new packet
+layout or a save-format version. Older framed peers remain eligible for
+toroidal connections; a new client talking to one falls back to stopping a
+route when an acknowledgement precedes teleportation. Bounded games do not
+receive this additional resolution. See the [test evidence](evidence/topology-acknowledgement-review-2026-11-14.md#resuming-a-deferred-teleport-route) for the covered and unverified cases.

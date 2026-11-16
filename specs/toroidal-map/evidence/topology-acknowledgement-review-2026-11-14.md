@@ -177,14 +177,13 @@ An unrelated response could therefore release the wait early, and a rejected
 teleport answer was treated as if it had succeeded. These are code-level
 risks; neither was previously reproduced as a natural gameplay failure.
 
-The controller now records the expected teleport question and its sent
-request ID. Only the matching acknowledgement clears the wait. An accepted
-answer continues the existing route only if the server has already sent a
-teleportation movement for that hero; otherwise automatic movement stops.
-A rejection also stops it without undoing server-applied effects. Unrelated, stale and duplicate
-acknowledgements do not release it. This applies to bounded and toroidal maps.
-It does not automatically retry the answer or resolve an activity that the
-server has kept open.
+The controller records the teleport question and sent request ID. Unrelated,
+stale and duplicate acknowledgements do not release the wait. A rejected
+answer stops the route without undoing server-applied effects. For the current
+toroidal protocol, an accepted answer also waits for the matching resolution
+and continues only if teleportation of that hero was observed. Bounded maps
+and older negotiated peers use the conservative fallback described below.
+The controller does not retry an answer or resolve an activity that stays open.
 
 On macOS arm64, the client, server and test binary built from `b96c4bc` with
 the client change later committed as `e26c744`. Seventeen focused
@@ -262,7 +261,7 @@ only finishing the covering activity moves the hero to the paired gate.
 This establishes the server ordering in a staged test, not that it occurs
 naturally during a normal game.
 
-Client change `fff0f3b` prevents the acknowledged answer alone from
+Earlier client change `fff0f3b` prevents the acknowledged answer alone from
 continuing a route. It tracks the actual `TryMoveHero::TELEPORTATION` for the
 same hero. When acknowledgement arrives first, it stops automatic movement
 instead of issuing the next step prematurely; a later server teleport still
@@ -283,3 +282,31 @@ four-second observation. Logs and observations are under
 removed and the ordinary client, server and tests rebuilt; its marker is
 absent from both resulting binaries. Remote timing and naturally occurring
 buried portal activities remain unverified.
+
+## Resuming a deferred teleport route
+
+The current toroidal protocol sends `QuestionResolved` after the teleport
+activity's completion callback, including when it produces no movement. The
+client waits for both the matching accepted answer and resolution, in either
+order, and resumes only after observing the hero's teleportation. With an
+older negotiated peer, it retains the conservative stop-on-early-ack fallback.
+Bounded maps do not receive the new server notification. The protocol version
+marks this semantic guarantee; the save format and packet structure do not
+change.
+
+The server activity test confirms the deferred ordering. On macOS arm64, an
+ordinary graphical portal route reached `(7,4,0)` with movement `1560 → 1360`.
+In a second graphical run, temporary server instrumentation held the teleport
+activity under a synthetic blocker for one second after acceptance. The client
+sent no next movement while waiting and continued to `(7,4,0)` after the
+teleport and resolution. Instrumentation was removed and the binaries rebuilt.
+Logs are in `runtime/teleport-resolution-normal-2026-11-16/` and
+`runtime/teleport-resolution-buried-2026-11-16/` on TB5. This is not proof of
+a naturally occurring overlapping activity or remote-network timing.
+
+Fifty-two focused movement, gate, AI dialog, connection and save tests passed;
+three optional external-server cases were skipped in that run. Separately,
+two current test listeners connected to the real previous framed server
+`6bf2051`, negotiated its version, selected a toroidal map and exchanged a
+chat message. That covers the lobby only, not mixed-version gameplay. The
+isolated logs are in `runtime/teleport-protocol-old-server-qa2-2026-11-16/`.
