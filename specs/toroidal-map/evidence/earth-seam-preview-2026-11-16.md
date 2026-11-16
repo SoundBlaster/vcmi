@@ -50,3 +50,17 @@ the seam west with movement points `1560 → 1485`. The observation is
 test clients were force-stopped. Neither launch checks Finder double-click,
 clean shutdown, animation continuity or a complete game. The previous
 menu-based launcher text is retained beside the local launcher for rollback.
+
+The client was subsequently rebuilt from clean commit `7c42081`. The two
+CLI test methods passed again, and a fresh isolated graphical preview started
+red as human on the toroidal map. A west command moved the hero from
+`(0,425,0)` to `(251,425,0)`, with movement points `1500 → 1425`.
+Observation: `runtime/earth-quickstart-qa-2026-11-16/head-observe.jsonl` on
+TB5. This client was force-stopped after the check.
+
+An additional exploratory profile placed `headless`, `onlyai`, `spectate` and
+`donotstartserver` under `session` in its ordinary settings file. A control
+launch without preview did not load those inserted values: its logged
+`onlyai` and `donotstartserver` values were false and a GUI was created.
+Therefore the experiment does not demonstrate a persisted-session defect;
+an attempted defensive change was removed before the clean build above.
