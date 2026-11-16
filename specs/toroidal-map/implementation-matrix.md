@@ -338,7 +338,9 @@ unassisted route and visual acceptance remain open. An
 identified a misplaced whirlpool, which the preparation recipe moved from
 partly snowy terrain onto water. The initialized engine and server checked
 all six exits, and a second unseeded AI run used two of them and continued
-to day 29. That run also reported AI subgoal failures and replanning; their
+to day 29. A [fixed-seed repeat](evidence/earth-autonomous-whirlpool-2026-11-16.md#fixed-seed-longer-run)
+reached day 45 and crossed the horizontal seam in both directions. Both runs
+also reported AI subgoal failures and replanning; their
 causes have not been established. These partial games do not establish full
 AI support or visual acceptance.
 

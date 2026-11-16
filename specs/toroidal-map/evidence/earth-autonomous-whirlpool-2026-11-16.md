@@ -106,3 +106,23 @@ create a command socket: its path was directly under shared `/tmp`, whereas
 the channel requires a user-owned private parent directory. The second run
 used a private temporary directory and completed. This was a test setup error,
 not evidence of a game failure or a macOS permissions prompt.
+
+## Fixed-seed longer run
+
+On the same repaired map, an isolated macOS arm64 run used
+`vcmiclient --headless --testmap Maps/toroid-earth-demo.vmap --testseed 12345 --disable-video`.
+The log confirms the requested seed. All eight slots used AI; no fog reveal
+or forced wins were injected. After 110 seconds the run was stopped during
+teal's turn on day 45. It did not reach a recorded victory or defeat.
+
+The server trace recorded three successful ordinary horizontal seam steps,
+including both directions, by hero ID 7319, and a successful whirlpool
+teleport from hero anchor `(204,231,0)` to `(5,265,0)`. There were no server
+`ERROR` log lines, no `Movement request for hero` failures and no
+`Cannot disembark hero, tile is blocked!` messages in stdout. The AI did log
+21 subgoal errors: 13 lost-hero reports, three repeated idle interactions,
+and five reachability reports; the trace does not establish their causes.
+The game continued past these messages. Logs are under
+`runtime/earth-seeded-2026-11-16-12345/` on TB5. A seed fixes the initial
+random generator state; this single partial run does not prove every
+subsequent concurrent choice is reproducible or that the game can finish.
