@@ -51,6 +51,15 @@ Logs are under `runtime/earth-autonomous-whirlpool-repair-2026-11-16/` on TB5.
 This is one random partial game, not a complete playthrough or evidence of
 visual animation continuity.
 
+The server trace also records two ordinary successful (`TryMoveHero::SUCCESS`)
+diagonal westward seam steps by the same AI hero, with hero anchors
+`(1,353,0) → (252,354,0)` and `(1,260,0) → (252,259,0)`; the matching
+movement packets were delivered to the client. Hero anchors use the game's
+offset from visitable positions, so an anchor x of 252 is consistent with a
+visitable x of 251 on this 252-wide map. These are two naturally selected
+steps in this run, not coverage of both directions, the vertical seam or
+corners in an unassisted game.
+
 The same stdout also reports AI subgoal failures followed by replanning,
 including four `Repeated interaction did not move the hero` messages for
 hero-exchange tasks near towns, as well as lost-hero and unreachable-target
