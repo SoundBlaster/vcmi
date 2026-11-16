@@ -205,3 +205,31 @@ route after a rejection or recovery from an open dialog. Logs and observation
 streams are under `runtime/teleport-answer-{gui,reject-gui}-2026-11-16/`
 on TB5. The temporary injection was removed and client and server rebuilt;
 its marker is absent from both resulting binaries.
+
+## Route continuing past a portal
+
+On 2026-11-16, a separate 36×36 toroidal fixture was derived from the local
+`toroid-demo-clean-2026-11-15.vmap`: the red hero was staged at `(0,3,0)`,
+the nearby resource removed, and two same-channel monoliths added with
+entrances `(0,2,0)` and `(7,3,0)`. The selected destination `(7,4,0)` was
+visible and required a step after the portal. The generated local VMAP has
+SHA-256 `8e505853477a3e47ef8dd87b2860a63273c911538aeb6530008ba215d7e269b1`.
+It and the logs are under `runtime/teleport-long-route-fixture-2026-11-16/`
+on TB5; it is a staged test map, not a balanced scenario.
+
+With client/server implementation `e26c744`, two diagnostic GUI clicks on
+the destination produced an actual route. The server trace records movement
+to the first entrance, an accepted `QuestionAnswer`, teleport to the second
+entrance and a subsequent normal step to `(7,4,0)`. Movement points changed
+`1560 → 1360`. This confirms normal continuation after the matching answer.
+
+The same route was repeated in a separate profile with the temporary
+server-only injection rejecting the teleport `QuestionAnswer` before
+applying it. The hero stopped at `(0,2,0)` with 1,460 points; during the next
+five seconds the client sent no further `MoveHero` or `QuestionAnswer`
+requests. The server-side teleport activity stayed open. Logs and observation
+are under `runtime/teleport-long-route-reject-2026-11-16/` on TB5. This checks
+an injected rejection in one GUI route; it does not reproduce a natural
+rejection, prove recovery of the pending dialog or test remote-network timing.
+The injection was removed and the ordinary client, server and tests rebuilt;
+the injection marker is absent from the resulting client and server.
