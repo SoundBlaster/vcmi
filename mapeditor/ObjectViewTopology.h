@@ -10,6 +10,13 @@
 
 namespace ObjectViewTopology
 {
+/// Resolve a clipboard placement on the map. Bounded maps retain their old
+/// behavior of leaving an out-of-bounds paste at its original position.
+inline int3 clipboardPosition(const MapTopology & topology, const int3 & position, const int3 & shift)
+{
+	return topology.canonicalize(position + shift).value_or(position);
+}
+
 /// Starts of periodic copies that intersect the canonical half-open axis.
 inline std::vector<int> visibleStarts(int start, int length, int extent)
 {

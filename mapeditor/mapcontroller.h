@@ -72,11 +72,11 @@ public:
 	
 	bool discardObject(int level) const;
 	void createObject(int level, std::shared_ptr<CGObjectInstance> obj) const;
-	bool canPlaceObject(const CGObjectInstance * obj, QString & error) const;
+	bool canPlaceObject(const CGObjectInstance * obj, QString & error, std::optional<int3> destination = std::nullopt) const;
 	bool canPlaceGrail(const CGObjectInstance * grailObj, QString & error) const;
 	bool canPlaceHero(const CGObjectInstance * heroObj, QString & error) const;
 	/// Hero can not be placed into main town of a player that has hero generated in main town on game start
-	bool canPlaceHeroAtPosition(const CGObjectInstance * heroObj, QString & error) const;
+	bool canPlaceHeroAtPosition(const CGObjectInstance * heroObj, QString & error, std::optional<int3> destination = std::nullopt) const;
 	
 	/// Ensures that the object's mod is listed in the map's required mods.
 	/// If the mod is missing, prompts the user to add it. Returns false if the user declines,

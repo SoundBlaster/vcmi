@@ -14,6 +14,15 @@
 #include "../../mapeditor/TerrainViewTopology.h"
 #include "../../mapeditor/ObjectViewTopology.h"
 
+TEST(MapTopology, EditorClipboardPlacementWrapsBothAxesAndPreservesBoundedFallback)
+{
+	const MapTopology torus(7, 5, 2, true), bounded(7, 5, 2, false);
+	EXPECT_EQ(ObjectViewTopology::clipboardPosition(torus, {6, 4, 1}, {1, 1, 0}), int3(0, 0, 1));
+	EXPECT_EQ(ObjectViewTopology::clipboardPosition(torus, {0, 0, 0}, {-1, -1, 0}), int3(6, 4, 0));
+	EXPECT_EQ(ObjectViewTopology::clipboardPosition(bounded, {6, 4, 1}, {1, 1, 0}), int3(6, 4, 1));
+	EXPECT_EQ(ObjectViewTopology::clipboardPosition(bounded, {2, 2, 0}, {1, -1, 0}), int3(3, 1, 0));
+}
+
 TEST(MapTopology, EditorObjectCopiesCoverTheCanonicalAxis)
 {
 	for(int extent = 3; extent <= 9; ++extent)

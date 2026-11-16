@@ -657,9 +657,16 @@ void MapView::dropEvent(QDropEvent * event)
 #endif
 
 		QString errorMsg;
-		if(controller->canPlaceObject(sc->selectionObjectsView.newObject.get(), errorMsg))
+		auto obj = sc->selectionObjectsView.newObject;
+		const auto shift = sc->selectionObjectsView.shift;
+		int3 destination = obj->pos;
+		destination.z = sc->level;
+		destination.x += shift.x();
+		destination.y += shift.y();
+		if(controller->map()->toroidal)
+			destination = controller->map()->getTopology().canonicalize(destination).value_or(destination);
+		if(controller->canPlaceObject(obj.get(), errorMsg, destination))
 		{
-			auto obj = sc->selectionObjectsView.newObject;
 			controller->commitObjectCreate(sc->level);
 			openObjectProperties(obj.get(), false);
 		}

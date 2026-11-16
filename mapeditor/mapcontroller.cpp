@@ -10,6 +10,7 @@
 
 #include "StdInc.h"
 #include "mapcontroller.h"
+#include "ObjectViewTopology.h"
 
 #include "../lib/GameConstants.h"
 #include "../lib/entities/artifact/CArtifact.h"
@@ -426,17 +427,15 @@ void MapController::pasteFromClipboard(int level)
 	for(auto & objUniquePtr : _clipboard)
 	{
 		auto obj = CMemorySerializer::deepCopyShared(*objUniquePtr, _cb.get());
+		int3 original = objUniquePtr->pos;
+		original.z = level;
+		obj->pos = ObjectViewTopology::clipboardPosition(_map->getTopology(), original, shift);
 		QString errorMsg;
 		if(!canPlaceObject(obj.get(), errorMsg))
 		{
 			errors.push_back(std::move(errorMsg));
 			continue;
 		}
-		auto newPos = objUniquePtr->pos + shift;
-		if(_map->isInTheMap(newPos))
-			obj->pos = newPos;
-		obj->pos.z = level;
-
 		obj->id = {};
 		Initializer init(*this, obj.get(), defaultPlayer);
 		_map->getEditManager()->insertObject(obj);
@@ -609,12 +608,12 @@ void MapController::commitObjectCreate(int level)
 	main->mapChanged();
 }
 
-bool MapController::canPlaceObject(const CGObjectInstance * newObj, QString & error) const
+bool MapController::canPlaceObject(const CGObjectInstance * newObj, QString & error, std::optional<int3> destination) const
 {	
 	if(newObj->ID == Obj::GRAIL) //special case for grail
 		return canPlaceGrail(newObj, error);
 
-	if((newObj->ID == Obj::HERO || newObj->ID == Obj::RANDOM_HERO) && !canPlaceHeroAtPosition(newObj, error))
+	if((newObj->ID == Obj::HERO || newObj->ID == Obj::RANDOM_HERO) && !canPlaceHeroAtPosition(newObj, error, destination))
 		return false;
 	
 	if(defaultPlayer == PlayerColor::NEUTRAL && (newObj->ID == Obj::HERO || newObj->ID == Obj::RANDOM_HERO))
@@ -661,12 +660,14 @@ bool MapController::canPlaceHero(const CGObjectInstance * heroObj, QString & err
 	return false;
 }
 
-bool MapController::canPlaceHeroAtPosition(const CGObjectInstance * heroObj, QString & error) const
+bool MapController::canPlaceHeroAtPosition(const CGObjectInstance * heroObj, QString & error, std::optional<int3> destination) const
 {
+	const auto rawVisitable = destination ? *destination - heroObj->getVisitableOffset() : heroObj->visitablePos();
+	const auto heroVisitable = _map->getTopology().canonicalize(rawVisitable).value_or(rawVisitable);
 	for(const auto & townID : _map->getAllTowns())
 	{
 		const auto * town = _map->getObject(townID);
-		if(town->visitablePos() != heroObj->visitablePos() || !town->getOwner().isValidPlayer())
+		if(town->visitablePos() != heroVisitable || !town->getOwner().isValidPlayer())
 			continue;
 
 		const auto & playerInfo = _map->players.at(town->getOwner().getNum());
