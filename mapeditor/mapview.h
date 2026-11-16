@@ -132,8 +132,10 @@ private:
 	int3 tileStart;
 	int3 tilePrev;
 	bool pressedOnSelected;
+	bool updatingViewport = false;
 	
 	std::set<int3> temporaryTiles;
+	std::set<int3> lassoOutline;
 };
 
 #ifdef ENABLE_SINGLE_APP_BUILD

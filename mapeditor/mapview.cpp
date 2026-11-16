@@ -18,6 +18,15 @@
 #include "../lib/mapObjectConstructors/CObjectClassesHandler.h"
 #include "../lib/mapping/CMap.h"
 #include "../lib/GameLibrary.h"
+#include <QScopedValueRollback>
+
+namespace
+{
+int sceneTileCoordinate(qreal coordinate, bool toroidal)
+{
+	return TerrainViewTopology::sceneTileCoordinate(coordinate, toroidal, 32);
+}
+}
 
 
 MinimapView::MinimapView(QWidget * parent):
@@ -104,10 +113,12 @@ void MapView::resetInteractionState()
 	tilePrev = int3{};
 	pressedOnSelected = false;
 	temporaryTiles.clear();
+	lassoOutline.clear();
 }
 
 void MapView::resizeEvent(QResizeEvent * event)
 {
+	QGraphicsView::resizeEvent(event);
 	setViewports();
 }
 
@@ -120,7 +131,7 @@ void MapView::mouseMoveEvent(QMouseEvent *mouseEvent)
 		return;
 
 	auto pos = mapToScene(mouseEvent->pos()); //TODO: do we need to check size?
-	int3 tile(pos.x() / 32, pos.y() / 32, sc->level);
+	int3 tile(sceneTileCoordinate(pos.x(), controller->map()->toroidal), sceneTileCoordinate(pos.y(), controller->map()->toroidal), sc->level);
 	
 	//if scene will be scrolled without mouse movement, selection, object moving and rubber band will not be updated
 	//to change this behavior, all this logic should be placed in viewportEvent
@@ -130,7 +141,11 @@ void MapView::mouseMoveEvent(QMouseEvent *mouseEvent)
 	if(tile == tilePrev) //do not redraw
 		return;
 
-	currentCoordinates(tile.x, tile.y);
+	const auto canonical = controller->map()->getTopology().canonicalize(tile);
+	if(canonical)
+		currentCoordinates(canonical->x, canonical->y);
+	else
+		currentCoordinates(tile.x, tile.y);
 
 	switch(selectionTool)
 	{
@@ -218,11 +233,12 @@ void MapView::mouseMoveEvent(QMouseEvent *mouseEvent)
 				std::vector<int3>selectedTiles;
 				for(auto ts = tileStart; ts.dist2d(tileStart) < edge; ts += dir)
 				{
-					if(!controller->map()->isInTheMap(ts))
+					const auto position = controller->map()->getTopology().canonicalize(ts);
+					if(!position)
 						break;
-					if(!sc->selectionTerrainView.selection().count(ts))
-						temporaryTiles.insert(ts);
-					selectedTiles.push_back(ts);
+					if(!sc->selectionTerrainView.selection().count(*position))
+						temporaryTiles.insert(*position);
+					selectedTiles.push_back(*position);
 				}
 				sc->selectionTerrainView.select(selectedTiles);
 			}
@@ -234,11 +250,12 @@ void MapView::mouseMoveEvent(QMouseEvent *mouseEvent)
 				std::vector<int3>erasedTiles;
 				for(auto ts = tileStart; ts.dist2d(tileStart) < edge; ts += dir)
 				{
-					if(!controller->map()->isInTheMap(ts))
+					const auto position = controller->map()->getTopology().canonicalize(ts);
+					if(!position)
 						break;
-					if(sc->selectionTerrainView.selection().count(ts))
-						temporaryTiles.insert(ts);
-					erasedTiles.push_back(ts);
+					if(sc->selectionTerrainView.selection().count(*position))
+						temporaryTiles.insert(*position);
+					erasedTiles.push_back(*position);
 				}
 				sc->selectionTerrainView.erase(erasedTiles);
 			}
@@ -265,6 +282,7 @@ void MapView::mouseMoveEvent(QMouseEvent *mouseEvent)
 				}
 				i += dir;
 				tiles.push_back(i);
+				lassoOutline.insert(i);
 			}
 			sc->selectionTerrainView.select(tiles);
 		}
@@ -307,9 +325,10 @@ void MapView::mousePressEvent(QMouseEvent *event)
 		return;
 
 	mouseStart = mapToScene(event->pos());
-	tileStart = tilePrev = int3(mouseStart.x() / 32, mouseStart.y() / 32, sc->level);
+	tileStart = tilePrev = int3(sceneTileCoordinate(mouseStart.x(), controller->map()->toroidal), sceneTileCoordinate(mouseStart.y(), controller->map()->toroidal), sc->level);
+	const auto canonicalStart = controller->map()->getTopology().canonicalize(tileStart);
 
-	if(sc->selectionTerrainView.selection().count(tileStart))
+	if(canonicalStart && sc->selectionTerrainView.selection().count(*canonicalStart))
 		pressedOnSelected = true;
 	else
 		pressedOnSelected = false;
@@ -355,6 +374,11 @@ void MapView::mousePressEvent(QMouseEvent *event)
 
 		sc->selectionTerrainView.clear();
 		sc->selectionObjectsView.clear();
+		if(selectionTool == MapView::SelectionTool::Lasso)
+		{
+			lassoOutline.clear();
+			lassoOutline.insert(tileStart);
+		}
 		break;
 
 	case MapView::SelectionTool::Fill:
@@ -362,7 +386,9 @@ void MapView::mousePressEvent(QMouseEvent *event)
 		if(event->button() != Qt::RightButton && event->button() != Qt::LeftButton)
 			break;
 
-		const auto tilesToFill = TerrainViewTopology::floodSelection(controller->map()->getTopology(), tileStart,
+		if(!canonicalStart)
+			break;
+		const auto tilesToFill = TerrainViewTopology::floodSelection(controller->map()->getTopology(), *canonicalStart,
 			[&](const int3 & tile, const int3 & tilen)
 			{
 				if(event->button() == Qt::LeftButton)
@@ -470,7 +496,7 @@ void MapView::mouseReleaseEvent(QMouseEvent *event)
 		if(event->button() == Qt::LeftButton)
 		{
 			mouseStart = mapToScene(event->pos());
-			tileStart = tilePrev = int3(mouseStart.x() / 32, mouseStart.y() / 32, sc->level);
+			tileStart = tilePrev = int3(sceneTileCoordinate(mouseStart.x(), controller->map()->toroidal), sceneTileCoordinate(mouseStart.y(), controller->map()->toroidal), sc->level);
 			if(auto * pickedObject = sc->selectionObjectsView.selectObjectAt(tileStart.x, tileStart.y))
 				sc->objectPickerView.select(pickedObject);
 		}
@@ -499,6 +525,7 @@ void MapView::mouseReleaseEvent(QMouseEvent *event)
 			}
 			i += dir;
 			initialTiles.push_back(i);
+			lassoOutline.insert(i);
 		}
 		sc->selectionTerrainView.select(initialTiles);
 
@@ -507,7 +534,8 @@ void MapView::mouseReleaseEvent(QMouseEvent *event)
 		//value.second: x postiion of right tile
 		std::map<int, std::pair<int, int>> selectionRangeMapX;
 		std::map<int, std::pair<int, int>> selectionRangeMapY;
-		for(auto & t : sc->selectionTerrainView.selection())
+		const auto & outline = controller->map()->toroidal ? lassoOutline : sc->selectionTerrainView.selection();
+		for(auto & t : outline)
 		{
 			auto pairIter = selectionRangeMapX.find(t.y);
 			if(pairIter == selectionRangeMapX.end())
@@ -543,6 +571,7 @@ void MapView::mouseReleaseEvent(QMouseEvent *event)
 		}
 		std::set_intersection(selectionByX.begin(), selectionByX.end(), selectionByY.begin(), selectionByY.end(), std::back_inserter(finalSelection));
 		sc->selectionTerrainView.select(finalSelection);
+		lassoOutline.clear();
 
 		break;
 	}
@@ -651,7 +680,10 @@ void MapView::moveNewObjectTo(const QPoint & viewportPos)
 		return;
 
 	auto pos = mapToScene(viewportPos);
-	int3 tile(pos.x() / 32 + 1, pos.y() / 32 + 1, sc->level);
+	int3 tile(sceneTileCoordinate(pos.x(), controller->map()->toroidal) + 1, sceneTileCoordinate(pos.y(), controller->map()->toroidal) + 1, sc->level);
+	if(controller->map()->toroidal)
+		if(const auto canonical = controller->map()->getTopology().canonicalize(tile))
+			tile = *canonical;
 
 	sc->selectionObjectsView.selectionMode = SelectionObjectsLayer::MOVEMENT;
 	sc->selectionObjectsView.selectObject(sc->selectionObjectsView.newObject.get());
@@ -682,10 +714,59 @@ void MapView::dragLeaveEvent(QDragLeaveEvent * event)
 
 void MapView::setViewports()
 {
+	if(updatingViewport || !controller || !controller->map())
+		return;
+	QScopedValueRollback guard(updatingViewport, true);
 	if(auto * sc = dynamic_cast<MapScene*>(scene()))
 	{
-		auto rect = mapToScene(viewport()->geometry()).boundingRect();
-		controller->miniScene(sc->level)->viewport.setViewport(rect.x() / 32, rect.y() / 32, rect.width() / 32, rect.height() / 32);
+		const auto * map = controller->map();
+		const int width = map->width * 32;
+		const int height = map->height * 32;
+		if(map->toroidal)
+		{
+			const auto visibleScene = mapToScene(viewport()->rect()).boundingRect();
+			const int paddingX = static_cast<int>(std::ceil(visibleScene.width())) + width;
+			const int paddingY = static_cast<int>(std::ceil(visibleScene.height())) + height;
+			const QRectF desired(-paddingX, -paddingY, width + 2 * paddingX, height + 2 * paddingY);
+			if(sceneRect() != desired)
+				setSceneRect(desired);
+			const QPointF center = mapToScene(viewport()->rect().center());
+			const QPointF canonical(TerrainViewTopology::wrapSceneCoordinate(center.x(), width),
+			                        TerrainViewTopology::wrapSceneCoordinate(center.y(), height));
+			const QPointF shift = canonical - center;
+			if(!shift.isNull())
+			{
+				centerOn(canonical);
+				mouseStart += shift;
+				const int dx = static_cast<int>(std::round(shift.x() / 32));
+				const int dy = static_cast<int>(std::round(shift.y() / 32));
+				tileStart.x += dx;
+				tileStart.y += dy;
+				tilePrev.x += dx;
+				tilePrev.y += dy;
+				std::set<int3> shiftedOutline;
+				for(const auto & tile : lassoOutline)
+					shiftedOutline.insert(tile + int3(dx, dy, 0));
+				lassoOutline.swap(shiftedOutline);
+			}
+		}
+		else
+		{
+			const QRectF desired(0, 0, width, height);
+			if(sceneRect() != desired)
+				setSceneRect(desired);
+		}
+		auto rect = mapToScene(viewport()->rect()).boundingRect();
+		if(map->toroidal)
+		{
+			const int left = static_cast<int>(std::floor(rect.left() / 32));
+			const int top = static_cast<int>(std::floor(rect.top() / 32));
+			const int right = static_cast<int>(std::ceil(rect.right() / 32));
+			const int bottom = static_cast<int>(std::ceil(rect.bottom() / 32));
+			controller->miniScene(sc->level)->viewport.setViewport(left, top, right - left, bottom - top);
+		}
+		else
+			controller->miniScene(sc->level)->viewport.setViewport(rect.x() / 32, rect.y() / 32, rect.width() / 32, rect.height() / 32);
 		for (auto * layer : sc->getDynamicLayers())
 		{
 			layer->setViewport(rect);

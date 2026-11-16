@@ -9,10 +9,25 @@
 #include "../lib/mapping/MapTopology.h"
 
 #include <array>
+#include <cmath>
 #include <set>
 
 namespace TerrainViewTopology
 {
+inline double wrapSceneCoordinate(double coordinate, int period)
+{
+	assert(period > 0);
+	const double result = std::fmod(coordinate, static_cast<double>(period));
+	return result < 0 ? result + period : result;
+}
+
+inline int sceneTileCoordinate(double coordinate, bool toroidal, int tileSize)
+{
+	assert(tileSize > 0);
+	const double tile = coordinate / tileSize;
+	return toroidal ? static_cast<int>(std::floor(tile)) : static_cast<int>(tile);
+}
+
 struct TileRectangle
 {
 	int x;
@@ -73,11 +88,11 @@ inline std::optional<int3> roadSourceAbove(const MapTopology & topology, const i
 	return topology.canonicalize(tile + int3(0, -1, 0));
 }
 
-/// Map a square brush to physical tiles; toroidal callers reject an outside pointer.
+/// Map a square brush on any displayed copy to physical tiles.
 inline std::vector<int3> brushSelection(const MapTopology & topology, const int3 & center, int firstOffset, int size, bool toroidal)
 {
 	const auto canonicalCenter = topology.canonicalize(center);
-	if(size <= 0 || (toroidal && (!canonicalCenter || *canonicalCenter != center)))
+	if(size <= 0 || (toroidal && !canonicalCenter))
 		return {};
 	std::set<int3> tiles;
 	for(int dx = firstOffset; dx < firstOffset + size; ++dx)

@@ -69,6 +69,17 @@ TEST(MapTopology, EditorRoadAndRedrawCrossToroidalSeams)
 	}
 }
 
+TEST(MapTopology, EditorCameraAndPointerCoordinatesWrapAtSubtileBoundaries)
+{
+	EXPECT_DOUBLE_EQ(TerrainViewTopology::wrapSceneCoordinate(-0.25, 224), 223.75);
+	EXPECT_DOUBLE_EQ(TerrainViewTopology::wrapSceneCoordinate(224.25, 224), 0.25);
+	EXPECT_DOUBLE_EQ(TerrainViewTopology::wrapSceneCoordinate(-448.5, 224), 223.5);
+	EXPECT_EQ(TerrainViewTopology::sceneTileCoordinate(-0.25, true, 32), -1);
+	EXPECT_EQ(TerrainViewTopology::sceneTileCoordinate(-32.25, true, 32), -2);
+	EXPECT_EQ(TerrainViewTopology::sceneTileCoordinate(-0.25, false, 32), 0);
+	EXPECT_EQ(TerrainViewTopology::sceneTileCoordinate(32.25, true, 32), 1);
+}
+
 TEST(MapTopology, EditorRepeatedSectionsCoverDisplayedAndCanonicalCoordinates)
 {
 	const MapTopology topology(7, 5, 1, true);
@@ -141,7 +152,7 @@ TEST(MapTopology, EditorSquareBrushWrapsOnlyOnToroidalMaps)
 			}
 	const MapTopology small(3, 3, 1, true), bounded(7, 5, 1, false);
 	EXPECT_EQ(TerrainViewTopology::brushSelection(small, {0, 0, 0}, -1, 4, true).size(), 9u);
-	EXPECT_TRUE(TerrainViewTopology::brushSelection(small, {-1, 0, 0}, -1, 4, true).empty());
+	EXPECT_EQ(TerrainViewTopology::brushSelection(small, {-1, 0, 0}, -1, 4, true).size(), 9u);
 	EXPECT_TRUE(TerrainViewTopology::brushSelection(small, {0, 0, 1}, -1, 4, true).empty());
 	// Bounded brushes retain their prior behavior when their pointer is just outside.
 	const auto outside = TerrainViewTopology::brushSelection(bounded, {-1, 0, 0}, -1, 4, false);

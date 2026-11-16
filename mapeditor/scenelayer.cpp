@@ -20,6 +20,11 @@
 #include "mapview.h"
 #include "mapcontroller.h"
 
+namespace
+{
+constexpr int canonicalSectionRole = 0x56434d49;
+}
+
 AbstractLayer::AbstractLayer(MapSceneBase * s): scene(s)
 {
 }
@@ -89,6 +94,39 @@ void AbstractViewportLayer::setViewport(const QRectF & viewPort)
 {
 	if(!map)
 		return;
+	if(map->toroidal)
+	{
+		// Align to the displayed sector grid so ordinary scrolling within a
+		// sector does not recreate its pixmap on every pixel.
+		const int left = static_cast<int>(std::floor(viewPort.left() / sectorSize)) * sectorSize;
+		const int top = static_cast<int>(std::floor(viewPort.top() / sectorSize)) * sectorSize;
+		const int right = static_cast<int>(std::ceil(viewPort.right() / sectorSize)) * sectorSize;
+		const int bottom = static_cast<int>(std::ceil(viewPort.bottom() / sectorSize)) * sectorSize;
+		std::vector<QRectF> required;
+		for(int y = top; y < bottom; y += sectorSize)
+			for(int x = left; x < right; x += sectorSize)
+				for(const auto & part : TerrainViewTopology::repeatedSections(x, y, sectorSize, sectorSize, mapWidthPx(), mapHeightPx()))
+				{
+					const QRectF displayed(part.displayedX, part.displayedY, part.width, part.height);
+					const QRectF canonical(part.canonicalX, part.canonicalY, part.width, part.height);
+					required.push_back(displayed);
+					const auto sectors = getAllSectors();
+					if(std::any_of(sectors.begin(), sectors.end(), [&](const QGraphicsItem * item)
+						{ return item->sceneBoundingRect() == displayed && item->data(canonicalSectionRole).toRectF() == canonical; }))
+						continue;
+					if(auto * item = draw(canonical))
+					{
+						item->setPos(displayed.topLeft());
+						item->setData(canonicalSectionRole, canonical);
+						addSector(item);
+					}
+				}
+		const auto sectors = getAllSectors();
+		for(auto * item : sectors)
+			if(std::find(required.begin(), required.end(), item->sceneBoundingRect()) == required.end())
+				removeSector(item);
+		return;
+	}
 	if (items->boundingRect().contains(viewPort))
 		return;
 
@@ -200,7 +238,9 @@ void AbstractViewportLayer::redraw(const std::vector<QRectF> & areas)
 	{
 		for (auto area : areas)
 		{
-			if (existingSector->sceneBoundingRect().intersects(area))
+			const QRectF section = existingSector->data(canonicalSectionRole).isValid()
+				? existingSector->data(canonicalSectionRole).toRectF() : existingSector->sceneBoundingRect();
+			if (section.intersects(area))
 			{
 				intersectingSectors.insert(existingSector);
 			}
@@ -256,7 +296,19 @@ void AbstractViewportLayer::redrawSectors(std::set<QGraphicsItem *> & sectors)
 	}
 	for (QGraphicsItem * sectorToRemove : sectorsToRemove)
 	{
-		addSector(draw(sectorToRemove->sceneBoundingRect()));
+		const auto data = sectorToRemove->data(canonicalSectionRole);
+		const auto displayed = sectorToRemove->sceneBoundingRect();
+		const auto canonical = data.isValid() ? data.toRectF() : displayed;
+		auto * replacement = draw(canonical);
+		if(replacement)
+		{
+			if(data.isValid())
+			{
+				replacement->setPos(displayed.topLeft());
+				replacement->setData(canonicalSectionRole, data);
+			}
+			addSector(replacement);
+		}
 		removeSector(sectorToRemove);
 	}
 }
@@ -273,7 +325,9 @@ std::set<QGraphicsItem *> AbstractViewportLayer::getContainingSectors(const std:
 	for (QGraphicsItem * existingSector : getAllSectors()) {
 		for (const int3 tile : tiles)
 		{
-			if (existingSector->sceneBoundingRect().contains(QPointF(tile.x * tileSize, tile.y * tileSize)))
+			const auto data = existingSector->data(canonicalSectionRole);
+			const auto area = data.isValid() ? data.toRectF() : existingSector->sceneBoundingRect();
+			if (area.contains(QPointF(tile.x * tileSize, tile.y * tileSize)))
 			{
 				result.insert(existingSector);
 				break;
@@ -488,25 +542,45 @@ QGraphicsItem * SelectionTerrainLayer::draw(const QRectF & section)
 
 void SelectionTerrainLayer::select(const std::vector<int3> & tiles)
 {
+	std::vector<int3> changed;
 	for (int3 tile : tiles)
 	{
+		if(map->toroidal)
+		{
+			const auto canonical = map->getTopology().canonicalize(tile);
+			if(!canonical)
+				continue;
+			tile = *canonical;
+		}
 		if(!area.count(tile) && map->isInTheMap(tile))
+		{
 			area.insert(tile);
+			changed.push_back(tile);
+		}
 	}
-	redraw(tiles);
+	redraw(changed);
 	onSelection();
 }
 
 void SelectionTerrainLayer::erase(const std::vector<int3> & tiles)
 {
+	std::vector<int3> changed;
 	for (int3 tile : tiles)
 	{
+		if(map->toroidal)
+		{
+			const auto canonical = map->getTopology().canonicalize(tile);
+			if(!canonical)
+				continue;
+			tile = *canonical;
+		}
 		if(area.count(tile))
 		{
 			area.erase(tile);
+			changed.push_back(tile);
 		}
 	}
-	redraw(tiles);
+	redraw(changed);
 	onSelection();
 }
 
@@ -672,6 +746,14 @@ QGraphicsItem * SelectionObjectsLayer::draw(const QRectF & section)
 
 CGObjectInstance * SelectionObjectsLayer::selectObjectAt(int x, int y, const CGObjectInstance * ignore) const
 {
+	if(map && map->toroidal)
+	{
+		const auto canonical = map->getTopology().canonicalize({x, y, scene->level});
+		if(!canonical)
+			return nullptr;
+		x = canonical->x;
+		y = canonical->y;
+	}
 	if(!map || !map->isInTheMap(int3(x, y, scene->level)))
 		return nullptr;
 	
@@ -732,9 +814,10 @@ void SelectionObjectsLayer::selectObjects(int x1, int y1, int x2, int y2)
 	{
 		for(int i = x1; i < x2; ++i)
 		{
-			if(map->isInTheMap(int3(i, j, scene->level)))
+			const auto position = map->getTopology().canonicalize({i, j, scene->level});
+			if(position)
 			{
-				for(auto & o : handler->getObjects(i, j, scene->level))
+				for(auto & o : handler->getObjects(position->x, position->y, scene->level))
 					if(!lockedObjects.count(o.obj))
 					{
 						selectedObjects.insert(const_cast<CGObjectInstance*>(o.obj));

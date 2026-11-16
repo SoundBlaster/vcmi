@@ -22,6 +22,7 @@
 #include "../lib/mapObjects/Quest.h"
 #include "../lib/mapping/CMapService.h"
 #include "../lib/mapping/CMap.h"
+#include "../lib/mapping/MapTopology.h"
 #include "../lib/mapping/CMapEditManager.h"
 #include "../lib/mapping/ObstacleProxy.h"
 #include "../lib/modding/CModHandler.h"
@@ -551,6 +552,9 @@ void MapController::commitObjectShift(int level)
 			int3 pos = obj->pos;
 			pos.z = level;
 			pos.x += shift.x(); pos.y += shift.y();
+			if(_map->toroidal)
+				if(const auto canonical = _map->getTopology().canonicalize(pos))
+					pos = *canonical;
 			
 			_map->getEditManager()->moveObject(obj, pos);
 			_mapHandler->invalidate(obj);
@@ -584,6 +588,9 @@ void MapController::commitObjectCreate(int level)
 	int3 pos = newObj->pos;
 	pos.z = level;
 	pos.x += shift.x(); pos.y += shift.y();
+	if(_map->toroidal)
+		if(const auto canonical = _map->getTopology().canonicalize(pos))
+			pos = *canonical;
 	
 	newObj->pos = pos;
 	
