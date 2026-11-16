@@ -14,9 +14,9 @@ spells and teleports can legitimately follow different rules from walking.
 
 The checked VCMI source includes a graphical Template Editor inside the map
 editor. Its open/save dialogs select VCMI `.json` templates. HotA documents a
-separate editor and `.h3t` files. Conversion and availability of a particular
-Jebus Outcast version, including its rules and mod dependencies, have not
-been verified. Importing a diagram or a file is not proof that another engine
+separate editor and `.h3t` files. A local Jebus Outcast 3.01 pack has since
+been inspected; a two-player approximation is being tested, not a faithful
+conversion. Importing a diagram or a file is not proof that another engine
 will generate the same maps or apply identical game rules.
 
 On 2026-11-10 the locally built Template Editor opened the bundled VCMI
@@ -78,3 +78,7 @@ symmetrical two-player ring graph and generation-time zone observation. One
 ordinary generated sample still has unguarded seam transitions between starts
 and treasure zones when converted in memory; the prototype is not yet a
 supported toroidal generator or a balanced playable template.
+
+The [Outcast-inspired pilot](evidence/outcast-inspired-pilot-2026-11-17.md)
+records the local source, an experimental saved-map approach, successful and
+failed route checks, and remaining limits before presenting it for play.
