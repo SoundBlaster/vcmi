@@ -105,6 +105,9 @@ demo preparation reviewable as separate changes where practical.
   of a bounded control were checked. Verify other corner directions, object
   placement and additional multi-tile moves, redo,
   broader bounded behavior and smoothness before closing this task.
+  [Clipboard placement](evidence/editor-clipboard-placement-2026-11-16.md)
+  now canonicalizes toroidal destinations and checks hero placement against
+  the actual target; real copy/paste and drag gestures still need checking.
   [Initial minimap geometry](evidence/editor-minimap-reference-2026-11-16.md)
   and its reference outline are implemented and observed in a corner view.
   [Repeated viewport section geometry](evidence/editor-repeated-sections-2026-11-16.md)
