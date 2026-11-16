@@ -15,6 +15,8 @@
 #include "../../lib/callback/EditorCallback.h"
 #include "../../lib/callback/GameRandomizer.h"
 #include "../../lib/CRandomGenerator.h"
+#include "../../lib/CCreatureHandler.h"
+#include "../../lib/CStack.h"
 #include "../../lib/CPlayerState.h"
 #include "../../lib/GameLibrary.h"
 #include "../../lib/mapObjectConstructors/AObjectTypeHandler.h"
@@ -219,7 +221,7 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	seams.close();
 	ASSERT_TRUE(seams.good());
 	std::cout << "Bidirectional unguarded seam transitions between generated zones: " << candidateCount << std::endl;
-	const auto contacts = rmg::findUnguardedSeamContacts(*map, [&](const int3 & tile)
+	auto contacts = rmg::findUnguardedSeamContacts(*map, [&](const int3 & tile)
 	{
 		return zones[tile.y * map->width + tile.x];
 	});
@@ -241,6 +243,80 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	if(std::getenv("VCMI_RMG_TRY_CLOSURES"))
 	{
 		std::set<int3> protectedCells;
+		std::vector<std::array<int3, 3>> trialGuards;
+		if(std::getenv("VCMI_RMG_TRY_GUARD"))
+		{
+			const int requestedGuards = std::getenv("VCMI_RMG_TRY_TWO_GUARDS") ? 2 : 1;
+			int selectedStart = -1;
+			std::set<int> selectedTreasures;
+			for(int guardIndex = 0; guardIndex < requestedGuards; ++guardIndex)
+			{
+			std::optional<rmg::SeamContact> crossing;
+			std::optional<int3> interior;
+			for(const auto & candidate : contacts)
+			{
+				const bool connectsStartAndTreasure =
+					(candidate.firstZone >= 1 && candidate.firstZone <= 2 && candidate.secondZone >= 3 && candidate.secondZone <= 4)
+					|| (candidate.secondZone >= 1 && candidate.secondZone <= 2 && candidate.firstZone >= 3 && candidate.firstZone <= 4);
+				const int startZone = std::min(candidate.firstZone, candidate.secondZone);
+				const int treasureZone = std::max(candidate.firstZone, candidate.secondZone);
+				const auto & first = map->getTile(candidate.first);
+				const auto & second = map->getTile(candidate.second);
+				if(!connectsStartAndTreasure || (selectedStart != -1 && startZone != selectedStart) || selectedTreasures.contains(treasureZone)
+				   || protectedCells.contains(candidate.first) || protectedCells.contains(candidate.second)
+				   || !candidate.firstToSecond || !candidate.secondToFirst || first.visitable() || second.visitable()
+				   || first.hasRoad() || second.hasRoad())
+					continue;
+				for(const auto & direction : int3::getDirs())
+				{
+					const auto approach = map->getTopology().canonicalize(candidate.first + direction);
+					if(!approach || *approach == candidate.second || zones[approach->y * map->width + approach->x] != candidate.firstZone)
+						continue;
+					const auto & tile = map->getTile(*approach);
+					if(!tile.isLand() || !tile.entrableTerrain() || tile.blocked() || tile.visitable()
+					   || map->guardingCreaturePosition(*approach).isValid())
+						continue;
+					interior = *approach;
+					break;
+				}
+				if(interior)
+				{
+					crossing = candidate;
+					break;
+				}
+			}
+			ASSERT_TRUE(crossing.has_value()) << "No candidate seam crossing with a clear approach";
+			selectedStart = std::min(crossing->firstZone, crossing->secondZone);
+			selectedTreasures.insert(std::max(crossing->firstZone, crossing->secondZone));
+			const CreatureID creature(0);
+			const int value = creature.toEntity(LIBRARY)->getAIValue();
+			ASSERT_GT(value, 0);
+			auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::MONSTER, creature);
+			auto guard = std::dynamic_pointer_cast<CGCreature>(factory->create(map->cb, nullptr));
+			ASSERT_NE(guard, nullptr);
+			guard->initialCharacter = CGCreature::Character::HOSTILE;
+			guard->neverFlees = true;
+			guard->putStack(SlotID(0), std::make_unique<CStackInstance>(map->cb, creature, std::max(1, 12000 / value)));
+			CRandomGenerator guardRandom(12345);
+			rmg::Object object(guard);
+			object.setTemplate(map->getTile(crossing->first).getTerrainID(), guardRandom);
+			object.setPosition(crossing->first);
+			ASSERT_EQ(guard->visitablePos(), crossing->first);
+			map->getEditManager()->insertObject(guard);
+			ASSERT_EQ(map->guardingCreaturePosition(crossing->second), crossing->first);
+			ASSERT_EQ(map->guardingCreaturePosition(*interior), crossing->first);
+			protectedCells.insert(*interior);
+			protectedCells.insert(crossing->second);
+			trialGuards.push_back({crossing->first, *interior, crossing->second});
+			contacts = rmg::findUnguardedSeamContacts(*map, [&](const int3 & tile)
+			{
+				return zones[tile.y * map->width + tile.x];
+			});
+			std::cout << "Experimental guard " << crossing->first.toString() << " protects seam "
+			          << crossing->second.toString() << " and approach " << interior->toString()
+			          << " between zones " << crossing->firstZone << " and " << crossing->secondZone << std::endl;
+			}
+		}
 		for(const auto & contact : contacts)
 			for(const auto & pos : {contact.first, contact.second})
 				if(map->getTile(pos).visitable() || map->getTile(pos).hasRoad())
@@ -279,6 +355,23 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 		ASSERT_NE(closedMap, nullptr);
 		closedCallback.setMap(closedMap.get());
 		ASSERT_TRUE(closedMap->toroidal);
+		for(const auto & trial : trialGuards)
+		{
+			const auto & [guard, approach, opposite] = trial;
+			ASSERT_FALSE(closedMap->getTile(approach).blocked());
+			ASSERT_FALSE(closedMap->getTile(opposite).blocked());
+			EXPECT_EQ(closedMap->guardingCreaturePosition(approach), guard);
+			EXPECT_EQ(closedMap->guardingCreaturePosition(opposite), guard);
+			EXPECT_TRUE(closedMap->canMoveBetween(approach, guard));
+			EXPECT_TRUE(closedMap->canMoveBetween(opposite, guard));
+		}
+		std::ofstream guardFile(std::string(output) + ".guards");
+		ASSERT_TRUE(guardFile.good());
+		for(const auto & [guard, approach, opposite] : trialGuards)
+			guardFile << guard.x << ' ' << guard.y << ' ' << approach.x << ' ' << approach.y
+			          << ' ' << opposite.x << ' ' << opposite.y << '\n';
+		guardFile.close();
+		ASSERT_TRUE(guardFile.good());
 		const auto afterReload = rmg::findUnguardedSeamContacts(*closedMap, [&](const int3 & tile)
 		{
 			return zones[tile.y * closedMap->width + tile.x];
@@ -1163,6 +1256,110 @@ TEST(MapFormat, ChecksExternalMapModRequirements)
 		for(const auto & name : names)
 			EXPECT_TRUE(missing.contains(name)) << name;
 	}
+}
+
+TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
+{
+	const char * base = std::getenv("VCMI_RMG_GUARD_TEST_BASE");
+	if(!base || !*base)
+		GTEST_SKIP() << "Set VCMI_RMG_GUARD_TEST_BASE to a two-guard trial's original output path";
+	std::ifstream guardFile(std::string(base) + ".guards");
+	ASSERT_TRUE(guardFile.good());
+	std::vector<std::array<int3, 3>> guards;
+	int gx, gy, ax, ay, bx, by;
+	while(guardFile >> gx >> gy >> ax >> ay >> bx >> by)
+		guards.push_back({int3(gx, gy, 0), int3(ax, ay, 0), int3(bx, by, 0)});
+	ASSERT_EQ(guards.size(), 2u);
+	std::ifstream mapFile(std::string(base) + ".closed.vmap", std::ios::binary);
+	ASSERT_TRUE(mapFile.good());
+	const std::vector<ui8> bytes((std::istreambuf_iterator<char>(mapFile)), std::istreambuf_iterator<char>());
+	ASSERT_FALSE(bytes.empty());
+	for(const auto & [guardPos, approachA, approachB] : guards)
+		for(const auto & approach : {approachA, approachB})
+		{
+			SCOPED_TRACE(guardPos.toString() + " from " + approach.toString());
+			ExternalInspectionMapService service(bytes);
+			auto header = service.loadMapHeader(ResourcePath("inspection"), false);
+			ASSERT_NE(header, nullptr);
+			ASSERT_TRUE(header->toroidal);
+			StartInfo start;
+			start.mapname = "inspection";
+			start.difficulty = static_cast<ui8>(EMapDifficulty::EASY);
+			start.mode = EStartMode::NEW_GAME;
+			for(int index = 0; index < static_cast<int>(header->players.size()); ++index)
+			{
+				const auto & info = header->players[index];
+				if(!info.canHumanPlay && !info.canComputerPlay)
+					continue;
+				auto & player = start.playerInfos[PlayerColor(index)];
+				player.color = PlayerColor(index);
+				player.connectedPlayerIDs.insert(static_cast<PlayerConnectionID>(index));
+				player.name = "Inspection";
+				player.castle = info.defaultCastle();
+				player.hero = info.defaultHero();
+				player.bonus = PlayerStartingBonus::GOLD;
+			}
+			auto state = std::make_shared<CGameState>();
+			state->preInit(LIBRARY);
+			GameRandomizer randomizer(*state);
+			randomizer.setSeed(12345);
+			Load::ProgressAccumulator progress;
+			state->init(&service, &start, randomizer, progress, false);
+			auto & map = state->getMap();
+			if(guardPos == guards.front()[0] && approach == guards.front()[1])
+			{
+				for(const auto & id : map.getHeroesOnMap())
+				{
+					auto * startingHero = dynamic_cast<CGHeroInstance *>(map.getObject(id));
+					if(!startingHero || !startingHero->getOwner().isValidPlayer() || startingHero->isGarrisoned() || startingHero->inBoat())
+						continue;
+					for(int x = 0; x < map.width; ++x)
+						for(int y = 0; y < map.height; ++y)
+							state->getPlayerTeam(startingHero->getOwner())->fogOfWarMap[int3(x, y, 0)] = 1;
+					startingHero->setMovementPoints(3000);
+					CPathsInfo paths(state->getMapSize(), startingHero);
+					auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, startingHero);
+					CPathfinder(*state, config).calculatePaths();
+					for(const auto & trial : guards)
+					{
+						const auto * node = paths.getPathInfo(trial[0], EPathfindingLayer::LAND);
+						std::cout << "Starting player=" << startingHero->getOwner().getNum()
+						          << " hero=" << startingHero->visitablePos().toString()
+						          << " guard=" << trial[0].toString() << " reachable=" << node->reachable();
+						if(node->reachable())
+							std::cout << " turns=" << static_cast<int>(node->turns) << " cost=" << node->cost << " movement=" << node->moveRemains;
+						std::cout << std::endl;
+					}
+				}
+			}
+			CGHeroInstance * hero = nullptr;
+			for(const auto & id : map.getHeroesOnMap())
+				if(auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id)); candidate
+				   && candidate->getOwner().isValidPlayer() && !candidate->isGarrisoned() && !candidate->inBoat())
+				{
+					hero = candidate;
+					break;
+				}
+			ASSERT_NE(hero, nullptr);
+			ChangeObjPos place;
+			place.objid = hero->id;
+			place.nPos = approach;
+			state->apply(place);
+			ASSERT_EQ(hero->visitablePos(), approach);
+			for(int x = 0; x < map.width; ++x)
+				for(int y = 0; y < map.height; ++y)
+					state->getPlayerTeam(hero->getOwner())->fogOfWarMap[int3(x, y, 0)] = 1;
+			hero->setMovementPoints(3000);
+			state->actingPlayers.insert(hero->getOwner());
+			GameHandlerTestServer server(state, hero->getOwner());
+			CGameHandler handler(server, state);
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(guardPos), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
+			const auto * battle = state->getBattle(hero->getOwner());
+			ASSERT_NE(battle, nullptr);
+			const auto * guard = dynamic_cast<const CArmedInstance *>(map.getObject(map.getTile(guardPos).topVisitableObj()));
+			ASSERT_NE(guard, nullptr);
+			EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), guard);
+		}
 }
 
 TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
