@@ -390,9 +390,11 @@ initially waited during startup. After disk access was granted, it opened a
 game and executed a boat crossing of a corner in both directions. This is
 historical build evidence and does not establish continuous animation.
 
-The [latest configured full-suite record](evidence/full-suite-40bffe9-2026-11-16.md)
-reports 2,084 passing and 14 skipped tests at `40bffe9`, with three additional
-tests disabled. The earlier [full-suite record](evidence/topology-full-suite-2026-11-10.md)
+The [latest configured full-suite record](evidence/full-suite-teleport-resolution-2026-11-16.md)
+reports 2,090 passing and 15 skipped tests after the teleport-resolution and
+Earth mine-access changes, with three additional tests disabled. The prior
+[full-suite and original save record](evidence/full-suite-40bffe9-2026-11-16.md)
+reports 2,084 passing and 14 skipped tests at `40bffe9`. The earlier [full-suite record](evidence/topology-full-suite-2026-11-10.md)
 includes three optional historical-format fixtures. These runs used different
 revisions and fixture selections.
 
