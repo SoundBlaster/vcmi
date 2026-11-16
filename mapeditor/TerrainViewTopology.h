@@ -21,6 +21,39 @@ struct TileRectangle
 	int height;
 };
 
+struct RepeatedSection
+{
+	int displayedX;
+	int displayedY;
+	int canonicalX;
+	int canonicalY;
+	int width;
+	int height;
+};
+
+/// Split a displayed rectangle at map-period boundaries. Coordinates may be
+/// pixels or tiles, provided all arguments use the same unit.
+inline std::vector<RepeatedSection> repeatedSections(int x, int y, int width, int height, int periodX, int periodY)
+{
+	if(width <= 0 || height <= 0 || periodX <= 0 || periodY <= 0)
+		return {};
+	std::vector<RepeatedSection> result;
+	for(int dy = 0; dy < height;)
+	{
+		const int canonicalY = MapTopology::wrapCoordinate(y + dy, periodY);
+		const int sectionHeight = std::min(height - dy, periodY - canonicalY);
+		for(int dx = 0; dx < width;)
+		{
+			const int canonicalX = MapTopology::wrapCoordinate(x + dx, periodX);
+			const int sectionWidth = std::min(width - dx, periodX - canonicalX);
+			result.push_back({x + dx, y + dy, canonicalX, canonicalY, sectionWidth, sectionHeight});
+			dx += sectionWidth;
+		}
+		dy += sectionHeight;
+	}
+	return result;
+}
+
 /// Visible portions of a viewport, in the canonical minimap rectangle.
 inline std::vector<TileRectangle> wrappedViewportAreas(int x, int y, int viewportWidth, int viewportHeight, int width, int height)
 {

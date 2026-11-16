@@ -69,6 +69,34 @@ TEST(MapTopology, EditorRoadAndRedrawCrossToroidalSeams)
 	}
 }
 
+TEST(MapTopology, EditorRepeatedSectionsCoverDisplayedAndCanonicalCoordinates)
+{
+	const MapTopology topology(7, 5, 1, true);
+	for(const auto & [x, y, width, height] : std::vector<std::array<int, 4>>{
+		{1, 1, 3, 2}, {-1, 1, 3, 2}, {6, 4, 3, 3}, {-9, -7, 16, 12}, {0, 0, 7, 5}})
+	{
+		std::map<int3, int3> actual;
+		for(const auto & area : TerrainViewTopology::repeatedSections(x, y, width, height, 7, 5))
+			for(int dx = 0; dx < area.width; ++dx)
+				for(int dy = 0; dy < area.height; ++dy)
+				{
+					const int3 displayed(area.displayedX + dx, area.displayedY + dy, 0);
+					const int3 canonical(area.canonicalX + dx, area.canonicalY + dy, 0);
+					EXPECT_TRUE(actual.emplace(displayed, canonical).second);
+				}
+		ASSERT_EQ(actual.size(), static_cast<size_t>(width * height));
+		for(int dx = 0; dx < width; ++dx)
+			for(int dy = 0; dy < height; ++dy)
+			{
+				const int3 displayed(x + dx, y + dy, 0);
+				ASSERT_TRUE(actual.contains(displayed));
+				EXPECT_EQ(actual.at(displayed), *topology.canonicalize(displayed));
+			}
+	}
+	EXPECT_TRUE(TerrainViewTopology::repeatedSections(0, 0, 0, 1, 7, 5).empty());
+	EXPECT_TRUE(TerrainViewTopology::repeatedSections(0, 0, 1, 1, 7, 0).empty());
+}
+
 TEST(MapTopology, EditorMinimapViewportCoversWrappedTiles)
 {
 	const MapTopology topology(7, 5, 1, true);
