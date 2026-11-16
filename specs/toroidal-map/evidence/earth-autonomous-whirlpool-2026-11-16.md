@@ -69,6 +69,17 @@ exchange failed or whether topology is involved. They are retained as an
 AI limitation rather than counted as server movement rejections or silently
 treated as a clean AI run.
 
+For the first such message, the trace shows a server `GarrisonDialog` and
+`MapObjectVisit` closing, a successful `QuestionAnswer`, and the AI removing
+the exchange question between Lacus and Aenain. Lacus remained at
+`(164,353,0)` while the target was `(164,352,0)`; the same interaction was
+later retried and the existing guard stopped further repetition. The
+`ExecuteHeroChain.cpp` containing this guard is byte-identical to source
+baseline `30e9207` (`git diff 30e9207 -- AI/Nullkiller2/Goals/ExecuteHeroChain.cpp`
+was empty). The trace does not prove the exchange produced the desired army
+or hero arrangement, nor that changing the guard would improve it. No
+topology-specific cause or safe targeted fix has been established.
+
 The repaired local map SHA-256 is
 `ea6c4de705dba4139f2ceb780a7bc7a747c3075c2244188980d50caf16b89819`;
 the seam-preview SHA-256 is
