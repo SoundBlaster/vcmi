@@ -233,3 +233,20 @@ an injected rejection in one GUI route; it does not reproduce a natural
 rejection, prove recovery of the pending dialog or test remote-network timing.
 The injection was removed and the ordinary client, server and tests rebuilt;
 the injection marker is absent from the resulting client and server.
+
+## Unrelated acknowledgement during a portal route
+
+The same GUI route was repeated with a temporary server instrumentation that
+sent a successful `QuestionAnswer` acknowledgement with unknown request ID
+`10006` while the actual portal answer was request `6`, then delayed the real
+answer by one second. The client received the unrelated packet and logged
+the expected unknown-request warning. It sent no further `MoveHero` request
+between the injected packet and release of the real answer. After the actual
+answer the hero teleported and reached `(7,4,0)`, spending 200 points in
+total. This exercises the real client with an artificial stale/unrelated
+acknowledgement, not a naturally observed race between two live dialogs.
+
+The isolated observation and client/server log are under
+`runtime/teleport-unrelated-ack-2026-11-16/` on TB5. The temporary injection
+and delay were removed from the server source and the client, server and test
+binary were rebuilt; the injection marker is absent from client and server.
