@@ -76,11 +76,14 @@ demo preparation reviewable as separate changes where practical.
   object layers, selection and brush input across both axes and corners.
   The minimap must show the coordinate-reference rectangle and all wrapped
   viewport portions. Verify real editor interactions and retain bounded-map
-  behavior; the current viewport layers clamp rendering to one map period.
+  behavior. Repeated viewport sections and canonical input are implemented;
+  verify vertical scrolling and corners, object placement and movement, undo,
+  reload, bounded maps and smoothness before closing this task.
   [Initial minimap geometry](evidence/editor-minimap-reference-2026-11-16.md)
-  and its reference outline are implemented; their GUI appearance is unverified.
+  and its reference outline are implemented and observed in a corner view.
   [Repeated viewport section geometry](evidence/editor-repeated-sections-2026-11-16.md)
-  is tested but not yet connected to rendering or editor input.
+  is connected to rendering and editor input. See the
+  [initial interactive check](evidence/editor-toroidal-scroll-2026-11-16.md).
 - [ ] Review Earth draft object footprints and collisions for issues affecting
   actual play, preserving the source and a reproducible local test copy.
   A [mask audit](evidence/earth-object-overlap-audit-2026-11-15.md) identifies
