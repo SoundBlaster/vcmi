@@ -316,6 +316,7 @@ public:
 
 	void overrideGameSettings(const JsonNode & input);
 	void overrideGameSetting(EGameSettings option, const JsonNode & input);
+	JsonNode getGameSettingsOverrides() const;
 	const IGameSettings & getSettings() const;
 
 	void parseUidCounter();

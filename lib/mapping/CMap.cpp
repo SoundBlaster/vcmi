@@ -1174,6 +1174,11 @@ void CMap::overrideGameSettings(const JsonNode & input)
 	return gameSettings->loadOverrides(input);
 }
 
+JsonNode CMap::getGameSettingsOverrides() const
+{
+	return gameSettings->getAllOverrides();
+}
+
 CArtifactInstance * CMap::createScroll(const SpellID & spellId)
 {
 	return createArtifact(ArtifactID::SPELL_SCROLL, spellId);

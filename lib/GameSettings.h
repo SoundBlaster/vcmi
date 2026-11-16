@@ -31,9 +31,6 @@ class DLL_LINKAGE GameSettings final : public IGameSettings, boost::noncopyable
 	// for convenience / performance, contains actual settings - combined version of base and override settings
 	std::array<JsonNode, OPTIONS_COUNT> actualSettings;
 
-	// converts all existing overrides into a single json node for serialization
-	JsonNode getAllOverrides() const;
-
 public:
 	GameSettings();
 	~GameSettings();
@@ -48,6 +45,9 @@ public:
 
 	// loads all overrides from provided json node, for deserialization
 	void loadOverrides(const JsonNode &);
+
+	// Converts map-specific overrides into a JSON node for serialization.
+	JsonNode getAllOverrides() const;
 
 	JsonNode getFullConfig() const override;
 	const JsonNode & getValue(EGameSettings option) const override;

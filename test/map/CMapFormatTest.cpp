@@ -19,6 +19,7 @@
 #include "../../lib/CStack.h"
 #include "../../lib/CPlayerState.h"
 #include "../../lib/GameLibrary.h"
+#include "../../lib/IGameSettings.h"
 #include "../../lib/mapObjectConstructors/AObjectTypeHandler.h"
 #include "../../lib/mapObjectConstructors/CObjectClassesHandler.h"
 #include "../../lib/mapObjects/ObjectTemplate.h"
@@ -646,6 +647,31 @@ TEST(MapFormat, Terrain)
 		JsonComparer c(true);
 		c.compare("surface", actualSurface, expectedSurface);
 		c.compare("underground", actualUnderground, expectedUnderground);
+	}
+}
+
+TEST(MapFormat, GameSettingsOverridesSurviveVmapRoundTrip)
+{
+	static const std::string path = "test/TerrainTest/";
+	const JsonNode header(JsonPath::builtin(path + CMapFormatJson::HEADER_FILE_NAME));
+	const JsonNode objects(JsonPath::builtin(path + CMapFormatJson::OBJECTS_FILE_NAME));
+	const JsonNode surface(JsonPath::builtin(path + "surface_terrain.json"));
+	const JsonNode underground(JsonPath::builtin(path + "underground_terrain.json"));
+	for(const bool toroidal : {false, true})
+	{
+		auto map = loadOriginal(header, objects, surface, underground);
+		map->setToroidalAndRebuild(toroidal);
+		JsonNode settings;
+		settings["heroes"]["perPlayerOnMapCap"].Integer() = 1;
+		settings["heroes"]["perPlayerTotalCap"].Integer() = 1;
+		map->overrideGameSettings(settings);
+		CMemoryBuffer buffer;
+		JsonNode actualHeader, actualObjects, actualSurface, actualUnderground;
+		loadActual(&buffer, map, actualHeader, actualObjects, actualSurface, actualUnderground);
+		auto reloaded = loadOriginal(actualHeader, actualObjects, actualSurface, actualUnderground);
+		EXPECT_EQ(reloaded->getSettings().getInteger(EGameSettings::HEROES_PER_PLAYER_ON_MAP_CAP), 1);
+		EXPECT_EQ(reloaded->getSettings().getInteger(EGameSettings::HEROES_PER_PLAYER_TOTAL_CAP), 1);
+		EXPECT_TRUE(actualHeader["gameSettings"]["towns"].isNull());
 	}
 }
 

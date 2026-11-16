@@ -1056,7 +1056,10 @@ void CMapLoaderJson::readHeader(const bool complete)
 	readDisposedHeroes(handler);
 
 	if(complete)
+	{
 		readOptions(handler);
+		map->overrideGameSettings(static_cast<const JsonNode &>(header)["gameSettings"]);
+	}
 }
 
 void CMapLoaderJson::readTerrainTile(const std::string & src, TerrainTile & tile)
@@ -1499,6 +1502,9 @@ void CMapSaverJson::writeHeader()
 	header["battleOnly"].Bool() = mapHeader->battleOnly;
 
 	writeOptions(handler);
+	const JsonNode overrides = map->getGameSettingsOverrides();
+	if(!overrides.isNull())
+		header["gameSettings"] = overrides;
 
 	writeTranslations();
 	
