@@ -310,3 +310,9 @@ two current test listeners connected to the real previous framed server
 `6bf2051`, negotiated its version, selected a toroidal map and exchanged a
 chat message. That covers the lobby only, not mixed-version gameplay. The
 isolated logs are in `runtime/teleport-protocol-old-server-qa2-2026-11-16/`.
+
+A separate server activity test exercises a subterranean gate on a bounded
+map. It verifies a successful hero teleport followed by the answer
+acknowledgement and asserts that no additional question-resolution packet is
+sent. The bounded test, toroidal deferred-activity test and two tracker tests
+passed together on macOS arm64. This is not a mixed-version gameplay test.

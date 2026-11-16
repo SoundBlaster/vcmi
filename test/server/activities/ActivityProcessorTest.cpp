@@ -2754,6 +2754,53 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGatePairedAcrossToroidalSeam)
 	EXPECT_EQ(friendly->visitablePos(), across->visitablePos());
 }
 
+TEST_F(SubterraneanGateTopologyTest, boundedTeleportDoesNotSendToroidalResolution)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, true).playerActive(player).hero(int3(2, 5, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	ASSERT_FALSE(map()->toroidal);
+	const std::string text = R"({ "animation": "test.def", "visitableFrom": ["+++", "+++", "+++"], "mask": [ "A" ] })";
+	JsonNode definition(text.data(), text.size(), "BoundedGateTraversalTest");
+	auto appearance = std::make_shared<ObjectTemplate>();
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	appearance->readJson(definition, resolver, false);
+	GameRandomizer randomizer(*gameState());
+	const auto addGate = [&](const int3 & pos, const std::string & name)
+	{
+		auto gate = std::make_shared<CGSubterraneanGate>(gameState().get());
+		gate->ID = Obj::SUBTERRANEAN_GATE;
+		gate->subID = MapObjectSubID(0);
+		gate->pos = pos;
+		gate->instanceName = name;
+		gate->appearance = appearance;
+		static_cast<CGObjectInstance *>(gate.get())->initObj(randomizer);
+		map()->addNewObject(gate);
+		return gate;
+	};
+	const auto surface = addGate(int3(1, 5, 0), "bounded_surface_gate");
+	const auto interior = addGate(int3(1, 5, 1), "bounded_interior_gate");
+	CGSubterraneanGate::postInit(gameState().get());
+	ASSERT_TRUE(CGTeleport::isConnected(surface.get(), interior.get()));
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	hero->setMovementPoints(3000);
+	TeleportMovementTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(surface->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
+	auto dialog = handler.activities->topActivity(player);
+	ASSERT_NE(dialog, nullptr);
+	ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+	QuestionAnswer answer(dialog->getActiveQuestionID(), 0);
+	answer.player = player;
+	answer.requestID = 74;
+	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, answer);
+	ASSERT_EQ(server.lastReplyResult, true);
+	EXPECT_EQ(hero->visitablePos(), interior->visitablePos());
+	EXPECT_EQ(server.teleportOrdering, (std::vector<std::string>{"teleported", "answer applied"}));
+}
+
 TEST_F(SubterraneanGateTopologyTest, heroUsesGateWithVisitableTileAcrossSeam)
 {
 	const PlayerColor player(0);
