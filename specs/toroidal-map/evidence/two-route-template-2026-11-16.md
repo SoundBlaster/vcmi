@@ -71,8 +71,9 @@ each guard from either side. With fog revealed and movement artificially
 increased, one starting hero followed server-executed paths of 42 and 28
 nodes to the two guards. This proves those particular approaches work, not
 that both players have equivalent routes or that all bypasses are closed.
-The original inland connections remain, so the added guards do not establish
-the requested two-exit design. Obstacles are not yet proven to preserve all
+The original inland connections remain, consistent with the later decision to
+extend the original graph. The added guards are not yet tied to declared seam
+edges, so the trial does not establish the intended extended graph. Obstacles are not yet proven to preserve all
 interior routes. Guard selection in this trial is a fixed creature and an
 approximate strength target, not the generator's normal balance algorithm.
 
@@ -87,7 +88,7 @@ the candidate-to-template-connection mapping and fairness are not verified.
 The audit and obstacle planner are reusable code, but generation and guard
 placement above are opt-in test instrumentation, not a supported generator
 feature. A complete implementation must select intended seam connections
-while constructing the zone graph, prevent extra inland and wrapped exits,
+while constructing the zone graph, preserve intended inland connections and prevent unintended wrapped exits,
 maintain zone and path invariants, and fail explicitly when it cannot satisfy
 the contract. It must then validate both players' actual routes, armies and
 rewards across multiple generated maps.

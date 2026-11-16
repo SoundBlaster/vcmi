@@ -78,10 +78,12 @@ demo preparation reviewable as separate changes where practical.
   captures generation-time zone IDs and finds unguarded seam transitions.
   Test-only guarded seam placement, obstacle closure, save/reload and server
   approaches have been exercised on one map. The existing inland passages
-  remain and trial placement is unreliable. Implement seam-aware intended
-  connections in the generator, prevent unwanted exits without disconnecting
-  zones, validate routes for both players and measure fairness over multiple
-  maps; establish reproducible inputs.
+  remain and trial placement is unreliable. Preserve the original internal
+  connections and add explicitly declared seam connections as distinct edges,
+  including when they connect the same zone pair. Prevent other inter-zone
+  exits without disconnecting zones; same-zone seam continuity needs no guard
+  just because it crosses the seam. Validate routes for both players and
+  measure fairness over multiple maps; establish reproducible inputs.
 - [ ] Implement continuous toroidal map-editor navigation, including terrain,
   object layers, selection and brush input across both axes and corners.
   The minimap must show the coordinate-reference rectangle and all wrapped
