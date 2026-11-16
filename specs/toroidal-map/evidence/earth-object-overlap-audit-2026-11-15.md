@@ -93,3 +93,10 @@ The two final runs passed on macOS arm64 using `be65072` plus the inspection
 extension, with HotA enabled; XML files are
 `runtime/earth-artifact-tree-{present,removed}-2026-11-16.xml` under TB5.
 This is one overlap and does not establish that other candidates are safe.
+
+A further repeat on `992b30a` plus an inventory assertion checked that the
+hero did not already possess the artifact type and did possess it after the
+request. Both tree-present and tree-removed variants passed, and each still
+asserted removal of the map object. XML is
+`runtime/earth-artifact-tree-inventory-{present,removed}-2026-11-16.xml` on
+TB5. The previous limitations about staged placement and other overlaps apply.

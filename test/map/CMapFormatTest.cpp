@@ -1069,6 +1069,14 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		CGameHandler handler(server, state);
 		if(std::getenv("VCMI_INSPECT_EARTH_BANK_VISIT"))
 		{
+			std::optional<ArtifactID> expectedArtifact;
+			if(std::getenv("VCMI_INSPECT_EARTH_EXPECT_ARTIFACT"))
+			{
+				const auto * artifact = dynamic_cast<const CGArtifact *>(first);
+				ASSERT_NE(artifact, nullptr);
+				expectedArtifact = artifact->getArtifactType();
+				ASSERT_FALSE(hero->hasArt(*expectedArtifact));
+			}
 			if(std::getenv("VCMI_INSPECT_EARTH_REMOVE_OVERLAP_OBSTACLE"))
 				ASSERT_TRUE(handler.removeObject(second, hero->getOwner()));
 			const auto targetId = first->id;
@@ -1098,6 +1106,8 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 						std::cout << "Overlap target remains=" << (map.getObject(targetId) != nullptr) << std::endl;
 						if(std::getenv("VCMI_INSPECT_EARTH_EXPECT_TARGET_REMOVED"))
 							EXPECT_EQ(map.getObject(targetId), nullptr);
+						if(expectedArtifact)
+							EXPECT_TRUE(hero->hasArt(*expectedArtifact));
 					}
 					else
 					{
