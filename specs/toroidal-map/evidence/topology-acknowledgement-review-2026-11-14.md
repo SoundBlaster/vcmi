@@ -168,3 +168,40 @@ The observation and copied client/server log are
 `runtime/earth-move-ack-qa-2026-11-16/observe-reject.jsonl` and
 `runtime/earth-move-ack-qa-2026-11-16/client-reject-verification-2026-11-16.log`
 on TB5.
+
+## Teleport question acknowledgement correlation
+
+The human movement controller formerly released its teleport wait on any
+`QuestionAnswer` acknowledgement, ignoring both its request ID and result.
+An unrelated response could therefore release the wait early, and a rejected
+teleport answer was treated as if it had succeeded. These are code-level
+risks; neither was previously reproduced as a natural gameplay failure.
+
+The controller now records the expected teleport question and its sent
+request ID. Only the matching acknowledgement clears the wait. An accepted
+answer continues the existing route; a rejection aborts automatic movement
+without undoing any server-applied effects. Unrelated, stale and duplicate
+acknowledgements do not release it. This applies to bounded and toroidal maps.
+It does not automatically retry the answer or resolve an activity that the
+server has kept open.
+
+On macOS arm64, the client, server and test binary built from `b96c4bc` with
+the client change later committed as `e26c744`. Seventeen focused
+tests passed, including the new tracker checks for unrelated questions,
+stale and duplicate requests, accepted and rejected replies, existing
+movement acknowledgement tests, four whirlpool tests and nine AI dialog
+tests. The tracker test verifies the decision state, not a complete GUI route.
+
+In an isolated graphical session with the earlier staged water-portal map,
+the human hero entered the portal from `(239,430,0)` and emerged at
+`(168,290,0)`, with movement `1500 → 1400`; this exercised an accepted
+teleport answer. A second isolated run used a temporary server-only injection
+to reject the first `QuestionAnswer` before applying it. The hero remained
+at the entrance `(239,429,0)` with 1,400 points; the log recorded one
+rejection and no subsequent movement or answer request during a five-second
+observation. The server activity remained unresolved. These GUI runs used
+one-step shortcut movement, so they do not establish behavior of a longer
+route after a rejection or recovery from an open dialog. Logs and observation
+streams are under `runtime/teleport-answer-{gui,reject-gui}-2026-11-16/`
+on TB5. The temporary injection was removed and client and server rebuilt;
+its marker is absent from both resulting binaries.
