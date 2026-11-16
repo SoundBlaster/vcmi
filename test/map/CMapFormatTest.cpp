@@ -993,6 +993,70 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_FALSE(state->players.at(PlayerColor(*aiSlot)).isHuman());
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_EARTH_WHIRLPOOL_WATER"))
+	{
+		const auto entry = map.instanceNames.find("whirlpool_10403");
+		ASSERT_NE(entry, map.instanceNames.end());
+		const auto * whirlpool = dynamic_cast<const CGWhirlpool *>(entry->second.get());
+		ASSERT_NE(whirlpool, nullptr);
+		const auto exits = CGWhirlpool::getPassableExitTiles(*state, {whirlpool->id});
+		ASSERT_EQ(exits.size(), 6u);
+		for(const auto & [id, pos] : exits)
+		{
+			EXPECT_EQ(id, whirlpool->id);
+			EXPECT_FALSE(map.getTile(pos).isLand()) << pos.toString();
+		}
+		CGHeroInstance * hero = nullptr;
+		for(const auto & id : map.getHeroesOnMap())
+			if(auto * candidate = dynamic_cast<CGHeroInstance *>(map.getObject(id)); candidate
+			   && candidate->getOwner().isValidPlayer() && !candidate->isGarrisoned() && !candidate->inBoat())
+			{
+				hero = candidate;
+				break;
+			}
+		ASSERT_NE(hero, nullptr);
+		std::optional<int3> shore, water;
+		for(int x = 0; x < map.width && !water; ++x)
+			for(int y = 0; y < map.height && !water; ++y)
+			{
+				const int3 land(x, y, 0);
+				const auto & tile = map.getTile(land);
+				if(!tile.isLand() || tile.blocked() || tile.visitable() || state->guardingCreaturePosition(land).isValid())
+					continue;
+				for(const auto & dir : {int3(0, -1, 0), int3(0, 1, 0), int3(-1, 0, 0), int3(1, 0, 0)})
+				{
+					const auto neighbor = map.getTopology().canonicalize(land + dir);
+					if(neighbor && map.getTile(*neighbor).isWater() && !map.getTile(*neighbor).blocked()
+					   && !map.getTile(*neighbor).visitable() && !state->guardingCreaturePosition(*neighbor).isValid()
+					   && map.canMoveBetween(land, *neighbor))
+					{
+						shore = land;
+						water = *neighbor;
+						break;
+					}
+				}
+			}
+		ASSERT_TRUE(shore && water);
+		ChangeObjPos place;
+		place.objid = hero->id;
+		place.nPos = *shore;
+		state->apply(place);
+		const auto player = hero->getOwner();
+		state->actingPlayers.insert(player);
+		GameHandlerTestServer server(state, player);
+		CGameHandler handler(server, state);
+		handler.createBoat(*water, BoatId::CASTLE, player);
+		hero->setMovementPoints(3000);
+		ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(*water),
+		                             EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+		ASSERT_TRUE(hero->inBoat());
+		for(const auto & [id, pos] : exits)
+		{
+			ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(pos), EMovementMode::MONOLITH));
+			EXPECT_EQ(hero->visitablePos(), pos);
+			ASSERT_TRUE(hero->inBoat());
+		}
+	}
 	if(std::getenv("VCMI_INSPECT_EARTH_INTERACTIVE_OVERLAPS"))
 	{
 		int shared = 0;

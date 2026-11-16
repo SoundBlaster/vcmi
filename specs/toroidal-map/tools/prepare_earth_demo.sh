@@ -50,4 +50,5 @@ exec python3 "$script_dir/assemble_stacked_draft.py" "$1" "$2" \
     --require-mod hota.neutralcreatures.ancientaltar \
     --require-mod hota.terrainoverlays \
     --require-mod hota.wastelandterrain \
-    --relocate-water-monolith monolithTwoWay_5267 240 429
+    --relocate-water-monolith monolithTwoWay_5267 240 429 \
+    --relocate-water-whirlpool whirlpool_10403 4 265

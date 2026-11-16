@@ -1,7 +1,7 @@
 import copy
 import unittest
 
-from assemble_stacked_draft import (assemble, blocking_pairs, place_object, relocate_decorations, relocate_water_monoliths, replace_gate_pairs,
+from assemble_stacked_draft import (assemble, blocking_pairs, place_object, relocate_decorations, relocate_water_monoliths, relocate_water_whirlpools, replace_gate_pairs,
                                     repair_mine_guards, repair_mountain_interactions, repair_south_guards,
                                     rotate_cell_art, source_gate_pairs)
 
@@ -12,6 +12,33 @@ def obj(name, kind, x, y, level, mask):
 
 
 class StackedDraftTest(unittest.TestCase):
+    def test_water_whirlpool_move_requires_clear_water_and_preserves_source(self):
+        whirlpool = obj("whirlpool", "whirlpool", 3, 3, 0, ["AAA", "AAA"])
+        source = [whirlpool]
+        placed = copy.deepcopy(source)
+        source_rows = [["wt0_"] * 8 for _ in range(8)]
+        rows = copy.deepcopy(source_rows)
+        rows[3][3] = "sn0_"
+        report = relocate_water_whirlpools(source, placed, [source_rows, source_rows], rows,
+                                          [("whirlpool", 4, 5)])
+        self.assertEqual(report, [{"object": "whirlpool", "from": [3, 3], "to": [4, 5]}])
+        self.assertEqual((source[0]["x"], source[0]["y"]), (3, 3))
+        self.assertEqual(placed[0]["template"], whirlpool["template"])
+        dry = copy.deepcopy(rows)
+        dry[5][3] = "sn0_"
+        with self.assertRaisesRegex(ValueError, "clear water"):
+            relocate_water_whirlpools(source, copy.deepcopy(source), [source_rows, source_rows], dry,
+                                      [("whirlpool", 4, 5)])
+        blocker = obj("rock", "mountain", 3, 5, 0, ["B"])
+        with self.assertRaisesRegex(ValueError, "occupied"):
+            relocate_water_whirlpools(source, copy.deepcopy(source) + [blocker], [source_rows, source_rows], rows,
+                                      [("whirlpool", 4, 5)])
+        bad_source = copy.deepcopy(source_rows)
+        bad_source[3][3] = "sn0_"
+        with self.assertRaisesRegex(ValueError, "Source whirlpool entrances"):
+            relocate_water_whirlpools(source, copy.deepcopy(source), [bad_source, source_rows], rows,
+                                      [("whirlpool", 4, 5)])
+
     def test_assembler_applies_explicit_water_monolith_move(self):
         header = {"mapLevels": {"surface": {"width": 8, "height": 8, "index": 0},
                                 "underground": {"width": 8, "height": 8, "index": 1}}}

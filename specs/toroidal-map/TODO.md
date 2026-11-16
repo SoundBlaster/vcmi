@@ -93,6 +93,9 @@ demo preparation reviewable as separate changes where practical.
   play. A [blocked seam monolith approach was opened](evidence/earth-object-overlap-audit-2026-11-15.md#seam-monolith-approach-repaired)
   by removing a decoration; a server route from the original hero reached it
   with forced wins and other test-only changes.
+  An [autonomous AI run exposed a misplaced whirlpool](evidence/earth-autonomous-whirlpool-2026-11-16.md):
+  the recipe now puts all six exits on water and a staged server check reaches
+  each by boat. A complete post-fix AI game remains unverified.
   [All three water-monolith exits and one graphical route](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits)
   are checked from the relocated entrance; exhaustive reverse-route checks
   are deferred unless a defect or a demo requirement warrants them.

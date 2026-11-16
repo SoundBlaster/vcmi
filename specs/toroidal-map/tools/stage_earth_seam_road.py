@@ -17,6 +17,8 @@ def stage(source, output):
         "20c6b4c4abb50a2f1d20e0f39053d90c47680e01654711b2fb24901453ef11b1",
         # Same draft with an accessible approach to monolithTwoWay_11148.
         "d26eea5dc3c80036502ba23401b5c29a7dc9b7b75bb205c080cb1d4d4305f89a",
+        # Same draft with the misplaced whirlpool moved onto water.
+        "ce72175e7a609c19df65ba3c766ae4208218a8fd8066f8b40c0f387ce6483c66",
     }
     with ZipFile(source) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}

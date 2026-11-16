@@ -164,6 +164,57 @@ def changed_cells(before, after):
     return {(x, y) for y, row in enumerate(before) for x, cell in enumerate(row) if cell != after[y][x]}
 
 
+def relocate_water_whirlpools(source, converted, source_levels, rows, relocations):
+    """Move selected source-water whirlpools to clear water, preserving their templates."""
+    width, height = len(rows[0]), len(rows)
+    original = {obj["instanceName"]: obj for obj in source}
+    placed = {obj["instanceName"]: obj for obj in converted}
+
+    def cells(obj, x, y, kinds="BHAT", wrap=True):
+        mask = obj["template"]["mask"]
+        positions = {(x - len(line) + 1 + col, y - len(mask) + 1 + row)
+                     for row, line in enumerate(mask) for col, kind in enumerate(line) if kind in kinds}
+        return {((px % width), (py % height)) for px, py in positions} if wrap else positions
+
+    occupied = collections.defaultdict(set)
+    for obj in converted:
+        for position in cells(obj, obj["x"], obj["y"]):
+            occupied[position].add(obj["instanceName"])
+    report = []
+    for name, x, y in relocations:
+        if any(item["object"] == name for item in report):
+            raise ValueError(f"Duplicate water whirlpool: {name!r}")
+        old, obj = original.get(name), placed.get(name)
+        if (not old or not obj or old["type"] != "whirlpool" or obj["type"] != old["type"]
+                or obj["subtype"] != old["subtype"] or obj["template"] != old["template"]):
+            raise ValueError(f"Expected an unchanged whirlpool: {name!r}")
+        if not (0 <= x < width and 0 <= y < height):
+            raise ValueError(f"Water whirlpool anchor outside destination: {name!r}")
+        source_rows = source_levels[old["l"]]
+        source_cells = cells(old, old["x"], old["y"], "AT", wrap=False)
+        if not source_cells or any(not (0 <= px < len(source_rows[0]) and 0 <= py < len(source_rows))
+                                   or source_rows[py][px][:2] != "wt" for px, py in source_cells):
+            raise ValueError(f"Source whirlpool entrances must be on water: {name!r}")
+        active = cells(obj, x, y)
+        if not active or any(occupied[p] - {name} for p in active):
+            raise ValueError(f"Water whirlpool destination is occupied: {name!r}")
+        if any(rows[py][px][:2] != "wt" or len(list(CELL_PART.finditer(rows[py][px]))) != 1
+               for px, py in active):
+            raise ValueError(f"Water whirlpool destination must be clear water: {name!r}")
+        surroundings = {((px + dx) % width, (py + dy) % height)
+                        for px, py in active for dx in (-1, 0, 1) for dy in (-1, 0, 1)} - active
+        if not any(not occupied[p] and rows[p[1]][p[0]][:2] == "wt" for p in surroundings):
+            raise ValueError(f"Water whirlpool has no clear water approach: {name!r}")
+        previous = [obj["x"], obj["y"]]
+        for p in cells(obj, obj["x"], obj["y"]):
+            occupied[p].discard(name)
+        obj["x"], obj["y"] = x, y
+        for p in active:
+            occupied[p].add(name)
+        report.append({"object": name, "from": previous, "to": [x, y]})
+    return report
+
+
 def relocate_water_monoliths(source, converted, source_levels, rows, relocations):
     """Apply explicitly selected water-monolith moves with conservative geometry checks."""
     width, height = len(rows[0]), len(rows)
@@ -465,7 +516,7 @@ def nested_positions(value, path=()):
 def assemble(header, surface, underground, objects, fragment_seed=None, polar_seed=None,
              oceanize=False, snow_island=None, gate_pairs=(), relocate=(), repair_mountains=False,
              required_mods=(), repair_guards=False, repair_other_guards=False, relocate_obstacles=(),
-             reserve_tiles=(), relocate_water_monolith=()):
+             reserve_tiles=(), relocate_water_monolith=(), relocate_water_whirlpool=()):
     levels = sorted(header["mapLevels"].values(), key=lambda level: level["index"])
     if len(levels) != 2 or [level["index"] for level in levels] != [0, 1]:
         raise ValueError("Expected exactly two indexed levels")
@@ -554,6 +605,7 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
                      "libraryOfEnlightenment", "schoolOfWar", "colosseumOfTheMagi", "abandonedMine"}, underground)
                     if repair_other_guards else None)
     water_monoliths = relocate_water_monoliths(objects, converted, source_levels, rows, relocate_water_monolith)
+    water_whirlpools = relocate_water_whirlpools(objects, converted, source_levels, rows, relocate_water_whirlpool)
     if polar is not None:
         for obj in converted:
             reference = references.get(obj["instanceName"])
@@ -623,6 +675,7 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
         "mine_guard_repair": guard_repair,
         "other_guard_repair": other_guards,
         "relocated_water_monoliths": water_monoliths,
+        "relocated_water_whirlpools": water_whirlpools,
         "limitations": ["diagnostic draft only", "object and interaction overlaps unresolved",
                         "road artwork and movement costs unverified",
                         "required mods not assessed"]
@@ -638,7 +691,8 @@ def assemble(header, surface, underground, objects, fragment_seed=None, polar_se
                        + (["automatic mountain moves may alter routes and need review"] if mountain_repair else [])
                        + (["selected obstacle moves may alter routes and need review"] if obstacles else [])
                        + (["guard moves may change nearby guard coverage"] if guard_repair or other_guards else [])
-                       + (["water monolith moves need gameplay and visual validation"] if water_monoliths else []),
+                       + (["water monolith moves need gameplay and visual validation"] if water_monoliths else [])
+                       + (["water whirlpool moves need gameplay and visual validation"] if water_whirlpools else []),
     }
 
 
@@ -673,6 +727,9 @@ def main():
     parser.add_argument("--relocate-water-monolith", action="append", default=[], nargs=3,
                         metavar=("INSTANCE", "X", "Y"),
                         help="Move an explicitly selected source-water HotA monolith to a checked water anchor")
+    parser.add_argument("--relocate-water-whirlpool", action="append", default=[], nargs=3,
+                        metavar=("INSTANCE", "X", "Y"),
+                        help="Move an explicitly selected source-water whirlpool to a checked water anchor")
     args = parser.parse_args()
     with zipfile.ZipFile(args.source) as archive:
         expected = {"header.json", "surface_terrain.json", "underground_terrain.json", "objects.json"}
@@ -686,7 +743,8 @@ def main():
             args.illustrative_snow_island, args.gate_pair or (), args.relocate_mountain,
             args.repair_mountain_interactions, args.require_mod, args.repair_mine_guards, args.repair_other_guards,
             args.relocate_obstacle, args.reserve_tile,
-            [(name, int(x), int(y)) for name, x, y in args.relocate_water_monolith])
+            [(name, int(x), int(y)) for name, x, y in args.relocate_water_monolith],
+            [(name, int(x), int(y)) for name, x, y in args.relocate_water_whirlpool])
     with zipfile.ZipFile(args.output, "x", compression=zipfile.ZIP_DEFLATED) as output:
         for name, data in extras.items():
             output.writestr(name, data)
