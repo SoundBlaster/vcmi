@@ -400,6 +400,10 @@ void LayerTransitionRule::process(
 			/// Cannot enter empty water tile from land -> it has to be visitable
 			if(destination.node->accessible == EPathAccessibility::ACCESSIBLE)
 				destination.blocked = true;
+			// An occupied boat is represented by its hero, not a boardable boat.
+			// The toroidal server rejects a direct land-to-vehicle move into it.
+			if(pathfinderHelper->usesToroidalTopology() && destination.nodeHero)
+				destination.blocked = true;
 		}
 
 		break;

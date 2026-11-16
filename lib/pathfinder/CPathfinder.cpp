@@ -588,6 +588,12 @@ void CPathfinderHelper::updateTurnInfo(const int Turn)
 	}
 }
 
+bool CPathfinderHelper::usesToroidalTopology() const
+{
+	const auto * header = gameInfo.tryGetMapHeader();
+	return header && header->toroidal;
+}
+
 bool CPathfinderHelper::isLayerAvailable(const EPathfindingLayer & layer) const
 {
 	switch(layer.toEnum())

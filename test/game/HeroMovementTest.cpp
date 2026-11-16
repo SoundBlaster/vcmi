@@ -4775,6 +4775,43 @@ TEST_F(HeroMovementTest, CollectsResourceWithVisitableTileAcrossSeam)
 	EXPECT_EQ(map()->getObject(id), nullptr);
 }
 
+TEST_F(HeroMovementTest, LandHeroCannotPlanSailingIntoOccupiedBoat)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(1, 1, 0), HeroTypeID(0), player)
+		.hero(int3(3, 1, 0), HeroTypeID(1), player).terrain(int3(1, 1, 0), TerrainId::WATER);
+	startWithMap(std::move(builder));
+	map()->setToroidalAndRebuild(true);
+	revealMap(player);
+	auto * walker = findHeroAt(int3(1, 1, 0));
+	auto * sailor = findHeroAt(int3(3, 1, 0));
+	ASSERT_NE(walker, nullptr);
+	ASSERT_NE(sailor, nullptr);
+	const int3 water(1, 1, 0);
+	GameHandlerTestServer server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.createBoat(water, BoatId::CASTLE, player);
+	walker->setMovementPoints(3000);
+	{
+		CPathsInfo paths(gameState()->getMapSize(), walker);
+		auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), walker);
+		CPathfinder(*gameState(), config).calculatePaths();
+		ASSERT_TRUE(paths.getNode(water, EPathfindingLayer::SAIL)->reachable());
+	}
+	sailor->setMovementPoints(3000);
+	ASSERT_TRUE(handler.moveHero(sailor->id, sailor->convertFromVisitablePos(water), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	ASSERT_TRUE(sailor->inBoat());
+	ASSERT_EQ(sailor->visitablePos(), water);
+	walker->setMovementPoints(3000);
+	CPathsInfo paths(gameState()->getMapSize(), walker);
+	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), walker);
+	CPathfinder(*gameState(), config).calculatePaths();
+	EXPECT_FALSE(paths.getNode(water, EPathfindingLayer::SAIL)->reachable());
+	EXPECT_FALSE(handler.moveHero(walker->id, walker->convertFromVisitablePos(water), EMovementMode::STANDARD, false, player, EPathfindingLayer::SAIL));
+	EXPECT_EQ(walker->visitablePos(), int3(0, 1, 0));
+}
+
 TEST_F(HeroMovementTest, HeroCanEmbarkSailAndDisembarkAcrossToroidalSeam)
 {
 	const PlayerColor player(0);

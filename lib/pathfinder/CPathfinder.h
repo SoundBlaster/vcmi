@@ -102,6 +102,7 @@ public:
 	bool isPatrolMovementAllowed(const int3 & dst) const;
 	void updateTurnInfo(const int turn = 0);
 	bool isLayerAvailable(const EPathfindingLayer & layer) const;
+	bool usesToroidalTopology() const;
 	const TurnInfo * getTurnInfo() const;
 	int getMaxMovePoints(const EPathfindingLayer & layer) const;
 

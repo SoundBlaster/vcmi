@@ -63,6 +63,9 @@ namespace AIPathfinding
 
 		if(source.node->layer == EPathfindingLayer::LAND && destination.node->layer == EPathfindingLayer::SAIL)
 		{
+			// A virtual boat cannot be created under another hero.
+			if(pathfinderHelper->usesToroidalTopology() && destination.nodeHero)
+				return;
 			std::shared_ptr<const VirtualBoatAction> virtualBoat = findVirtualBoat(destination, source);
 
 			if(virtualBoat && tryUseSpecialAction(destination, source, virtualBoat, EPathNodeAction::EMBARK))
