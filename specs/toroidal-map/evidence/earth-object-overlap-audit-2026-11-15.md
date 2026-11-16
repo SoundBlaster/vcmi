@@ -123,6 +123,15 @@ hero or attempt a battle or exchange, so it does not establish that the
 flowers block the town or that an unoccupied visit works. No changes were made
 to the map for these checks.
 
+On the later repaired draft, a follow-up staged the red hero at `(40,94,0)`
+and requested the occupied town tile. The server started a battle against
+`randomHero_11991`; after a forced victory and battle and level-up dialog
+replies, `randomTown_7497` belonged to the red player. Flowers remained on
+the map. The test passed on macOS arm64 using `83de8d9` plus this diagnostic;
+XML: `runtime/earth-overlap-town-capture-final-2026-11-16.xml` on TB5. This
+exercises one staged attack and forced outcome, not normal access from the
+red starting region, battle balance, an unoccupied visit or other towns.
+
 ## Seam monolith approach repaired
 
 In the earlier draft, `monolithTwoWay_11148` at `(1,285,0)` had no adjacent

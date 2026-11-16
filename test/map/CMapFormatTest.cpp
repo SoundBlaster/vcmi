@@ -1151,7 +1151,13 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 			const auto targetId = first->id;
 			const auto top = map.getTile(target).topVisitableObj();
 			std::cout << "Target top object=" << (map.getObject(top) ? map.getObject(top)->instanceName : "none") << std::endl;
-			ASSERT_EQ(top, first->id);
+			if(std::getenv("VCMI_INSPECT_EARTH_EXPECT_OCCUPIED_TOWN"))
+			{
+				ASSERT_NE(dynamic_cast<const CGTownInstance *>(first), nullptr);
+				ASSERT_NE(dynamic_cast<const CGHeroInstance *>(map.getObject(top)), nullptr);
+			}
+			else
+				ASSERT_EQ(top, first->id);
 			CPathsInfo paths(state->getMapSize(), hero);
 			auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, hero);
 			CPathfinder(*state, config).calculatePaths();
@@ -1177,6 +1183,12 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 							EXPECT_EQ(map.getObject(targetId), nullptr);
 						if(expectedArtifact)
 							EXPECT_TRUE(hero->hasArt(*expectedArtifact));
+						if(std::getenv("VCMI_INSPECT_EARTH_EXPECT_OCCUPIED_TOWN"))
+						{
+							const auto * battle = state->getBattle(hero->getOwner());
+							ASSERT_NE(battle, nullptr);
+							EXPECT_EQ(battle->getSideArmy(BattleSide::DEFENDER), dynamic_cast<const CGHeroInstance *>(map.getObject(top)));
+						}
 						if(std::getenv("VCMI_INSPECT_EARTH_EXPECT_TELEPORT"))
 						{
 							const auto activity = handler.activities->topActivity(hero->getOwner());
@@ -1195,6 +1207,24 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 					ASSERT_EQ(index, 1u) << "Unexpected interaction before the bank";
 					break;
 				}
+			}
+			if(std::getenv("VCMI_INSPECT_EARTH_CAPTURE_OCCUPIED_TOWN"))
+			{
+				ASSERT_NE(state->getBattle(hero->getOwner()), nullptr);
+				handler.battles->cheatBattleVictory(hero->getOwner());
+				for(int limit = 0; limit < 16; ++limit)
+				{
+					const auto prompt = handler.activities->topActivity(hero->getOwner());
+					if(!prompt || (prompt->getType() != ActivityType::BattleDialog && prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+						break;
+					ASSERT_EQ(handler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+				}
+				const auto * town = dynamic_cast<const CGTownInstance *>(map.getObject(targetId));
+				ASSERT_NE(town, nullptr);
+				EXPECT_EQ(town->getOwner(), hero->getOwner());
+				std::cout << "Occupied town after forced battle owner=" << town->getOwner().getNum()
+				          << " hero=" << hero->visitablePos().toString()
+				          << " activity=" << (handler.activities->topActivity(hero->getOwner()) != nullptr) << std::endl;
 			}
 			if(std::getenv("VCMI_INSPECT_EARTH_OVERLAP_BUILD_BOAT"))
 			{
