@@ -51,6 +51,15 @@ Logs are under `runtime/earth-autonomous-whirlpool-repair-2026-11-16/` on TB5.
 This is one random partial game, not a complete playthrough or evidence of
 visual animation continuity.
 
+The same stdout also reports AI subgoal failures followed by replanning,
+including four `Repeated interaction did not move the hero` messages for
+hero-exchange tasks near towns, as well as lost-hero and unreachable-target
+messages. The repeated-interaction safeguard deliberately stops retrying a
+previously idle interaction; these observations do not establish why the
+exchange failed or whether topology is involved. They are retained as an
+AI limitation rather than counted as server movement rejections or silently
+treated as a clean AI run.
+
 The repaired local map SHA-256 is
 `ea6c4de705dba4139f2ceb780a7bc7a747c3075c2244188980d50caf16b89819`;
 the seam-preview SHA-256 is
