@@ -77,6 +77,8 @@ demo preparation reviewable as separate changes where practical.
   The minimap must show the coordinate-reference rectangle and all wrapped
   viewport portions. Verify real editor interactions and retain bounded-map
   behavior; the current viewport layers clamp rendering to one map period.
+  [Initial minimap geometry](evidence/editor-minimap-reference-2026-11-16.md)
+  and its reference outline are implemented; their GUI appearance is unverified.
 - [ ] Review Earth draft object footprints and collisions for issues affecting
   actual play, preserving the source and a reproducible local test copy.
   A [mask audit](evidence/earth-object-overlap-audit-2026-11-15.md) identifies
