@@ -175,3 +175,31 @@ no suitable candidate for 2–4. This small sample is not a general success
 rate, but confirms that geometric seam contact alone is insufficient. Seam
 passages and their approaches need to be reserved during generation, before
 other objects consume or block the candidate area.
+
+## Early seam approach experiment
+
+An opt-in diagnostic now chooses cardinal seam contacts and connects their
+approaches to each zone's free paths before zone-filling modifiers run. It
+also adds the selected tiles to the object-distance field on both sides of
+the rectangle. That distance field is a placement bias, not an enforceable
+exclusion zone; the trial must still reject occupied or guarded approaches.
+The ordinary generator does not enable this mode. Guard placement and closure
+of other inter-zone contacts are still separate test-only post-processing.
+
+For diagnostic seeds 1 through 10, one trial per seed placed the two selected
+seam guards, closed all statically detected unguarded inter-zone land contacts,
+and reloaded the toroidal map. Each sample then passed separate server checks:
+both sides of each added guard start a battle, one starting hero can reach the
+two added guards, and each starting hero can reach its two traced original
+guards. Movement was artificially increased and fog revealed; the checks end
+when battle starts, do not test after victory, and do not establish balance.
+These ten outcomes are not a general success-rate claim. The trial uses test
+content, a fixed guard type and heuristic obstacle placement, and must not be
+treated as a supported playable generator.
+
+The user's seam-first landscape sketch motivates selecting consistent terrain
+features around the rectangle before filling interior areas. Opposite sides
+are adjacent, so features can continue across the seam without being mirror
+images; corners involve both axes. This experiment reserves movement paths
+only. It does not yet generate matching terrain, roads or rivers across those
+edges, nor has its visual result been reviewed.

@@ -88,8 +88,13 @@ demo preparation reviewable as separate changes where practical.
   contacts and fails if it cannot find them. It does not reserve or construct
   passages; independent post-processing failed for three tested seeds. One
   sample preserved server routes from both starts to all four traced original
-  guards. Reserve seam approaches before object placement and complete the
-  template-to-guard integration and graph validation.
+  guards. An experimental mode now reserves seam approaches before object
+  placement and biases nearby placement away from them. Complete the
+  template-to-guard integration, graph validation and failure handling.
+- [ ] Generate terrain features continuously across the toroidal seams and
+  corners. Consider seam-first placement and optional symmetry; verify terrain
+  transitions, roads, rivers, objects and movement without requiring mirrored
+  tiles. Review the rendered result in addition to checking map data.
 - [ ] Implement continuous toroidal map-editor navigation, including terrain,
   object layers, selection and brush input across both axes and corners.
   The minimap must show the coordinate-reference rectangle and all wrapped
