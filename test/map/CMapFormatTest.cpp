@@ -1396,6 +1396,21 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 										ASSERT_EQ(hero->visitablePos(), across);
 										ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(road), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
 										ASSERT_EQ(hero->visitablePos(), road);
+										if(std::getenv("VCMI_INSPECT_EARTH_ROAD_GATE_CONNECTIVITY"))
+										{
+											hero->setMovementPoints(30000);
+											CPathsInfo fromRoad(state->getMapSize(), hero);
+											auto roadConfig = std::make_shared<SingleHeroPathfinderConfig>(fromRoad, *state, hero);
+											CPathfinder(*state, roadConfig).calculatePaths();
+											for(const char * name : {"subterraneanGate_5430", "subterraneanGate_10528", "subterraneanGate_5431", "subterraneanGate_10533"})
+											{
+												const auto target = map.instanceNames.find(name);
+												ASSERT_NE(target, map.instanceNames.end()) << name;
+												CGPath gateRoute;
+												const bool found = fromRoad.getPath(gateRoute, target->second->visitablePos(), EPathfindingLayer::LAND);
+												std::cout << "Gate from road " << name << " reachable=" << found << " nodes=" << gateRoute.nodes.size() << std::endl;
+											}
+										}
 										reachedRoad = true;
 										std::cout << "Reached and crossed seam road in both directions=" << road.toString() << std::endl;
 										break;

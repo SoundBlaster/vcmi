@@ -140,3 +140,17 @@ the battles are winnable normally, the length of a real game, or visuals.
 The local demo profile's map symlink now points to this saved copy. The
 previous `earth-connected-seam-road-verified.vmap` remains on TB5 as the
 rollback target. No map or third-party assets are committed.
+
+## Gate paths after reaching the road
+
+The same saved demo was checked on 2026-11-16 with the HotA demo profile and
+the `38cc375` test build plus `VCMI_INSPECT_EARTH_ROAD_GATE_CONNECTIVITY`.
+After the diagnostic route above reached the road and crossed both ways,
+the fully revealed single-hero pathfinder found no LAND route from `(0,425,0)`
+to any of the four converted gates. This was a successful inspection, not an
+assertion that a route should exist; XML is
+`runtime/earth-road-gate-connectivity-2026-11-16.xml` under the TB5 build root.
+The result applies to that one game state after the three forced victories,
+with extra movement points and modified creature behavior. Other battles,
+transport, portal traversal or game-state changes could enable a route; no
+gate route was executed and wider regional connectivity remains unverified.

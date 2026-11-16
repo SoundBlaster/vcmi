@@ -82,7 +82,9 @@ demo preparation reviewable as separate changes where practical.
 - [ ] Check land, water and region connectivity and the effects of replacing
   the original underground gates. The [current pair and approach check](evidence/earth-current-gates-2026-11-16.md)
   records their intentional behavior change; wider regional connectivity and
-  normal routes to each gate remain unverified.
+  normal routes to each gate remain unverified. A [road-to-gates pathfinder
+  inspection](evidence/earth-start-connectivity-2026-11-15.md#gate-paths-after-reaching-the-road)
+  found no route in one modified game state; it does not rule out later routes.
 - [x] Investigate the [water-monolith mismatch](evidence/earth-portal-road-2026-11-15.md):
   restore the misplaced entrance to water in the demo preparation recipe.
 - [ ] Address remaining placement and collision problems if they affect demo
