@@ -13,9 +13,10 @@ The tool rejected a different input and refused to overwrite the preview.
 
 The local profile is `runtime/earth-seam-preview-2026-11-16/` under the TB5
 build root. It links the local game data and mods but has separate map,
-configuration and saves. `Start Seam Preview.command` launches the local
-client; `README.txt` describes selecting `Earth Seam Road QA`. The script's
-shell syntax was checked. Finder double-click was not independently tested.
+configuration and saves. Initially `Start Seam Preview.command` launched the
+local client for manual selection of `Earth Seam Road QA`; the later direct
+launch is described below. The script's shell syntax was checked. Finder
+double-click was not independently tested.
 No source map or game assets are included in the repository.
 
 On macOS arm64, client `1.8.0.7744dbd` started this profile through the normal
@@ -27,3 +28,25 @@ the process was forcibly stopped afterwards. The observation and screenshot
 are in the local profile. This prepares a convenient scene for the user's
 visual review; it does not establish continuous animation, full-frame scroll
 quality or balance of an ordinary game.
+
+## Direct human preview launch
+
+The client has an opt-in `--preview-map MAP` option that selects a local map
+and starts it with a human player. It rejects an empty path and incompatible
+AI-only, headless, spectator, automatic-turn, external-server, test-map and
+test-save options before startup. The ordinary menu and existing AI-only
+`--testmap` path are unchanged. `--testseed` remains restricted to `--testmap`.
+The opt-in Python CLI test runs the built client against these invalid
+combinations; its two test methods passed on macOS arm64.
+
+On 2026-11-16 the client built from `8f1f4d3` plus this option started the
+preview map directly in an isolated QA profile. The server and client logs
+identified red as human; its observed hero crossed west from `(0,425,0)` to
+`(251,425,0)`. The local preview profile's launcher was then updated to use
+the new option and invoked from `/Users/egor`, a different working directory.
+It started the same map directly with a human red player; the hero crossed
+the seam west with movement points `1560 → 1485`. The observation is
+`runtime/earth-seam-preview-2026-11-16/launcher-observe.jsonl` on TB5. Both
+test clients were force-stopped. Neither launch checks Finder double-click,
+clean shutdown, animation continuity or a complete game. The previous
+menu-based launcher text is retained beside the local launcher for rollback.

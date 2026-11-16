@@ -172,6 +172,7 @@ int main(int argc, char * argv[])
 		("help,h", "display help and exit")
 		("version,v", "display version information and exit")
 		("testmap", po::value<std::string>(), "")
+		("preview-map", po::value<std::string>(), "start a local map directly with a human player")
 		("testseed", po::value<si64>(), "fixed seed for an in-process --testmap session (1-2147483647)")
 		("testsave", po::value<std::string>(), "")
 		("logLocation", po::value<std::string>(), "new location for log files")
@@ -231,6 +232,13 @@ int main(int argc, char * argv[])
 			std::cerr << "Invalid server port: expected a value from 0 to 65535" << std::endl;
 			return 1;
 		}
+	}
+	if(vm.count("preview-map") && (vm["preview-map"].as<std::string>().empty() || vm.count("testmap")
+		|| vm.count("testsave") || vm.count("headless") || vm.count("onlyAI") || vm.count("spectate")
+		|| vm.count("autoSkip") || vm.count("donotstartserver")))
+	{
+		std::cerr << "--preview-map requires a map and a local human-controlled graphical session" << std::endl;
+		return 1;
 	}
 	if(vm.count("testseed"))
 	{
@@ -426,6 +434,13 @@ int main(int argc, char * argv[])
 			session["testmap"].String() = vm["testmap"].as<std::string>();
 			session["onlyai"].Bool() = true;
 			GAME->server().debugStartTest(session["testmap"].String(), false);
+		}
+		else if(vm.count("preview-map"))
+		{
+			session["onlyai"].Bool() = false;
+			session["headless"].Bool() = false;
+			session["spectate"].Bool() = false;
+			GAME->server().debugStartTest(vm["preview-map"].as<std::string>(), false);
 		}
 		else if(vm.count("testsave"))
 		{
