@@ -1333,6 +1333,25 @@ TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
 							std::cout << " turns=" << static_cast<int>(node->turns) << " cost=" << node->cost << " movement=" << node->moveRemains;
 						std::cout << std::endl;
 					}
+					if(const char * guardNames = std::getenv("VCMI_RMG_MEASURE_GUARDS"); guardNames && *guardNames)
+					{
+						std::vector<std::string> names;
+						boost::split(names, guardNames, boost::is_any_of(","));
+						for(const auto & name : names)
+						{
+							const auto object = map.instanceNames.find(name);
+							ASSERT_NE(object, map.instanceNames.end()) << name;
+							const auto * creature = dynamic_cast<const CGCreature *>(object->second.get());
+							ASSERT_NE(creature, nullptr) << name;
+							const auto * node = paths.getPathInfo(creature->visitablePos(), EPathfindingLayer::LAND);
+							std::cout << "Boundary candidate=" << name << " player=" << startingHero->getOwner().getNum()
+							          << " pos=" << creature->visitablePos().toString() << " strength=" << creature->getArmyStrength()
+							          << " reachable=" << node->reachable();
+							if(node->reachable())
+								std::cout << " turns=" << static_cast<int>(node->turns) << " cost=" << node->cost << " movement=" << node->moveRemains;
+							std::cout << std::endl;
+						}
+					}
 					anyStartingHeroReachesBoth = anyStartingHeroReachesBoth || reachesBoth;
 				}
 				EXPECT_TRUE(anyStartingHeroReachesBoth) << "Neither starting hero can reach both seam guards";
