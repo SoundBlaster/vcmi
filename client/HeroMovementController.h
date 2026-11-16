@@ -10,6 +10,7 @@
 #pragma once
 
 #include "MovementRequestTracker.h"
+#include "TeleportAnswerTracker.h"
 #include "../lib/constants/EntityIdentifiers.h"
 #include "../lib/int3.h"
 #include "../lib/filesystem/ResourcePath.h"
@@ -31,7 +32,7 @@ class HeroMovementController
 	/// movement was requested to be terminated, e.g. by player or due to inability to move
 	bool stoppingMovement = false;
 
-	bool waitingForQueryApplyReply = false;
+	TeleportAnswerTracker teleportAnswer;
 	MovementRequestTracker movementRequests;
 
 	const CGHeroInstance * currentlyMovingHero = nullptr;
@@ -65,7 +66,8 @@ public:
 	void onMoveHeroApplied();
 	void onMoveHeroRequestSent(ObjectInstanceID hero, int requestID);
 	void onMoveHeroRequestApplied(int requestID, bool accepted);
-	void onQuestionAnswerApplied();
+	void onQuestionAnswerSent(QuestionID question, int requestID);
+	void onQuestionAnswerApplied(int requestID, bool accepted);
 	void onPlayerTurnStarted();
 	void onBattleStarted();
 	void showTeleportDialog(const CGHeroInstance * hero, TeleportChannelID channel, TTeleportExitsList exits, bool impassable, QuestionID questionID);

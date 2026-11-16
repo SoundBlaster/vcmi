@@ -73,6 +73,7 @@
 #include "../../server/activities/ActivityProcessor.h"
 #include "../../server/activities/Activity.h"
 #include "../../client/MovementRequestTracker.h"
+#include "../../client/TeleportAnswerTracker.h"
 #include "../../server/battles/BattleProcessor.h"
 #include "../../server/processors/HeroPoolProcessor.h"
 #include "../../server/processors/PlayerMessageProcessor.h"
@@ -3802,6 +3803,29 @@ TEST(MovementRequestTracker, IgnoresOtherHeroesAndOldOrDuplicateReplies)
 	}
 	EXPECT_FALSE(tracker.consume(3));
 	EXPECT_TRUE(tracker.consume(4));
+}
+
+TEST(TeleportAnswerTracker, OnlyTheCurrentQuestionsRequestCanReleaseTheRoute)
+{
+	TeleportAnswerTracker tracker;
+	using Result = TeleportAnswerTracker::Result;
+	const QuestionID first(10), second(11), unrelated(12);
+	tracker.begin(first);
+	tracker.sent(unrelated, 1);
+	EXPECT_EQ(tracker.consume(1, true), Result::UNRELATED);
+	EXPECT_TRUE(tracker.waiting());
+	tracker.sent(first, 2);
+	EXPECT_EQ(tracker.consume(1, false), Result::UNRELATED);
+	EXPECT_TRUE(tracker.waiting());
+	EXPECT_EQ(tracker.consume(2, false), Result::STOP);
+	EXPECT_FALSE(tracker.waiting());
+	EXPECT_EQ(tracker.consume(2, false), Result::UNRELATED);
+	tracker.begin(second);
+	tracker.sent(second, 3);
+	EXPECT_EQ(tracker.consume(2, true), Result::UNRELATED);
+	EXPECT_TRUE(tracker.waiting());
+	EXPECT_EQ(tracker.consume(3, true), Result::CONTINUE);
+	EXPECT_FALSE(tracker.waiting());
 }
 
 TEST_F(HeroMovementTest, ActivityBlockedMovementIsRejectedWithoutMovementPacket)

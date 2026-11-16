@@ -86,8 +86,8 @@ void HeroMovementController::showTeleportDialog(const CGHeroInstance * hero, Tel
 	// Player entered teleporter
 	// Check whether hero that has entered teleporter has paths that goes through teleporter and select appropriate exit
 	// othervice, ask server to select one randomly by sending invalid (-1) value as answer
-	assert(waitingForQueryApplyReply == false);
-	waitingForQueryApplyReply = true;
+	assert(!teleportAnswer.waiting());
+	teleportAnswer.begin(questionID);
 
 	if(!GAME->interface()->localState->hasPath(hero))
 	{
@@ -226,12 +226,24 @@ void HeroMovementController::onTryMoveHero(const CGHeroInstance * hero, const Tr
 	}
 }
 
-void HeroMovementController::onQuestionAnswerApplied()
+void HeroMovementController::onQuestionAnswerSent(QuestionID question, int requestID)
 {
-	if (!waitingForQueryApplyReply)
+	teleportAnswer.sent(question, requestID);
+}
+
+void HeroMovementController::onQuestionAnswerApplied(int requestID, bool accepted)
+{
+	const auto result = teleportAnswer.consume(requestID, accepted);
+	if(result == TeleportAnswerTracker::Result::UNRELATED)
 		return;
 
-	waitingForQueryApplyReply = false;
+	if(result == TeleportAnswerTracker::Result::STOP)
+	{
+		// The response is not transactional. Keep any authoritative updates,
+		// but do not send more steps on a route whose teleport answer failed.
+		requestMovementAbort();
+		return;
+	}
 
 	// Server accepted our TeleportDialog question reply and moved hero
 	// Continue moving alongside our path, if any
@@ -270,7 +282,7 @@ void HeroMovementController::onMoveHeroApplied()
 	// hero has moved onto teleporter and activated it
 	// in this case next movement should be done only after question reply has been acknowledged
 	// and hero has been moved to teleport destination
-	if(waitingForQueryApplyReply)
+	if(teleportAnswer.waiting())
 		return;
 
 	if(ENGINE->input().ignoreEventsUntilInput())
