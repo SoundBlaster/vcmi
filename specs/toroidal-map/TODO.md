@@ -84,7 +84,9 @@ demo preparation reviewable as separate changes where practical.
   records their intentional behavior change; wider regional connectivity and
   normal routes to each gate remain unverified. A [road-to-gates pathfinder
   inspection](evidence/earth-start-connectivity-2026-11-15.md#gate-paths-after-reaching-the-road)
-  found no route in one modified game state; it does not rule out later routes.
+  found no direct route in one modified game state. A [server route through one
+  gate](evidence/earth-start-connectivity-2026-11-15.md#executed-route-from-the-road-through-one-gate)
+  then succeeded after forced victories and other test-only changes.
 - [x] Investigate the [water-monolith mismatch](evidence/earth-portal-road-2026-11-15.md):
   restore the misplaced entrance to water in the demo preparation recipe.
 - [ ] Address remaining placement and collision problems if they affect demo

@@ -1482,6 +1482,59 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 														}
 												}
 											}
+											if(std::getenv("VCMI_INSPECT_EARTH_ROAD_GATE_ROUTE"))
+											{
+												const int3 approach(3, 417, 0);
+												CGPath approachRoute;
+												ASSERT_TRUE(fromRoad.getPath(approachRoute, approach, EPathfindingLayer::LAND));
+												ASSERT_GE(approachRoute.nodes.size(), 2u);
+												for(size_t index = approachRoute.nodes.size() - 1; index > 0; --index)
+												{
+													const auto & step = approachRoute.nodes[index - 1];
+													ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(step.coord), EMovementMode::STANDARD, false, hero->getOwner(), step.layer));
+													std::cout << "Gate approach executed step=" << step.coord.toString() << " hero=" << hero->visitablePos().toString()
+													          << " battle=" << (state->getBattle(hero->getOwner()) != nullptr)
+													          << " activity=" << (routeHandler.activities->topActivity(hero->getOwner()) != nullptr) << std::endl;
+													if(state->getBattle(hero->getOwner()) || routeHandler.activities->topActivity(hero->getOwner()))
+														break;
+													ASSERT_EQ(hero->visitablePos(), step.coord);
+												}
+												std::cout << "Gate approach outcome hero=" << hero->visitablePos().toString()
+												          << " reached=" << (hero->visitablePos() == approach) << std::endl;
+												if(std::getenv("VCMI_INSPECT_EARTH_ROAD_GATE_TRAVERSE"))
+										{
+											ASSERT_EQ(hero->visitablePos(), approach);
+												ASSERT_NE(state->getBattle(hero->getOwner()), nullptr);
+												routeHandler.battles->cheatBattleVictory(hero->getOwner());
+											const auto result = routeHandler.activities->topActivity(hero->getOwner());
+												ASSERT_NE(result, nullptr);
+												ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
+												ASSERT_EQ(routeHandler.activities->submitReply(result->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+												for(int limit = 0; limit < 16; ++limit)
+												{
+													const auto prompt = routeHandler.activities->topActivity(hero->getOwner());
+													if(!prompt || (prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+														break;
+													ASSERT_EQ(routeHandler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+												}
+												const auto entrance = map.instanceNames.find("subterraneanGate_5431");
+												const auto exit = map.instanceNames.find("subterraneanGate_10533");
+												ASSERT_NE(entrance, map.instanceNames.end());
+												ASSERT_NE(exit, map.instanceNames.end());
+												hero->setMovementPoints(30000);
+												ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(entrance->second->visitablePos()), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
+												const auto dialog = routeHandler.activities->topActivity(hero->getOwner());
+												ASSERT_NE(dialog, nullptr);
+												const auto teleport = std::dynamic_pointer_cast<TeleportDialogActivity>(dialog);
+												ASSERT_NE(teleport, nullptr);
+												const auto selected = std::ranges::find_if(teleport->td.exits, [&](const auto & item) { return item.first == exit->second->id; });
+												ASSERT_NE(selected, teleport->td.exits.end());
+												const auto answer = static_cast<ui32>(std::distance(teleport->td.exits.begin(), selected));
+												ASSERT_EQ(routeHandler.activities->submitReply(dialog->getActiveQuestionID(), hero->getOwner(), answer), ReplyOutcome::Accepted);
+												ASSERT_EQ(hero->visitablePos(), exit->second->visitablePos());
+												std::cout << "Reached paired gate exit=" << hero->visitablePos().toString() << std::endl;
+											}
+											}
 										}
 										reachedRoad = true;
 										std::cout << "Reached and crossed seam road in both directions=" << road.toString() << std::endl;

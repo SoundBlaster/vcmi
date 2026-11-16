@@ -168,3 +168,22 @@ reachable after defeating guards: the diagnostic did not execute those routes
 or win those additional battles. It passed using `577b66d` plus this inspection
 extension; log and XML are `runtime/earth-road-gate-geometric-2026-11-16.{log,xml}`
 on TB5.
+
+## Executed route from the road through one gate
+
+On the same current draft and HotA profile, an extended server diagnostic
+continued the prepared route from the red starting hero: two forced victories
+on the route to `shipyard_5987`, a built boat, a third forced victory near
+the seam road, and a crossing of that road in both directions. From `(0,425)`
+the normal pathfinder supplied a nine-step route to `(3,417)`, beside
+`subterraneanGate_5431`. Normal server movement executed the route and began
+a fourth battle on the final approach. After a forced victory and the
+necessary dialog replies, a movement request entered the gate and a teleport
+dialog selected `subterraneanGate_10533`; the hero arrived at `(249,416,0)`.
+
+The test passed on macOS arm64 using `2e499a4` plus this diagnostic extension;
+log and XML are `runtime/earth-road-gate-traverse-2026-11-16.{log,xml}` on
+TB5. The test reveals the map, modifies creature aggression and flee behavior,
+replenishes movement and forces all four victories. It verifies one server
+route and one portal direction, not normal combat balance, a graphical
+playthrough, or access to every region and gate. The map was not modified.
