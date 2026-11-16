@@ -319,10 +319,14 @@ game-state load retained the boat and allowed sailing back and disembarking.
 Two in-process replicas decoded server packets and matched hero, boat and
 player fog across the tested land and sea seams; no TCP transport was used.
 Four replacement portal approaches were tested with forced battle victories.
-The map still has an estimated 164 new interactive overlap occurrences,
-unreviewed terrain and object moves, incomplete mod dependency assessment and
-unknown distribution rights. It is not evidence of a fully playable or
-accepted demo.
+The [overlap audit](evidence/earth-object-overlap-audit-2026-11-15.md)
+reported 161 newly overlapping pairs involving an interactive mask on an
+earlier draft; these are candidates, not confirmed defects. On the current
+demo, a separate serialized-mask and initialized-engine scan found no shared
+visitable cells between distinct non-hero, non-boat objects. It did not rule
+out obstruction by noninteractive footprints. Wider terrain, object moves,
+mod dependencies and distribution rights remain incompletely assessed; the
+checks do not establish a fully playable or accepted demo.
 
 The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)
 also covers boat embarkation and disembarkation across one edge with two
@@ -359,11 +363,15 @@ and the search does not prove that every relevant calculation has been found.
 ## Execution record
 
 The separate [`961e235` preview bundle](evidence/topology-preview-961e235-2026-11-14.md)
-was built and signed, but its client has not yet reached an observable game
-window; it is not current-build gameplay evidence.
+initially waited during startup. After disk access was granted, it opened a
+game and executed a boat crossing of a corner in both directions. This is
+historical build evidence and does not establish continuous animation.
 
-The [current full-suite record](evidence/topology-full-suite-2026-11-10.md)
-includes the three optional historical-format fixtures; four tests remain disabled.
+The [latest configured full-suite record](evidence/full-suite-40bffe9-2026-11-16.md)
+reports 2,084 passing and 14 skipped tests at `40bffe9`, with three additional
+tests disabled. The earlier [full-suite record](evidence/topology-full-suite-2026-11-10.md)
+includes three optional historical-format fixtures. These runs used different
+revisions and fixture selections.
 
 The isolated helper tests are recorded in
 [`evidence/topology-unit-2026-11-09.md`](evidence/topology-unit-2026-11-09.md).
