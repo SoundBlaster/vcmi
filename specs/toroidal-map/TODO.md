@@ -101,6 +101,9 @@ demo preparation reviewable as separate changes where practical.
   [All three water-monolith exits and one graphical route](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits)
   are checked from the relocated entrance; exhaustive reverse-route checks
   are deferred unless a defect or a demo requirement warrants them.
+  A [seeded AI run](evidence/earth-ai-seed42-movement-rejection-2026-11-16.md)
+  exposed a rejected movement-layer request away from the seam; reproduce the
+  pathfinder/server disagreement and assess its relation to toroidal rules.
 - [x] Prepare a road that crosses a seam and verify its logical and static
   visual continuity: [Earth road extension](evidence/earth-road-seam-2026-11-15.md#static-view-and-local-demo-integration).
   Its far end is not connected to another existing road network. A
