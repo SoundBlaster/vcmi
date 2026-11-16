@@ -146,3 +146,32 @@ interaction rules, guard removal, portals, spells and balance are not covered.
 The static audit excludes guarded tiles and does not prove a complete hero
 route graph. The trial still constructs guards and barriers after placement;
 it is not a supported generator feature.
+
+## Original connection trace and server routes
+
+An opt-in generator trace records the template connection ID, endpoint zone
+IDs and actual guard position when a direct guarded connection is placed.
+It does not trace indirect connections, portals, unguarded passages or wide
+connections. The trace is diagnostic and is not part of the map format.
+
+For one saved test-content map, the trace identified all four original
+template edges. After adding the two test-only seam guards and obstacles and
+reloading the map, the server executed paths from each starting hero to the
+two original guards associated with that player's zone. The paths required
+33 and 36 steps for player 0 and 34 and 31 for player 1. Both added guards
+were also reached by player 1 and attacked from both sides in separate server
+tests. Fog was revealed and movement was artificially increased to 30,000;
+the tests stop at the battle, so they do not prove traversal after victory.
+This is one sample, not evidence of general balance or full graph preservation.
+
+The saved sample VMAP SHA-256 is
+`814dc2e487e019a996755e5c95d76f2c7ff1e2c9614fe9be066c715c2a0c635e`;
+the trace sidecar SHA-256 is
+`c9eec7493f191213907003e218c6e6b9caff76617a687c323ce14f5009129038`.
+For seeds 1, 2 and 3, none of ten attempts per seed completed the separate
+post-generation guard placement trial. A follow-up run found no suitable
+candidate for 2–3 on seed 1; on seeds 2 and 3 it placed a 2–3 guard but found
+no suitable candidate for 2–4. This small sample is not a general success
+rate, but confirms that geometric seam contact alone is insufficient. Seam
+passages and their approaches need to be reserved during generation, before
+other objects consume or block the candidate area.

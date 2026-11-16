@@ -85,8 +85,11 @@ demo preparation reviewable as separate changes where practical.
   just because it crosses the seam. Validate routes for both players and
   measure fairness over multiple maps; establish reproducible inputs.
   An opt-in placement heuristic now prefers the declared geometric seam
-  contacts and fails if it cannot find them. It does not construct passages;
-  the complete template-to-guard integration and graph validation remain open.
+  contacts and fails if it cannot find them. It does not reserve or construct
+  passages; independent post-processing failed for three tested seeds. One
+  sample preserved server routes from both starts to all four traced original
+  guards. Reserve seam approaches before object placement and complete the
+  template-to-guard integration and graph validation.
 - [ ] Implement continuous toroidal map-editor navigation, including terrain,
   object layers, selection and brush input across both axes and corners.
   The minimap must show the coordinate-reference rectangle and all wrapped
