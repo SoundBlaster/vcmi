@@ -109,8 +109,9 @@ demo preparation reviewable as separate changes where practical.
   a [direct original-start launcher](evidence/earth-human-start-2026-11-15.md#direct-launch-from-the-original-start)
   also starts the map for a human in an isolated test profile;
   the [seam preview](evidence/earth-seam-preview-2026-11-16.md#direct-human-preview-launch)
-  also starts directly for a human. Finder execution and an unassisted route
-  to the seam remain unverified.
+  also starts directly for a human. A [Finder double-click](evidence/earth-human-start-2026-11-15.md#finder-launch-of-the-repaired-map)
+  of a launcher copy started the repaired map; an unassisted route to the
+  seam remains unverified.
 
 ## 5. AI and bounded compatibility
 

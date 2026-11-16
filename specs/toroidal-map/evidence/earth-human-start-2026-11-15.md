@@ -53,3 +53,17 @@ invocation of a copy of the launcher, not Finder double-click, clean shutdown,
 continuous animation, or a complete playthrough. The isolated record is
 `runtime/earth-direct-qa-2026-11-16/observe.jsonl` under the TB5 build root.
 The launcher, game assets and third-party map remain local on TB5.
+
+## Finder launch of the repaired map
+
+On 2026-11-16, Finder opened a copy of `Start Earth Direct.command` by double
+click in a newly created isolated profile. That profile linked the current
+repaired demo, SHA-256
+`f8add693e77bed3ee423481f9ecbb81ed9e8ddb75ecbc0d6161ca006c60e33b5`, and
+game assets, with separate configuration, saves and logs. The `f44cd5a`
+client process started; its profile log recorded the map load, initialized
+game state and red as a human player. The test process was force-stopped.
+The log is `runtime/earth-finder-direct-qa-2026-11-16/logs/VCMI_Client_log.txt`
+on TB5. Finder execution and log evidence do not establish movement, a clean
+shutdown, normal battle balance or visual continuity. The tested file was a
+copy of the user's launcher and did not use the user's save directory.
