@@ -1,5 +1,22 @@
 # Earth seam preview for visual review
 
+## Current preview after the mine repair
+
+The preview was regenerated from the mine-access draft SHA-256
+`4b3c264a4cd7f9580c7161da572f9e1a06ebb3a26aef368ff3d9f95e7b3f8832`.
+Its SHA-256 is
+`8e95c36250ea90cd902528e1dda959a1e188bed85fefe0c71163b128849ab87b`.
+Decoded comparison with that draft found only the staged hero changed; the
+scenario name is also changed for the preview. In an initialized game, a
+server test moved the hero along the seam road in both directions; it passed
+on macOS arm64 with XML at
+`runtime/earth-mine-overlap-2026-11-16/preview-road.xml` on TB5.
+
+The local preview profile now uses this regenerated map. Its previous map is
+preserved as `earth-seam-preview-before-mine-2026-11-16.vmap.bak`. This new
+preview has not been graphically launched or visually assessed; previous
+graphical observations below apply to earlier builds of the preview.
+
 `tools/stage_earth_seam_road.py` accepts the current source-checked Earth
 demo in addition to its earlier fixture. It creates a separate map with red
 hero `randomHero_7305` moved from anchor `(165,353,0)` to `(1,425,0)` and

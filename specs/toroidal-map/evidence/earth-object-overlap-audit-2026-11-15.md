@@ -160,9 +160,9 @@ pathfinder and server movement, then forced a victory and checked the mine's
 owner. The test passed on macOS arm64; the XML is
 `runtime/earth-mine-overlap-2026-11-16/repaired-capture.xml`. The original
 source and previous draft remain unchanged. The local Earth demo profile now
-points to the repaired draft; the separate seam preview still uses the prior
-whirlpool-repaired map. Normal access from a starting town, battle balance and
-graphical presentation of this mine remain unverified.
+points to the repaired draft, and the [seam preview](earth-seam-preview-2026-11-16.md#current-preview-after-the-mine-repair)
+was regenerated from it. Normal access from a starting town, battle balance
+and graphical presentation of this mine remain unverified.
 
 ## Seam monolith approach repaired
 

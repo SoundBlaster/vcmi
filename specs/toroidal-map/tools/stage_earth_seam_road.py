@@ -19,6 +19,8 @@ def stage(source, output):
         "d26eea5dc3c80036502ba23401b5c29a7dc9b7b75bb205c080cb1d4d4305f89a",
         # Same draft with the misplaced whirlpool moved onto water.
         "ce72175e7a609c19df65ba3c766ae4208218a8fd8066f8b40c0f387ce6483c66",
+        # Same draft with the reef removed from the gem mine approach.
+        "0f7a01877b14cf0a1d78237c38b2df868138a8a3c632b47900b893e19e93515d",
     }
     with ZipFile(source) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}
