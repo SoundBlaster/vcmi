@@ -44,6 +44,8 @@
 #include "../../lib/pathfinder/CPathfinder.h"
 #include "../../lib/pathfinder/PathfinderOptions.h"
 #include "../../lib/pathfinder/TransientLanding.h"
+#include "../../lib/rmg/CMapGenerator.h"
+#include "../../lib/rmg/CRmgTemplateStorage.h"
 #include "../../lib/bonuses/Bonus.h"
 #include "../../lib/serializer/CMemorySerializer.h"
 #include "../../lib/serializer/CLoadFile.h"
@@ -68,6 +70,68 @@
 
 #include <condition_variable>
 #include <thread>
+
+// Explicitly enabled local diagnostic; generation depends on installed game data.
+TEST(RandomTemplateProbe, GenerateJebusCross)
+{
+	const char * output = std::getenv("VCMI_RMG_PROBE_OUTPUT");
+	if(!output)
+		GTEST_SKIP() << "Set VCMI_RMG_PROBE_OUTPUT to generate a local diagnostic map";
+	const auto * tpl = LIBRARY->tplh->getTemplate("vcmi:Jebus Cross");
+	ASSERT_NE(tpl, nullptr);
+	CMapGenOptions options;
+	options.setWidth(108);
+	options.setHeight(108);
+	options.setLevels(1);
+	options.setHumanOrCpuPlayerCount(4);
+	options.setCompOnlyPlayerCount(0);
+	options.setTeamCount(0);
+	options.setCompOnlyTeamCount(0);
+	options.setWaterContent(EWaterContent::NONE);
+	options.setMapTemplate(tpl);
+	ASSERT_TRUE(options.checkOptions());
+	EditorCallback callback(nullptr);
+	CMapGenerator generator(options, &callback, 12345);
+	auto map = generator.generate();
+	ASSERT_NE(map, nullptr);
+	callback.setMap(map.get());
+	CMemoryBuffer buffer;
+	{
+		CMapSaverJson saver(&buffer);
+		saver.saveMap(map);
+	}
+	buffer.seek(0);
+	EditorCallback reloadedCallback(nullptr);
+	CMapLoaderJson loader(&buffer);
+	auto reloaded = loader.loadMap(&reloadedCallback);
+	ASSERT_NE(reloaded, nullptr);
+	EXPECT_EQ(reloaded->width, 108);
+	EXPECT_EQ(reloaded->height, 108);
+	std::ofstream out(output, std::ios::binary);
+	ASSERT_TRUE(out.good());
+	out.write(reinterpret_cast<const char *>(buffer.getBuffer().data()), buffer.getSize());
+	out.close();
+	ASSERT_TRUE(out.good());
+	// Use the engine's occupancy and guard lookup, including wrapped guards.
+	// This is a conservative static filter, not a hero pathfinder.
+	map->toroidal = true;
+	std::ofstream grid(std::string(output) + ".walk");
+	ASSERT_TRUE(grid.good());
+	for(int y = 0; y < map->height; ++y)
+	{
+		for(int x = 0; x < map->width; ++x)
+		{
+			const int3 pos(x, y, 0);
+			const auto & tile = map->getTile(pos);
+			const bool clear = tile.isLand() && tile.entrableTerrain() && !tile.blocked() && !tile.visitable()
+				&& map->guardingCreaturePosition(pos).x < 0;
+			grid << (clear ? '.' : '#');
+		}
+		grid << '\n';
+	}
+	grid.close();
+	ASSERT_TRUE(grid.good());
+}
 
 #ifdef ENABLE_NULLKILLER2_AI
 #include "../../AI/Nullkiller2/AIGateway.h"
