@@ -84,6 +84,9 @@ demo preparation reviewable as separate changes where practical.
   exits without disconnecting zones; same-zone seam continuity needs no guard
   just because it crosses the seam. Validate routes for both players and
   measure fairness over multiple maps; establish reproducible inputs.
+  An opt-in placement heuristic now prefers the declared geometric seam
+  contacts and fails if it cannot find them. It does not construct passages;
+  the complete template-to-guard integration and graph validation remain open.
 - [ ] Implement continuous toroidal map-editor navigation, including terrain,
   object layers, selection and brush input across both axes and corners.
   The minimap must show the coordinate-reference rectangle and all wrapped

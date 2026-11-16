@@ -114,3 +114,35 @@ reachable from their respective nearby starts in a diagnostic pathfinder
 check, but their identity as the original template edges and preservation of
 every original route were not established. No balance claim follows from
 these measurements, and two attempts do not estimate the success rate.
+
+## Experimental placement constraints and graph audit
+
+`CZonePlacer` now has a diagnostic-only opt-in API for specifying pairs of
+zones that should meet across a seam. Its capacity-balancing step prefers
+assignments with at least three cardinal seam contacts for each requested
+pair, then minimizes area error. It throws if the final zone assignment does
+not satisfy that geometric condition. Three contacts need not be consecutive,
+and this heuristic does not guarantee an open, guarded or usable passage.
+The normal bounded generator does not set the constraint. There is no template
+field or supported toroidal generator yet.
+
+On this machine, for seed 2 the baseline placement had two cardinal contacts
+between zones 3 and 4 and the constrained placement had ten; for seed 4 the
+counts were one and eleven. Seed 14 had none and the constrained attempt
+explicitly failed. These examples are not a statistical performance estimate.
+In another sample of 20 distinct seeds, both requested pairs 2–3 and 2–4
+already had at least three contacts even without the constraint. The four
+zone areas in the first two constrained samples were within 84 tiles of one
+another on a 108×108 map, but this does not establish general size balance.
+An invalid requested zone also caused generation to fail.
+
+An opt-in map with constrained 2–3 and 2–4 placement was subsequently
+processed by the separate test-only guard and obstacle trial. On one saved
+sample, the static audit found no unguarded ordinary land contacts between
+distinct zones anywhere on the map, including the seams. Four server approach
+tests and two server-executed routes from one player to the new guards passed.
+The second player's access, preservation of every original graph edge,
+interaction rules, guard removal, portals, spells and balance are not covered.
+The static audit excludes guarded tiles and does not prove a complete hero
+route graph. The trial still constructs guards and barriers after placement;
+it is not a supported generator feature.
