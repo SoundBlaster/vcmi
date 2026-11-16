@@ -71,6 +71,7 @@
 #include "../../server/CVCMIServer.h"
 #include "../../server/TurnTimerHandler.h"
 #include "../../server/activities/ActivityProcessor.h"
+#include "../../server/activities/Activity.h"
 #include "../../server/battles/BattleProcessor.h"
 #include "../../server/processors/HeroPoolProcessor.h"
 #include "../../server/processors/PlayerMessageProcessor.h"
@@ -3771,6 +3772,56 @@ TEST_F(HeroMovementTest, MovementAcknowledgementReportsRejectedAndAcceptedReques
 	ASSERT_TRUE(server.results.contains(2));
 	EXPECT_TRUE(server.results.at(2));
 	EXPECT_EQ(hero->visitablePos(), int3(10, 10, 0));
+}
+
+TEST_F(HeroMovementTest, ActivityBlockedMovementIsRejectedWithoutMovementPacket)
+{
+	const PlayerColor player(0);
+	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
+	builder.size(36, false).playerActive(player).hero(int3(11, 10, 0), HeroTypeID(0), player);
+	startWithMap(std::move(builder));
+	gameState()->actingPlayers.insert(player);
+	auto * hero = findHeroByOwner(player);
+	ASSERT_NE(hero, nullptr);
+	const auto origin = hero->visitablePos();
+
+	class BlockingActivity final : public Activity
+	{
+	public:
+		BlockingActivity(CGameHandler * handler, PlayerColor owner) : Activity(handler, ActivityType::MapObjectVisit)
+		{
+			addPlayer(owner);
+		}
+		bool blocksPack(const CPackForServer * pack) const override { return blockAllButReply(pack); }
+	};
+	class Capture final : public GameHandlerTestServer
+	{
+	public:
+		using GameHandlerTestServer::GameHandlerTestServer;
+		std::optional<bool> accepted;
+		int movementPackets = 0;
+		void sendPack(CPackForClient & pack, GameConnectionID) override
+		{
+			if(const auto * response = dynamic_cast<const PackageApplied *>(&pack))
+				accepted = response->result;
+		}
+		void applyPack(CPackForClient & pack) override
+		{
+			if(dynamic_cast<const TryMoveHero *>(&pack))
+				++movementPackets;
+			GameHandlerTestServer::applyPack(pack);
+		}
+	} server(gameState(), player);
+	CGameHandler handler(server, gameState());
+	handler.activities->addActivity(std::make_shared<BlockingActivity>(&handler, player));
+	MoveHero request({hero->convertFromVisitablePos(origin + int3(1, 0, 0))}, EPathfindingLayer::LAND, hero->id, false);
+	request.player = player;
+	request.requestID = 1;
+	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, request);
+	ASSERT_TRUE(server.accepted.has_value());
+	EXPECT_FALSE(*server.accepted);
+	EXPECT_EQ(server.movementPackets, 0);
+	EXPECT_EQ(hero->visitablePos(), origin);
 }
 
 TEST_F(HeroMovementTest, monstersGuardAcrossToroidalEdgesAndCorners)

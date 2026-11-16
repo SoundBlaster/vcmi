@@ -92,3 +92,24 @@ acknowledgement test passed. The preceding full run at `e46d07a` passed 1,500
 tests from 226 suites with four disabled; this step changes a source comment,
 adds assertions to an existing test and updates documentation, rather than
 changing the packet handling code.
+
+## Activity-blocked movement and the human client
+
+On 2026-11-16, a focused bounded-map server fixture installed a synthetic
+activity that blocks movement, then submitted a `MoveHero` request through
+`handleReceivedPack`. The server returned `PackageApplied.result=false`,
+emitted no `TryMoveHero` through the test server's apply path, and left the
+hero at the origin. This complements the earlier partial-movement test; both
+passed on macOS arm64 using `6aa6e57` plus this test. XML is
+`runtime/activity-blocked-movement-2026-11-16.xml` under the TB5 build root.
+
+Source inspection shows `CPlayerInterface::requestRealized` ignores that
+result and calls `onMoveHeroApplied`; if movement is active, a path remains,
+no dialog is busy, and the next node is in the current turn, that method can
+send another movement request. The fixture does not run the graphical client
+or establish that those conditions occur together in normal play, so a live
+retry loop is a risk, not an observed one. A negative acknowledgement can
+also follow a partially applied batch. Any fix must stop or reconcile the
+affected route using authoritative state and associate the acknowledgement
+with its request; treating every unrelated failed movement reply as belonging
+to the current hero could interrupt another route.

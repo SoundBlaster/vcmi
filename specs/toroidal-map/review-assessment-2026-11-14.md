@@ -22,6 +22,12 @@ threads, all unresolved, including outdated threads; there was no next page.
 Their themes match the assessment below. The check did not post replies or
 change thread status, and does not make the experimental branch merge-ready.
 
+The PR was read again on 2026-11-16 at head `6aa6e57`: all 17 threads were
+still unresolved, with no further page. The activity-blocked movement case
+has since received a focused [server reproduction](evidence/topology-acknowledgement-review-2026-11-14.md#activity-blocked-movement-and-the-human-client);
+the corresponding human-client retry remains unverified. No review reply or
+thread state was changed.
+
 | Review item | Assessment and branch evidence | Remaining question |
 | --- | --- | --- |
 | F1: turn can stall in AIR/WATER | Confirmed by [normal fog exploration](evidence/topology-stranded-fog-reproduction-2026-11-14.md). Fixed the timer gate and added [conditional return](evidence/topology-transient-origin-return-2026-11-14.md), [group prevalidation](evidence/topology-multiple-transient-return-2026-11-14.md), a [disk-save check](evidence/topology-return-origin-disk-save-2026-11-14.md), and [conditional aviation recovery](evidence/topology-aviate-multistep-2026-11-14.md). Nullkiller2 now [backs off rejected end-turn requests](evidence/topology-ai-endturn-backoff-2026-11-14.md). | No general liveness guarantee for old saves without an origin, unavailable origins and other cases. Backoff reduces load but does not resolve a permanently blocked turn. G12 remains pending. |
