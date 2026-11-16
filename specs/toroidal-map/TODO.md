@@ -72,6 +72,11 @@ demo preparation reviewable as separate changes where practical.
 
 ## 4. Earth demo and authoring
 
+- [ ] Implement continuous toroidal map-editor navigation, including terrain,
+  object layers, selection and brush input across both axes and corners.
+  The minimap must show the coordinate-reference rectangle and all wrapped
+  viewport portions. Verify real editor interactions and retain bounded-map
+  behavior; the current viewport layers clamp rendering to one map period.
 - [ ] Review Earth draft object footprints and collisions for issues affecting
   actual play, preserving the source and a reproducible local test copy.
   A [mask audit](evidence/earth-object-overlap-audit-2026-11-15.md) identifies

@@ -98,6 +98,9 @@ constraints:
   - id: authoring
     level: MUST
     statement: A supported toroidal map can be authored with passable and visually coherent seam crossings; any supported random generator must account for the topology rather than merely connecting unrelated generated edges after the fact.
+  - id: editor_toroidal_navigation
+    level: MUST
+    statement: In the map editor, a toroidal level can be scrolled continuously across either seam and corners, displaying adjacent map content and addressing canonical tiles consistently for selection, painting and object manipulation. The minimap identifies the original rectangle as a coordinate reference rather than an impassable border, shows all portions of the visible area across seams, and navigates to the corresponding location. Existing bounded-map navigation remains unchanged.
   - id: ai
     level: MUST
     statement: An AI advertised as supporting toroidal maps must plan and act using legal wrapped routes and must not assume that cells across a seam are far apart. Unsupported AI profiles must be identified rather than silently advertised as compatible.
