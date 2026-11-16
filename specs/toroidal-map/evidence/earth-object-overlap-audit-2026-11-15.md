@@ -100,3 +100,25 @@ request. Both tree-present and tree-removed variants passed, and each still
 asserted removal of the map object. XML is
 `runtime/earth-artifact-tree-inventory-{present,removed}-2026-11-16.xml` on
 TB5. The previous limitations about staged placement and other overlaps apply.
+
+## Two shipyards and an occupied town
+
+Two additional candidate overlaps involve `shipyard_10611` with
+`iceBlock_9660`, and `shipyard_11031` with both `hotaBushes_10247` and
+`spruces_10255`. In separate initialized current-draft games, the test fully
+revealed the map and staged the red hero near each shipyard. The normal
+pathfinder and server movement reached its visitable cell with all decorations
+still present. The server then built a boat at `(16,272,0)` and `(56,69,0)`,
+respectively, and the test verified a boat object at each location. Both
+passed on macOS arm64 using `b70e9e5` plus the diagnostic extension; XML:
+`runtime/overlap-boat-final-shipyard_{10611,11031}-2026-11-16.xml` on TB5.
+This does not prove either yard is reachable from a starting town, boat
+boarding, every approach direction, or behavior after other map changes.
+
+For `randomTown_7497`, whose visitable mask overlaps `flowers_10066`, the
+pathfinder found a route from the staged neighboring tile. An exploratory
+visit test expected the town to be the top object and failed: the initialized
+tile was instead topped by `randomHero_11991`. The test did not remove that
+hero or attempt a battle or exchange, so it does not establish that the
+flowers block the town or that an unoccupied visit works. No changes were made
+to the map for these checks.

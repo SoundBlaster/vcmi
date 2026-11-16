@@ -1121,6 +1121,22 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 					break;
 				}
 			}
+			if(std::getenv("VCMI_INSPECT_EARTH_OVERLAP_BUILD_BOAT"))
+			{
+				ASSERT_EQ(hero->visitablePos(), target);
+				const auto * shipyard = dynamic_cast<const CGShipyard *>(map.getObject(targetId));
+				ASSERT_NE(shipyard, nullptr);
+				const auto boatPos = shipyard->bestLocation();
+				const auto status = shipyard->shipyardStatus();
+				std::cout << "Overlap shipyard boat location=" << boatPos.toString() << " status=" << static_cast<int>(status) << std::endl;
+				ASSERT_EQ(status, IBoatGenerator::GOOD);
+				ASSERT_TRUE(handler.buildBoat(shipyard->id, hero->getOwner()));
+				EXPECT_TRUE(std::ranges::any_of(map.getTile(boatPos).visitableObjects, [&](const auto & id)
+				{
+					const auto * object = map.getObject(id);
+					return object && object->ID == Obj::BOAT;
+				}));
+			}
 		}
 		else
 		{
