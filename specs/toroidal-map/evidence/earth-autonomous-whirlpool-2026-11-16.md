@@ -88,3 +88,21 @@ Both launch profiles now use those maps. The previous demo map remains at
 `earth-portal-approach-2026-11-16.vmap`, and the previous preview is kept as
 `earth-seam-preview-before-whirlpool-2026-11-16.vmap.bak`. Game assets and
 third-party map data remain outside the repository.
+
+## Graphical preview after repair
+
+The actual preview profile map with SHA-256 `e14da15866653f5bf585d7b580efa2e83b64d14eba3466298c01b24652d2d64f`
+was launched in an isolated profile using the macOS arm64 graphical client
+with `--preview-map` and the diagnostic observation and command channels.
+The selected human hero started at `(0,425,0)` with 1,560 movement points.
+One accepted `shortcut west` command was followed by the observed position
+`(251,425,0)` with 1,485 points. The observation is
+`runtime/earth-whirlpool-gui-qa2-2026-11-16/observation.jsonl` under the TB5
+build root; the test process was stopped afterwards. This checks startup and
+state progression, not the visual continuity of the animation.
+
+A first attempt loaded the map and observed the selected hero but did not
+create a command socket: its path was directly under shared `/tmp`, whereas
+the channel requires a user-owned private parent directory. The second run
+used a private temporary directory and completed. This was a test setup error,
+not evidence of a game failure or a macOS permissions prompt.
