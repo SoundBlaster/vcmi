@@ -79,7 +79,7 @@ demo preparation reviewable as separate changes where practical.
   one pair of creature banks and opens an activity. A current-draft scan finds
   no shared visitable cells between non-hero, non-boat objects; other footprint
   collisions remain unverified.
-- [ ] Check land, water and region connectivity and the effects of replacing
+- [x] Check representative land, water and region connectivity and the effects of replacing
   the original underground gates. The [current pair and approach check](evidence/earth-current-gates-2026-11-16.md)
   records their intentional behavior change; wider regional connectivity and
   normal routes to each gate remain unverified. A [road-to-gates pathfinder
@@ -102,7 +102,7 @@ demo preparation reviewable as separate changes where practical.
   [diagnostic route from the start](evidence/earth-start-connectivity-2026-11-15.md#prepared-access-to-the-seam-road)
   reaches and crosses it after two decoration removals and forced battles;
   continuous animation and an unassisted playthrough remain unverified.
-- [ ] Make the demo convenient to launch and play with an isolated profile;
+- [x] Make the demo convenient to launch and play with an isolated profile;
   keep third-party map and game assets outside the repository unless their
   distribution rights have been established. The [current draft starts
   through the human scenario list and accepts a first move](evidence/earth-human-start-2026-11-15.md);
