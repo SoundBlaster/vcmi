@@ -21,6 +21,20 @@ struct TileRectangle
 	int height;
 };
 
+/// Visible portions of a viewport, in the canonical minimap rectangle.
+inline std::vector<TileRectangle> wrappedViewportAreas(int x, int y, int viewportWidth, int viewportHeight, int width, int height)
+{
+	if(viewportWidth <= 0 || viewportHeight <= 0 || width <= 0 || height <= 0)
+		return {};
+	const auto xs = MapTopology::splitWrappedInterval(x, viewportWidth, width);
+	const auto ys = MapTopology::splitWrappedInterval(y, viewportHeight, height);
+	std::vector<TileRectangle> result;
+	for(const auto & [left, w] : xs)
+		for(const auto & [top, h] : ys)
+			result.push_back({left, top, w, h});
+	return result;
+}
+
 inline std::optional<int3> roadSourceAbove(const MapTopology & topology, const int3 & tile)
 {
 	return topology.canonicalize(tile + int3(0, -1, 0));

@@ -56,6 +56,20 @@ void MinimapView::mousePressEvent(QMouseEvent* event)
 	mouseMoveEvent(event);
 }
 
+void MinimapView::drawForeground(QPainter * painter, const QRectF & rect)
+{
+	QGraphicsView::drawForeground(painter, rect);
+	if(!controller || !controller->map() || !controller->map()->toroidal)
+		return;
+	painter->save();
+	QPen referencePen(QColor(40, 210, 225), 0, Qt::DashLine);
+	referencePen.setCosmetic(true);
+	painter->setPen(referencePen);
+	painter->setBrush(Qt::NoBrush);
+	painter->drawRect(QRectF(0, 0, controller->map()->width, controller->map()->height));
+	painter->restore();
+}
+
 #ifdef ENABLE_SINGLE_APP_BUILD
 namespace MapEditor {
 #endif

@@ -880,7 +880,13 @@ void MinimapViewLayer::draw()
 	//maybe not optimal but ok
 	QPainter painter(pixmap.get());
 	painter.setPen(Qt::white);
-	painter.drawRect(x, y, w, h);
+	if(map->toroidal)
+	{
+		for(const auto & area : TerrainViewTopology::wrappedViewportAreas(x, y, w, h, map->width, map->height))
+			painter.drawRect(area.x, area.y, area.width - 1, area.height - 1);
+	}
+	else
+		painter.drawRect(x, y, w, h);
 	
 	redraw();
 }

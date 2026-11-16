@@ -69,6 +69,26 @@ TEST(MapTopology, EditorRoadAndRedrawCrossToroidalSeams)
 	}
 }
 
+TEST(MapTopology, EditorMinimapViewportCoversWrappedTiles)
+{
+	const MapTopology topology(7, 5, 1, true);
+	for(const auto & [x, y, width, height] : std::vector<std::array<int, 4>>{
+		{1, 1, 3, 2}, {-1, 1, 3, 2}, {6, 4, 3, 3}, {-9, -7, 10, 8}, {0, 0, 7, 5}})
+	{
+		std::set<int3> expected, actual;
+		for(int dx = 0; dx < width; ++dx)
+			for(int dy = 0; dy < height; ++dy)
+				expected.insert(*topology.canonicalize({x + dx, y + dy, 0}));
+		for(const auto & area : TerrainViewTopology::wrappedViewportAreas(x, y, width, height, 7, 5))
+			for(int dx = 0; dx < area.width; ++dx)
+				for(int dy = 0; dy < area.height; ++dy)
+					EXPECT_TRUE(actual.insert({area.x + dx, area.y + dy, 0}).second);
+		EXPECT_EQ(actual, expected);
+	}
+	EXPECT_TRUE(TerrainViewTopology::wrappedViewportAreas(0, 0, 0, 1, 7, 5).empty());
+	EXPECT_TRUE(TerrainViewTopology::wrappedViewportAreas(0, 0, 1, 1, 0, 5).empty());
+}
+
 TEST(MapTopology, EditorSquareBrushWrapsOnlyOnToroidalMaps)
 {
 	for(int level = 0; level < 2; ++level)

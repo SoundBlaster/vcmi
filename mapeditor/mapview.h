@@ -153,6 +153,9 @@ public:
 public slots:
 	void mouseMoveEvent(QMouseEvent * mouseEvent) override;
 	void mousePressEvent(QMouseEvent * event) override;
+
+protected:
+	void drawForeground(QPainter * painter, const QRectF & rect) override;
 	
 signals:
 	void cameraPositionChanged(const QPointF & newPosition);
