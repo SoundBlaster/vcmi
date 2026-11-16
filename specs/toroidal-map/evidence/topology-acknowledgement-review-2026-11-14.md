@@ -143,5 +143,28 @@ reported `(0,425) → (251,425) → (250,425) → (249,425)`, with movement poin
 `1560 → 1260`; the client was force-stopped afterwards. The observation is
 `runtime/earth-move-ack-qa-2026-11-16/observe-final.jsonl` on TB5. This is a
 positive graphical route, not a live rejected acknowledgement or a complete
-multiplayer test. A real GUI rejection, unrelated concurrent commands and
+multiplayer test. A natural GUI rejection, unrelated concurrent commands and
 remote network timing remain unverified.
+
+## Graphical rejection and manual retry
+
+On 2026-11-16, the client and server based on `f44cd5a` were built with a
+temporary, opt-in server instrumentation that returned a negative
+`PackageApplied` for the first `MoveHero`, before applying any movement. In
+an isolated macOS arm64 Earth seam-preview profile, two diagnostic clicks
+selected a three-step westbound route. The server log records request 6 and
+the injected rejection at `05:01:33.136`; the observed hero remained at
+`(0,425,0)` with 1,500 movement points. No further movement request appeared
+before the next user-equivalent click at `05:01:56.260` (about 23 seconds).
+That click resumed the route: requests 7–9 moved the hero through
+`(251,425,0)` and `(250,425,0)` to `(249,425,0)`, ending with 1,200 points.
+
+This exercised the real graphical movement controller and an injected reply,
+not a naturally occurring blocking activity, a partially applied batch,
+another concurrent hero, remote networking or visual smoothness. The client
+was force-stopped. The test-only server source was removed, and client and
+server were rebuilt; neither resulting binary contains the injection marker.
+The observation and copied client/server log are
+`runtime/earth-move-ack-qa-2026-11-16/observe-reject.jsonl` and
+`runtime/earth-move-ack-qa-2026-11-16/client-reject-verification-2026-11-16.log`
+on TB5.
