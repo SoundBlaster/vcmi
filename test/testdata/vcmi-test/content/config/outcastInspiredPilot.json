@@ -1,0 +1,48 @@
+{
+	"Outcast-Inspired Pilot": {
+		"description": "Diagnostic two-player approximation; not Jebus Outcast compatibility.",
+		"minSize": "l", "maxSize": "xl", "players": "2",
+		"allowedWaterContent": ["none"],
+		"settings": { "heroes": { "perPlayerOnMapCap": 1, "perPlayerTotalCap": 1 } },
+		"bannedSkills": ["vcmi-test:runes", "vcmi-test:levelGranting", "vcmi-test:offerCooldownOne", "vcmi-test:offerCooldownTwo"],
+		"bannedSpells": ["vcmi-test:testRestoreWarMachine", "vcmi-test:testSummonSameUnit"],
+		"bannedHeroes": ["vcmi-test:shieldSpecialist", "vcmi-test:airShieldSpecialist", "vcmi-test:frenzySpecialist", "vcmi-test:forgetfulnessSpecialist"],
+		"zones": {
+			"1": {
+				"type": "playerStart", "size": 10, "owner": 1,
+				"playerTowns": { "castles": 2 }, "neutralTowns": { "towns": 2 },
+				"mines": { "wood": 3, "ore": 3, "mercury": 1, "sulfur": 1, "crystal": 1, "gems": 1, "gold": 1 },
+				"treasure": [ { "min": 12000, "max": 22000, "density": 2 }, { "min": 5000, "max": 12000, "density": 11 }, { "min": 100, "max": 5000, "density": 7 } ]
+			},
+			"2": {
+				"type": "playerStart", "size": 10, "owner": 2,
+				"playerTowns": { "castles": 2 }, "neutralTowns": { "towns": 2 },
+				"minesLikeZone": 1, "treasureLikeZone": 1
+			},
+			"3": {
+				"type": "treasure", "size": 64, "neutralTowns": { "castles": 5 },
+				"terrainTypes": ["sand"], "matchTerrainToTown": false,
+				"treasure": [ { "min": 30000, "max": 40000, "density": 2 }, { "min": 20000, "max": 30000, "density": 10 }, { "min": 10000, "max": 20000, "density": 10 } ]
+			},
+			"4": {
+				"type": "treasure", "size": 4, "mines": { "gold": 2 },
+				"treasure": [ { "min": 3000, "max": 8000, "density": 25 }, { "min": 100, "max": 3000, "density": 50 } ]
+			},
+			"5": { "type": "treasure", "size": 4, "minesLikeZone": 4, "treasureLikeZone": 4 }
+		},
+		"connections": [
+			{ "a": "1", "b": "3", "guard": 45000, "road": "true" },
+			{ "a": "1", "b": "3", "guard": 45000, "road": "true" },
+			{ "a": "1", "b": "3", "guard": 45000, "road": "true" },
+			{ "a": "1", "b": "3", "guard": 45000, "road": "true" },
+			{ "a": "2", "b": "3", "guard": 45000, "road": "true" },
+			{ "a": "2", "b": "3", "guard": 45000, "road": "true" },
+			{ "a": "2", "b": "3", "guard": 45000, "road": "true" },
+			{ "a": "2", "b": "3", "guard": 45000, "road": "true" },
+			{ "a": "3", "b": "4", "type": "forcePortal", "guard": 30000, "road": "false" },
+			{ "a": "3", "b": "5", "type": "forcePortal", "guard": 30000, "road": "false" },
+			{ "a": "1", "b": "4", "type": "fictive", "guard": 6000 },
+			{ "a": "2", "b": "5", "type": "fictive", "guard": 6000 }
+		]
+	}
+}

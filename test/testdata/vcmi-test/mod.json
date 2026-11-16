@@ -12,7 +12,7 @@
 	"skills" : [ "config/hotaSkills.json", "config/skills.json" ],
 	"spells" : [ "config/hotaSpells.json", "config/spells.json" ],
 	"bonuses" : [ "config/hotaBonuses.json" ],
-	"templates" : [ "config/twoRouteExperiment.json" ],
+	"templates" : [ "config/twoRouteExperiment.json", "config/outcastInspiredPilot.json" ],
 	"objects" : {
 		"questGate" : {
 			"name" : "Quest Gate",

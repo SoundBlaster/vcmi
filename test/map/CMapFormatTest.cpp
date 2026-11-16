@@ -112,13 +112,14 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 		GTEST_SKIP() << "Set VCMI_RMG_PROBE_OUTPUT to generate a local diagnostic map";
 	const char * templateName = std::getenv("VCMI_RMG_PROBE_TEMPLATE");
 	const bool twoRoute = templateName && std::string(templateName) == "vcmi-test:Two Route Experiment";
+	const bool outcastPilot = templateName && std::string(templateName) == "vcmi-test:Outcast-Inspired Pilot";
 	const auto * tpl = LIBRARY->tplh->getTemplate(templateName ? templateName : "vcmi:Jebus Cross");
 	ASSERT_NE(tpl, nullptr);
 	CMapGenOptions options;
 	options.setWidth(108);
 	options.setHeight(108);
 	options.setLevels(1);
-	options.setHumanOrCpuPlayerCount(twoRoute ? 2 : 4);
+	options.setHumanOrCpuPlayerCount(twoRoute || outcastPilot ? 2 : 4);
 	options.setCompOnlyPlayerCount(0);
 	options.setTeamCount(0);
 	options.setCompOnlyTeamCount(0);
@@ -138,9 +139,11 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	}
 	if(std::getenv("VCMI_RMG_TRY_SEAM_PLACEMENT"))
 	{
-		ASSERT_TRUE(twoRoute) << "The experimental seam constraints require the two-route test template";
+		ASSERT_TRUE(twoRoute || outcastPilot) << "The experimental seam constraints require a diagnostic template";
 		if(std::getenv("VCMI_RMG_TRY_DIFFICULT_SEAM"))
 			generator.getZonePlacer()->setExperimentalSeamAdjacencies({{3, 4}});
+		else if(outcastPilot)
+			generator.getZonePlacer()->setExperimentalSeamAdjacencies({{1, 3}, {2, 3}});
 		else
 			generator.getZonePlacer()->setExperimentalSeamAdjacencies({{2, 3}, {2, 4}});
 		if(std::getenv("VCMI_RMG_RESERVE_SEAM_APPROACHES"))
@@ -155,6 +158,17 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	});
 	ASSERT_NE(map, nullptr);
 	ASSERT_EQ(zones.size(), static_cast<size_t>(map->width * map->height));
+	if(outcastPilot)
+	{
+		// Test-only spells must not leak from the fixture mod into saved towns.
+		const std::set<SpellID> fixtureSpells = {
+			SpellID(SpellID::decode("vcmi-test:testRestoreWarMachine")),
+			SpellID(SpellID::decode("vcmi-test:testSummonSameUnit"))
+		};
+		for(const auto & object : map->objects)
+			if(auto * town = dynamic_cast<CGTownInstance *>(object.get()))
+				std::erase_if(town->possibleSpells, [&](const SpellID & spell) { return fixtureSpells.contains(spell); });
+	}
 	if(std::getenv("VCMI_RMG_RESERVE_SEAM_APPROACHES"))
 		for(const auto & approach : generator.getZonePlacer()->getExperimentalSeamApproaches())
 			std::cout << "Reserved seam approach " << approach.zoneA << "-" << approach.zoneB << " "
@@ -189,6 +203,13 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	ASSERT_NE(reloaded, nullptr);
 	EXPECT_EQ(reloaded->width, 108);
 	EXPECT_EQ(reloaded->height, 108);
+	if(outcastPilot)
+	{
+		ASSERT_EQ(map->getSettings().getInteger(EGameSettings::HEROES_PER_PLAYER_ON_MAP_CAP), 1);
+		ASSERT_EQ(map->getSettings().getInteger(EGameSettings::HEROES_PER_PLAYER_TOTAL_CAP), 1);
+		ASSERT_EQ(reloaded->getSettings().getInteger(EGameSettings::HEROES_PER_PLAYER_ON_MAP_CAP), 1);
+		ASSERT_EQ(reloaded->getSettings().getInteger(EGameSettings::HEROES_PER_PLAYER_TOTAL_CAP), 1);
+	}
 	if(twoRoute)
 	{
 		for(const auto * spell : {"core:fly", "core:dimensionDoor", "core:waterWalk"})
@@ -301,7 +322,9 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			// These are additional edges, independent of the template's inland
 			// connections between the same pairs. This is test data, not yet a
 			// supported template field or a balanced two-player layout.
-			const std::array<std::pair<int, int>, 2> intendedSeamEdges = {{{2, 3}, {2, 4}}};
+			const std::array<std::pair<int, int>, 2> intendedSeamEdges = outcastPilot
+				? std::array<std::pair<int, int>, 2>{{{1, 3}, {2, 3}}}
+				: std::array<std::pair<int, int>, 2>{{{2, 3}, {2, 4}}};
 			int selectedStart = -1;
 			std::set<int> selectedTreasures;
 			for(int guardIndex = 0; guardIndex < requestedGuards; ++guardIndex)
@@ -326,7 +349,7 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 				const auto & first = map->getTile(candidate.first);
 				const auto & second = map->getTile(candidate.second);
 				if(!connectsStartAndTreasure || (requestedGuards == 2 && std::make_pair(startZone, treasureZone) != intendedSeamEdges[guardIndex])
-				   || (selectedStart != -1 && startZone != selectedStart) || selectedTreasures.contains(treasureZone)
+				   || (!outcastPilot && ((selectedStart != -1 && startZone != selectedStart) || selectedTreasures.contains(treasureZone)))
 				   || protectedCells.contains(candidate.first) || protectedCells.contains(candidate.second)
 				   || !candidate.firstToSecond || !candidate.secondToFirst || first.visitable() || second.visitable()
 				   || first.hasRoad() || second.hasRoad())
@@ -364,7 +387,7 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			ASSERT_NE(guard, nullptr);
 			guard->initialCharacter = CGCreature::Character::HOSTILE;
 			guard->neverFlees = true;
-			guard->putStack(SlotID(0), std::make_unique<CStackInstance>(map->cb, creature, std::max(1, 12000 / value)));
+			guard->putStack(SlotID(0), std::make_unique<CStackInstance>(map->cb, creature, std::max(1, (outcastPilot ? 45000 : 12000) / value)));
 			CRandomGenerator guardRandom(12345);
 			rmg::Object object(guard);
 			object.setTemplate(map->getTile(crossing->first).getTerrainID(), guardRandom);
@@ -416,7 +439,7 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			return zones[tile.y * map->width + tile.x];
 		}, !closeAllZoneContacts);
 		std::cout << "Experimental barriers placed: " << placed << ", remaining unguarded contacts: " << remaining.size() << std::endl;
-		EXPECT_TRUE(remaining.empty());
+		ASSERT_TRUE(remaining.empty());
 		CMemoryBuffer closedBuffer;
 		{
 			CMapSaverJson closedSaver(&closedBuffer);
@@ -1419,7 +1442,9 @@ TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
 			auto & map = state->getMap();
 			if(guardPos == guards.front()[0] && approach == guards.front()[1])
 			{
+				const bool outcastPilot = std::getenv("VCMI_RMG_OUTCAST_PILOT") != nullptr;
 				bool anyStartingHeroReachesBoth = false;
+				std::set<int> playersReachingOwnGuard;
 				for(const auto & id : map.getHeroesOnMap())
 				{
 					auto * startingHero = dynamic_cast<CGHeroInstance *>(map.getObject(id));
@@ -1433,10 +1458,13 @@ TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
 					auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *state, startingHero);
 					CPathfinder(*state, config).calculatePaths();
 					bool reachesBoth = true;
-					for(const auto & trial : guards)
+					for(size_t guardIndex = 0; guardIndex < guards.size(); ++guardIndex)
 					{
+						const auto & trial = guards[guardIndex];
 						const auto * node = paths.getPathInfo(trial[0], EPathfindingLayer::LAND);
 						reachesBoth = reachesBoth && node->reachable();
+						if(outcastPilot && startingHero->getOwner().getNum() == guardIndex && node->reachable())
+							playersReachingOwnGuard.insert(static_cast<int>(guardIndex));
 						std::cout << "Starting player=" << startingHero->getOwner().getNum()
 						          << " hero=" << startingHero->visitablePos().toString()
 						          << " guard=" << trial[0].toString() << " reachable=" << node->reachable();
@@ -1465,7 +1493,10 @@ TEST(MapFormat, GeneratedSeamGuardsStartBattlesFromBothSides)
 					}
 					anyStartingHeroReachesBoth = anyStartingHeroReachesBoth || reachesBoth;
 				}
-				EXPECT_TRUE(anyStartingHeroReachesBoth) << "Neither starting hero can reach both seam guards";
+				if(outcastPilot)
+					EXPECT_EQ(playersReachingOwnGuard.size(), 2u) << "Each player must reach their own seam guard";
+				else
+					EXPECT_TRUE(anyStartingHeroReachesBoth) << "Neither starting hero can reach both seam guards";
 			}
 			CGHeroInstance * hero = nullptr;
 			for(const auto & id : map.getHeroesOnMap())
@@ -1507,7 +1538,10 @@ TEST(MapFormat, StartingHeroCanReachEachGeneratedSeamGuard)
 	{
 		std::ifstream traceFile(std::string(base) + ".connections");
 		ASSERT_TRUE(traceFile.good());
-		const std::map<int, std::pair<int, int>> expectedEdges = {{0, {1, 3}}, {1, {2, 3}}, {2, {1, 4}}, {3, {2, 4}}};
+		const bool outcastPilot = std::getenv("VCMI_RMG_OUTCAST_PILOT") != nullptr;
+		const std::map<int, std::pair<int, int>> expectedEdges = outcastPilot
+			? std::map<int, std::pair<int, int>>{{0, {1, 3}}, {1, {1, 3}}, {2, {1, 3}}, {3, {1, 3}}, {4, {2, 3}}, {5, {2, 3}}, {6, {2, 3}}, {7, {2, 3}}}
+			: std::map<int, std::pair<int, int>>{{0, {1, 3}}, {1, {2, 3}}, {2, {1, 4}}, {3, {2, 4}}};
 		std::set<int> seenEdges;
 		int id, zoneA, zoneB, x, y, z;
 		while(traceFile >> id >> zoneA >> zoneB >> x >> y >> z)
@@ -1520,7 +1554,7 @@ TEST(MapFormat, StartingHeroCanReachEachGeneratedSeamGuard)
 			ASSERT_LE(startZone, 2);
 			targets.emplace_back(int3(x, y, z), startZone - 1);
 		}
-		ASSERT_EQ(targets.size(), 4u) << "All four original edges must be directly guarded";
+		ASSERT_EQ(targets.size(), expectedEdges.size()) << "All original edges must be directly guarded";
 	}
 	else
 	{
@@ -1528,7 +1562,7 @@ TEST(MapFormat, StartingHeroCanReachEachGeneratedSeamGuard)
 		ASSERT_TRUE(guardFile.good());
 		int gx, gy, ax, ay, bx, by;
 		while(guardFile >> gx >> gy >> ax >> ay >> bx >> by)
-			targets.emplace_back(int3(gx, gy, 0), -1);
+			targets.emplace_back(int3(gx, gy, 0), std::getenv("VCMI_RMG_OUTCAST_PILOT") ? static_cast<int>(targets.size()) : -1);
 		ASSERT_EQ(targets.size(), 2u);
 	}
 	std::ifstream mapFile(std::string(base) + ".closed.vmap", std::ios::binary);
