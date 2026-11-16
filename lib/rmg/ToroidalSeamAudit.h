@@ -29,12 +29,13 @@ struct SeamContact
 	bool secondToFirst;
 };
 
-/// Identify possible unguarded ground contacts between distinct zones.
+/// Identify possible unguarded ground contacts between distinct zones. When
+/// seamOnly is false, include both internal and wrapped contacts.
 /// This is a static audit, not a replacement for player pathfinding: it does
 /// not model visits, fog, boats, spells or changes to guards. Nonblocking
 /// visitable objects remain candidates rather than being silently excluded.
 template<class ZoneAt>
-std::vector<SeamContact> findUnguardedSeamContacts(const CMap & map, ZoneAt zoneAt)
+std::vector<SeamContact> findUnguardedZoneContacts(const CMap & map, ZoneAt zoneAt, bool seamOnly)
 {
 	if(!map.toroidal)
 		throw std::invalid_argument("seam audit requires toroidal topology");
@@ -55,7 +56,7 @@ std::vector<SeamContact> findUnguardedSeamContacts(const CMap & map, ZoneAt zone
 		for(int y = 0; y < map.height; ++y)
 			for(int x = 0; x < map.width; ++x)
 			{
-				if(x != 0 && x != map.width - 1 && y != 0 && y != map.height - 1)
+				if(seamOnly && x != 0 && x != map.width - 1 && y != 0 && y != map.height - 1)
 					continue;
 				const int3 first(x, y, z);
 				if(!eligible(first))
@@ -63,7 +64,7 @@ std::vector<SeamContact> findUnguardedSeamContacts(const CMap & map, ZoneAt zone
 				for(const auto & direction : int3::getDirs())
 				{
 					const int3 raw = first + direction;
-					if(map.isInTheMap(raw))
+					if(seamOnly && map.isInTheMap(raw))
 						continue;
 					const auto second = topology.canonicalize(raw);
 					if(!second || index(first) >= index(*second) || zoneAt(first) == zoneAt(*second) || !eligible(*second))
@@ -75,6 +76,12 @@ std::vector<SeamContact> findUnguardedSeamContacts(const CMap & map, ZoneAt zone
 				}
 			}
 	return result;
+}
+
+template<class ZoneAt>
+std::vector<SeamContact> findUnguardedSeamContacts(const CMap & map, ZoneAt zoneAt)
+{
+	return findUnguardedZoneContacts(map, zoneAt, true);
 }
 
 /// Plan a set of contact endpoints to block while preserving protected cells.

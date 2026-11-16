@@ -29,6 +29,13 @@
 
 #include <limits>
 
+namespace
+{
+// A single diagonal corner contact is not a useful placement target for a
+// guarded passage. This remains a geometric heuristic, not a passability test.
+constexpr int MIN_EXPERIMENTAL_SEAM_CONTACTS = 3;
+}
+
 CZonePlacer::CZonePlacer(RmgMap & map, const ZonePlacementConfig & config)
 	: width(0), height(0), mapSize(0),
 	gravityConstant(1e-3f),
@@ -40,6 +47,20 @@ CZonePlacer::CZonePlacer(RmgMap & map, const ZonePlacementConfig & config)
 	bestTotalOverlap(1e10),
 	map(map)
 {
+}
+
+void CZonePlacer::setExperimentalSeamAdjacencies(std::vector<std::pair<TRmgTemplateZoneId, TRmgTemplateZoneId>> edges)
+{
+	for(auto & [a, b] : edges)
+	{
+		if(a == b)
+			throw rmgException("Invalid experimental seam adjacency");
+		if(a > b)
+			std::swap(a, b);
+	}
+	std::ranges::sort(edges);
+	edges.erase(std::unique(edges.begin(), edges.end()), edges.end());
+	experimentalSeamAdjacencies = std::move(edges);
 }
 
 int3 CZonePlacer::cords(const float3 & f) const
@@ -950,6 +971,26 @@ void CZonePlacer::assignZones(vstd::RNG * rand)
 		assignTilesCapacityBalanced(level, levelZones, vertices);
 	}
 
+	// Fail before filling the map if a requested seam adjacency was not
+	// produced. Adjacent cells alone do not establish a traversable passage.
+	for(const auto & [a, b] : experimentalSeamAdjacencies)
+	{
+		int contacts = 0;
+		auto matches = [&](int first, int second)
+		{
+			return (first == a && second == b) || (first == b && second == a);
+		};
+		for(int z = 0; z < levels; ++z)
+		{
+			for(int y = 0; y < height; ++y)
+				contacts += matches(map.getZoneID(int3(0, y, z)), map.getZoneID(int3(width - 1, y, z)));
+			for(int x = 0; x < width; ++x)
+				contacts += matches(map.getZoneID(int3(x, 0, z)), map.getZoneID(int3(x, height - 1, z)));
+		}
+		if(contacts < MIN_EXPERIMENTAL_SEAM_CONTACTS)
+			throw rmgException("Could not place experimental seam adjacency " + std::to_string(a) + "-" + std::to_string(b));
+	}
+
 	//set position (town position) to center of mass of irregular zone
 	for(const auto & zone : zones)
 	{
@@ -1049,6 +1090,19 @@ void CZonePlacer::assignTilesCapacityBalanced(int level, const std::vector<std::
 	std::vector<int> vertexZone(numVertices, 0);
 	std::vector<int> bestVertexZone(numVertices, 0);
 	double bestError = std::numeric_limits<double>::infinity();
+	size_t bestMissingSeamEdges = std::numeric_limits<size_t>::max();
+	std::vector<std::pair<int, int>> localSeamEdges;
+	for(const auto & [a, b] : experimentalSeamAdjacencies)
+	{
+		int first = -1, second = -1;
+		for(size_t z = 0; z < numZones; ++z)
+		{
+			if(levelZones[z]->getId() == a) first = static_cast<int>(z);
+			if(levelZones[z]->getId() == b) second = static_cast<int>(z);
+		}
+		if(first >= 0 && second >= 0)
+			localSeamEdges.emplace_back(first, second);
+	}
 	for(int iter = 0; iter < balanceIterations; ++iter)
 	{
 		std::vector<double> area(numZones, 0.0);
@@ -1077,8 +1131,27 @@ void CZonePlacer::assignTilesCapacityBalanced(int level, const std::vector<std::
 			if(area[z] <= 0)
 				allNonEmpty = false;
 		}
-		if(allNonEmpty && error < bestError)
+		size_t missing = 0;
+		for(const auto & [a, b] : localSeamEdges)
 		{
+			auto zoneAt = [&](int x, int y)
+			{
+				return vertexZone[nearestVertex[static_cast<size_t>(x) * height + y]];
+			};
+			auto matches = [&](int first, int second)
+			{
+				return (first == a && second == b) || (first == b && second == a);
+			};
+			int contacts = 0;
+			for(int y = 0; y < height; ++y)
+				contacts += matches(zoneAt(0, y), zoneAt(width - 1, y));
+			for(int x = 0; x < width; ++x)
+				contacts += matches(zoneAt(x, 0), zoneAt(x, height - 1));
+			missing += contacts < MIN_EXPERIMENTAL_SEAM_CONTACTS;
+		}
+		if(allNonEmpty && (missing < bestMissingSeamEdges || (missing == bestMissingSeamEdges && error < bestError)))
+		{
+			bestMissingSeamEdges = missing;
 			bestError = error;
 			bestVertexZone = vertexZone;
 		}

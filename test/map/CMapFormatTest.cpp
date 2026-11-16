@@ -48,6 +48,7 @@
 #include "../../lib/pathfinder/PathfinderOptions.h"
 #include "../../lib/pathfinder/TransientLanding.h"
 #include "../../lib/rmg/CMapGenerator.h"
+#include "../../lib/rmg/CZonePlacer.h"
 #include "../../lib/rmg/CRmgTemplateStorage.h"
 #include "../../lib/rmg/RmgMap.h"
 #include "../../lib/rmg/ToroidalSeamAudit.h"
@@ -124,7 +125,22 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 	options.setMapTemplate(tpl);
 	ASSERT_TRUE(options.checkOptions());
 	EditorCallback callback(nullptr);
-	CMapGenerator generator(options, &callback, 12345);
+	const char * seedValue = std::getenv("VCMI_RMG_PROBE_SEED");
+	CMapGenerator generator(options, &callback, seedValue ? std::stoi(seedValue) : 12345);
+	if(std::getenv("VCMI_RMG_TRY_INVALID_SEAM_PLACEMENT"))
+	{
+		generator.getZonePlacer()->setExperimentalSeamAdjacencies({{2, 999}});
+		EXPECT_ANY_THROW(generator.generate());
+		return;
+	}
+	if(std::getenv("VCMI_RMG_TRY_SEAM_PLACEMENT"))
+	{
+		ASSERT_TRUE(twoRoute) << "The experimental seam constraints require the two-route test template";
+		if(std::getenv("VCMI_RMG_TRY_DIFFICULT_SEAM"))
+			generator.getZonePlacer()->setExperimentalSeamAdjacencies({{3, 4}});
+		else
+			generator.getZonePlacer()->setExperimentalSeamAdjacencies({{2, 3}, {2, 4}});
+	}
 	std::vector<int> zones;
 	auto map = generator.generateWithZoneObserver([&](const RmgMap & generated)
 	{
@@ -384,6 +400,18 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			return zones[tile.y * closedMap->width + tile.x];
 		});
 		EXPECT_TRUE(afterReload.empty()) << "Unguarded contacts after save and reload: " << afterReload.size();
+		if(std::getenv("VCMI_RMG_AUDIT_ALL_ZONE_CONTACTS"))
+		{
+			const auto allContacts = rmg::findUnguardedZoneContacts(*closedMap, [&](const int3 & tile)
+			{
+				return zones[tile.y * closedMap->width + tile.x];
+			}, false);
+			std::map<std::pair<int, int>, size_t> byZonePair;
+			for(const auto & contact : allContacts)
+				++byZonePair[std::minmax(contact.firstZone, contact.secondZone)];
+			for(const auto & [pair, count] : byZonePair)
+				std::cout << "Unguarded inter-zone contacts " << pair.first << "-" << pair.second << ": " << count << std::endl;
+		}
 		std::ofstream closedFile(std::string(output) + ".closed.vmap", std::ios::binary);
 		ASSERT_TRUE(closedFile.good());
 		closedFile.write(reinterpret_cast<const char *>(closedBuffer.getBuffer().data()), closedBuffer.getSize());

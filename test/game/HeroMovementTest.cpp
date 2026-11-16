@@ -4000,6 +4000,12 @@ TEST_F(HeroMovementTest, ToroidalSeamAuditFindsUnguardedEdgesAndCornersButExclud
 	EXPECT_TRUE(has(int3(0, 0, 0), int3(35, 35, 0)));
 	EXPECT_FALSE(has(int3(0, 18, 0), int3(35, 18, 0)));
 	EXPECT_FALSE(has(int3(0, 17, 0), int3(35, 17, 0)));
+	const auto allContacts = rmg::findUnguardedZoneContacts(*map(), zones, false);
+	EXPECT_TRUE(std::ranges::any_of(allContacts, [](const auto & contact)
+	{
+		return (contact.first == int3(17, 5, 0) && contact.second == int3(18, 5, 0))
+			|| (contact.first == int3(18, 5, 0) && contact.second == int3(17, 5, 0));
+	}));
 }
 
 TEST_F(HeroMovementTest, SeamClosurePlanPreservesProtectedCellsAndCoversDiagonalContacts)

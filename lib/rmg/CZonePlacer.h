@@ -44,6 +44,11 @@ public:
 	void findPathsBetweenZones();
 	void assignZones(vstd::RNG * rand);
 	void RemoveRoadsForWideConnections();
+	/// Experimental placement constraint for diagnostics. This only requires
+	/// zones to have at least three cardinal contacts across seams; it does
+	/// not create or guard a passage.
+	/// The ordinary generator never sets it.
+	void setExperimentalSeamAdjacencies(std::vector<std::pair<TRmgTemplateZoneId, TRmgTemplateZoneId>> edges);
 
 	const TDistanceMap & getDistanceMap();
 	
@@ -99,4 +104,5 @@ private:
 	TDistanceMap distancesBetweenZones;
 	std::set<TRmgTemplateZoneId> lastSwappedZones;
 	RmgMap & map;
+	std::vector<std::pair<TRmgTemplateZoneId, TRmgTemplateZoneId>> experimentalSeamAdjacencies;
 };
