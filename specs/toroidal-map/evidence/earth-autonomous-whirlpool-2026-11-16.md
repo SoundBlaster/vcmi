@@ -35,8 +35,21 @@ not a change to general whirlpool or boat rules.
   accepted direct `MONOLITH` movements of a hero in a boat to each exit and
   the hero remained aboard. This is a staged server check, not six complete
   player-initiated whirlpool dialogs.
-- The same engine and server check passed on the seam preview. This does not
-  establish a full post-fix AI playthrough or visual animation continuity.
+- The same engine and server check passed on the seam preview.
+
+## Post-fix autonomous run
+
+A separate unseeded AI-only, headless run used the repaired map and no forced
+victories or fog reveal. It was stopped after 45 seconds, during pink's turn
+on day 29. The captured stdout contains no `Movement request for hero` failure
+and no `Cannot disembark hero, tile is blocked!` message. The full server trace
+records hero Rissa travelling from hero anchor `(251,357,0)` to `(5,264,0)`,
+and later from `(204,231,0)` to `(5,265,0)`. Both responses have result `2`
+(`TryMoveHero::TELEPORTATION`), placing the visitable position on the repaired
+whirlpool's two different rows. The game continued after these transitions.
+Logs are under `runtime/earth-autonomous-whirlpool-repair-2026-11-16/` on TB5.
+This is one random partial game, not a complete playthrough or evidence of
+visual animation continuity.
 
 The repaired local map SHA-256 is
 `ea6c4de705dba4139f2ceb780a7bc7a747c3075c2244188980d50caf16b89819`;
