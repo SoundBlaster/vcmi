@@ -179,8 +179,9 @@ risks; neither was previously reproduced as a natural gameplay failure.
 
 The controller now records the expected teleport question and its sent
 request ID. Only the matching acknowledgement clears the wait. An accepted
-answer continues the existing route; a rejection aborts automatic movement
-without undoing any server-applied effects. Unrelated, stale and duplicate
+answer continues the existing route only if the server has already sent a
+teleportation movement for that hero; otherwise automatic movement stops.
+A rejection also stops it without undoing server-applied effects. Unrelated, stale and duplicate
 acknowledgements do not release it. This applies to bounded and toroidal maps.
 It does not automatically retry the answer or resolve an activity that the
 server has kept open.
@@ -250,3 +251,35 @@ The isolated observation and client/server log are under
 `runtime/teleport-unrelated-ack-2026-11-16/` on TB5. The temporary injection
 and delay were removed from the server source and the client, server and test
 binary were rebuilt; the injection marker is absent from client and server.
+
+## An accepted answer may precede teleportation
+
+The server's `submitReply` can accept an answer for an activity that is
+temporarily covered by another activity. A focused gate test now sends a
+real `QuestionAnswer` while a test activity covers the teleport dialog:
+`PackageApplied` reports success while the hero is still at the entrance;
+only finishing the covering activity moves the hero to the paired gate.
+This establishes the server ordering in a staged test, not that it occurs
+naturally during a normal game.
+
+Client change `fff0f3b` prevents the acknowledged answer alone from
+continuing a route. It tracks the actual `TryMoveHero::TELEPORTATION` for the
+same hero. When acknowledgement arrives first, it stops automatic movement
+instead of issuing the next step prematurely; a later server teleport still
+updates the game state. This is a conservative fallback: the previously
+selected route does not resume automatically after that deferred teleport.
+It does not solve a rejected answer or a server activity that never finishes.
+
+On macOS arm64, 22 focused movement, gate, whirlpool and dialog tests passed.
+On the staged graphical portal route, the ordinary ordering still reached
+`(7,4,0)` with movement `1560 → 1360`. In a second isolated run, temporary
+server instrumentation placed a synthetic activity above the portal, sent
+the accepted acknowledgement, waited one second and finished the activity.
+No further `MoveHero` was sent after acknowledgement; the server subsequently
+teleported the hero to `(7,3,0)` with 1,460 points, where it remained for a
+four-second observation. Logs and observations are under
+`runtime/teleport-confirmed-positive-2026-11-16/` and
+`runtime/teleport-buried-gui-2026-11-16/` on TB5. The instrumentation was
+removed and the ordinary client, server and tests rebuilt; its marker is
+absent from both resulting binaries. Remote timing and naturally occurring
+buried portal activities remain unverified.
