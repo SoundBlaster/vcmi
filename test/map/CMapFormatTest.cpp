@@ -1017,8 +1017,10 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 	if(std::getenv("VCMI_INSPECT_EARTH_BANK_OVERLAP"))
 	{
 		const auto heroEntry = map.instanceNames.find("randomHero_7305");
-		const auto firstEntry = map.instanceNames.find("creatureBank_10789");
-		const auto secondEntry = map.instanceNames.find("creatureBank_11365");
+		const char * firstName = std::getenv("VCMI_INSPECT_EARTH_OVERLAP_TARGET");
+		const char * secondName = std::getenv("VCMI_INSPECT_EARTH_OVERLAP_OBSTACLE");
+		const auto firstEntry = map.instanceNames.find(firstName ? firstName : "creatureBank_10789");
+		const auto secondEntry = map.instanceNames.find(secondName ? secondName : "creatureBank_11365");
 		ASSERT_NE(heroEntry, map.instanceNames.end());
 		ASSERT_NE(firstEntry, map.instanceNames.end());
 		ASSERT_NE(secondEntry, map.instanceNames.end());
@@ -1067,6 +1069,9 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		CGameHandler handler(server, state);
 		if(std::getenv("VCMI_INSPECT_EARTH_BANK_VISIT"))
 		{
+			if(std::getenv("VCMI_INSPECT_EARTH_REMOVE_OVERLAP_OBSTACLE"))
+				ASSERT_TRUE(handler.removeObject(second, hero->getOwner()));
+			const auto targetId = first->id;
 			const auto top = map.getTile(target).topVisitableObj();
 			std::cout << "Target top object=" << (map.getObject(top) ? map.getObject(top)->instanceName : "none") << std::endl;
 			ASSERT_EQ(top, first->id);
@@ -1088,8 +1093,17 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 				ASSERT_TRUE(accepted);
 				if(index == 1)
 				{
-					EXPECT_EQ(hero->visitablePos(), target);
-					EXPECT_NE(handler.activities->topActivity(hero->getOwner()), nullptr);
+					if(firstName)
+					{
+						std::cout << "Overlap target remains=" << (map.getObject(targetId) != nullptr) << std::endl;
+						if(std::getenv("VCMI_INSPECT_EARTH_EXPECT_TARGET_REMOVED"))
+							EXPECT_EQ(map.getObject(targetId), nullptr);
+					}
+					else
+					{
+						EXPECT_EQ(hero->visitablePos(), target);
+						EXPECT_NE(handler.activities->topActivity(hero->getOwner()), nullptr);
+					}
 				}
 				if(state->getBattle(hero->getOwner()) || handler.activities->topActivity(hero->getOwner()))
 				{

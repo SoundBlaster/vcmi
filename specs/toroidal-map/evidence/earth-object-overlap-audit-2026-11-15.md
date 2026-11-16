@@ -71,3 +71,25 @@ passed on macOS arm64 with the test change on `b8955d1`; XML is
 checks one initialized state and the serialized masks, not every possible
 randomized state, hero/boat overlap, visibility ordering, or collisions of
 an interactive cell with a nonvisitable object's blocking footprint.
+
+## Artifact and tree overlap
+
+On the same current draft, `artifact_11045` has a visitable mask cell at
+`(71,258,0)` overlapping a blocking mask cell of `pineTrees_9100`. The
+opt-in engine inspection initialized the map twice, fully revealed the map,
+and placed the red hero at `(72,259,0)`. The actual pathfinder found the
+artifact tile, and server movement toward it was accepted. The artifact was
+the top visitable object and was removed from the map after the request, both
+with the trees present and after the test removed the trees in memory. The
+hero remained at the origin in both runs. Each final run asserted the object
+was removed; it did not inspect inventory or prove access from a starting town.
+The source map and saved demo were not modified.
+
+An earlier exploratory run incorrectly required the hero to occupy the
+artifact tile and an activity to open, assumptions inherited from the creature
+bank check; it failed those assertions. The comparison above records the
+observed object removal without treating that failure as a confirmed defect.
+The two final runs passed on macOS arm64 using `be65072` plus the inspection
+extension, with HotA enabled; XML files are
+`runtime/earth-artifact-tree-{present,removed}-2026-11-16.xml` under TB5.
+This is one overlap and does not establish that other candidates are safe.
