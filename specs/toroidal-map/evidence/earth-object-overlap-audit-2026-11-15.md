@@ -167,3 +167,17 @@ west from `(0,425,0)` to `(251,425,0)`, spending 75 movement points. The
 observation is `runtime/earth-move-ack-qa-2026-11-16/observe-portal-fix.jsonl`
 on TB5; the client was force-stopped. This is not a graphical visit to the
 repaired monolith or the user's visual acceptance.
+
+The `VCMI_INSPECT_EARTH_OPENED_MONOLITH_ROUTE` and
+`VCMI_INSPECT_EARTH_OPENED_MONOLITH_EXECUTE` diagnostic subsequently started
+at the red hero's original position on the repaired map. It followed the
+previous route to `shipyard_5987` with two forced wins, built and boarded a
+boat, and used the normal pathfinder to reach `(0,285,0)`. The 96-node
+server-executed route included one further forced battle. The hero entered
+`monolithTwoWay_11148`, selected the first exit in its teleport dialog and
+arrived at `(0,292,0)`. The test passed on macOS arm64 with `a9a2146` plus
+the diagnostic; log and XML are
+`runtime/earth-opened-monolith-exit-2026-11-16.{log,xml}` on TB5. The test
+revealed the map, modified creature aggression and fleeing, supplied extra
+movement and forced three wins; it does not establish normal game balance,
+unassisted travel, other exits or graphical portal behavior.

@@ -331,8 +331,9 @@ checks do not establish a fully playable or accepted demo.
 The current local Earth draft additionally [opens one monolith approach](evidence/earth-object-overlap-audit-2026-11-15.md#seam-monolith-approach-repaired)
 by removing a noninteractive decoration. A staged server visit, the earlier
 start-to-gate route and a graphical seam step passed on that revised map or
-its corresponding preview; access from the start and visual acceptance
-remain open.
+its corresponding preview. A further server run reached this monolith from
+the original hero and used one exit under modified test conditions; an
+unassisted route and visual acceptance remain open.
 
 The [TCP movement record](evidence/topology-tcp-movement-2026-11-10.md)
 also covers boat embarkation and disembarkation across one edge with two

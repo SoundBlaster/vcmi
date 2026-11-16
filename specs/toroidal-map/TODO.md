@@ -91,7 +91,8 @@ demo preparation reviewable as separate changes where practical.
   restore the misplaced entrance to water in the demo preparation recipe.
 - [ ] Address remaining placement and collision problems if they affect demo
   play. A [blocked seam monolith approach was opened](evidence/earth-object-overlap-audit-2026-11-15.md#seam-monolith-approach-repaired)
-  by removing a decoration; access from a starting town is not established.
+  by removing a decoration; a server route from the original hero reached it
+  with forced wins and other test-only changes.
   [All three water-monolith exits and one graphical route](evidence/earth-portal-road-2026-11-15.md#graphical-water-portal-and-other-exits)
   are checked from the relocated entrance; exhaustive reverse-route checks
   are deferred unless a defect or a demo requirement warrants them.

@@ -1388,6 +1388,64 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 						CPathsInfo seamPaths(state->getMapSize(), hero);
 						auto seamConfig = std::make_shared<SingleHeroPathfinderConfig>(seamPaths, *state, hero);
 						CPathfinder(*state, seamConfig).calculatePaths();
+						if(std::getenv("VCMI_INSPECT_EARTH_OPENED_MONOLITH_ROUTE"))
+						{
+							const int3 approach(0, 285, 0);
+							CGPath routeToApproach;
+							const bool found = seamPaths.getPath(routeToApproach, approach, EPathfindingLayer::LAND);
+							std::cout << "Opened monolith approach from shipyard boat=" << found
+							          << " nodes=" << routeToApproach.nodes.size() << std::endl;
+							if(std::getenv("VCMI_INSPECT_EARTH_OPENED_MONOLITH_EXECUTE"))
+							{
+								ASSERT_TRUE(found);
+								ASSERT_GE(routeToApproach.nodes.size(), 2u);
+								int forcedBattles = 0;
+								for(size_t index = routeToApproach.nodes.size() - 1; index > 0; --index)
+								{
+									const auto & step = routeToApproach.nodes[index - 1];
+									ASSERT_FALSE(step.isTeleportAction()) << step.coord.toString();
+									for(int attempt = 0; attempt < 4 && hero->visitablePos() != step.coord; ++attempt)
+									{
+										hero->setMovementPoints(30000);
+										ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(step.coord), EMovementMode::STANDARD, false, hero->getOwner(), step.layer)) << step.coord.toString();
+										if(state->getBattle(hero->getOwner()))
+										{
+											++forcedBattles;
+											routeHandler.battles->cheatBattleVictory(hero->getOwner());
+											const auto result = routeHandler.activities->topActivity(hero->getOwner());
+											ASSERT_NE(result, nullptr);
+											ASSERT_EQ(result->getType(), ActivityType::BattleDialog);
+											ASSERT_EQ(routeHandler.activities->submitReply(result->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+											for(int limit = 0; limit < 16; ++limit)
+											{
+												const auto prompt = routeHandler.activities->topActivity(hero->getOwner());
+												if(!prompt || (prompt->getType() != ActivityType::HeroLevelUpDialog && prompt->getType() != ActivityType::CommanderLevelUpDialog))
+													break;
+												ASSERT_EQ(routeHandler.activities->submitReply(prompt->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+											}
+										}
+										ASSERT_EQ(routeHandler.activities->topActivity(hero->getOwner()), nullptr) << step.coord.toString();
+									}
+									ASSERT_EQ(hero->visitablePos(), step.coord);
+								}
+								ASSERT_EQ(hero->visitablePos(), approach);
+								const auto portal = map.instanceNames.find("monolithTwoWay_11148");
+								ASSERT_NE(portal, map.instanceNames.end());
+								hero->setMovementPoints(30000);
+								ASSERT_TRUE(routeHandler.moveHero(hero->id, hero->convertFromVisitablePos(portal->second->visitablePos()), EMovementMode::STANDARD, false, hero->getOwner(), EPathfindingLayer::LAND));
+								const auto dialog = routeHandler.activities->topActivity(hero->getOwner());
+								ASSERT_NE(dialog, nullptr);
+								ASSERT_EQ(dialog->getType(), ActivityType::TeleportDialog);
+								const auto teleport = std::dynamic_pointer_cast<TeleportDialogActivity>(dialog);
+								ASSERT_NE(teleport, nullptr);
+								ASSERT_FALSE(teleport->td.exits.empty());
+								const auto exitPos = teleport->td.exits.front().second;
+								ASSERT_EQ(routeHandler.activities->submitReply(dialog->getActiveQuestionID(), hero->getOwner(), 0), ReplyOutcome::Accepted);
+								ASSERT_EQ(hero->visitablePos(), exitPos);
+								std::cout << "Reached opened monolith via boat; forced sea-route battles=" << forcedBattles << std::endl;
+								std::cout << "Opened monolith selected exit=" << exitPos.toString() << std::endl;
+							}
+						}
 						CGPath seamRoute;
 						const bool reachable = seamPaths.getPath(seamRoute, road, EPathfindingLayer::LAND);
 						std::cout << "Road route from boat reachable=" << reachable
