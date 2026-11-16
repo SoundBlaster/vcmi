@@ -77,8 +77,8 @@ demo preparation reviewable as separate changes where practical.
   The minimap must show the coordinate-reference rectangle and all wrapped
   viewport portions. Verify real editor interactions and retain bounded-map
   behavior. Repeated viewport sections and canonical input are implemented;
-  verify vertical scrolling and corners, object placement and movement, undo,
-  reload, bounded maps and smoothness before closing this task.
+  verify scrolling through corners, object placement and movement, undo,
+  bounded maps and smoothness before closing this task.
   [Initial minimap geometry](evidence/editor-minimap-reference-2026-11-16.md)
   and its reference outline are implemented and observed in a corner view.
   [Repeated viewport section geometry](evidence/editor-repeated-sections-2026-11-16.md)
