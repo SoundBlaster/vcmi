@@ -1,6 +1,6 @@
 # Jebus Cross: initial seam connectivity probe
 
-On macOS arm64, `RandomTemplateProbe.GenerateJebusCross` generated and
+On macOS arm64, the probe (now named `RandomTemplateProbe.GenerateTemplate`) generated and
 reloaded a bounded 108×108, single-level map with four players, no water,
 template `vcmi:Jebus Cross` and seed 12345. The template was the bundled
 `Mods/vcmi/Content/config/rmg/hdmod/jebusCross.json`, SHA-256
@@ -55,6 +55,6 @@ python3 specs/toroidal-map/tools/compare_walk_seams.py \
 ```
 
 To generate a new local sample, set `VCMI_RMG_PROBE_OUTPUT` to an output
-VMAP path and run `vcmitest --gtest_filter=RandomTemplateProbe.GenerateJebusCross`
+VMAP path and run `vcmitest --gtest_filter=RandomTemplateProbe.GenerateTemplate`
 with initialized VCMI game data. The test writes a `.walk` sidecar; it is
 opt-in and does not run during ordinary test invocations.

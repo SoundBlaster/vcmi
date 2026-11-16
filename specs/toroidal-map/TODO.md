@@ -74,8 +74,10 @@ demo preparation reviewable as separate changes where practical.
 
 - [ ] Compare generated template-zone connections with actual toroidal hero
   routes and guards. The [initial Jebus Cross probe](evidence/jebus-cross-seam-probe-2026-11-16.md)
-  identifies static candidate seam links, but does not retain zone IDs or prove
-  hero routes. Capture generation-time zones and establish deterministic inputs.
+  identifies static candidate seam links. A [two-route experiment](evidence/two-route-template-2026-11-16.md)
+  captures generation-time zone IDs and finds unguarded seam transitions.
+  Add guarded seam placement and actual hero-route validation; establish
+  deterministic inputs and measure player fairness.
 - [ ] Implement continuous toroidal map-editor navigation, including terrain,
   object layers, selection and brush input across both axes and corners.
   The minimap must show the coordinate-reference rectangle and all wrapped

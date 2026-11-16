@@ -72,3 +72,9 @@ generates a map and compares a conservative engine-derived occupancy grid. It
 finds candidate seam shortcuts; it does not yet correlate template zone IDs
 or establish actual hero routes. Repeating one seed produced different grids
 under the local multithreaded generator configuration.
+
+A [two-route prototype](evidence/two-route-template-2026-11-16.md) adds a
+symmetrical two-player ring graph and generation-time zone observation. One
+ordinary generated sample still has unguarded seam transitions between starts
+and treasure zones when converted in memory; the prototype is not yet a
+supported toroidal generator or a balanced playable template.
