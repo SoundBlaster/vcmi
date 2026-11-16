@@ -51,3 +51,23 @@ These observations show an approach and activity for each object in a staged,
 fully revealed test state. They do not establish normal access from a starting
 town, all approach directions, the activity's contents or completion, or
 visual quality. No map repair was applied solely because of the mask overlap.
+
+## Shared visitable cells on the current draft
+
+The current `earth-accessible-seam-2026-11-16.vmap`, SHA-256
+`67640eefaa91e9efcf04315bef66197d834e662652bd25bd10f234391c43e5a8`, was
+checked separately from the earlier pair report. A read-only scan of its
+serialized masks found 2,858 canonical cells containing at least one `A` or
+`T` visitable cell, and none containing visitable cells from two distinct
+objects. This counts both newly introduced and pre-existing overlaps, unlike
+the original pair-difference report.
+
+The opt-in `VCMI_INSPECT_EARTH_INTERACTIVE_OVERLAPS` inspection then loaded
+and initialized that draft in the engine with the HotA profile. It scanned
+every cell's actual `visitableObjects`, excluding heroes and boats, and
+asserted that no cell contained two or more remaining objects. The test
+passed on macOS arm64 with the test change on `b8955d1`; XML is
+`runtime/earth-interactive-occupancy-final-2026-11-16.xml` under TB5. This
+checks one initialized state and the serialized masks, not every possible
+randomized state, hero/boat overlap, visibility ordering, or collisions of
+an interactive cell with a nonvisitable object's blocking footprint.

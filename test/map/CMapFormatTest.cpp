@@ -991,6 +991,29 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		ASSERT_FALSE(state->players.at(PlayerColor(*aiSlot)).isHuman());
 	auto & map = state->getMap();
 	ASSERT_TRUE(map.toroidal);
+	if(std::getenv("VCMI_INSPECT_EARTH_INTERACTIVE_OVERLAPS"))
+	{
+		int shared = 0;
+		for(int z = 0; z < map.levels(); ++z)
+			for(int x = 0; x < map.width; ++x)
+				for(int y = 0; y < map.height; ++y)
+				{
+					const int3 pos(x, y, z);
+					std::vector<std::string> names;
+					for(const auto & id : map.getTile(pos).visitableObjects)
+						if(const auto * object = map.getObject(id); object && object->ID != Obj::HERO && object->ID != Obj::BOAT)
+							names.push_back(object->instanceName);
+					if(names.size() < 2)
+						continue;
+					++shared;
+					std::cout << "Shared non-hero visitable tile=" << pos.toString();
+					for(const auto & name : names)
+						std::cout << " " << name;
+					std::cout << std::endl;
+				}
+		std::cout << "Shared non-hero visitable tiles=" << shared << std::endl;
+		EXPECT_EQ(shared, 0);
+	}
 	if(std::getenv("VCMI_INSPECT_EARTH_BANK_OVERLAP"))
 	{
 		const auto heroEntry = map.instanceNames.find("randomHero_7305");

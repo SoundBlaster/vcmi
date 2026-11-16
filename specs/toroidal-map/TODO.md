@@ -76,7 +76,9 @@ demo preparation reviewable as separate changes where practical.
   actual play, preserving the source and a reproducible local test copy.
   A [mask audit](evidence/earth-object-overlap-audit-2026-11-15.md) identifies
   new interactive overlap candidates; a staged engine check reaches each of
-  one pair of creature banks and opens an activity. Other pairs are unverified.
+  one pair of creature banks and opens an activity. A current-draft scan finds
+  no shared visitable cells between non-hero, non-boat objects; other footprint
+  collisions remain unverified.
 - [ ] Check land, water and region connectivity and the effects of replacing
   the original underground gates. The [current pair and approach check](evidence/earth-current-gates-2026-11-16.md)
   records their intentional behavior change; wider regional connectivity and
