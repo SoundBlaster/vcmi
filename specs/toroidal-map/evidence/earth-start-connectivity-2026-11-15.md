@@ -154,3 +154,17 @@ The result applies to that one game state after the three forced victories,
 with extra movement points and modified creature behavior. Other battles,
 transport, portal traversal or game-state changes could enable a route; no
 gate route was executed and wider regional connectivity remains unverified.
+
+An additional diagnostic on the same map and state compared those results to
+an eight-neighbor land flood fill using engine occupancy and permitted movement
+directions but ignoring guard battles. It found a free geometric approach to
+all four gates. For gates `5430`, `5431` and `10533`, the chosen approach was
+also reachable by the real pathfinder; each gate tile was guarded. For gate
+`10528`, the chosen approach was not reachable, and the first unreachable
+cell on that particular geometric route was `(248,412,0)`, guarded from
+`(249,412,0)`. The gate tile itself was guarded as well. This supports guard
+encounters as an explanation to investigate, not a proof that every gate is
+reachable after defeating guards: the diagnostic did not execute those routes
+or win those additional battles. It passed using `577b66d` plus this inspection
+extension; log and XML are `runtime/earth-road-gate-geometric-2026-11-16.{log,xml}`
+on TB5.

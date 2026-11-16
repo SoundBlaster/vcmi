@@ -1402,6 +1402,24 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 											CPathsInfo fromRoad(state->getMapSize(), hero);
 											auto roadConfig = std::make_shared<SingleHeroPathfinderConfig>(fromRoad, *state, hero);
 											CPathfinder(*state, roadConfig).calculatePaths();
+											std::vector<int> gateParent(map.width * map.height, -1);
+											std::vector<int> gateQueue{indexOf(road)};
+											gateParent[gateQueue.front()] = gateQueue.front();
+											for(size_t i = 0; i < gateQueue.size(); ++i)
+											{
+												const auto current = posOf(gateQueue[i]);
+												for(const auto & direction : int3::getDirs())
+												{
+													const auto next = map.getTopology().canonicalize(current + direction);
+													if(!next || gateParent[indexOf(*next)] != -1)
+														continue;
+													const auto & tile = map.getTile(*next);
+													if(!tile.isLand() || tile.blocked() || tile.visitable() || !map.canMoveBetween(current, *next))
+														continue;
+													gateParent[indexOf(*next)] = gateQueue[i];
+													gateQueue.push_back(indexOf(*next));
+												}
+											}
 											for(const char * name : {"subterraneanGate_5430", "subterraneanGate_10528", "subterraneanGate_5431", "subterraneanGate_10533"})
 											{
 												const auto target = map.instanceNames.find(name);
@@ -1409,6 +1427,36 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 												CGPath gateRoute;
 												const bool found = fromRoad.getPath(gateRoute, target->second->visitablePos(), EPathfindingLayer::LAND);
 												std::cout << "Gate from road " << name << " reachable=" << found << " nodes=" << gateRoute.nodes.size() << std::endl;
+												const auto targetPos = target->second->visitablePos();
+												int approach = -1;
+												for(const auto & direction : int3::getDirs())
+												{
+													const auto neighbor = map.getTopology().canonicalize(targetPos + direction);
+													if(neighbor && gateParent[indexOf(*neighbor)] != -1 && map.canMoveBetween(*neighbor, targetPos))
+													{
+														approach = indexOf(*neighbor);
+														break;
+													}
+												}
+												std::cout << "Gate free geometric approach " << name << " found=" << (approach >= 0) << std::endl;
+												if(approach >= 0)
+												{
+													std::cout << "Gate approach detail " << name << " at=" << posOf(approach).toString()
+													          << " reachable=" << fromRoad.getNode(posOf(approach), EPathfindingLayer::LAND)->reachable()
+													          << " target guard=" << state->guardingCreaturePosition(targetPos).toString() << std::endl;
+													std::vector<int> routeToGate;
+													for(int at = approach; at != gateQueue.front(); at = gateParent[at])
+														routeToGate.push_back(at);
+													std::reverse(routeToGate.begin(), routeToGate.end());
+													for(const int step : routeToGate)
+														if(!fromRoad.getNode(posOf(step), EPathfindingLayer::LAND)->reachable())
+														{
+															const auto pos = posOf(step);
+															std::cout << "Gate first unreachable geometric step " << name << " at=" << pos.toString()
+															          << " guard=" << state->guardingCreaturePosition(pos).toString() << std::endl;
+															break;
+														}
+												}
 											}
 										}
 										reachedRoad = true;
