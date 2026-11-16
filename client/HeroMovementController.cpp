@@ -32,6 +32,8 @@
 #include "../lib/mapping/CMapHeader.h"
 #include "../lib/mapping/MapTopology.h"
 #include "../lib/networkPacks/PacksForClient.h"
+#include "../lib/serializer/GameConnection.h"
+#include "../lib/serializer/ESerializationVersion.h"
 #include "../lib/RoadHandler.h"
 #include "../lib/TerrainHandler.h"
 
@@ -87,7 +89,10 @@ void HeroMovementController::showTeleportDialog(const CGHeroInstance * hero, Tel
 	// Check whether hero that has entered teleporter has paths that goes through teleporter and select appropriate exit
 	// othervice, ask server to select one randomly by sending invalid (-1) value as answer
 	assert(!teleportAnswer.waiting());
-	teleportAnswer.begin(questionID, hero->id);
+	const auto & connection = GAME->server().logicConnection;
+	const bool waitForResolution = GAME->interface()->cb->getMapHeader()->toroidal && connection
+		&& connection->getSerializationVersion() >= ESerializationVersion::TOROIDAL_TELEPORT_RESOLUTION;
+	teleportAnswer.begin(questionID, hero->id, waitForResolution);
 
 	if(!GAME->interface()->localState->hasPath(hero))
 	{
@@ -236,7 +241,7 @@ void HeroMovementController::onQuestionAnswerSent(QuestionID question, int reque
 void HeroMovementController::onQuestionAnswerApplied(int requestID, bool accepted)
 {
 	const auto result = teleportAnswer.consume(requestID, accepted);
-	if(result == TeleportAnswerTracker::Result::UNRELATED)
+	if(result == TeleportAnswerTracker::Result::UNRELATED || result == TeleportAnswerTracker::Result::WAIT)
 		return;
 
 	if(result == TeleportAnswerTracker::Result::STOP)
@@ -251,6 +256,15 @@ void HeroMovementController::onQuestionAnswerApplied(int requestID, bool accepte
 	// Server accepted our TeleportDialog question reply and moved hero
 	// Continue moving alongside our path, if any
 	if(duringMovement)
+		onMoveHeroApplied();
+}
+
+void HeroMovementController::onTeleportQuestionResolved(QuestionID question)
+{
+	const auto result = teleportAnswer.resolved(question);
+	if(result == TeleportAnswerTracker::Result::STOP)
+		requestMovementAbort();
+	else if(result == TeleportAnswerTracker::Result::CONTINUE && duringMovement)
 		onMoveHeroApplied();
 }
 

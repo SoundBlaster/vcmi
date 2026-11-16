@@ -139,6 +139,27 @@ TEST(GameConnectionTopologyTest, PreviousTaggedToroidalPeerNegotiatesItsOwnVersi
 	EXPECT_TRUE(server.supportsMapTopology(map));
 }
 
+TEST(GameConnectionTopologyTest, PreviousFramedPeerKeepsToroidalCompatibilityWithoutTeleportResolution)
+{
+	const auto old = ESerializationVersion::TOROIDAL_FRAMED_PACKETS;
+	const auto greeting = LobbyTopologyCapability::negotiateClient(LobbyTopologyCapability::encode(old));
+	ASSERT_TRUE(greeting.toroidal);
+	ASSERT_TRUE(LobbyTopologyCapability::isSafeServerGreeting(greeting));
+	EXPECT_EQ(greeting.version, old);
+	EXPECT_LT(greeting.version, ESerializationVersion::TOROIDAL_TELEPORT_RESOLUTION);
+	const auto current = LobbyTopologyCapability::negotiateClient(LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	EXPECT_GE(current.version, ESerializationVersion::TOROIDAL_TELEPORT_RESOLUTION);
+	auto transport = std::make_shared<PacketCapture>();
+	auto connection = std::make_shared<GameConnection>(transport);
+	connection->setSerializationVersion(old);
+	connection->setToroidalTopologySupported(true);
+	CVCMIServer server(0, true);
+	server.activeConnections.push_back(connection);
+	CMapHeader map;
+	map.toroidal = true;
+	EXPECT_TRUE(server.supportsMapTopology(map));
+}
+
 TEST(GameConnectionTopologyTest, PreFramingToroidalPeerCannotStartToroidalGame)
 {
 	const auto old = ESerializationVersion::TOROIDAL_TRANSIENT_RETURN;
@@ -427,6 +448,52 @@ TEST(GameConnectionTopologyTest, ConnectsToExternalLegacyServerWithBoundedMap)
 	ASSERT_TRUE(pumpUntil([&] { return host.receivedChats > 0 && guest.receivedChats > 0; })) << host.failure << " " << guest.failure;
 	EXPECT_TRUE(host.failure.empty());
 	EXPECT_TRUE(guest.failure.empty());
+}
+
+TEST(GameConnectionTopologyTest, ConnectsToPreviousFramedServerWithToroidalMap)
+{
+	const auto * portText = std::getenv("VCMI_TOROID_PREVIOUS_FRAMED_PORT");
+	const auto * mapText = std::getenv("VCMI_TOROID_PREVIOUS_FRAMED_MAP");
+	if(!portText || !*portText || !mapText || !*mapText)
+		GTEST_SKIP() << "Set VCMI_TOROID_PREVIOUS_FRAMED_PORT and VCMI_TOROID_PREVIOUS_FRAMED_MAP";
+	char * end = nullptr;
+	const auto value = std::strtol(portText, &end, 10);
+	ASSERT_TRUE(end && *end == '\0' && value > 0 && value <= 65535);
+	auto network = INetworkHandler::createHandler();
+	LobbyProbe host("previous-framed-host", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	LobbyProbe guest("previous-framed-guest", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
+	const auto pumpUntil = [&](const auto & ready)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+		while(!ready() && host.failure.empty() && guest.failure.empty() && std::chrono::steady_clock::now() < deadline)
+		{
+			network->getContext().restart();
+			network->getContext().poll();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+		return ready();
+	};
+	network->connectToRemote(host, "127.0.0.1", static_cast<uint16_t>(value));
+	ASSERT_TRUE(pumpUntil([&] { return host.ack.has_value(); })) << host.failure;
+	ASSERT_TRUE(host.ack->toroidal);
+	ASSERT_EQ(host.ack->version, ESerializationVersion::TOROIDAL_FRAMED_PACKETS);
+	network->connectToRemote(guest, "127.0.0.1", static_cast<uint16_t>(value));
+	ASSERT_TRUE(pumpUntil([&] { return guest.ack.has_value(); })) << guest.failure;
+	ASSERT_TRUE(guest.ack->toroidal);
+	ASSERT_EQ(guest.ack->version, ESerializationVersion::TOROIDAL_FRAMED_PACKETS);
+	LobbySetMap select;
+	select.selection.type = ScenarioSelection::EType::MAP;
+	select.selection.fileURI = mapText;
+	host.codec->sendPack(select);
+	ASSERT_TRUE(pumpUntil([&] { return host.mapToroidal && guest.mapToroidal; })) << host.failure << " " << guest.failure;
+	EXPECT_TRUE(*host.mapToroidal);
+	EXPECT_TRUE(*guest.mapToroidal);
+	EXPECT_EQ(host.mapURI, guest.mapURI);
+	LobbyChatMessage chat;
+	chat.playerName = host.uuid;
+	chat.message.appendRawString("previous framed protocol remains usable");
+	host.codec->sendPack(chat);
+	ASSERT_TRUE(pumpUntil([&] { return host.receivedChats > 0 && guest.receivedChats > 0; })) << host.failure << " " << guest.failure;
 }
 
 TEST(GameConnectionTopologyTest, RejectsConflictingTopologyWireLayouts)

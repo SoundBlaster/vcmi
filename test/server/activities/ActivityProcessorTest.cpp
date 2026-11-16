@@ -1,4 +1,5 @@
 #include "StdInc.h"
+#include "../../../lib/serializer/CTypeList.h"
 
 #include <gtest/gtest.h>
 
@@ -2614,9 +2615,14 @@ public:
 	int3 failedEnd;
 	ui32 failedPoints = 0;
 	std::vector<std::string> movementReplyEvents;
+	std::vector<std::string> teleportOrdering;
 	std::optional<bool> lastReplyResult;
 	void applyPack(CPackForClient & pack) override
 	{
+		if(const auto * movement = dynamic_cast<const TryMoveHero *>(&pack); movement && movement->result == TryMoveHero::TELEPORTATION)
+			teleportOrdering.emplace_back("teleported");
+		if(dynamic_cast<const QuestionResolved *>(&pack))
+			teleportOrdering.emplace_back("question resolved");
 		if(const auto * movement = dynamic_cast<const TryMoveHero *>(&pack); movement && movement->result == TryMoveHero::FAILED)
 		{
 			++failedMoves;
@@ -2632,6 +2638,8 @@ public:
 	{
 		if(const auto * applied = dynamic_cast<const PackageApplied *>(&pack))
 		{
+			if(applied->packType == CTypeList::getInstance().getTypeID<QuestionAnswer>(nullptr))
+				teleportOrdering.emplace_back("answer applied");
 			lastReplyResult = applied->result;
 			movementReplyEvents.emplace_back("reply applied");
 		}
@@ -2707,10 +2715,12 @@ TEST_F(SubterraneanGateTopologyTest, heroUsesGatePairedAcrossToroidalSeam)
 	answer.requestID = 73;
 	handler.handleReceivedPack(GameConnectionID::FIRST_CONNECTION, answer);
 	ASSERT_EQ(server.lastReplyResult, true);
+	EXPECT_EQ(server.teleportOrdering, (std::vector<std::string>{"answer applied"}));
 	EXPECT_EQ(hero->visitablePos(), surface->visitablePos());
 	EXPECT_EQ(handler.activities->topActivity(player), blocker);
 	blocker->finish();
 	EXPECT_EQ(hero->visitablePos(), across->visitablePos());
+	EXPECT_EQ(server.teleportOrdering, (std::vector<std::string>{"answer applied", "teleported", "question resolved"}));
 	hero->setMovementPoints(3000);
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(int3(34, 5, 1)), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));
 	ASSERT_TRUE(handler.moveHero(hero->id, hero->convertFromVisitablePos(across->visitablePos()), EMovementMode::STANDARD, false, player, EPathfindingLayer::LAND));

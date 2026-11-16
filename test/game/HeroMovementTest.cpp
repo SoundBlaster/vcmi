@@ -3811,7 +3811,7 @@ TEST(TeleportAnswerTracker, OnlyTheCurrentQuestionsRequestCanReleaseTheRoute)
 	using Result = TeleportAnswerTracker::Result;
 	const QuestionID first(10), second(11), unrelated(12);
 	const ObjectInstanceID hero(20), otherHero(21);
-	tracker.begin(first, hero);
+	tracker.begin(first, hero, false);
 	tracker.sent(unrelated, 1);
 	EXPECT_EQ(tracker.consume(1, true), Result::UNRELATED);
 	EXPECT_TRUE(tracker.waiting());
@@ -3821,23 +3821,59 @@ TEST(TeleportAnswerTracker, OnlyTheCurrentQuestionsRequestCanReleaseTheRoute)
 	EXPECT_EQ(tracker.consume(2, false), Result::STOP);
 	EXPECT_FALSE(tracker.waiting());
 	EXPECT_EQ(tracker.consume(2, false), Result::UNRELATED);
-	tracker.begin(second, hero);
+	tracker.begin(second, hero, false);
 	tracker.sent(second, 3);
 	EXPECT_EQ(tracker.consume(2, true), Result::UNRELATED);
 	EXPECT_TRUE(tracker.waiting());
 	tracker.teleported(otherHero);
 	EXPECT_EQ(tracker.consume(3, true), Result::STOP); // accepted but not yet moved
 	EXPECT_FALSE(tracker.waiting());
-	tracker.begin(second, hero);
+	tracker.begin(second, hero, false);
 	tracker.sent(second, 4);
 	tracker.teleported(hero);
 	EXPECT_EQ(tracker.consume(4, true), Result::CONTINUE);
 	EXPECT_FALSE(tracker.waiting());
-	tracker.begin(second, hero);
+	tracker.begin(second, hero, false);
 	tracker.sent(second, 5);
 	tracker.teleported(hero);
 	EXPECT_EQ(tracker.consume(5, false), Result::STOP); // rejected after an effect
 	EXPECT_FALSE(tracker.waiting());
+}
+
+TEST(TeleportAnswerTracker, ToroidalRouteWaitsForBothAcknowledgementAndResolution)
+{
+	TeleportAnswerTracker tracker;
+	using Result = TeleportAnswerTracker::Result;
+	const QuestionID question(10), other(11);
+	const ObjectInstanceID hero(20);
+	tracker.begin(question, hero, true);
+	tracker.sent(question, 1);
+	EXPECT_EQ(tracker.consume(1, true), Result::WAIT);
+	EXPECT_EQ(tracker.consume(1, false), Result::UNRELATED); // duplicate acknowledgement
+	EXPECT_TRUE(tracker.waiting());
+	EXPECT_EQ(tracker.resolved(other), Result::UNRELATED);
+	tracker.teleported(hero);
+	EXPECT_EQ(tracker.resolved(question), Result::CONTINUE);
+	EXPECT_FALSE(tracker.waiting());
+	EXPECT_EQ(tracker.resolved(question), Result::UNRELATED);
+
+	tracker.begin(question, hero, true);
+	tracker.sent(question, 2);
+	tracker.teleported(hero);
+	EXPECT_EQ(tracker.resolved(question), Result::WAIT);
+	EXPECT_EQ(tracker.consume(2, true), Result::CONTINUE);
+	EXPECT_FALSE(tracker.waiting());
+
+	tracker.begin(question, hero, true);
+	tracker.sent(question, 3);
+	EXPECT_EQ(tracker.resolved(question), Result::WAIT);
+	EXPECT_EQ(tracker.consume(3, true), Result::STOP); // resolved without moving
+	EXPECT_FALSE(tracker.waiting());
+
+	tracker.begin(question, hero, true);
+	tracker.sent(question, 4);
+	EXPECT_EQ(tracker.consume(4, false), Result::STOP);
+	EXPECT_EQ(tracker.resolved(question), Result::UNRELATED);
 }
 
 TEST_F(HeroMovementTest, ActivityBlockedMovementIsRejectedWithoutMovementPacket)

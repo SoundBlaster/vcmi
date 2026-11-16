@@ -1343,6 +1343,7 @@ void CPlayerInterface::closeActiveLevelUpDialog()
 
 void CPlayerInterface::questionResolved(QuestionID questionID)
 {
+	movementController->onTeleportQuestionResolved(questionID);
 	for(const auto & exchange : ENGINE->windows().findWindows<CExchangeWindow>())
 	{
 		if(exchange->getQuestionID() != questionID)

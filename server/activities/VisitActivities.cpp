@@ -12,6 +12,7 @@
 
 #include "../../lib/CPlayerState.h"
 #include "../../lib/gameState/CGameState.h"
+#include "../../lib/mapping/CMap.h"
 #include "../../lib/mapObjects/CGHeroInstance.h"
 #include "../../lib/mapObjects/CGTownInstance.h"
 #include "../../lib/mapObjects/TownBuildingInstance.h"
@@ -103,6 +104,10 @@ void MapObjectVisitActivity::onChildCompleted(const ActivityPtr & child)
 	// and check the battle result instead of the hero.
 	if(object)
 		child->notifyObjectAboutRemoval(object, hero, std::exchange(visitState, {}));
+	// Toroidal peers share this completion signal. It follows the teleport
+	// callback, including its movement/failure packet, even for a queued answer.
+	if(child->getType() == ActivityType::TeleportDialog && gh->gameState().getMap().toroidal)
+		gh->sendQuestionResolved(child->getActiveQuestionID());
 }
 
 void MapObjectVisitActivity::onAdded()

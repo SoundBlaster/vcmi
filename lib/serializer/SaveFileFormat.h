@@ -54,9 +54,10 @@ constexpr uint32_t TOROIDAL_VERSION_TAG = 0x54520000u;
 constexpr uint32_t VERSION_TAG_MASK = 0xffff0000u;
 constexpr uint32_t VERSION_VALUE_MASK = 0x0000ffffu;
 static_assert(static_cast<uint32_t>(ESerializationVersion::CURRENT) <= VERSION_VALUE_MASK);
-// TOROIDAL_FRAMED_PACKETS changes network framing only. Both saved-game
+// The framed-packet and teleport-resolution versions change network behavior
+// only. Both saved-game
 // layouts continue using their last actual data-format versions below.
-static_assert(ESerializationVersion::CURRENT == ESerializationVersion::TOROIDAL_FRAMED_PACKETS,
+static_assert(ESerializationVersion::CURRENT == ESerializationVersion::TOROIDAL_TELEPORT_RESOLUTION,
 	"Reassess bounded-save compatibility when adding serialization features");
 
 constexpr ESerializationVersion versionForTopology(bool toroidal)

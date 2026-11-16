@@ -68,6 +68,7 @@ public:
 	void onMoveHeroRequestApplied(int requestID, bool accepted);
 	void onQuestionAnswerSent(QuestionID question, int requestID);
 	void onQuestionAnswerApplied(int requestID, bool accepted);
+	void onTeleportQuestionResolved(QuestionID question);
 	void onPlayerTurnStarted();
 	void onBattleStarted();
 	void showTeleportDialog(const CGHeroInstance * hero, TeleportChannelID channel, TTeleportExitsList exits, bool impassable, QuestionID questionID);
