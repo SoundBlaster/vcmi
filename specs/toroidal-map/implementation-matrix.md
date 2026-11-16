@@ -360,6 +360,13 @@ The [coordinate audit](coordinate-audit.md) and its [candidate index](coordinate
 track the ongoing source review. Search matches are not automatically defects,
 and the search does not prove that every relevant calculation has been found.
 
+For `authority`, the human route controller now associates movement replies
+with requests from its active route and stops on a matching refusal. The
+[acknowledgement record](evidence/topology-acknowledgement-review-2026-11-14.md#correlating-human-route-acknowledgements)
+distinguishes the tested server refusal, request tracking and successful GUI
+route from an untested live GUI refusal. This supplements the row above and
+does not establish transactional request semantics or overall acceptance.
+
 ## Execution record
 
 The separate [`961e235` preview bundle](evidence/topology-preview-961e235-2026-11-14.md)

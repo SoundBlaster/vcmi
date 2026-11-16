@@ -9,6 +9,7 @@
  */
 #pragma once
 
+#include "MovementRequestTracker.h"
 #include "../lib/constants/EntityIdentifiers.h"
 #include "../lib/int3.h"
 #include "../lib/filesystem/ResourcePath.h"
@@ -31,6 +32,7 @@ class HeroMovementController
 	bool stoppingMovement = false;
 
 	bool waitingForQueryApplyReply = false;
+	MovementRequestTracker movementRequests;
 
 	const CGHeroInstance * currentlyMovingHero = nullptr;
 	AudioPath currentMovementSoundName;
@@ -61,6 +63,8 @@ public:
 
 	// netpack handlers
 	void onMoveHeroApplied();
+	void onMoveHeroRequestSent(ObjectInstanceID hero, int requestID);
+	void onMoveHeroRequestApplied(int requestID, bool accepted);
 	void onQuestionAnswerApplied();
 	void onPlayerTurnStarted();
 	void onBattleStarted();

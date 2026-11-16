@@ -113,3 +113,35 @@ also follow a partially applied batch. Any fix must stop or reconcile the
 affected route using authoritative state and associate the acknowledgement
 with its request; treating every unrelated failed movement reply as belonging
 to the current hero could interrupt another route.
+
+## Correlating human route acknowledgements
+
+The human movement controller now registers only `MoveHero` requests sent
+from its own route dispatch, for its active hero. Registration happens through
+`requestSent` before the client sends the packet. A matching negative
+acknowledgement aborts further automatic route movement without rolling back
+any state or path updates already received. A matching positive response
+continues the existing movement flow. An acknowledgement outside that route,
+including an old or duplicate ID, is ignored. This applies on bounded and
+toroidal maps. Question-answer acknowledgement handling is unchanged.
+
+On macOS arm64, `vcmiclient` and `vcmitest` built from `676f572` plus these
+changes. Three focused tests passed: request registration/consumption with
+other heroes, unrelated sends and old replies; activity-blocked server
+movement; and a server batch with an accepted prefix and rejected suffix.
+XML: `runtime/movement-request-tracking-final-2026-11-16.xml` on TB5.
+An earlier version also passed 67 movement and artifact tests; the final
+registration-scope change was then checked by the three focused tests.
+The configured full suite on the final change ran 2,100 tests: 2,086 passed,
+14 external-fixture cases were skipped and three additional tests were
+disabled. Log and XML: `runtime/full-suite-movement-ack-2026-11-16.{log,xml}`
+under the TB5 build root. This suite does not execute the graphical controller.
+
+The final client opened the isolated Earth seam preview with a human player.
+Two diagnostic GUI clicks requested a three-step westbound path. Observation
+reported `(0,425) → (251,425) → (250,425) → (249,425)`, with movement points
+`1560 → 1260`; the client was force-stopped afterwards. The observation is
+`runtime/earth-move-ack-qa-2026-11-16/observe-final.jsonl` on TB5. This is a
+positive graphical route, not a live rejected acknowledgement or a complete
+multiplayer test. A real GUI rejection, unrelated concurrent commands and
+remote network timing remain unverified.

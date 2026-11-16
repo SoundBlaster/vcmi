@@ -72,6 +72,7 @@
 #include "../../server/TurnTimerHandler.h"
 #include "../../server/activities/ActivityProcessor.h"
 #include "../../server/activities/Activity.h"
+#include "../../client/MovementRequestTracker.h"
 #include "../../server/battles/BattleProcessor.h"
 #include "../../server/processors/HeroPoolProcessor.h"
 #include "../../server/processors/PlayerMessageProcessor.h"
@@ -3772,6 +3773,35 @@ TEST_F(HeroMovementTest, MovementAcknowledgementReportsRejectedAndAcceptedReques
 	ASSERT_TRUE(server.results.contains(2));
 	EXPECT_TRUE(server.results.at(2));
 	EXPECT_EQ(hero->visitablePos(), int3(10, 10, 0));
+}
+
+TEST(MovementRequestTracker, IgnoresOtherHeroesAndOldOrDuplicateReplies)
+{
+	MovementRequestTracker tracker;
+	const ObjectInstanceID first(10), second(11);
+	tracker.start(first);
+	tracker.sent(first, 0); // A request outside this controller is not its route.
+	{
+		MovementRequestTracker::SendScope scope(tracker);
+		tracker.sent(second, 1);
+		tracker.sent(first, 2);
+	}
+	EXPECT_FALSE(tracker.consume(0));
+	EXPECT_FALSE(tracker.consume(1));
+	EXPECT_TRUE(tracker.consume(2));
+	EXPECT_FALSE(tracker.consume(2));
+	{
+		MovementRequestTracker::SendScope scope(tracker);
+		tracker.sent(first, 3);
+	}
+	tracker.stop();
+	tracker.start(second);
+	{
+		MovementRequestTracker::SendScope scope(tracker);
+		tracker.sent(second, 4);
+	}
+	EXPECT_FALSE(tracker.consume(3));
+	EXPECT_TRUE(tracker.consume(4));
 }
 
 TEST_F(HeroMovementTest, ActivityBlockedMovementIsRejectedWithoutMovementPacket)

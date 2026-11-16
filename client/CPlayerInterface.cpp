@@ -1314,10 +1314,16 @@ void CPlayerInterface::showGarrisonDialog(const CArmedInstance * up, const CGHer
 	ENGINE->windows().pushWindow(cgw);
 }
 
+void CPlayerInterface::requestSent(const CPackForServer * pack, int requestID)
+{
+	if(const auto * movement = dynamic_cast<const MoveHero *>(pack))
+		movementController->onMoveHeroRequestSent(movement->hid, requestID);
+}
+
 void CPlayerInterface::requestRealized( PackageApplied *pa )
 {
 	if(pa->packType == CTypeList::getInstance().getTypeID<MoveHero>(nullptr))
-		movementController->onMoveHeroApplied();
+		movementController->onMoveHeroRequestApplied(pa->requestID, pa->result);
 
 	if(pa->packType == CTypeList::getInstance().getTypeID<QuestionAnswer>(nullptr))
 	{

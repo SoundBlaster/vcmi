@@ -154,6 +154,7 @@ protected: // Call-ins from server, should not be called directly, but only via 
 	void availableCreaturesChanged(const CGDwelling *town) override;
 	void heroBonusChanged(const CGHeroInstance *hero, const Bonus &bonus, bool gain) override;//if gain hero received bonus, else he lost it
 	void playerBonusChanged(const Bonus &bonus, bool gain) override;
+	void requestSent(const CPackForServer * pack, int requestID) override;
 	void requestRealized(PackageApplied *pa) override;
 	void questionResolved(QuestionID questionID) override;
 	void heroExchangeStarted(ObjectInstanceID hero1, ObjectInstanceID hero2, QuestionID question) override;

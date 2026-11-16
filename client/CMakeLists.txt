@@ -436,6 +436,7 @@ set(vcmiclientcommon_HEADERS
 	ClientCommandManager.h
 	ClientNetPackVisitors.h
 	HeroMovementController.h
+	MovementRequestTracker.h
 	GameChatHandler.h
 	LobbyClientNetPackVisitors.h
 	ServerRunner.h

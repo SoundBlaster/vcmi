@@ -239,6 +239,25 @@ void HeroMovementController::onQuestionAnswerApplied()
 		onMoveHeroApplied();
 }
 
+void HeroMovementController::onMoveHeroRequestSent(ObjectInstanceID hero, int requestID)
+{
+	movementRequests.sent(hero, requestID);
+}
+
+void HeroMovementController::onMoveHeroRequestApplied(int requestID, bool accepted)
+{
+	if(!movementRequests.consume(requestID))
+		return;
+	if(!accepted)
+	{
+		// A batch may already have applied a prefix. Stop issuing commands and
+		// retain the authoritative position and path updates received so far.
+		requestMovementAbort();
+		return;
+	}
+	onMoveHeroApplied();
+}
+
 void HeroMovementController::onMoveHeroApplied()
 {
 	// at this point, server have finished processing of hero movement request
@@ -284,6 +303,7 @@ void HeroMovementController::endMove(const CGHeroInstance * hero)
 {
 	assert(duringMovement == true);
 	assert(currentlyMovingHero != nullptr);
+	movementRequests.stop();
 	duringMovement = false;
 	stoppingMovement = false;
 	currentlyMovingHero = nullptr;
@@ -362,6 +382,7 @@ void HeroMovementController::requestMovementStart(const CGHeroInstance * h, cons
 
 	duringMovement = true;
 	currentlyMovingHero = h;
+	movementRequests.start(h->id);
 
 	ENGINE->cursor().hide();
 	sendMovementRequest(h, path);
@@ -370,6 +391,7 @@ void HeroMovementController::requestMovementStart(const CGHeroInstance * h, cons
 void HeroMovementController::sendMovementRequest(const CGHeroInstance * h, const CGPath & path)
 {
 	assert(duringMovement == true);
+	MovementRequestTracker::SendScope requestScope(movementRequests);
 
 	int heroMovementSpeed = settings["adventure"]["heroMoveTime"].Integer();
 	bool useMovementBatching = heroMovementSpeed == 0;
