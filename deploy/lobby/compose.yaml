@@ -1,0 +1,16 @@
+services:
+  lobby:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3031:3031/tcp"
+    volumes:
+      - lobby-data:/home/lobby/.local/share/vcmi
+    mem_limit: 512m
+    cpus: 1
+    logging:
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  lobby-data:
