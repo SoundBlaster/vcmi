@@ -1,0 +1,7 @@
+# Add before the Platform ingress fallback handle. Preserve the /heroes3 prefix.
+handle /heroes3 {
+	redir * /heroes3/ 308
+}
+handle /heroes3/* {
+	reverse_proxy vcmi-lobby-website-1:80
+}

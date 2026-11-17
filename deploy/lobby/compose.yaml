@@ -6,6 +6,9 @@ services:
       - "80:80/tcp"
     volumes:
       - ./site:/usr/share/nginx/html/heroes3:ro
+    networks:
+      - default
+      - managed-ingress
     mem_limit: 128m
     cpus: 0.5
     logging:
@@ -27,3 +30,7 @@ services:
         max-file: "3"
 volumes:
   lobby-data:
+networks:
+  managed-ingress:
+    name: platform-managed-production_managed-ingress
+    external: true
