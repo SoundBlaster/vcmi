@@ -22,5 +22,8 @@ the entrypoint initializes the database only when absent.
 Clients use settings `lobby.hostname` and `lobby.port`; the protocol is TCP,
 not HTTP, so a URL path such as `/heroes3` cannot select the lobby. A DNS
 hostname pointing at the VPS can provide a readable address on port 3031.
+The separate `website` service serves `site/` at `/heroes3/` over HTTP on
+port 80. Configure HTTPS at a trusted reverse proxy and a domain before using
+it as a distribution endpoint. Keep game assets and secrets out of `site/`.
 Confirm lobby login, room creation, relay and an actual match with two clients;
 an open TCP port by itself is not an end-to-end test.
