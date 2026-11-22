@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Terrain Painter</title>
+<meta name="description" content="Paint a VCMI adventure map terrain by pixels or convert any picture, then download a ready .vmap.">
+<link rel="stylesheet" href="painter.css">
+</head>
+<body>
+<header class="bar">
+	<a class="brand" href="../">VCMI · TOROIDAL</a>
+	<h1 data-i18n="title">Terrain Painter</h1>
+	<div class="bar-right">
+		<span id="status" class="status" role="status" aria-live="polite"></span>
+		<select id="lang" aria-label="Language">
+			<option value="en">English</option>
+			<option value="ru">Русский</option>
+		</select>
+	</div>
+</header>
+
+<div class="layout">
+	<aside class="panels">
+		<details open>
+			<summary data-i18n="mapSection">1. Map</summary>
+			<div class="row">
+				<label for="sizePreset" data-i18n="size">Size</label>
+				<select id="sizePreset">
+					<option value="36">S · 36 × 36</option>
+					<option value="72">M · 72 × 72</option>
+					<option value="108">L · 108 × 108</option>
+					<option value="144" selected>XL · 144 × 144</option>
+					<option value="180">H · 180 × 180</option>
+					<option value="216">XH · 216 × 216</option>
+					<option value="252">G · 252 × 252</option>
+					<option value="custom" data-i18n="custom">Custom</option>
+				</select>
+			</div>
+			<div class="row">
+				<input id="mapWidth" type="number" min="8" max="512" value="144" aria-label="Width">
+				<span>×</span>
+				<input id="mapHeight" type="number" min="8" max="512" value="144" aria-label="Height">
+				<button id="resizeMap" type="button" data-i18n="resize">Resize</button>
+			</div>
+			<label class="check"><input id="toroidal" type="checkbox" checked> <span data-i18n="toroidal">Toroidal: edges wrap around</span></label>
+			<div class="row">
+				<button id="newMap" type="button" data-i18n="newMap">New map</button>
+				<label for="fillTerrain" data-i18n="filledWith">filled with</label>
+				<select id="fillTerrain"></select>
+			</div>
+		</details>
+
+		<details open>
+			<summary data-i18n="imageSection">2. Picture → terrain</summary>
+			<label id="dropZone" class="drop" tabindex="0">
+				<input id="imageInput" type="file" accept="image/*" hidden>
+				<span data-i18n="dropHint">Drop a picture here, paste it or click to choose. It stays on your device.</span>
+			</label>
+			<div id="converter" hidden>
+				<div class="row">
+					<label for="fitMode" data-i18n="fit">Fit</label>
+					<select id="fitMode">
+						<option value="cover" data-i18n="fitCover">Crop to fill</option>
+						<option value="contain" data-i18n="fitContain">Fit with margins</option>
+						<option value="stretch" data-i18n="fitStretch">Stretch</option>
+					</select>
+					<button id="matchAspect" type="button" data-i18n="matchAspect">Match picture shape</button>
+				</div>
+				<div class="row">
+					<label for="clusterCount" data-i18n="colors">Colour groups</label>
+					<input id="clusterCount" type="range" min="3" max="16" value="10">
+					<output id="clusterCountOut">10</output>
+				</div>
+				<table class="clusters">
+					<thead><tr><th></th><th data-i18n="share">Share</th><th data-i18n="terrain">Terrain</th><th data-i18n="obstaclesShort">Obstacles</th></tr></thead>
+					<tbody id="clusterRows"></tbody>
+				</table>
+				<div class="row">
+					<label for="smoothing" data-i18n="smoothing">Smoothing</label>
+					<input id="smoothing" type="range" min="0" max="4" value="1">
+					<output id="smoothingOut">1</output>
+				</div>
+				<div class="row">
+					<label for="minRegion" data-i18n="minRegion">Remove spots smaller than</label>
+					<input id="minRegion" type="range" min="0" max="60" value="6">
+					<output id="minRegionOut">6</output>
+				</div>
+				<div class="row">
+					<button id="applyConversion" type="button" class="primary" data-i18n="apply">Use as map</button>
+					<button id="discardConversion" type="button" data-i18n="discard">Discard</button>
+				</div>
+			</div>
+			<div class="row">
+				<label class="check"><input id="showUnderlay" type="checkbox"> <span data-i18n="underlay">Show picture under the map</span></label>
+				<input id="underlayOpacity" type="range" min="10" max="90" value="45" aria-label="Opacity">
+			</div>
+		</details>
+
+		<details open>
+			<summary data-i18n="paintSection">3. Paint</summary>
+			<div class="tools" role="toolbar">
+				<button type="button" data-tool="brush" class="active" data-i18n-title="toolBrush" title="Brush (B)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.5 2.5l3 3-9.5 9.5-3-3z"/><path d="M9 12c-2.5 0-4.5 1.8-4.5 4.3 0 1.4-.8 2.7-2 3.2 3.6 1.5 9-.1 9.5-4.5"/></svg><span data-i18n="toolBrushLabel">Brush</span></button>
+				<button type="button" data-tool="eraser" data-i18n-title="toolEraser" title="Eraser (E)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3.5l6 6L11 19H6.5l-3-3z"/><path d="M9 9l6 6"/><path d="M11 19h10"/></svg><span data-i18n="toolEraserLabel">Eraser</span></button>
+				<button type="button" data-tool="fill" data-i18n-title="toolFill" title="Fill (F)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12L12 4.5l7.5 7.5-7.5 7.5z"/><path d="M4.5 12h15"/><path d="M21 16.5c0 1.5-1 2.4-1 3.5a1 1 0 0 0 2 0c0-1.1-1-2-1-3.5z"/></svg><span data-i18n="toolFillLabel">Fill</span></button>
+				<button type="button" data-tool="picker" data-i18n-title="toolPicker" title="Pick terrain (I)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5l5 5"/><path d="M16.5 2.5a2.1 2.1 0 0 1 3 3L17 8l-1-1"/><path d="M15 6l-9.5 9.5L4 20l4.5-1.5L18 9"/></svg><span data-i18n="toolPickerLabel">Picker</span></button>
+				<button type="button" data-tool="pan" data-i18n-title="toolPan" title="Move view (H)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2v20"/><path d="M2 12h20"/><path d="M12 2l-3 3m3-3l3 3"/><path d="M12 22l-3-3m3 3l3-3"/><path d="M2 12l3-3m-3 3l3 3"/><path d="M22 12l-3-3m3 3l-3 3"/></svg><span data-i18n="toolPanLabel">Move</span></button>
+			</div>
+			<div class="tools history">
+				<button type="button" id="undo" data-i18n-title="undo" title="Undo (Ctrl+Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg><span data-i18n="undoLabel">Undo</span></button>
+				<button type="button" id="redo" data-i18n-title="redo" title="Redo (Ctrl+Shift+Z)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/></svg><span data-i18n="redoLabel">Redo</span></button>
+			</div>
+			<div id="fillModeRow" class="row segmented" role="radiogroup" hidden>
+				<label><input type="radio" name="fillMode" value="area" checked> <span data-i18n="fillArea">Connected area</span></label>
+				<label><input type="radio" name="fillMode" value="all"> <span data-i18n="fillAll">Whole map</span></label>
+			</div>
+			<div class="row segmented" role="radiogroup">
+				<label><input type="radio" name="layer" value="terrain" checked> <span data-i18n="layerTerrain">Terrain</span></label>
+				<label><input type="radio" name="layer" value="obstacles"> <span data-i18n="layerObstacles">Obstacles</span></label>
+			</div>
+			<div class="row">
+				<label for="brushSize" data-i18n="brushSize">Brush</label>
+				<input id="brushSize" type="range" min="1" max="31" value="3">
+				<output id="brushSizeOut">3</output>
+			</div>
+			<div id="palette" class="palette"></div>
+			<label class="check"><input id="torusPreview" type="checkbox" checked> <span data-i18n="torusPreview">Show wrapped copies around the map</span></label>
+			<label class="check"><input id="showGrid" type="checkbox" checked> <span data-i18n="grid">Grid when zoomed in</span></label>
+			<label class="check" id="showObjectsRow" hidden><input id="showObjects" type="checkbox" checked> <span data-i18n="showObjects">Show objects from the map editor</span></label>
+			<p class="hint" data-i18n="paintHint">Pen or mouse paints. Two-finger scrolling moves the view, pinch or Cmd/Ctrl + scroll zooms.</p>
+		</details>
+
+		<details open>
+			<summary data-i18n="buildSection">4. Get the map</summary>
+			<label class="field"><span data-i18n="mapName">Name</span><input id="mapName" type="text" maxlength="80"></label>
+			<label class="field"><span data-i18n="mapDescription">Description</span><textarea id="mapDescription" rows="3" maxlength="1500"></textarea></label>
+			<button id="buildMap" type="button" class="primary wide" data-i18n="build">Build .vmap</button>
+			<div id="buildResult" class="result" hidden>
+				<p id="buildSummary"></p>
+				<label class="check"><input id="showChanged" type="checkbox" checked> <span data-i18n="showChanged">Highlight cells the engine changed</span></label>
+				<button id="acceptChanges" type="button" data-i18n="acceptChanges">Copy engine changes into the drawing</button>
+			</div>
+			<p class="hint" data-i18n="roundTripHint">To repaint an existing map, use File → Export terrain to PNG in the VCMI map editor, open both PNG files here, then import the saved PNG back with File → Import terrain from PNG.</p>
+			<p class="hint" data-i18n="buildHint">Only the terrain grid is sent to the server. Towns, heroes and objects are placed afterwards in the VCMI map editor.</p>
+			<div class="row">
+				<button id="exportPng" type="button" data-i18n="exportPng">Save PNG</button>
+				<button id="importPng" type="button" data-i18n="importPng">Open PNG</button>
+				<input id="pngInput" type="file" accept="image/png" multiple hidden>
+				<button id="exportPalette" type="button" data-i18n="exportPalette">Palette .gpl</button>
+			</div>
+		</details>
+	</aside>
+
+	<main class="stage">
+		<canvas id="view"></canvas>
+		<div class="zoom">
+			<button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+			<button type="button" id="zoomFit" data-i18n="fitView">Fit</button>
+			<button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+		</div>
+		<div id="cursorInfo" class="cursor-info"></div>
+	</main>
+</div>
+<script src="painter.js"></script>
+</body>
+</html>

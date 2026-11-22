@@ -1,0 +1,5 @@
+src/
+out/
+data/
+build/
+__pycache__/
