@@ -133,6 +133,10 @@ private slots:
 
 	void on_actionExport_triggered();
 
+	void on_actionExportTerrain_triggered();
+
+	void on_actionImportTerrain_triggered();
+
 	void on_actionTranslations_triggered();
 	
 	void on_actionh3m_converter_triggered();

@@ -183,7 +183,31 @@ void CMapEditManager::removeObjects(std::set<CGObjectInstance *> & objects)
 void CMapEditManager::execute(std::unique_ptr<CMapOperation> && operation)
 {
 	operation->execute();
-	undoManager.addOperation(std::move(operation));
+	if(undoGroup)
+	{
+		undoGroup->addOperation(std::move(operation));
+		undoGroupEmpty = false;
+	}
+	else
+		undoManager.addOperation(std::move(operation));
+}
+
+void CMapEditManager::beginUndoGroup()
+{
+	if(undoGroup)
+		throw std::logic_error("Undo groups cannot be nested");
+	undoGroup = std::make_unique<CComposedOperation>(map);
+	undoGroupEmpty = true;
+}
+
+void CMapEditManager::endUndoGroup()
+{
+	if(!undoGroup)
+		throw std::logic_error("No undo group to end");
+	// the operations are already applied, so the group is stored without executing it again
+	auto group = std::move(undoGroup);
+	if(!undoGroupEmpty)
+		undoManager.addOperation(std::move(group));
 }
 
 CTerrainSelection & CMapEditManager::getTerrainSelection()

@@ -14,6 +14,7 @@
 #include "MapEditUtils.h"
 
 class CMapOperation;
+class CComposedOperation;
 
 namespace vstd
 {
@@ -92,8 +93,15 @@ public:
 
 	CMapUndoManager & getUndoManager();
 
+	/// Edits until endUndoGroup become one undo step
+	void beginUndoGroup();
+	void endUndoGroup();
+
 private:
 	void execute(std::unique_ptr<CMapOperation> && operation);
+
+	std::unique_ptr<CComposedOperation> undoGroup;
+	bool undoGroupEmpty = true;
 
 	CMap * map;
 	CMapUndoManager undoManager;

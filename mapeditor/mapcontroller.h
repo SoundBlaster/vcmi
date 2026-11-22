@@ -19,6 +19,16 @@
 using ModCompatibilityInfo = std::map<std::string, ModVerificationInfo>;
 class EditorObstaclePlacer;
 
+/// Outcome of replacing the terrain of a level from a picture
+struct TerrainImportResult
+{
+	int changedTiles = 0;
+	int removedObstacles = 0;
+	int placedObstacles = 0;
+	int inexactPixels = 0; ///< pixels that match no terrain colour exactly
+	std::vector<const CGObjectInstance *> misplacedObjects; ///< land objects now on water and water objects now on land
+};
+
 
 class EditorMainWindow;
 class MapController : public QObject
@@ -62,6 +72,13 @@ public:
 	void commitObjectErase(const CGObjectInstance* obj);
 	void commitObjectErase(int level);
 	void commitObstacleFill(int level);
+
+	/// One pixel per tile in minimap colours; tiles covered by obstacles use the blocked colour of their terrain
+	QImage terrainImage(int level) const;
+	/// Transparent picture with the tiles of every object except obstacles, to lay over terrainImage
+	QImage objectsImage(int level) const;
+	/// Repaints the level from a terrainImage-style picture of the map size as one undo step; obstacles end up exactly on the blocked-colour tiles
+	TerrainImportResult importTerrainImage(int level, const QImage & image);
 	void commitChangeWithoutRedraw();
 	void commitObjectShift(int level);
 	void commitObjectCreate(int level);

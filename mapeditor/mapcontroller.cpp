@@ -38,6 +38,7 @@
 #include "scenelayer.h"
 #include "maphandler.h"
 #include "mainwindow.h"
+#include "graphics.h"
 #include "inspector/inspector.h"
 #include "GameLibrary.h"
 #include "PlayerSelectionDialog.h"
@@ -519,6 +520,215 @@ void MapController::commitObstacleFill(int level)
 	
 	_miniscenes[level]->updateMap();
 	main->mapChanged();
+}
+
+namespace
+{
+bool isObstacle(const CGObjectInstance & object)
+{
+	return !object.isVisitable() && object.getObjectHandler()->isStaticObject();
+}
+
+QRgb toRgb(const ColorRGBA & color)
+{
+	return qRgb(color.r, color.g, color.b);
+}
+
+/// Whether a terrain picture can mark obstacles on this terrain with a separate colour
+bool showsObstacles(const TerrainId & id)
+{
+	const auto * terrain = id.toEntity(LIBRARY);
+	return terrain->isPassable() && !terrain->isWater() && toRgb(terrain->minimapBlocked) != toRgb(terrain->minimapUnblocked);
+}
+}
+
+QImage MapController::terrainImage(int level) const
+{
+	QImage image(_map->width, _map->height, QImage::Format_RGB32);
+	for(int y = 0; y < _map->height; ++y)
+	{
+		for(int x = 0; x < _map->width; ++x)
+		{
+			const auto & tile = _map->getTile(int3(x, y, level));
+			const bool covered = std::any_of(tile.blockingObjects.begin(), tile.blockingObjects.end(), [&](const ObjectInstanceID & id)
+			{
+				return isObstacle(*_map->getObject(id));
+			});
+			const auto * terrain = tile.getTerrain();
+			image.setPixel(x, y, toRgb(covered ? terrain->minimapBlocked : terrain->minimapUnblocked));
+		}
+	}
+	return image;
+}
+
+QImage MapController::objectsImage(int level) const
+{
+	QImage image(_map->width, _map->height, QImage::Format_ARGB32);
+	image.fill(Qt::transparent);
+	for(const auto & object : _map->objects)
+	{
+		if(!object || object->anchorPos().z != level || isObstacle(*object))
+			continue;
+		QColor color(Qt::white);
+		if(object->getOwner().isValidPlayer())
+			color = QColor::fromRgb(graphics->playerColors.at(object->getOwner().getNum()));
+		color.setAlpha(150);
+		for(const auto & pos : object->getBlockedPosOnMap(_map->getTopology()))
+			image.setPixelColor(pos.x, pos.y, color);
+		if(object->isVisitable())
+		{
+			if(const auto visitable = _map->getTopology().canonicalize(object->visitablePos()))
+			{
+				color.setAlpha(255);
+				image.setPixelColor(visitable->x, visitable->y, color);
+			}
+		}
+	}
+	return image;
+}
+
+TerrainImportResult MapController::importTerrainImage(int level, const QImage & image)
+{
+	if(image.width() != _map->width || image.height() != _map->height)
+		throw std::invalid_argument("Terrain image size differs from the map size");
+
+	struct PaletteEntry
+	{
+		QRgb color;
+		TerrainId terrain;
+		bool obstacle;
+	};
+	std::vector<PaletteEntry> palette;
+	for(const auto & terrain : LIBRARY->terrainTypeHandler->getObjects())
+		palette.push_back({toRgb(terrain->minimapUnblocked), terrain->getId(), false});
+	// unblocked colours come first and win when a terrain uses one colour for both
+	for(const auto & terrain : LIBRARY->terrainTypeHandler->getObjects())
+		palette.push_back({toRgb(terrain->minimapBlocked), terrain->getId(), true});
+
+	TerrainImportResult result;
+	const int tileCount = _map->width * _map->height;
+	std::vector<TerrainId> target(tileCount);
+	std::vector<bool> marked(tileCount);
+	for(int y = 0; y < _map->height; ++y)
+	{
+		for(int x = 0; x < _map->width; ++x)
+		{
+			const QRgb pixel = image.pixel(x, y);
+			const PaletteEntry * best = nullptr;
+			int bestDistance = std::numeric_limits<int>::max();
+			for(const auto & entry : palette)
+			{
+				const int distance = (qRed(pixel) - qRed(entry.color)) * (qRed(pixel) - qRed(entry.color))
+					+ (qGreen(pixel) - qGreen(entry.color)) * (qGreen(pixel) - qGreen(entry.color))
+					+ (qBlue(pixel) - qBlue(entry.color)) * (qBlue(pixel) - qBlue(entry.color));
+				if(distance < bestDistance)
+				{
+					bestDistance = distance;
+					best = &entry;
+				}
+			}
+			if(bestDistance > 0)
+				++result.inexactPixels;
+			target[y * _map->width + x] = best->terrain;
+			marked[y * _map->width + x] = best->obstacle && showsObstacles(best->terrain);
+		}
+	}
+
+	const auto index = [&](const int3 & pos) { return pos.y * _map->width + pos.x; };
+	std::map<TerrainId, std::vector<int3>> changed;
+	std::vector<bool> changedTile(tileCount);
+	for(int y = 0; y < _map->height; ++y)
+	{
+		for(int x = 0; x < _map->width; ++x)
+		{
+			const int3 pos(x, y, level);
+			if(_map->getTile(pos).getTerrainID() == target[index(pos)])
+				continue;
+			changed[target[index(pos)]].push_back(pos);
+			changedTile[index(pos)] = true;
+			++result.changedTiles;
+		}
+	}
+
+	auto * editManager = _map->getEditManager();
+	editManager->beginUndoGroup();
+
+	std::set<CGObjectInstance *> staleObstacles;
+	for(const auto & object : _map->objects)
+	{
+		if(!object || object->anchorPos().z != level || !isObstacle(*object))
+			continue;
+		for(const auto & pos : object->getBlockedPosOnMap(_map->getTopology()))
+		{
+			// obstacles on water and rock cannot be drawn in the picture, so they stay unless the terrain changes
+			if(changedTile[index(pos)] || (showsObstacles(target[index(pos)]) && !marked[index(pos)]))
+			{
+				staleObstacles.insert(object.get());
+				break;
+			}
+		}
+	}
+	if(!staleObstacles.empty())
+		editManager->removeObjects(staleObstacles);
+	result.removedObstacles = static_cast<int>(staleObstacles.size());
+
+	// Base land first, so that later terrains draw their transitions over it; water and rock last restore their borders
+	const auto rank = [](const TerrainId & id)
+	{
+		const auto * terrain = id.toEntity(LIBRARY);
+		if(id == ETerrainId::DIRT)
+			return 0;
+		if(id == ETerrainId::SAND)
+			return 1;
+		if(terrain->isWater())
+			return 3;
+		if(terrain->isRock())
+			return 4;
+		return 2;
+	};
+	std::vector<TerrainId> order;
+	for(const auto & entry : changed)
+		order.push_back(entry.first);
+	std::stable_sort(order.begin(), order.end(), [&](const TerrainId & a, const TerrainId & b) { return rank(a) < rank(b); });
+	static const int terrainDecorationPercentageLevel = 10;
+	for(const auto & terrain : order)
+	{
+		editManager->getTerrainSelection().setSelection(changed.at(terrain));
+		editManager->drawTerrain(terrain, terrainDecorationPercentageLevel, &CRandomGenerator::getDefault());
+	}
+
+	for(auto & painter : _obstaclePainters)
+		painter.second->clearBlockedArea();
+	for(int y = 0; y < _map->height; ++y)
+	{
+		for(int x = 0; x < _map->width; ++x)
+		{
+			const int3 pos(x, y, level);
+			const auto & tile = _map->getTile(pos);
+			if(marked[index(pos)] && !tile.blocked() && !tile.visitable() && tile.getTerrainID() == target[index(pos)])
+				_obstaclePainters.at(tile.getTerrainID())->addBlockedTile(pos);
+		}
+	}
+	for(auto & painter : _obstaclePainters)
+		result.placedObstacles += static_cast<int>(painter.second->placeObstacles(CRandomGenerator::getDefault()).size());
+
+	editManager->endUndoGroup();
+
+	for(const auto & object : _map->objects)
+	{
+		if(!object || object->anchorPos().z != level || isObstacle(*object) || object->appearance->canBePlacedAtAnyTerrain())
+			continue;
+		const auto pos = _map->getTopology().canonicalize(object->isVisitable() ? object->visitablePos() : object->anchorPos());
+		if(pos && object->appearance->canBePlacedAt(ETerrainId::WATER) != _map->getTile(*pos).isWater())
+			result.misplacedObjects.push_back(object.get());
+	}
+
+	_scenes[level]->selectionTerrainView.clear();
+	_scenes[level]->selectionObjectsView.clear();
+	resetMapHandler();
+	sceneForceUpdate();
+	main->mapChanged();
+	return result;
 }
 
 void MapController::commitObjectChange(int level)

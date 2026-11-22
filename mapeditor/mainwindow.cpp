@@ -1826,6 +1826,76 @@ void EditorMainWindow::on_actionExport_triggered()
 }
 
 
+void EditorMainWindow::on_actionExportTerrain_triggered()
+{
+	if(!controller.map())
+		return;
+
+	QString fileName = QFileDialog::getSaveFileName(this, tr("Export terrain to PNG"), lastSavingDir, "PNG (*.png)");
+	if(fileName.isEmpty())
+		return;
+	if(QFileInfo(fileName).suffix().isEmpty())
+		fileName += ".png";
+	lastSavingDir = QFileInfo(fileName).dir().path();
+
+	const QFileInfo info(fileName);
+	const QString objectsFileName = info.dir().filePath(info.completeBaseName() + "-objects.png");
+	if(!controller.terrainImage(mapLevel).save(fileName, "PNG") || !controller.objectsImage(mapLevel).save(objectsFileName, "PNG"))
+	{
+		QMessageBox::critical(this, tr("Export terrain to PNG"), tr("Cannot write %1").arg(fileName));
+		return;
+	}
+	displayStatus(tr("Terrain saved to %1, objects to %2").arg(info.fileName(), QFileInfo(objectsFileName).fileName()), 5000);
+}
+
+void EditorMainWindow::on_actionImportTerrain_triggered()
+{
+	if(!controller.map())
+		return;
+
+	const QString fileName = QFileDialog::getOpenFileName(this, tr("Import terrain from PNG"), lastSavingDir, "PNG (*.png)");
+	if(fileName.isEmpty())
+		return;
+	lastSavingDir = QFileInfo(fileName).dir().path();
+
+	QImage image;
+	if(!image.load(fileName))
+	{
+		QMessageBox::critical(this, tr("Import terrain from PNG"), tr("Cannot read %1").arg(fileName));
+		return;
+	}
+	const auto * map = controller.map();
+	if(image.width() != map->width || image.height() != map->height)
+	{
+		QMessageBox::warning(this, tr("Import terrain from PNG"),
+			tr("The picture is %1 × %2 pixels, but the map is %3 × %4 tiles. Each pixel must match one tile.")
+			.arg(image.width()).arg(image.height()).arg(map->width).arg(map->height));
+		return;
+	}
+
+	const auto result = controller.importTerrainImage(mapLevel, image);
+
+	QString text = tr("Changed tiles: %1\nRemoved obstacles: %2\nPlaced obstacles: %3")
+		.arg(result.changedTiles).arg(result.removedObstacles).arg(result.placedObstacles);
+	if(result.inexactPixels > 0)
+		text += "\n\n" + tr("%1 pixels have colours outside the terrain palette and were mapped to the nearest terrain.").arg(result.inexactPixels);
+	if(!result.misplacedObjects.empty())
+	{
+		text += "\n\n" + tr("These objects are now on the wrong side of a coastline:");
+		const size_t shown = std::min<size_t>(result.misplacedObjects.size(), 15);
+		for(size_t i = 0; i < shown; ++i)
+		{
+			const auto * object = result.misplacedObjects[i];
+			const int3 pos = object->isVisitable() ? object->visitablePos() : object->anchorPos();
+			text += QString("\n• %1 (%2, %3)").arg(QString::fromStdString(object->getObjectName().toString(&Translator::instance()))).arg(pos.x).arg(pos.y);
+		}
+		if(result.misplacedObjects.size() > shown)
+			text += "\n" + tr("…and %1 more").arg(result.misplacedObjects.size() - shown);
+	}
+	text += "\n\n" + tr("Undo reverts the whole import.");
+	QMessageBox::information(this, tr("Import terrain from PNG"), text);
+}
+
 void EditorMainWindow::on_actionTranslations_triggered()
 {
 	auto translationsDialog = new Translations(*controller.map(), this);

@@ -70,6 +70,8 @@
     <addaction name="actionSave"/>
     <addaction name="actionSave_as"/>
     <addaction name="actionExport"/>
+    <addaction name="actionExportTerrain"/>
+    <addaction name="actionImportTerrain"/>
     <addaction name="separator"/>
     <addaction name="actionCampaignEditor"/>
     <addaction name="actionTemplateEditor"/>
@@ -1397,6 +1399,16 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+E</string>
+   </property>
+  </action>
+  <action name="actionExportTerrain">
+   <property name="text">
+    <string>Export terrain to PNG...</string>
+   </property>
+  </action>
+  <action name="actionImportTerrain">
+   <property name="text">
+    <string>Import terrain from PNG...</string>
    </property>
   </action>
   <action name="actionTranslations">
