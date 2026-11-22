@@ -58,6 +58,7 @@ set(test_SRCS
 		serializer/GameConnectionTopologyTest.cpp
 
 		map/CMapEditManagerTest.cpp
+		map/WorldMapProbe.cpp
 		map/CMapFormatTest.cpp
 		map/CGArtifactRegressionTest.cpp
 		map/HeroMissionCriticalTest.cpp
