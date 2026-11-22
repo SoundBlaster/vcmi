@@ -46,14 +46,12 @@ different published World map are distinguished in
 
 The `/heroes3` route is part of Platform `main` since commit
 `ecd64ddcbd3572976ae6be58043f6abb535fd4d3` (PR #216). On 2026-11-23 the
-live server still used an older pinned Platform checkout with an identical
-but locally modified Caddyfile and additional untracked files. Its checkout
-helper refuses a dirty worktree. The active image lock and checkout also have
-different source commits, and a checkout can replace the live Caddy bind-mount
-inode. Files were backed up and the checkout procedure was rehearsed separately;
-the [reconciliation record](../../specs/toroidal-map/evidence/platform-checkout-reconciliation-2026-11-23.md)
-describes the remaining coordinated rollout. Do not overwrite the running
-checkout blindly. Verify HTTPS after that update.
+production checkout and runtime were aligned to this revision. The
+[rollout record](../../specs/toroidal-map/evidence/platform-rollout-2026-11-23.md)
+describes the operator-derived image lock, backups and checks. A checkout may
+replace the Caddyfile inode: preserve local files and coordinate ingress
+recreation with a future Platform deployment instead of overwriting a running
+checkout blindly.
 
 ## Terrain painter
 
