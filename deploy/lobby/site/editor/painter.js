@@ -43,7 +43,7 @@ const TEXT = {
 		dropHint: 'Drop a picture here, paste it or click to choose. It stays on your device.', fit: 'Fit', fitCover: 'Crop to fill',
 		fitContain: 'Fit with margins', fitStretch: 'Stretch', matchAspect: 'Match picture shape', colors: 'Colour groups', share: 'Share',
 		terrain: 'Terrain', obstaclesShort: 'Obstacles', smoothing: 'Smoothing', minRegion: 'Remove spots smaller than', apply: 'Use as map',
-		discard: 'Discard', underlay: 'Show picture under the map', paintSection: '3. Paint', toolBrush: 'Brush (B)', toolEraser: 'Eraser (E)',
+		discard: 'Discard', underlay: 'Show picture under the map', viewSection: '3. View', toolBrush: 'Brush (B)', toolEraser: 'Eraser (E)',
 		toolFill: 'Fill (F); Shift + click fills the whole map', toolPicker: 'Pick terrain (I)', toolPan: 'Move view (H)', undo: 'Undo (Ctrl+Z)', redo: 'Redo (Ctrl+Shift+Z)',
 		layerTerrain: 'Terrain', layerObstacles: 'Obstacles', brushSize: 'Brush', torusPreview: 'Show wrapped copies around the map',
 		grid: 'Grid when zoomed in', paintHint: 'Pen or mouse paints. Two-finger scrolling moves the view, pinch or Cmd/Ctrl + scroll zooms. Space + drag, the middle button or the hand tool also move the view; + and − zoom.',
@@ -71,7 +71,7 @@ const TEXT = {
 		fitCover: 'Обрезать по карте', fitContain: 'Вписать с полями', fitStretch: 'Растянуть', matchAspect: 'Пропорции картинки',
 		colors: 'Групп цветов', share: 'Доля', terrain: 'Земля', obstaclesShort: 'Препятствия', smoothing: 'Сглаживание',
 		minRegion: 'Убрать пятна меньше', apply: 'Взять как карту', discard: 'Отменить', underlay: 'Показать картинку под картой',
-		paintSection: '3. Рисование', toolBrush: 'Кисть (B)', toolEraser: 'Ластик (E)', toolFill: 'Заливка (F); Shift + клик — по всей карте', toolPicker: 'Пипетка (I)',
+		viewSection: '3. Вид', toolBrush: 'Кисть (B)', toolEraser: 'Ластик (E)', toolFill: 'Заливка (F); Shift + клик — по всей карте', toolPicker: 'Пипетка (I)',
 		toolPan: 'Двигать вид (H)', undo: 'Отменить (Ctrl+Z)', redo: 'Повторить (Ctrl+Shift+Z)', layerTerrain: 'Земля',
 		layerObstacles: 'Препятствия', brushSize: 'Кисть', torusPreview: 'Показывать склеенные копии вокруг карты',
 		grid: 'Сетка при увеличении', paintHint: 'Рисует стилус или мышь. Прокрутка двумя пальцами двигает вид, щипок или Cmd/Ctrl + прокрутка меняют масштаб. Ещё вид двигают пробел + перетаскивание, средняя кнопка и инструмент «рука»; + и − меняют масштаб.',
@@ -947,8 +947,18 @@ function selectTerrain(index)
 	selectLayer('terrain');
 	if (state.tool === 'picker' || state.tool === 'eraser')
 		selectTool('brush');
+	showCurrentTerrain();
+}
+
+function showCurrentTerrain()
+{
 	for (const button of $('palette').children)
-		button.classList.toggle('active', Number(button.dataset.terrain) === index);
+	{
+		const active = Number(button.dataset.terrain) === state.current;
+		button.classList.toggle('active', active);
+		button.setAttribute('aria-pressed', String(active));
+	}
+	$('currentTerrain').textContent = terrainName(state.current);
 }
 
 function swatch(color)
@@ -968,14 +978,14 @@ function buildPalette()
 		const button = document.createElement('button');
 		button.type = 'button';
 		button.dataset.terrain = index;
-		button.append(swatch(terrain.color), terrainName(index));
-		const key = document.createElement('kbd');
-		key.textContent = index < 9 ? String(index + 1) : index === 9 ? '0' : '';
-		button.append(key);
-		button.classList.toggle('active', index === state.current);
+		const key = index < 9 ? String(index + 1) : index === 9 ? '0' : '';
+		button.title = key ? `${terrainName(index)} (${key})` : terrainName(index);
+		button.setAttribute('aria-label', terrainName(index));
+		button.append(swatch(terrain.color));
 		button.addEventListener('click', () => selectTerrain(index));
 		palette.append(button);
 	});
+	showCurrentTerrain();
 }
 
 function buildFillSelect()
