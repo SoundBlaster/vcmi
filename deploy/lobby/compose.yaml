@@ -2,8 +2,6 @@ services:
   website:
     image: nginx:1.27-alpine
     restart: unless-stopped
-    ports:
-      - "80:80/tcp"
     volumes:
       - ./site:/usr/share/nginx/html/heroes3:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro

@@ -3,6 +3,7 @@
 import argparse
 import base64
 import collections
+import ipaddress
 import json
 import logging
 import os
@@ -18,21 +19,34 @@ BUILD_TIMEOUT = 60
 QUEUE_TIMEOUT = 20
 RATE_WINDOW = 600
 RATE_LIMIT = 30
+MAX_CLIENTS = 4096
 
 builds = threading.Semaphore(1)
-history = collections.defaultdict(collections.deque)
+history = collections.OrderedDict()
 history_lock = threading.Lock()
 
 
 def allowed(client):
     now = time.monotonic()
     with history_lock:
-        recent = history[client]
+        # Entries are ordered by last accepted request. Expire old client keys
+        # globally and refuse new ones at capacity rather than growing forever.
+        while history:
+            oldest, requests = next(iter(history.items()))
+            if now - requests[-1] <= RATE_WINDOW:
+                break
+            del history[oldest]
+        recent = history.get(client)
+        if recent is None:
+            if len(history) >= MAX_CLIENTS:
+                return False
+            recent = history[client] = collections.deque()
         while recent and now - recent[0] > RATE_WINDOW:
             recent.popleft()
         if len(recent) >= RATE_LIMIT:
             return False
         recent.append(now)
+        history.move_to_end(client)
         return True
 
 
@@ -42,9 +56,13 @@ class Handler(SimpleHTTPRequestHandler):
     server_version = "vcmimapbuilder"
 
     def client(self):
-        # the service is reachable only through the website proxy, which passes the address Caddy put first in X-Forwarded-For
+        # Only nginx can reach this service; nginx is reachable via trusted
+        # Caddy, which replaces untrusted incoming forwarding headers.
         forwarded = self.headers.get("X-Real-IP", "").split(",")[0].strip()
-        return forwarded or self.client_address[0]
+        try:
+            return str(ipaddress.ip_address(forwarded))
+        except ValueError:
+            return self.client_address[0]
 
     def reply(self, status, payload):
         body = json.dumps(payload).encode()
@@ -75,10 +93,10 @@ class Handler(SimpleHTTPRequestHandler):
         if length <= 0 or length > MAX_BODY:
             self.reply(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "The request is too large"})
             return
-        body = self.rfile.read(length)
         if not allowed(self.client()):
             self.reply(HTTPStatus.TOO_MANY_REQUESTS, {"error": "Too many maps in a short time, try again later"})
             return
+        body = self.rfile.read(length)
         if not builds.acquire(timeout=QUEUE_TIMEOUT):
             self.reply(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "The server is busy, try again in a minute"})
             return
