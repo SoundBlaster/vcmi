@@ -74,15 +74,30 @@ container instead of `docker build`, then build the runtime image from `out/`:
 `src/` is a copy of this repository without client, editor, launcher and test
 sources.
 
-### Public API hardening needed
+### Public API protection
 
-The current nginx configuration forwards the incoming `X-Forwarded-For` value
-as `X-Real-IP`, which mapbuilder uses as its per-client rate-limit key. The
-website's directly published HTTP port allows callers to supply that header,
-so the limit is not a reliable abuse boundary. Requests are also read before
-the limit is checked, and the threaded server has no overall connection bound.
-Before relying on this service for broader public use, restrict direct access
-to the trusted ingress, set client identity only from a verified proxy chain,
-bound request concurrency and timeouts, and test both the ingress and direct
-access paths. The current `health` response only shows that the HTTP service
-answered; it does not test map generation, the lobby or a multiplayer game.
+The website has no published host port. It is reached through Caddy on the
+managed ingress network, which replaces untrusted incoming forwarding headers.
+nginx forwards the resulting `X-Forwarded-For` as `X-Real-IP` to mapbuilder.
+The latter accepts only valid IP addresses as rate-limit keys. Do not publish
+the website port or put an untrusted proxy/container on the ingress network:
+either would allow callers to bypass that identity boundary. If Caddy's
+`trusted_proxies` settings change, reverify the complete forwarding chain.
+
+Mapbuilder allows 30 requests per IP per ten minutes, keeps at most 4096
+active client records and rejects new clients while that table is full. nginx
+limits API requests to eight concurrent connections and applies 10-second
+header/body inactivity timeouts. Mapbuilder still runs one build at a time.
+These are bounded resource protections, not a guarantee against distributed
+abuse; monitor capacity and tune the limits for actual usage.
+
+On 2026-11-22 the deployment returned a valid 16×16 toroidal VMAP through
+HTTPS, rejected a ninth concurrent API request while eight incomplete requests
+were held, and treated two requests with different spoofed forwarding headers
+as the same client. Docker showed no host port binding for the website. The
+health response alone does not test the lobby or a multiplayer game.
+The previous compose file, nginx config and server source are retained under
+`/opt/vcmi-lobby/hardening-20261122/`; the previous mapbuilder image is tagged
+`vcmi-lobby-mapbuilder:pre-hardening-20261122`. If rollback is necessary,
+restore those files and that image before recreating only website/mapbuilder;
+the old compose file reopens host port 80, so the original exposure returns.

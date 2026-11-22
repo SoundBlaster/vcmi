@@ -187,9 +187,11 @@ demo preparation reviewable as separate changes where practical.
   validation and representative gameplay. The published World map differs in
   declared mod dependencies from the original generated fixture; see the
   [fixture record](evidence/world-map-from-picture-2026-11-22.md).
-- [ ] Harden the public terrain-painter API and make the live Platform HTTPS
-  route durable in Platform's own repository. The current deployment caveats
-  are documented in the [lobby README](../../deploy/lobby/README.md).
+- [x] Restrict the terrain-painter ingress and bound API resource usage; the
+  [lobby README](../../deploy/lobby/README.md) records live checks and the
+  remaining operational assumptions.
+- [ ] Make the live Platform HTTPS route durable in Platform's own repository.
+  The [lobby README](../../deploy/lobby/README.md) records the deployment gap.
 - [ ] Run appropriate automated and graphical checks for each change, update
   the SpecPM evidence and implementation matrix, and record revisions and
   environment. Keep known failures and unverified scenarios visible.
