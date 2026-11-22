@@ -178,6 +178,18 @@ demo preparation reviewable as separate changes where practical.
 
 ## 6. Verification and acceptance
 
+- [ ] Verify the configurable globe projection on the released rendering backends and
+  display scales: clicks and hover at edges/corners, zoom and panning, map
+  objects, fog and animation. The visual projection retains toroidal game
+  topology; it is not spherical movement. Record build, backend and results.
+- [ ] Check the published World and Outcast map files independently of their
+  generation fixtures: capture source and hashes, required mods, editor
+  validation and representative gameplay. The published World map differs in
+  declared mod dependencies from the original generated fixture; see the
+  [fixture record](evidence/world-map-from-picture-2026-11-22.md).
+- [ ] Harden the public terrain-painter API and make the live Platform HTTPS
+  route durable in Platform's own repository. The current deployment caveats
+  are documented in the [lobby README](../../deploy/lobby/README.md).
 - [ ] Run appropriate automated and graphical checks for each change, update
   the SpecPM evidence and implementation matrix, and record revisions and
   environment. Keep known failures and unverified scenarios visible.

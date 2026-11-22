@@ -1,5 +1,13 @@
 # World map generated from the landing page picture
 
+This record describes the original generated fixture, not necessarily the map
+currently offered for download. On 2026-11-22 the public `toroidal-world.vmap`
+had SHA-256 `ec7b1d94c1487719ff8392722337b6ce8032ba6bfc68cf27b6995862ab0d0f37`.
+Its header declares a 256×128 toroidal surface and requires HotA 1.8.5 and
+HotA Map Decorations 1.5.2. Its later editing history and correspondence to
+the fixture below have not been established. Do not apply the no-HotA or
+connectivity observations below to that downloadable file without rechecking.
+
 [`tools/prepare_world_map.sh`](../tools/prepare_world_map.sh) builds a
 256×128 toroidal VMAP from `deploy/lobby/site/world.jpg`. Python scripts
 classify the picture into terrain letters, smooth the grid with wrapping on

@@ -33,6 +33,23 @@ of `site/`.
 Confirm lobby login, room creation, relay and an actual match with two clients;
 an open TCP port by itself is not an end-to-end test.
 
+### Deployment inventory and recovery
+
+The landing page advertises preview `toroid-preview-da6c93a` for macOS arm64
+and Windows x64. These release binaries predate later commits such as the
+terrain painter layout; changes on the site do not update installed clients.
+The downloadable `.vmap` files are server assets, not tracked in this Git
+checkout. Back them up separately before replacing the site and verify their
+hashes and mod requirements. The original generated-world evidence and the
+different published World map are distinguished in
+[`world-map-from-picture-2026-11-22.md`](../../specs/toroidal-map/evidence/world-map-from-picture-2026-11-22.md).
+
+On 2026-11-22, the live Platform Caddyfile contained an uncommitted `/heroes3`
+route. The fragment in this repository describes the integration but is not a
+substitute for committing it in Platform's deployment configuration. Preserve
+the other local changes in that checkout and verify HTTPS after that separate
+change is integrated. Do not overwrite the running configuration blindly.
+
 ## Terrain painter
 
 `site/editor/` is a static page that turns pictures and drawings into a
@@ -56,3 +73,16 @@ container instead of `docker build`, then build the runtime image from `out/`:
 
 `src/` is a copy of this repository without client, editor, launcher and test
 sources.
+
+### Public API hardening needed
+
+The current nginx configuration forwards the incoming `X-Forwarded-For` value
+as `X-Real-IP`, which mapbuilder uses as its per-client rate-limit key. The
+website's directly published HTTP port allows callers to supply that header,
+so the limit is not a reliable abuse boundary. Requests are also read before
+the limit is checked, and the threaded server has no overall connection bound.
+Before relying on this service for broader public use, restrict direct access
+to the trusted ingress, set client identity only from a verified proxy chain,
+bound request concurrency and timeouts, and test both the ingress and direct
+access paths. The current `health` response only shows that the HTTP service
+answered; it does not test map generation, the lobby or a multiplayer game.
