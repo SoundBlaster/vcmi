@@ -118,6 +118,7 @@ else()
 	option(ENABLE_SINGLE_APP_BUILD "Builds client and launcher as single executable" OFF)
 	option(ENABLE_TEST "Enable compilation of unit tests" OFF)
 	option(ENABLE_LOBBY "Enable compilation of lobby server" OFF)
+	option(ENABLE_MAPBUILDER "Enable compilation of the command-line tool that builds maps from terrain grids" OFF)
 	option(ENABLE_DISCORD "Enable compilation of discord integration" ON)
 
 	if (ENABLE_DISCORD)
@@ -818,7 +819,7 @@ endif()
 
 add_subdirectory(lib)
 
-if (ENABLE_CLIENT OR ENABLE_TEST)
+if (ENABLE_CLIENT OR ENABLE_TEST OR ENABLE_MAPBUILDER)
 	add_subdirectory_with_folder("AI" AI)
 endif()
 
@@ -860,6 +861,10 @@ endif()
 
 if(ENABLE_SERVER)
 	add_subdirectory(serverapp)
+endif()
+
+if(ENABLE_MAPBUILDER)
+	add_subdirectory(mapbuilder)
 endif()
 
 if(ENABLE_TEST)
