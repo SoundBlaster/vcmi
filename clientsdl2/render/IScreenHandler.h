@@ -18,11 +18,29 @@ class Rect;
 
 class Canvas;
 
+/// Vertex of a PresentedMesh. Unused here; client code is shared between backends.
+struct PresentedVertex
+{
+	float targetX;
+	float targetY;
+	float sourceX;
+	float sourceY;
+	float brightness;
+};
+
+/// Distortion mesh of a PresentedRegion. Unused here; client code is shared between backends.
+struct PresentedMesh
+{
+	std::vector<PresentedVertex> vertices;
+	std::vector<int> indices;
+};
+
 /// One region of an offscreen canvas. Unused here; client code is shared between backends.
 struct PresentedRegion
 {
 	Rect source;
 	Rect target;
+	std::shared_ptr<const PresentedMesh> mesh;
 };
 
 /// GPU layers composited under the software screen. This backend has none, but client code

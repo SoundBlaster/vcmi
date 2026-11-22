@@ -1050,6 +1050,15 @@ void ScreenHandler::composeFrame() const
 		for(const PresentedRegion & region : presented.regions)
 		{
 			SDL_SetTextureBlendMode(presented.source, SDL_BLENDMODE_NONE);
+
+			if(region.mesh)
+			{
+				// a distorted image samples between pixels everywhere, so nearest would shimmer while scrolling
+				SDL_SetTextureScaleMode(presented.source, SDL_SCALEMODE_LINEAR);
+				drawPresentedMesh(presented.source, region);
+				continue;
+			}
+
 			SDL_SetTextureScaleMode(presented.source, presentedScaleMode);
 
 			SDL_FRect from = CSDL_Ext::toSDLFloat(region.source);
@@ -1064,6 +1073,35 @@ void ScreenHandler::composeFrame() const
 	}
 
 	SDL_RenderTexture(renderer, isGpuRenderingEnabled() ? screenTarget : screenTexture, nullptr, nullptr);
+}
+
+void ScreenHandler::drawPresentedMesh(SDL_Texture * source, const PresentedRegion & region) const
+{
+	float textureWidth = 0;
+	float textureHeight = 0;
+	if(!SDL_GetTextureSize(source, &textureWidth, &textureHeight) || textureWidth <= 0 || textureHeight <= 0)
+	{
+		logGlobal->error("Failed to query the size of a presented canvas: %s", SDL_GetError());
+		return;
+	}
+
+	std::vector<SDL_Vertex> vertices;
+	vertices.reserve(region.mesh->vertices.size());
+
+	for(const PresentedVertex & vertex : region.mesh->vertices)
+	{
+		SDL_Vertex & result = vertices.emplace_back();
+		result.position.x = region.target.x + vertex.targetX * region.target.w;
+		result.position.y = region.target.y + vertex.targetY * region.target.h;
+		result.tex_coord.x = (region.source.x + vertex.sourceX * region.source.w) / textureWidth;
+		result.tex_coord.y = (region.source.y + vertex.sourceY * region.source.h) / textureHeight;
+		result.color = SDL_FColor{vertex.brightness, vertex.brightness, vertex.brightness, 1.0f};
+	}
+
+	SDL_Renderer * renderer = GpuResources::get().renderer();
+	const auto & indices = region.mesh->indices;
+	if(!SDL_RenderGeometry(renderer, source, vertices.data(), static_cast<int>(vertices.size()), indices.data(), static_cast<int>(indices.size())))
+		logGlobal->error("Failed to compose a presented canvas mesh: %s", SDL_GetError());
 }
 
 std::vector<Point> ScreenHandler::getSupportedResolutions() const

@@ -12,6 +12,7 @@
 #include "MapView.h"
 
 #include "IMapRendererContext.h"
+#include "MapGlobeProjection.h"
 #include "MapViewActions.h"
 #include "MapViewCache.h"
 #include "MapViewController.h"
@@ -205,7 +206,12 @@ void observeMapView(const MapViewModel & model, const Rect & viewport, const IMa
 }
 }
 
-BasicMapView::~BasicMapView() = default;
+BasicMapView::~BasicMapView()
+{
+	// nothing may be left pointing at the canvas once it is gone
+	if(globeCanvas)
+		ENGINE->screenHandler().clearPresentedCanvas(GpuRenderLayer::MAP);
+}
 
 std::shared_ptr<MapViewModel> BasicMapView::createModel(const Point & dimensions) const
 {
@@ -256,11 +262,52 @@ void BasicMapView::render(Canvas & target, bool fullUpdate)
 	logVisual->visualize(r);
 }
 
+MapGlobeProjection BasicMapView::selectGlobeProjection() const
+{
+	// the illusion of a planet only holds where the map wraps around
+	const auto * mapInterface = GAME->interface();
+	if(!mapInterface || !mapInterface->cb || !mapInterface->cb->getMapHeader()->toroidal)
+		return {};
+
+	const double nativeCornerAngle = settings["adventure"]["globeCurvature"].Float() * M_PI / 180.0;
+	if(nativeCornerAngle <= 0)
+		return {};
+
+	// The setting is the corner angle at native tile size. The sphere keeps its size in tiles, so zooming in
+	// shows a smaller part of it. Zooming out is capped well before the horizon, which the view cannot show.
+	constexpr double maxCornerAngle = 75 * M_PI / 180.0;
+	const double cornerDistance = std::hypot(pos.w / 2.0, pos.h / 2.0);
+	const double zoom = static_cast<double>(model->getSingleTileSize().x) / MapViewModel::getNativeTileSize().x;
+	const double radius = cornerDistance / std::sin(std::min(nativeCornerAngle, maxCornerAngle)) * zoom;
+	const double cornerAngle = std::asin(std::min(cornerDistance / radius, std::sin(maxCornerAngle)));
+
+	return MapGlobeProjection(pos.dimensions(), cornerAngle * 180.0 / M_PI);
+}
+
 void BasicMapView::renderGpu(bool fullUpdate)
 {
+	const MapGlobeProjection projection = selectGlobeProjection();
+	if(!(projection == model->getGlobeProjection()))
+	{
+		// the projected view shows more of the map than it covers, so the model renders the larger flat image
+		model->setGlobeProjection(projection);
+		model->setViewDimensions(projection.isEnabled() ? projection.getFlatDimensions() : pos.dimensions());
+		globeMesh = projection.isEnabled() ? projection.createMesh() : nullptr;
+		fullUpdate = true;
+	}
+
 	// tick() normally filled the cache; a scroll, zoom or level change since then invalidates it
 	if(!tilesCache->isUpdatedThisFrame())
 		tilesCache->update(controller->getContext());
+
+	if(projection.isEnabled())
+	{
+		renderGlobe(fullUpdate);
+		return;
+	}
+
+	// the canvas is still registered for presenting, so it goes only once the paths below replace it
+	auto previousGlobeCanvas = std::move(globeCanvas);
 
 	// Nothing is drawn over the terrain in the usual case, so the cache is composed straight onto
 	// the screen. Copying it into a layer here would mean reading a render target in the middle of
@@ -275,6 +322,22 @@ void BasicMapView::renderGpu(bool fullUpdate)
 	Canvas targetClipped(layer, pos);
 
 	tilesCache->render(controller->getContext(), targetClipped, fullUpdate);
+}
+
+void BasicMapView::renderGlobe(bool fullUpdate)
+{
+	const Point flatDimensions = model->getPixelsVisibleDimensions();
+
+	if(!globeCanvas || globeCanvas->getRenderArea().dimensions() != flatDimensions * ENGINE->screenHandler().getScalingFactor())
+	{
+		globeCanvas = std::make_unique<Canvas>(ENGINE->screenHandler().createOffscreenCanvas(flatDimensions));
+		fullUpdate = true;
+	}
+
+	tilesCache->render(controller->getContext(), *globeCanvas, fullUpdate);
+
+	const Rect target = pos * ENGINE->screenHandler().getScalingFactor();
+	ENGINE->screenHandler().presentFromCanvas(GpuRenderLayer::MAP, *globeCanvas, {{globeCanvas->getRenderArea(), target, globeMesh}});
 }
 
 void BasicMapView::tick(uint32_t msPassed)

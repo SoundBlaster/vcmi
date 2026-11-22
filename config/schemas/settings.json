@@ -409,7 +409,7 @@
 			"type" : "object",
 			"additionalProperties" : false,
 			"default" : {},
-			"required" : [ "heroMoveTime", "enemyMoveTime", "scrollSpeedPixels", "heroReminder", "quickCombat", "objectAnimation", "terrainAnimation", "forceQuickCombat", "borderScroll", "leftButtonDrag", "rightButtonDrag", "smoothDragging", "backgroundDimLevel", "hideBackground", "backgroundDimSmallWindows", "tileZoom", "minimapShowHeroes", "showMovePath", "replayShowBattles" ],
+			"required" : [ "heroMoveTime", "enemyMoveTime", "scrollSpeedPixels", "heroReminder", "quickCombat", "objectAnimation", "terrainAnimation", "forceQuickCombat", "borderScroll", "leftButtonDrag", "rightButtonDrag", "smoothDragging", "backgroundDimLevel", "hideBackground", "backgroundDimSmallWindows", "tileZoom", "globeCurvature", "minimapShowHeroes", "showMovePath", "replayShowBattles" ],
 			"properties" : {
 				"heroMoveTime" : {
 					"type" : "number",
@@ -481,6 +481,13 @@
 				"tileZoom" : {
 					"type" : "number",
 					"default" : 32
+				},
+				"globeCurvature" : {
+					"description" : "Angle in degrees between the center and a corner of the adventure map view, at native tile size, when a toroidal map is shown bent around a sphere. The sphere keeps its size in tiles, so the angle shrinks when zooming in. 0 shows the map flat",
+					"type" : "number",
+					"minimum" : 0,
+					"maximum" : 60,
+					"default" : 45
 				},
 				"showMovePath" : {
 					"type" : "boolean",

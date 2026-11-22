@@ -33,6 +33,21 @@ void MapViewModel::setViewCenter(const Point & newValue)
 	viewCenter = newValue;
 }
 
+void MapViewModel::setGlobeProjection(const MapGlobeProjection & newValue)
+{
+	globeProjection = newValue;
+}
+
+const MapGlobeProjection & MapViewModel::getGlobeProjection() const
+{
+	return globeProjection;
+}
+
+int3 MapViewModel::getTileAtScreenPoint(const Point & position) const
+{
+	return getTileAtPoint(globeProjection.toFlat(position));
+}
+
 void MapViewModel::setViewDimensions(const Point & newValue)
 {
 	viewDimensions = newValue;

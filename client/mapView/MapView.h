@@ -19,6 +19,8 @@ class MapViewActions;
 class MapViewController;
 class MapViewModel;
 class MapViewCache;
+class MapGlobeProjection;
+struct PresentedMesh;
 
 /// Internal class that contains logic shared between all map views
 class BasicMapView : public CIntObject
@@ -37,6 +39,16 @@ protected:
 
 	/// Draws the map into the GPU layer instead of into the screen surface
 	void renderGpu(bool fullUpdate);
+
+	/// Flat image of the view, presented through the globe projection of the model
+	std::unique_ptr<Canvas> globeCanvas;
+	std::shared_ptr<const PresentedMesh> globeMesh;
+
+	/// Projection the adventure map should be shown through this frame, disabled where it does not apply
+	MapGlobeProjection selectGlobeProjection() const;
+
+	/// Draws the map into globeCanvas and presents it bent around a sphere
+	void renderGlobe(bool fullUpdate);
 
 public:
 	bool needFullUpdate;

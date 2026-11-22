@@ -122,6 +122,10 @@ class ScreenHandler final : public IScreenHandler
 
 	/// Draws the layers and the screen target into the current render target, without cursor
 	void composeFrame() const;
+
+	/// Draws a presented region through its distortion mesh
+	void drawPresentedMesh(SDL_Texture * source, const PresentedRegion & region) const;
+
 	void destroyScreenBuffers();
 
 	/// Updates state (e.g. position) of game window after resolution/fullscreen change

@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include "MapGlobeProjection.h"
+
 #include "../../lib/Rect.h"
 #include <functional>
 
@@ -23,6 +25,8 @@ class MapViewModel
 	/// Whether the cache stores its tiles unscaled and scales them while blitting
 	bool cacheAtNativeSize = false;
 
+	MapGlobeProjection globeProjection;
+
 public:
 	/// size a tile is rendered at before any scaling
 	static Point getNativeTileSize();
@@ -32,6 +36,7 @@ public:
 	void setViewCenter(const Point & newValue);
 	void setViewDimensions(const Point & newValue);
 	void setLevel(int newLevel);
+	void setGlobeProjection(const MapGlobeProjection & newValue);
 
 	/// returns maximal possible size for a single tile
 	Point getSingleTileSizeUpperLimit() const;
@@ -72,6 +77,12 @@ public:
 
 	/// returns tile under specified position in target view
 	int3 getTileAtPoint(const Point & position) const;
+
+	/// returns tile shown under specified position on screen, relative to the view, accounting for the globe projection
+	int3 getTileAtScreenPoint(const Point & position) const;
+
+	/// returns projection the view is shown through, disabled when the view is shown flat
+	const MapGlobeProjection & getGlobeProjection() const;
 
 	/// returns currently visible map level
 	int getLevel() const;

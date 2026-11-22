@@ -55,7 +55,7 @@ void MapViewActions::clickPressed(const Point & cursorPosition)
 {
 	if (!settings["adventure"]["leftButtonDrag"].Bool())
 	{
-		auto tile = mapPosition(model->getTileAtPoint(cursorPosition - pos.topLeft()));
+		auto tile = mapPosition(model->getTileAtScreenPoint(cursorPosition - pos.topLeft()));
 
 		if(tile)
 			adventureInt->onTileLeftClicked(*tile);
@@ -66,7 +66,7 @@ void MapViewActions::clickReleased(const Point & cursorPosition)
 {
 	if (!dragActive && settings["adventure"]["leftButtonDrag"].Bool())
 	{
-		auto tile = mapPosition(model->getTileAtPoint(cursorPosition - pos.topLeft()));
+		auto tile = mapPosition(model->getTileAtScreenPoint(cursorPosition - pos.topLeft()));
 
 		if(tile)
 			adventureInt->onTileLeftClicked(*tile);
@@ -83,7 +83,7 @@ void MapViewActions::clickCancel(const Point & cursorPosition)
 
 void MapViewActions::showPopupWindow(const Point & cursorPosition)
 {
-	auto tile = mapPosition(model->getTileAtPoint(cursorPosition - pos.topLeft()));
+	auto tile = mapPosition(model->getTileAtScreenPoint(cursorPosition - pos.topLeft()));
 
 	if(tile)
 		adventureInt->onTileRightClicked(*tile);
@@ -158,7 +158,7 @@ void MapViewActions::gesture(bool on, const Point & initialPosition, const Point
 
 void MapViewActions::handleHover(const Point & cursorPosition)
 {
-	auto tile = mapPosition(model->getTileAtPoint(cursorPosition - pos.topLeft()));
+	auto tile = mapPosition(model->getTileAtScreenPoint(cursorPosition - pos.topLeft()));
 
 	if(!tile)
 	{

@@ -39,11 +39,29 @@ enum class TaskbarProgress : uint8_t
 	NORMAL
 };
 
+/// Vertex of a PresentedMesh. Positions are fractions of the region's target and source rectangles.
+struct PresentedVertex
+{
+	float targetX;
+	float targetY;
+	float sourceX;
+	float sourceY;
+	float brightness; ///< color modulation, 1 keeps the source color
+};
+
+/// Triangle mesh that draws a PresentedRegion distorted instead of as a plain scaled copy
+struct PresentedMesh
+{
+	std::vector<PresentedVertex> vertices;
+	std::vector<int> indices;
+};
+
 /// One region of an offscreen canvas, drawn onto the screen while the frame is composed
 struct PresentedRegion
 {
 	Rect source; ///< within the canvas
 	Rect target; ///< in screen pixels
+	std::shared_ptr<const PresentedMesh> mesh; ///< plain copy when null
 };
 
 class IScreenHandler
