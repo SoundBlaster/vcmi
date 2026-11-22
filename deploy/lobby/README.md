@@ -44,11 +44,13 @@ hashes and mod requirements. The original generated-world evidence and the
 different published World map are distinguished in
 [`world-map-from-picture-2026-11-22.md`](../../specs/toroidal-map/evidence/world-map-from-picture-2026-11-22.md).
 
-On 2026-11-22, the live Platform Caddyfile contained an uncommitted `/heroes3`
-route. The fragment in this repository describes the integration but is not a
-substitute for committing it in Platform's deployment configuration. Preserve
-the other local changes in that checkout and verify HTTPS after that separate
-change is integrated. Do not overwrite the running configuration blindly.
+The `/heroes3` route is part of Platform `main` since commit
+`ecd64ddcbd3572976ae6be58043f6abb535fd4d3` (PR #216). On 2026-11-23 the
+live server still used an older pinned Platform checkout with an identical
+but locally modified Caddyfile and additional untracked files. Its checkout
+helper refuses a dirty worktree; reconcile and preserve those files before a
+future update, and select a Platform revision that includes the route. Do not
+overwrite the running checkout blindly. Verify HTTPS after that update.
 
 ## Terrain painter
 

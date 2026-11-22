@@ -190,8 +190,9 @@ demo preparation reviewable as separate changes where practical.
 - [x] Restrict the terrain-painter ingress and bound API resource usage; the
   [lobby README](../../deploy/lobby/README.md) records live checks and the
   remaining operational assumptions.
-- [ ] Make the live Platform HTTPS route durable in Platform's own repository.
-  The [lobby README](../../deploy/lobby/README.md) records the deployment gap.
+- [x] Add the live Platform HTTPS route to Platform `main` (PR #216). The
+  [lobby README](../../deploy/lobby/README.md) records the still-pinned server
+  checkout and the reconciliation required before a future update.
 - [ ] Run appropriate automated and graphical checks for each change, update
   the SpecPM evidence and implementation matrix, and record revisions and
   environment. Keep known failures and unverified scenarios visible.
