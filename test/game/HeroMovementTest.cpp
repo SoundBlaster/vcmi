@@ -5295,6 +5295,8 @@ TEST(ObjectTemplateJsonTest, TaggedLayoutPreservesSelectiveVisitDirections)
 	const std::string json = R"({ "animation": "test.def", "visitableFrom": [ "---", "+--", "---" ], "mask": [ "A" ] })";
 	JsonNode definition(json.data(), json.size(), "SelectiveApproachBinaryRoundTrip");
 	ObjectTemplate original;
+	original.id = Obj::RESOURCE;
+	original.subid = 0;
 	original.readJson(definition, resolver, false);
 
 	for(const auto version : {ESerializationVersion::UPSTREAM_CURRENT, ESerializationVersion::CURRENT})

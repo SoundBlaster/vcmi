@@ -164,6 +164,14 @@ TEST_F(SaveFileTest, unsupportedVersionsAreReported)
 	EXPECT_THROW(CLoadFile loader(saveFile), SaveTooNewException);
 }
 
+TEST_F(SaveFileTest, untaggedForkLayoutCannotBeLoaded)
+{
+	setRawVersion(static_cast<uint32_t>(ESerializationVersion::CURRENT));
+	EXPECT_THROW(CLoadFile::readVersion(saveFile), SaveTooNewException);
+	EXPECT_THROW(CLoadFile loader(saveFile), SaveTooNewException);
+	EXPECT_EQ(CLoadFile::readMetadata(saveFile), metadata);
+}
+
 TEST_F(SaveFileTest, metadataOfNewerSaveIsReadable)
 {
 	setRawVersion(static_cast<uint32_t>(ESerializationVersion::CURRENT) + 1);
