@@ -48,6 +48,13 @@ This list is tied to the exact snapshot, not a prediction for a future HEAD.
 
 ## Compatibility facts requiring a decision before implementation
 
+**User decision, 2026-11-24:** The fork is a beta without active users; old
+experimental save and network version numbers need not remain compatible when
+integrating upstream. Allocate new toroidal versions after upstream's current
+versions. Incompatible old data and peers must be rejected safely rather than
+silently decoded under the wrong layout. This decision does not waive normal
+bounded-map compatibility or authorize rewriting existing user files.
+
 In the inspected enum, fork versions `TOROIDAL_MAP` through
 `TOROIDAL_TELEPORT_RESOLUTION` use ordinals 940–946. Upstream uses 940 for
 `MAP_ALLOWED_DIFFICULTIES`, 941 for `LOBBY_CAMPAIGN_ON_SERVER`, 942 for
