@@ -80,6 +80,8 @@ public:
 	void recordGuardedDirectConnection(int id, TRmgTemplateZoneId zoneA, TRmgTemplateZoneId zoneB, const int3 & position);
 	std::vector<GuardedDirectConnectionTrace> getGuardedDirectConnectionTrace() const;
 
+	void setSingleThread(bool value);
+
 	/// Next unused two-way monolith subtype. Thread-safe; called from the parallel connection-placement phase.
 	int getNextMonlithIndex();
 
@@ -98,7 +100,7 @@ public:
 	const std::vector<HeroTypeID> getAllPossibleHeroes() const;
 	void banQuestArt(const ArtifactID & id);
 	void unbanQuestArt(const ArtifactID & id);
-	Zone * getZoneWater() const;
+	Zone * getWaterZone(int level) const;
 	void addWaterTreasuresInfo();
 
 	int getRandomSeed() const;

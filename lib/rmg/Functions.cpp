@@ -19,6 +19,9 @@
 #include "../mapObjectConstructors/AObjectTypeHandler.h"
 #include "../mapObjectConstructors/CObjectClassesHandler.h"
 #include "../GameLibrary.h"
+#include "../CCreatureHandler.h"
+#include "../entities/faction/CFaction.h"
+#include "../entities/faction/CTown.h"
 
 #include <vstd/RNG.h>
 
@@ -72,8 +75,62 @@ int chooseRandomAppearance(vstd::RNG & generator, si32 ObjID, TerrainId terrain)
 	vstd::erase_if(factories, [ObjID, &terrain](si32 f)
 	{
 		//TODO: Use templates with lowest number of terrains (most specific)
-		return LIBRARY->objtypeh->getHandlerFor(ObjID, f)->getTemplates(terrain).empty();
+		return LIBRARY->objtypeh->getHandlerFor(ObjID, f).getTemplates(terrain).empty();
 	});
 	
 	return *RandomGeneratorUtil::nextItem(factories, generator);
+}
+
+float getNativeDwellingValueModifier(RmgMap & map, FactionID faction)
+{
+	float nativeZonesCount = static_cast<float>(map.getZoneCount(faction));
+	// value increases, if there are more native zones for the faction
+	return 1 + (nativeZonesCount / map.getTotalZoneCount()) + (nativeZonesCount / 2);
+}
+
+ui32 getNativeDwellingValue(RmgMap & map, const CCreature * creature)
+{
+	return static_cast<ui32>(creature->getAIValue() * creature->getGrowth() * getNativeDwellingValueModifier(map, creature->getFactionID()));
+}
+
+const CCreature * getRandomDwellingCreature(FactionID faction, int level)
+{
+	if(faction == FactionID::NEUTRAL || level < 0)
+		return nullptr;
+
+	const auto * factionPtr = faction.toFaction();
+	if(!factionPtr || !factionPtr->getTown())
+		return nullptr;
+
+	const auto & tiers = factionPtr->getTown()->creatures;
+	if(static_cast<size_t>(level) >= tiers.size() || tiers[level].empty())
+		return nullptr;
+
+	return tiers[level].front().toCreature();
+}
+
+ui32 getRandomDwellingValue(RmgMap & map, FactionID faction, int level)
+{
+	const auto * creature = getRandomDwellingCreature(faction, level);
+	if(!creature)
+		return 0;
+
+	return getNativeDwellingValue(map, creature);
+}
+
+std::vector<int> waterZoneLevels(EWaterContent::EWaterContent water,
+	const std::vector<MapLayerId> & levelLayers, const std::set<int> & landZoneLevels)
+{
+	if(water == EWaterContent::NONE)
+		return {};
+
+	std::vector<int> result;
+	for(int level : landZoneLevels)
+	{
+		if(static_cast<size_t>(level) >= levelLayers.size())
+			continue;
+		if(levelLayers[level] != MapLayerId::UNDERGROUND)
+			result.push_back(level);
+	}
+	return result;
 }

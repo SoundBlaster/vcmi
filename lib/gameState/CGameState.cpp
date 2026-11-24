@@ -191,8 +191,16 @@ void CGameState::preInit(const Services * newServices)
 void CGameState::init(const IMapService * mapService, StartInfo * si, IGameRandomizer & gameRandomizer, Load::ProgressAccumulator & progressTracking, bool allowSavingRandomMap)
 {
 	assert(services);
-	scenarioOps = CMemorySerializer::deepCopy(*si);
-	initialOpts = CMemorySerializer::deepCopy(*si);
+	// campaign is shared instead of deep-copied, only scenarioOps records the conquest
+	StartInfo withoutCampaign = *si;
+	withoutCampaign.campState = nullptr;
+	scenarioOps = CMemorySerializer::deepCopy(withoutCampaign);
+	initialOpts = CMemorySerializer::deepCopy(withoutCampaign);
+	if(si->campState)
+	{
+		scenarioOps->campState = std::make_shared<CampaignState>(*si->campState);
+		initialOpts->campState = std::make_shared<CampaignState>(*si->campState);
+	}
 	si = nullptr;
 	auto & randomGenerator = gameRandomizer.getDefault();
 
@@ -679,8 +687,8 @@ void CGameState::placeStartingHero(const PlayerColor & playerColor, const HeroTy
 
 	if (!hero)
 	{
-		auto handler = LIBRARY->objtypeh->getHandlerFor(Obj::HERO, heroTypeId.toHeroType()->getHeroClass()->getIndex());
-		auto object = handler->create(this, handler->getTemplates().front());
+		auto & handler = LIBRARY->objtypeh->getHandlerFor(Obj::HERO, heroTypeId.toHeroType()->getHeroClass()->getIndex());
+		auto object = handler.create(this, handler.getTemplates().front());
 		hero = std::dynamic_pointer_cast<CGHeroInstance>(object);
 		hero->ID = Obj::HERO;
 		hero->setHeroType(heroTypeId);
@@ -1103,12 +1111,12 @@ void CGameState::initHeroBoats(IGameRandomizer & gameRandomizer)
 
 		if (tile.isWater())
 		{
-			auto handler = LIBRARY->objtypeh->getHandlerFor(Obj::BOAT, hero->getBoatType().getNum());
-			auto boat = std::dynamic_pointer_cast<CGBoat>(handler->create(this, nullptr));
-			handler->configureObject(boat.get(), gameRandomizer);
+			auto & handler = LIBRARY->objtypeh->getHandlerFor(Obj::BOAT, hero->getBoatType().getNum());
+			auto boat = std::dynamic_pointer_cast<CGBoat>(handler.create(this, nullptr));
+			handler.configureObject(boat.get(), gameRandomizer);
 
 			boat->setAnchorPos(hero->anchorPos());
-			boat->appearance = handler->getTemplates().front();
+			boat->appearance = handler.getTemplates().front();
 			map->generateUniqueInstanceName(boat.get());
 			map->addNewObject(boat);
 			map->hideObject(boat.get());
@@ -1890,15 +1898,27 @@ std::vector<std::byte> CGameState::saveToMemory()
 	ReplayLog logBackup;
 	std::swap(logBackup, replayLog);
 
+	std::shared_ptr<const Campaign> campaignBackup = scenarioOps->campState ? scenarioOps->campState->getCampaignPtr() : nullptr;
+	setCampaign(nullptr);
+
 	CMemorySerializer serializer;
 	serializer.oser & *this;
 
+	setCampaign(campaignBackup);
 	std::swap(logBackup, replayLog);
 
 	return serializer.extractBuffer();
 }
 
-void CGameState::loadFromMemory(std::vector<std::byte> data)
+void CGameState::setCampaign(std::shared_ptr<const Campaign> campaign)
+{
+	if(scenarioOps->campState)
+		scenarioOps->campState->setCampaign(campaign);
+	if(initialOpts->campState)
+		initialOpts->campState->setCampaign(campaign);
+}
+
+void CGameState::loadFromMemory(std::vector<std::byte> data, std::shared_ptr<const Campaign> campaign)
 {
 	// battles are not part of serialize(), so leftovers of the discarded state have to go explicitly
 	currentBattles.clear();
@@ -1907,12 +1927,20 @@ void CGameState::loadFromMemory(std::vector<std::byte> data)
 	serializer.iser.loadingGamestate = true;
 	serializer.iser.cb = this;
 	serializer.iser & *this;
+
+	if(scenarioOps->campState && !campaign)
+		throw std::runtime_error("Snapshot of campaign " + scenarioOps->mapname + " is loaded without its campaign");
+	setCampaign(campaign);
 }
 
 void CGameState::loadGame(BinaryDeserializer & h)
 {
 	logGlobal->info("Loading game state...");
 	h & *this;
+
+	// older saves hold a separate copy of the campaign in each start info
+	if(!h.hasFeature(ESerializationVersion::CAMPAIGN_STATIC_DATA) && initialOpts->campState)
+		initialOpts->campState->setCampaign(scenarioOps->campState->getCampaignPtr());
 
 	// Runtime-only object, not serialized; rebuild from the loaded script source.
 	mapEventDispatcher = LIBRARY->scripts()->createMapScriptDispatcher(*this, false);

@@ -35,7 +35,7 @@
 #include "playerselectionwidget.h"
 #include "../mapcontroller.h"
 #include "questguardwidget.h"
-#include "questwidget.h"
+#include "questsourcewidget.h"
 #include "rewardswidget.h"
 #include "scholarwidget.h"
 #include "shrinewidget.h"
@@ -537,12 +537,12 @@ void Inspector::updateProperties(QuestSource * o)
 	{
 		case MapObjectID::SEER_HUT:
 		{
-			delegate = new QuestDelegate(controller, *o);
+			delegate = new QuestSourceDelegate(controller, *o);
 			break;
 		}
 		case MapObjectID::QUEST_GUARD:
 		{
-			delegate = new QuestGuardDelegate(controller, *(o->allQuestsEditor()[0].get()));
+			delegate = new QuestGuardDelegate(controller, *o);
 			break;
 		}
 	}
@@ -564,8 +564,8 @@ void Inspector::updateProperties()
 
 	if(obj->ID != Obj::HERO_PLACEHOLDER && !dynamic_cast<CGHeroInstance*>(obj))
 	{
-		auto factory = LIBRARY->objtypeh->getHandlerFor(obj->ID, obj->subID);
-		addProperty(QObject::tr("IsStatic"), factory->isStaticObject());
+		auto & factory = LIBRARY->objtypeh->getHandlerFor(obj->ID, obj->subID);
+		addProperty(QObject::tr("IsStatic"), factory.isStaticObject());
 	}
 
 	addProperty(QObject::tr("Owner"), obj->tempOwner, new OwnerDelegate(controller), true);

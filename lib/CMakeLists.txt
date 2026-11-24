@@ -245,6 +245,7 @@ set(lib_MAIN_SRCS
 	rewardable/Reward.cpp
 
 	rmg/RmgArea.cpp
+	rmg/TileDistanceIndex.cpp
 	rmg/RmgObject.cpp
 	rmg/RmgPath.cpp
 	rmg/CMapGenerator.cpp
@@ -740,6 +741,7 @@ set(lib_MAIN_HEADERS
 	rewardable/Reward.h
 
 	rmg/RmgArea.h
+	rmg/TileDistanceIndex.h
 	rmg/RmgObject.h
 	rmg/RmgPath.h
 	rmg/CMapGenerator.h

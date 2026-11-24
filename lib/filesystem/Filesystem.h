@@ -60,7 +60,10 @@ class DLL_LINKAGE CResourceHandler
 	 * @brief createInitial - creates instance of initial loader
 	 * that contains data necessary to load main FS
 	 */
-	static std::unique_ptr<ISimpleResourceLoader> createInitial();
+	static std::unique_ptr<ISimpleResourceLoader> createInitial(const std::shared_ptr<ISimpleResourceLoader> & bundledLoader);
+
+	/// Creates loader with game data and game configs shipped with the game, without user data directory
+	static std::shared_ptr<ISimpleResourceLoader> createBundled();
 
 public:
 	/// Gets root loader of the current filesystem, or of base filesystem if no game library is active
@@ -120,6 +123,9 @@ public:
 
 	/// Returns loader with provided name from this filesystem, or from base filesystem if this filesystem does not have it
 	ISimpleResourceLoader * getLoader(const std::string & identifier) const;
+
+	/// Returns true if loader with provided name exists in this filesystem or in base filesystem
+	bool hasLoader(const std::string & identifier) const;
 
 	~CResourceHandler() = default;
 private:

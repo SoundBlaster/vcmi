@@ -43,8 +43,10 @@ ESerializationVersion CLoadFile::readVersion(const boost::filesystem::path & fna
 	{
 		rawVersion &= SaveFileFormat::VERSION_VALUE_MASK;
 		if(rawVersion < static_cast<uint32_t>(ESerializationVersion::TOROIDAL_MAP))
-			throw std::runtime_error("Error: invalid toroidal save version in '" + fileNameUtf8 + "'!");
+			throw std::runtime_error("Error: unsupported toroidal save version in '" + fileNameUtf8 + "'!");
 	}
+	else if(rawVersion > static_cast<uint32_t>(ESerializationVersion::UPSTREAM_CURRENT) && !allowNewer)
+		throw SaveTooNewException("Error: unsupported untagged save version in '" + fileNameUtf8 + "'!");
 	const auto version = static_cast<ESerializationVersion>(rawVersion);
 
 	if(version < ESerializationVersion::MINIMAL)

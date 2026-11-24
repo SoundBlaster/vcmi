@@ -28,7 +28,6 @@ class CGameState;
 class Quest;
 class IQuestSource;
 class AObjectTypeHandler;
-using TObjectTypeHandler = std::shared_ptr<AObjectTypeHandler>;
 
 class DLL_LINKAGE CGObjectInstance : public IObjectInterface, public scripting::ApiRawPointer<CGObjectInstance>
 {
@@ -101,6 +100,8 @@ public:
 
 	/// If true hero can visit this object only from neighbouring tiles and can't stand on this object
 	virtual bool isBlockedVisitable() const;
+	/// returns true if hero can visit this object from tiles above its visitable tile
+	bool isVisitableFromTop() const;
 
 	// If true, can be possibly removed from the map
 	virtual bool isRemovable() const;
@@ -119,7 +120,7 @@ public:
 	std::optional<AudioPath> getVisitSound(vstd::RNG & rng) const;
 	std::optional<AudioPath> getRemovalSound(vstd::RNG & rng) const;
 
-	virtual TObjectTypeHandler getObjectHandler() const;
+	virtual const AObjectTypeHandler & getObjectHandler() const;
 
 	/** VIRTUAL METHODS **/
 

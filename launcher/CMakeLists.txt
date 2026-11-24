@@ -107,6 +107,7 @@ set(launcher_TS
 	"${translationsDir}/chinese.ts"
 	"${translationsDir}/czech.ts"
 	"${translationsDir}/dutch.ts"
+	"${translationsDir}/faroese.ts"
 	"${translationsDir}/filipino.ts"
 	"${translationsDir}/finnish.ts"
 	"${translationsDir}/french.ts"
@@ -117,6 +118,7 @@ set(launcher_TS
 	"${translationsDir}/japanese.ts"
 	"${translationsDir}/korean.ts"
 	"${translationsDir}/latvian.ts"
+	"${translationsDir}/lithuanian.ts"
 	"${translationsDir}/norwegian.ts"
 	"${translationsDir}/polish.ts"
 	"${translationsDir}/portuguese.ts"
@@ -197,8 +199,6 @@ endif()
 
 if(ANDROID)
 	get_target_property(rccPath Qt${QT_VERSION_MAJOR}::rcc IMPORTED_LOCATION)
-	get_filename_component(qtDir "${rccPath}/../../" ABSOLUTE)
-	set(qtDir "${qtDir}" PARENT_SCOPE)
  
 	function(generate_binary_resource resourceName resourceDir)
 		file(CREATE_LINK "${resourceDir}" "${CMAKE_CURRENT_BINARY_DIR}/${resourceName}"
@@ -310,14 +310,7 @@ if(IOS)
 			qt::QIOSIntegrationPlugin
 		)
 	endif()
-elseif(ANDROID)
-	set(androidSdkDir "$ENV{ANDROID_HOME}")
-	configure_file(
-		"${androidPackageSourceDir}/androiddeployqt.json.in"
-		"${CMAKE_BINARY_DIR}/androiddeployqt.json"
-		@ONLY
-	)
-else()
+elseif(NOT ANDROID)
 	install(TARGETS vcmilauncher DESTINATION ${BIN_DIR})
 
 	# Install icons and desktop file on Linux

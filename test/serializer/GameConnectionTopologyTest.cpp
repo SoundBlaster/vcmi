@@ -115,7 +115,7 @@ TEST(GameConnectionTopologyTest, CurrentVersionCarriesToroidalMapHeader)
 
 TEST(GameConnectionTopologyTest, PreviousVersionOmitsToroidalMapHeader)
 {
-	EXPECT_FALSE(topologyAfterPacketRoundTrip(ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER));
+	EXPECT_FALSE(topologyAfterPacketRoundTrip(ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE, ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE));
 }
 
 TEST(GameConnectionTopologyTest, PreviousTaggedToroidalPeerNegotiatesItsOwnVersion)
@@ -246,16 +246,15 @@ TEST(GameConnectionTopologyTest, ServerNegotiatesCapabilityAndRejectsMixedPeersF
 	EXPECT_TRUE(LobbyTopologyCapability::decode(anotherAck).toroidal);
 	EXPECT_TRUE(server.supportsMapTopology(map));
 
-	// An unrelated client with the same ordinal but no tag must be downgraded
-	// and cannot participate in a toroidal game.
-	const auto [secondTransport, second, secondAck] = connect(ESerializationVersion::CURRENT, "untagged");
+	// An upstream client can join the lobby and play bounded maps.
+	const auto [secondTransport, second, secondAck] = connect(ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE, "untagged");
 	EXPECT_FALSE(second->supportsToroidalTopology());
-	EXPECT_EQ(second->getSerializationVersion(), ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
-	EXPECT_EQ(secondAck, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	EXPECT_EQ(second->getSerializationVersion(), ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE);
+	EXPECT_EQ(secondAck, ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE);
 	EXPECT_FALSE(server.supportsMapTopology(map));
-	const auto [legacyTransport, legacy, legacyAck] = connect(ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER, "legacy");
+	const auto [legacyTransport, legacy, legacyAck] = connect(ESerializationVersion::CAMPAIGN_STATIC_DATA, "legacy");
 	EXPECT_FALSE(legacy->supportsToroidalTopology());
-	EXPECT_EQ(legacyAck, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	EXPECT_EQ(legacyAck, ESerializationVersion::CAMPAIGN_STATIC_DATA);
 	EXPECT_FALSE(server.supportsMapTopology(map));
 	map.toroidal = false;
 	EXPECT_TRUE(server.supportsMapTopology(map));
@@ -263,22 +262,32 @@ TEST(GameConnectionTopologyTest, ServerNegotiatesCapabilityAndRejectsMixedPeersF
 
 TEST(GameConnectionTopologyTest, LegacyGreetingIsAllowedButAmbiguousServerVersionIsRejected)
 {
-	const auto old = ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
+	const auto old = ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE;
 	const auto wire = LobbyTopologyCapability::encode(ESerializationVersion::CURRENT);
 	// The previous server responds with min(client version, server version).
 	const auto legacyAck = std::min(wire, old);
 	EXPECT_EQ(legacyAck, old);
 	EXPECT_TRUE(LobbyTopologyCapability::isSafeServerGreeting(LobbyTopologyCapability::decode(legacyAck)));
 	const auto taggedLegacy = LobbyTopologyCapability::negotiateClient(LobbyTopologyCapability::encode(old));
-	EXPECT_EQ(taggedLegacy.version, old);
+	EXPECT_EQ(taggedLegacy.version, ESerializationVersion::NONE);
 	EXPECT_FALSE(taggedLegacy.toroidal);
 	EXPECT_FALSE(LobbyTopologyCapability::isSafeServerGreeting(LobbyTopologyCapability::decode(LobbyTopologyCapability::encode(old))));
 	EXPECT_FALSE(LobbyTopologyCapability::isSafeServerGreeting(LobbyTopologyCapability::decode(ESerializationVersion::CURRENT)));
 	const auto unknownFuture = static_cast<ESerializationVersion>(static_cast<int32_t>(ESerializationVersion::CURRENT) + 1);
 	EXPECT_FALSE(LobbyTopologyCapability::isSafeServerGreeting(LobbyTopologyCapability::decode(unknownFuture)));
-	const auto downgradedFuture = LobbyTopologyCapability::negotiateClient(unknownFuture);
-	EXPECT_EQ(downgradedFuture.version, old);
-	EXPECT_FALSE(downgradedFuture.toroidal);
+	const auto rejectedFuture = LobbyTopologyCapability::negotiateClient(unknownFuture);
+	EXPECT_EQ(rejectedFuture.version, ESerializationVersion::NONE);
+	EXPECT_FALSE(rejectedFuture.toroidal);
+}
+
+TEST(GameConnectionTopologyTest, OldTaggedBetaGreetingsAreRejected)
+{
+	for(int32_t ordinal = 940; ordinal <= 946; ++ordinal)
+	{
+		const auto wire = LobbyTopologyCapability::encode(static_cast<ESerializationVersion>(ordinal));
+		EXPECT_EQ(LobbyTopologyCapability::negotiateClient(wire).version, ESerializationVersion::NONE);
+		EXPECT_FALSE(LobbyTopologyCapability::isSafeServerGreeting(LobbyTopologyCapability::decode(wire)));
+	}
 }
 
 TEST(GameConnectionTopologyTest, ServerRejectsClientBelowMinimumLobbyVersion)
@@ -301,7 +310,7 @@ TEST(GameConnectionTopologyTest, InternalConnectionsNegotiateBeforeToroidalStart
 	CVCMIServer server(0, true);
 	server.prepare(false, false);
 	LobbyProbe tagged("tagged-internal", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
-	LobbyProbe untagged("untagged-internal", ESerializationVersion::CURRENT);
+	LobbyProbe untagged("untagged-internal", ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE);
 	auto clientNetwork = INetworkHandler::createHandler();
 	const auto pump = [&]
 	{
@@ -329,7 +338,7 @@ TEST(GameConnectionTopologyTest, InternalConnectionsNegotiateBeforeToroidalStart
 	EXPECT_GT(untagged.packetsBeforeOwnAcknowledgement, 0);
 	EXPECT_GT(tagged.otherAcknowledgements, 0);
 	EXPECT_FALSE(untagged.ack->toroidal);
-	EXPECT_EQ(untagged.ack->version, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	EXPECT_EQ(untagged.ack->version, ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE);
 	EXPECT_FALSE(server.supportsMapTopology(map));
 	map.toroidal = false;
 	EXPECT_TRUE(server.supportsMapTopology(map));
@@ -342,7 +351,7 @@ TEST(GameConnectionTopologyTest, TcpConnectionsNegotiateBeforeToroidalStartGuard
 	ASSERT_NE(port, 0);
 	auto clientNetwork = INetworkHandler::createHandler();
 	LobbyProbe tagged("tagged-tcp", LobbyTopologyCapability::encode(ESerializationVersion::CURRENT));
-	LobbyProbe untagged("untagged-tcp", ESerializationVersion::CURRENT);
+	LobbyProbe untagged("untagged-tcp", ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE);
 	const auto waitForGreeting = [&](const LobbyProbe & probe)
 	{
 		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
@@ -369,7 +378,7 @@ TEST(GameConnectionTopologyTest, TcpConnectionsNegotiateBeforeToroidalStartGuard
 	ASSERT_TRUE(untagged.failure.empty()) << untagged.failure;
 	ASSERT_TRUE(untagged.ack.has_value());
 	EXPECT_FALSE(untagged.ack->toroidal);
-	EXPECT_EQ(untagged.ack->version, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	EXPECT_EQ(untagged.ack->version, ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE);
 	EXPECT_FALSE(server.supportsMapTopology(map));
 	map.toroidal = false;
 	EXPECT_TRUE(server.supportsMapTopology(map));
@@ -498,7 +507,7 @@ TEST(GameConnectionTopologyTest, ConnectsToPreviousFramedServerWithToroidalMap)
 
 TEST(GameConnectionTopologyTest, RejectsConflictingTopologyWireLayouts)
 {
-	const auto old = ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
+	const auto old = ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE;
 	EXPECT_THROW(topologyAfterPacketRoundTrip(old, ESerializationVersion::CURRENT), std::runtime_error);
 	EXPECT_THROW({
 		const bool decoded = topologyAfterPacketRoundTrip(ESerializationVersion::CURRENT, old);

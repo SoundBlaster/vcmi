@@ -89,9 +89,9 @@ TEST_F(SaveFileTest, toroidalVersionHasAnExplicitOnDiskMarker)
 	EXPECT_EQ(CLoadFile::readVersion(saveFile), ESerializationVersion::CURRENT);
 }
 
-TEST_F(SaveFileTest, boundedSaveUsesPreviousUnmarkedVersion)
+TEST_F(SaveFileTest, boundedSaveUsesUpstreamUnmarkedVersion)
 {
-	const auto previous = ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
+	const auto previous = ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE;
 	CSaveFile save(previous);
 	save.addChunk(SaveFileFormat::CHUNK_METADATA, metadata);
 	save.addChunk(SaveFileFormat::CHUNK_HEADER, header);
@@ -105,15 +105,15 @@ TEST_F(SaveFileTest, boundedSaveUsesPreviousUnmarkedVersion)
 	EXPECT_EQ(loader.readChunk(SaveFileFormat::CHUNK_GAMESTATE), gameState);
 }
 
-TEST_F(SaveFileTest, NetworkFramingDoesNotChangeSavedGameVersions)
+TEST_F(SaveFileTest, MapTopologySelectsSerializationLayout)
 {
-	EXPECT_EQ(SaveFileFormat::versionForTopology(false), ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
-	EXPECT_EQ(SaveFileFormat::versionForTopology(true), ESerializationVersion::TOROIDAL_TRANSIENT_RETURN);
+	EXPECT_EQ(SaveFileFormat::versionForTopology(false), ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE);
+	EXPECT_EQ(SaveFileFormat::versionForTopology(true), ESerializationVersion::TOROIDAL_VISIT_DIRECTIONS);
 }
 
 TEST_F(SaveFileTest, taggedVersionBelowTopologyIsRejected)
 {
-	setRawVersion(SaveFileFormat::TOROIDAL_VERSION_TAG | static_cast<uint32_t>(ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER));
+	setRawVersion(SaveFileFormat::TOROIDAL_VERSION_TAG | static_cast<uint32_t>(ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE));
 	EXPECT_THROW(CLoadFile::readVersion(saveFile), std::runtime_error);
 	EXPECT_THROW(CLoadFile::readMetadata(saveFile), std::runtime_error);
 }

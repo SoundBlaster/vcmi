@@ -103,6 +103,11 @@ const CMapGenerator::Config & CMapGenerator::getConfig() const
 	return config;
 }
 
+void CMapGenerator::setSingleThread(bool value)
+{
+	config.singleThread = value;
+}
+
 //must be instantiated in .cpp file for access to complete types of all member fields
 CMapGenerator::~CMapGenerator() = default;
 
@@ -158,6 +163,7 @@ std::unique_ptr<CMap> CMapGenerator::generateWithZoneObserver(const std::functio
 		Load::Progress::step();
 		initQuestArtsRemaining();
 		genZones();
+		map->addWaterZones(*this, *rand);
 		Load::Progress::step();
 		map->getMap(this).calculateGuardingGreaturePositions(); //clear map so that all tiles are unguarded
 		map->addModificators();
@@ -368,13 +374,14 @@ void CMapGenerator::genZones()
 
 void CMapGenerator::addWaterTreasuresInfo()
 {
-	if (!getZoneWater())
-		return;
-
 	//add treasures on water
-	for (const auto& treasureInfo : getConfig().waterTreasure)
+	for(const auto & z : map->getZones())
 	{
-		getZoneWater()->addTreasureInfo(treasureInfo);
+		if(z.second->getType() != ETemplateZoneType::WATER)
+			continue;
+
+		for(const auto & treasureInfo : getConfig().waterTreasure)
+			z.second->addTreasureInfo(treasureInfo);
 	}
 }
 
@@ -539,7 +546,7 @@ int CMapGenerator::getNextMonlithIndex()
 		else
 		{
 			//Skip modded Monoliths which can't beplaced on every terrain
-			auto templates = LIBRARY->objtypeh->getHandlerFor(Obj::MONOLITH_TWO_WAY, monolithIndex)->getTemplates();
+			auto templates = LIBRARY->objtypeh->getHandlerFor(Obj::MONOLITH_TWO_WAY, monolithIndex).getTemplates();
 			if (templates.empty() || !templates[0]->canBePlacedAtAnyTerrain())
 			{
 				monolithIndex++;
@@ -648,10 +655,12 @@ void CMapGenerator::unbanQuestArt(const ArtifactID & id)
 	map->getMap(this).allowedArtifact.insert(id);
 }
 
-Zone * CMapGenerator::getZoneWater() const
+Zone * CMapGenerator::getWaterZone(int level) const
 {
 	for(auto & z : map->getZones())
-		if(z.second->getType() == ETemplateZoneType::WATER)
+	{
+		if(z.second->getType() == ETemplateZoneType::WATER && z.second->getPos().z == level)
 			return z.second.get();
+	}
 	return nullptr;
 }

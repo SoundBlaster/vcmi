@@ -575,7 +575,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 			greeting.uuid = name;
 			greeting.names = {name};
 			greeting.mode = mode;
-			greeting.version = offerTopology ? LobbyTopologyCapability::encode(ESerializationVersion::CURRENT) : ESerializationVersion::CURRENT;
+			greeting.version = offerTopology ? LobbyTopologyCapability::encode(ESerializationVersion::CURRENT) : ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE;
 			codec->sendPack(greeting);
 		}
 		void onPacketReceived(const std::shared_ptr<INetworkConnection> &, const std::vector<std::byte> & bytes) override
@@ -685,7 +685,7 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	pumpUntil([&] { return legacy.negotiated || !legacy.failure.empty(); });
 	ASSERT_TRUE(legacy.negotiated) << legacy.failure;
 	EXPECT_FALSE(legacy.acceptedTopology);
-	EXPECT_EQ(legacy.acceptedVersion, ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER);
+	EXPECT_EQ(legacy.acceptedVersion, ESerializationVersion::VISITABLE_FROM_TOP_IN_OBJECT_TYPE);
 	ASSERT_EQ(server.activeConnections.size(), 3);
 	const auto messagesBefore = host.messages.size();
 	const auto legacyMessagesBefore = legacy.messages.size();
@@ -1788,39 +1788,31 @@ TEST(ToroidalDemoVmapTest, TcpLobbyStartsToroidalGameForTwoPeers)
 	}
 }
 
-TEST(ToroidalDemoVmapTest, DecodesExternalUntaggedPrototypeSave)
+TEST(ToroidalDemoVmapTest, RejectsExternalUntaggedPrototypeInLobby)
 {
 	const char * suppliedPath = std::getenv("VCMI_TOROID_PROTOTYPE_SAVE");
 	if(!suppliedPath || !*suppliedPath)
-		GTEST_SKIP() << "Set VCMI_TOROID_PROTOTYPE_SAVE to a branch-era saved game";
+		GTEST_SKIP() << "Set VCMI_TOROID_PROTOTYPE_SAVE to the documented untagged prototype save";
 	const boost::filesystem::path path(suppliedPath);
 	ASSERT_TRUE(boost::filesystem::is_regular_file(path));
-	ASSERT_EQ(CLoadFile::readVersion(path), ESerializationVersion::TOROIDAL_MAP);
-	std::ifstream file(path.c_str(), std::ios::binary);
-	std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
-	file.read(reinterpret_cast<char *>(fileHeader.data()), fileHeader.size());
-	ASSERT_TRUE(file.good());
-	ASSERT_EQ(SaveFileFormat::readUInt32(fileHeader.data() + SaveFileFormat::FILE_MAGIC.size()), static_cast<uint32_t>(ESerializationVersion::TOROIDAL_MAP));
-	CLoadFile saved(path);
-	CMapHeader header;
-	StartInfo info;
-	auto headerChunk = saved.openChunk(SaveFileFormat::CHUNK_HEADER, nullptr);
-	headerChunk->iser & header;
-	headerChunk->iser & info;
-	ASSERT_TRUE(headerChunk->isFullyRead());
-	ASSERT_TRUE(header.toroidal);
-	// The global test preset may not match the save's mods. Decode the chunks
-	// directly without claiming the normal mod-compatibility gate accepted it.
-	auto state = std::make_shared<CGameState>();
-	GameHandlerTestServer server(state);
-	CGameHandler handler(server, state);
-	auto game = saved.openChunk(SaveFileFormat::CHUNK_GAMESTATE, state.get());
-	ASSERT_NO_THROW(state->loadGame(game->iser));
-	ASSERT_NO_THROW(game->iser & handler);
-	EXPECT_TRUE(game->isFullyRead());
-	EXPECT_TRUE(state->getMap().toroidal);
-	EXPECT_EQ(state->getMap().width, header.width);
-	EXPECT_EQ(state->getMap().height, header.height);
+	ASSERT_EQ(CLoadFile::readVersion(path), ESerializationVersion::MAP_ALLOWED_DIFFICULTIES)
+		<< "The prototype and upstream reused ordinal 940";
+	auto * local = dynamic_cast<CFilesystemList *>(CResourceHandler::get("local"));
+	ASSERT_NE(local, nullptr);
+	auto loader = std::make_shared<CFilesystemLoader>("SAVES/TOROID-PROTOTYPE-PROBE/", path.parent_path(), 0);
+	local->addLoader(loader, false);
+	struct RemoveLoader
+	{
+		CFilesystemList * local;
+		ISimpleResourceLoader * loader;
+		~RemoveLoader() { local->removeLoader(loader); }
+	} removeLoader{local, loader.get()};
+	const ResourcePath resource("Saves/Toroid-Prototype-Probe/" + path.stem().string(), EResType::SAVEGAME);
+	const auto resolved = CResourceHandler::get()->getResourceName(resource);
+	ASSERT_TRUE(resolved.has_value());
+	ASSERT_TRUE(boost::filesystem::equivalent(*resolved, path));
+	CMapInfo info;
+	EXPECT_THROW(info.saveInit(resource), std::runtime_error);
 }
 
 TEST(ToroidalDemoVmapTest, DecodesOriginalBoundedSaveAndMovesHero)
@@ -2046,7 +2038,7 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 		ASSERT_TRUE(boost::filesystem::exists(path));
 		if(scenario == 1)
 		{
-			// The immediately preceding branch save stored the layer only in
+			// This serialization layout stored the layer only in
 			// server state. Its normal load must populate the replicated hero.
 			const auto priorVersion = ESerializationVersion::TOROIDAL_MOVEMENT_SOURCE_LAYER;
 			const std::string priorName = name + "-prior";
@@ -2115,7 +2107,7 @@ TEST_F(ToroidalDemoGameTest, ServerSaveUsesTheTopologySpecificSerializationVersi
 			EXPECT_EQ(noOriginHero->getConfirmedMovementLayer(), EPathfindingLayer::LAND);
 			EXPECT_EQ(noOriginHero->movementPointsRemaining(), 0);
 		}
-		const auto expectedVersion = scenario == 0 ? ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER : ESerializationVersion::TOROIDAL_TRANSIENT_RETURN;
+		const auto expectedVersion = SaveFileFormat::versionForTopology(scenario != 0);
 		EXPECT_EQ(CLoadFile::readVersion(path), expectedVersion);
 		std::ifstream file(path.c_str(), std::ios::binary);
 		std::array<std::byte, SaveFileFormat::FILE_HEADER_SIZE> fileHeader{};
@@ -4269,7 +4261,7 @@ TEST_F(HeroMovementTest, MovingBlockingObjectUpdatesAdjacentGuardCache)
 	auto appearance = std::make_shared<ObjectTemplate>();
 	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
 	appearance->readJson(definition, resolver, false);
-	ASSERT_FALSE(appearance->isVisitableFrom(0, -1));
+	ASSERT_FALSE(appearance->visitableFromOffset(int3(0, -1), 0)).value();
 	map()->hideObject(object);
 	object->appearance = appearance;
 	map()->showObject(object);
@@ -5291,9 +5283,37 @@ TEST(ObjectTemplateJsonTest, SelectiveVisitDirectionsReplaceDefaultsAndPreviousT
 				if(dx == 0 && dy == 0)
 					continue;
 				const bool allowed = dx == expected.x && dy == expected.y;
-				EXPECT_EQ(reused.isVisitableFrom(dx, dy), allowed);
-				EXPECT_EQ(restored.isVisitableFrom(dx, dy), allowed);
+				EXPECT_EQ(reused.visitableFromOffset(int3(dx, dy, 0)).value(), allowed);
+				EXPECT_EQ(restored.visitableFromOffset(int3(dx, dy, 0)).value(), allowed);
 			}
+	}
+}
+
+TEST(ObjectTemplateJsonTest, TaggedLayoutPreservesSelectiveVisitDirections)
+{
+	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
+	const std::string json = R"({ "animation": "test.def", "visitableFrom": [ "---", "+--", "---" ], "mask": [ "A" ] })";
+	JsonNode definition(json.data(), json.size(), "SelectiveApproachBinaryRoundTrip");
+	ObjectTemplate original;
+	original.readJson(definition, resolver, false);
+
+	for(const auto version : {ESerializationVersion::UPSTREAM_CURRENT, ESerializationVersion::CURRENT})
+	{
+		CMemorySerializer writer;
+		writer.oser.version = version;
+		writer.oser & original;
+		CMemorySerializer reader(writer.extractBuffer());
+		reader.iser.version = version;
+		ObjectTemplate restored;
+		reader.iser & restored;
+		EXPECT_TRUE(reader.isFullyRead());
+		if(version == ESerializationVersion::CURRENT)
+		{
+			EXPECT_EQ(restored.visitableFromOffset(int3(-1, 0, 0)), std::optional(true));
+			EXPECT_EQ(restored.visitableFromOffset(int3(1, 0, 0)), std::optional(false));
+		}
+		else
+			EXPECT_EQ(restored.visitableFromOffset(int3(-1, 0, 0)), std::nullopt);
 	}
 }
 
@@ -5341,8 +5361,8 @@ TEST_P(ToroidalDirectionalEntranceTest, SelectiveApproachMatchesPathfinderAndSer
 		map()->showObject(resource);
 	};
 	const auto forbidden = makeAppearance(dx, dy);
-	ASSERT_TRUE(forbidden->isVisitableFrom(dx, dy));
-	ASSERT_FALSE(forbidden->isVisitableFrom(-dx, -dy));
+	ASSERT_TRUE(forbidden->visitableFromOffset(int3(dx, dy), 0)).value();
+	ASSERT_FALSE(forbidden->visitableFromOffset(int3(-dx, -dy), 0)).value();
 	setAppearance(forbidden);
 	const auto resourceID = resource->id;
 	const auto gold = gameState()->players.at(player).resources[GameResID::GOLD];
@@ -5362,8 +5382,8 @@ TEST_P(ToroidalDirectionalEntranceTest, SelectiveApproachMatchesPathfinderAndSer
 	ASSERT_NE(map()->getObject(resourceID), nullptr);
 
 	const auto allowed = makeAppearance(-dx, -dy);
-	ASSERT_TRUE(allowed->isVisitableFrom(-dx, -dy));
-	ASSERT_FALSE(allowed->isVisitableFrom(dx, dy));
+	ASSERT_TRUE(allowed->visitableFromOffset(int3(-dx, -dy), 0)).value();
+	ASSERT_FALSE(allowed->visitableFromOffset(int3(dx, dy), 0)).value();
 	setAppearance(allowed);
 	CPathsInfo paths(gameState()->getMapSize(), hero);
 	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
@@ -5596,8 +5616,8 @@ TEST_F(HeroMovementTest, ObjectEntranceDirectionIsRespectedAcrossToroidalSeams)
 	auto appearance = std::make_shared<ObjectTemplate>();
 	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
 	appearance->readJson(definition, resolver, false);
-	ASSERT_FALSE(appearance->isVisitableFrom(0, -1));
-	ASSERT_TRUE(appearance->isVisitableFrom(-1, 0));
+	ASSERT_FALSE(appearance->visitableFromOffset(int3(0, -1), 0)).value();
+	ASSERT_TRUE(appearance->visitableFromOffset(int3(-1, 0), 0)).value();
 	map()->hideObject(resource);
 	resource->appearance = appearance;
 	map()->showObject(resource);

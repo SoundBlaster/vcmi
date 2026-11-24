@@ -848,14 +848,16 @@ static bool parseBonusImpl(const JsonNode & ability, Bonus * b, IIdentifierResol
 	value = &ability["valueType"];
 	if (!value->isNull())
 	{
-		// Newer mods use descriptive names for the existing value bounds. Keep the
-		// canonical enum names in bonusValueMap so serialization remains compatible.
-		if(value->String() == "AT_MOST")
-			b->valType = BonusValueType::INDEPENDENT_MIN;
-		else if(value->String() == "AT_LEAST")
-			b->valType = BonusValueType::INDEPENDENT_MAX;
-		else
-			b->valType = static_cast<BonusValueType>(parseByMapN(bonusValueMap, value, "value type "));
+		// names that describe effect of INDEPENDENT_MAX / INDEPENDENT_MIN more clearly
+		static const std::map<std::string, BonusValueType> bonusValueMapWithAliases = []()
+		{
+			auto result = bonusValueMap;
+			result["AT_LEAST"] = BonusValueType::INDEPENDENT_MAX;
+			result["AT_MOST"] = BonusValueType::INDEPENDENT_MIN;
+			return result;
+		}();
+
+		b->valType = static_cast<BonusValueType>(parseByMapN(bonusValueMapWithAliases, value, "value type "));
 	}
 
 	b->stacking = ability["stacking"].String();

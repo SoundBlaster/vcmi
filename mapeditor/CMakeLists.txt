@@ -2,6 +2,8 @@ set(editor_SRCS
 		StdInc.cpp
 		main.cpp
 		mainwindow.cpp
+		editorstartup.cpp
+		randommapcli.cpp
 		editorbridge.cpp
 		BitmapHandler.cpp
 		maphandler.cpp
@@ -37,7 +39,7 @@ set(editor_SRCS
 		inspector/armywidget.cpp
 		inspector/messagewidget.cpp
 		inspector/rewardswidget.cpp
-		inspector/questwidget.cpp
+		inspector/questsourcewidget.cpp
 		inspector/questguardwidget.cpp
 		inspector/heroartifactswidget.cpp
 		inspector/artifactwidget.cpp
@@ -50,6 +52,7 @@ set(editor_SRCS
 		inspector/scholarwidget.cpp
 		inspector/shrinewidget.cpp
 		inspector/segments/rewardwidget.cpp
+		inspector/segments/questwidget.cpp
 		resourceExtractor/ResourceConverter.cpp
 		helper.cpp
 		campaigneditor/campaigneditor.cpp
@@ -81,6 +84,8 @@ endif()
 set(editor_HEADERS
 		StdInc.h
 		mainwindow.h
+		editorstartup.h
+		randommapcli.h
 		editorbridge.h
 		BitmapHandler.h
 		maphandler.h
@@ -116,7 +121,7 @@ set(editor_HEADERS
 		inspector/armywidget.h
 		inspector/messagewidget.h
 		inspector/rewardswidget.h
-		inspector/questwidget.h
+		inspector/questsourcewidget.h
 		inspector/questguardwidget.h
 		inspector/heroartifactswidget.h
 		inspector/artifactwidget.h
@@ -131,6 +136,7 @@ set(editor_HEADERS
 		inspector/shrinewidget.h
 		inspector/WidgetInitializationException.h
 		inspector/segments/rewardwidget.h
+		inspector/segments/questwidget.h
 		resourceExtractor/ResourceConverter.h
 		mapeditorroles.h
 		maplayerselectiondialog.h
@@ -185,7 +191,7 @@ set(editor_FORMS
 		inspector/armywidget.ui
 		inspector/messagewidget.ui
 		inspector/rewardswidget.ui
-		inspector/questwidget.ui
+		inspector/questsourcewidget.ui
 		inspector/questguardwidget.ui
 		inspector/heroartifactswidget.ui
 		inspector/artifactwidget.ui
@@ -197,6 +203,7 @@ set(editor_FORMS
 		inspector/scholarwidget.ui
 		inspector/shrinewidget.ui
 		inspector/segments/rewardwidget.ui
+		inspector/segments/questwidget.ui
 		campaigneditor/campaigneditor.ui
 		campaigneditor/campaignproperties.ui
 		campaigneditor/scenarioproperties.ui
@@ -227,6 +234,7 @@ set(editor_TS
 	"${translationsDir}/tchinese.ts"
 	"${translationsDir}/czech.ts"
 	"${translationsDir}/dutch.ts"
+	"${translationsDir}/faroese.ts"
 	"${translationsDir}/filipino.ts"
 	"${translationsDir}/finnish.ts"
 	"${translationsDir}/french.ts"
@@ -237,6 +245,7 @@ set(editor_TS
 	"${translationsDir}/japanese.ts"
 	"${translationsDir}/korean.ts"
 	"${translationsDir}/latvian.ts"
+	"${translationsDir}/lithuanian.ts"
 	"${translationsDir}/norwegian.ts"
 	"${translationsDir}/polish.ts"
 	"${translationsDir}/portuguese.ts"
@@ -379,7 +388,7 @@ enable_pch(vcmieditor)
 install(TARGETS vcmieditor DESTINATION ${BIN_DIR})
 
 # Install icons and desktop file on Linux
-if(NOT WIN32 AND NOT APPLE)
+if(NOT WIN32 AND NOT APPLE AND NOT ANDROID)
 	foreach(iconSize 32 48 64 128 256)
 		install(FILES "icons/mapeditor.${iconSize}x${iconSize}.png"
 			DESTINATION "share/icons/hicolor/${iconSize}x${iconSize}/apps"

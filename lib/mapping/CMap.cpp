@@ -587,7 +587,9 @@ bool CMap::checkForVisitableDir(const int3 & src, const TerrainTile * pom, const
 
 		const int3 offset = toroidal && src.z == dst.z && isInTheMap(src) && isInTheMap(dst)
 			? getTopology().displacement(dst, src) : src - dst;
-		if (!getObject(objID)->appearance->isVisitableFrom(offset.x, offset.y))
+		const auto object = getObject(objID);
+		const auto directionalOverride = toroidal ? object->appearance->visitableFromOffset(offset) : std::nullopt;
+		if (directionalOverride ? !*directionalOverride : offset.y < 0 && !object->isVisitableFromTop())
 			return false;
 	}
 	return true;

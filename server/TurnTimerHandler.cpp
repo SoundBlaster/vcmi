@@ -116,6 +116,7 @@ void TurnTimerHandler::update(int waitTimeMs)
 	{
 		if(!gameHandler.gameInfo().tryGetPlayerState(player))
 			continue;
+
 		if(gameHandler.gameState().isPlayerMakingTurn(player))
 			onPlayerMakingTurn(player, waitTimeMs);
 		

@@ -11,6 +11,7 @@
 #include "../../mapObjectConstructors/AObjectTypeHandler.h"
 #include "ObjectManager.h"
 #include "RoadPlacer.h"
+#include "../Functions.h"
 
 #include <vstd/RNG.h>
 
@@ -47,19 +48,30 @@ bool ObjectPlacer::placeRequiredObjects(ObjectManager & manager)
 			if(secondaryID == -1)
 			{
 				auto subObjects = LIBRARY->objtypeh->knownSubObjects(objid.primaryID);
+				vstd::erase_if(subObjects, [&](MapObjectSubID subID)
+				{
+					return LIBRARY->objtypeh->getHandlerFor(objid.primaryID, subID).getTemplates(zone.getTerrainType()).empty();
+				});
 				if(subObjects.empty())
 				{
-					logGlobal->error("No subobjects for object type %d", objid.primaryID);
+					logGlobal->error("No subobjects of object type %d have graphics for terrain of zone %d", objid.primaryID, zone.getId());
 					continue;
 				}
 				secondaryID = *RandomGeneratorUtil::nextItem(subObjects, zone.getRand());
 			}
-			TObjectTypeHandler handler = LIBRARY->objtypeh->getHandlerFor(objid.primaryID, secondaryID);
+			auto & handler = LIBRARY->objtypeh->getHandlerFor(objid.primaryID, secondaryID);
 
-			assert(handler);
-			ui32 guardStrength = info.second.has_value() ? info.second.value() : handler->getRMGInfo().value;
+			ui32 guardStrength = info.second.has_value() ? info.second.value() : handler.getRMGInfo().value;
+			// Random dwelling of given level becomes a dwelling of the zone's faction (see ObjectManager::placeObject).
+			// Without a guard from the template, guard it according to the value of that native dwelling
+			if(!info.second.has_value() && objid.primaryID == Obj::RANDOM_DWELLING_LVL)
+			{
+				ui32 nativeValue = getRandomDwellingValue(map, zone.getTownType(), secondaryID); // objectLvl1 has index 0
+				if(nativeValue)
+					guardStrength = nativeValue;
+			}
 			
-			auto object = handler->create(map.mapInstance->cb, nullptr);
+			auto object = handler.create(map.mapInstance->cb, nullptr);
 			if (object->asOwnable() && object->tempOwner == PlayerColor::UNFLAGGABLE)
 				object->setOwner(PlayerColor::NEUTRAL);		
 

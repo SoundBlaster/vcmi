@@ -33,8 +33,8 @@ class DLL_LINKAGE ObjectTemplate : public Serializeable
 
 	/// tiles that are covered by this object, uses EBlockMapBits enum as flags
 	std::vector<std::vector<ui8>> usedTiles;
-	/// directions from which object can be entered, format same as for moveDir in CGHeroInstance(but 0 - 7)
-	ui8 visitDir;
+	/// Explicit template directions retained for toroidal maps.
+	std::optional<ui8> visitDirections;
 	/// list of terrains on which this object can be placed
 	std::set<TerrainId> allowedTerrains;
 
@@ -102,17 +102,10 @@ public:
 		return topVisibleOffset;
 	}
 
-	// Checks if object is visitable from certain direction. X and Y must be between -1..+1
-	bool isVisitableFrom(si8 X, si8 Y) const;
 	inline int3 getVisitableOffset() const
 	{
 		//logGlobal->warn("Warning: getVisitableOffset called on non-visitable obj!");
 		return visitableOffset;
-	};
-
-	inline bool isVisitableFromTop() const
-	{
-		return visitDir & 2;
 	};
 
 	inline bool canBePlacedAtAnyTerrain() const
@@ -121,6 +114,8 @@ public:
 	};
 
 	int getTotalAllowedTerrains() const;
+
+	std::optional<bool> visitableFromOffset(const int3 & offset) const;
 
 	// Checks if object can be placed on specific terrain
 	bool canBePlacedAt(TerrainId terrain) const;
@@ -177,8 +172,14 @@ public:
 		h & id;
 		subid.serializeIdentifier(h, id);
 		h & printPriority;
-		h & visitDir;
+		if (!h.hasFeature(Handler::Version::VISITABLE_FROM_TOP_IN_OBJECT_TYPE))
+		{
+			ui8 visitDir = 0;
+			h & visitDir;
+		}
 		h & editorAnimationFile;
+		if(h.hasFeature(Handler::Version::TOROIDAL_VISIT_DIRECTIONS))
+			h & visitDirections;
 
 		if (!h.saving)
 		{

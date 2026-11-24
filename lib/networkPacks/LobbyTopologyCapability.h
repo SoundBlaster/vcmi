@@ -44,10 +44,12 @@ inline Greeting decode(ESerializationVersion wireVersion)
 inline Greeting negotiateClient(ESerializationVersion wireVersion)
 {
 	const auto offered = decode(wireVersion);
-	auto version = std::min(offered.version, ESerializationVersion::CURRENT);
-	if(!offered.toroidal && version >= ESerializationVersion::TOROIDAL_MAP)
-		version = ESerializationVersion::CAMPAIGN_ENEMY_HERO_CARRIED_OVER;
-	return {version, offered.toroidal && version >= ESerializationVersion::TOROIDAL_MAP};
+	const auto version = std::min(offered.version, ESerializationVersion::CURRENT);
+	if(offered.toroidal && version < ESerializationVersion::TOROIDAL_MAP)
+		return {ESerializationVersion::NONE, false};
+	if(!offered.toroidal && version > ESerializationVersion::UPSTREAM_CURRENT)
+		return {ESerializationVersion::NONE, false};
+	return {version, offered.toroidal};
 }
 
 inline bool isSafeServerGreeting(const Greeting & greeting)
@@ -55,6 +57,6 @@ inline bool isSafeServerGreeting(const Greeting & greeting)
 	return greeting.version >= ESerializationVersion::MINIMAL_LOBBY
 		&& greeting.version <= ESerializationVersion::CURRENT
 		&& ((greeting.toroidal && greeting.version >= ESerializationVersion::TOROIDAL_FRAMED_PACKETS)
-			|| (!greeting.toroidal && greeting.version < ESerializationVersion::TOROIDAL_MAP));
+			|| (!greeting.toroidal && greeting.version <= ESerializationVersion::UPSTREAM_CURRENT));
 }
 }

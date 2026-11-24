@@ -79,20 +79,29 @@ enum class ESerializationVersion : int32_t
 	RUMOR_REWORK, // rumor state stores typed rumor and rumors told since their pool was exhausted
 	ARMAGEDDONS_BLADE_BEARER, // campaign scenario may allow only one hero to equip Armageddon's Blade
 	CAMPAIGN_ENEMY_HERO_CARRIED_OVER, // campaign scenario may carry over a hero that the player does not own
-	TOROIDAL_MAP, // map header stores the adventure map topology
+	MAP_ALLOWED_DIFFICULTIES, // map header may restrict difficulties available to player
+	LOBBY_CAMPAIGN_ON_SERVER, // server loads campaigns by name and prepares their next scenario itself
+	CAMPAIGN_STATIC_DATA, // campaign state refers to its campaign by pointer, shared between start infos
+	VISITABLE_FROM_TOP_IN_OBJECT_TYPE, // object templates no longer store visitable directions, object type defines whether it is visitable from top
+	// Tagged fork layouts use a separate range so upstream can extend its sequence.
+	TOROIDAL_MAP = 10000, // map header stores the adventure map topology
 	TOROIDAL_UNINDEXED_OBJECTS, // shown objects with no indexed occupancy
 	TOROIDAL_MOVEMENT_SOURCE_LAYER, // server tracks each hero's last confirmed movement layer
 	TOROIDAL_REPLICATED_MOVEMENT_LAYER, // clients receive and persist the confirmed movement layer
 	TOROIDAL_TRANSIENT_RETURN, // server preserves the land tile where transit started
 	TOROIDAL_FRAMED_PACKETS, // negotiated toroidal packets identify their wire layout
 	TOROIDAL_TELEPORT_RESOLUTION, // teleport question resolution follows its movement outcome
+	TOROIDAL_VISIT_DIRECTIONS, // fork template overrides for toroidal approaches
 
 	RELEASE_170 = HOTA_MAP_STACK_COUNT,
 	RELEASE_174 = CUSTOM_GARRISON_TITLE,
 
 	MINIMAL = RELEASE_170,
-	MINIMAL_LOBBY = LOBBY_SCENARIO_LIST, // client and server of lobby reject each other below this version
-	CURRENT = TOROIDAL_TELEPORT_RESOLUTION,
+	MINIMAL_LOBBY = CAMPAIGN_STATIC_DATA, // client and server of lobby reject each other below this version
+	UPSTREAM_CURRENT = VISITABLE_FROM_TOP_IN_OBJECT_TYPE,
+	CURRENT = TOROIDAL_VISIT_DIRECTIONS,
 };
 
 static_assert(ESerializationVersion::MINIMAL <= ESerializationVersion::CURRENT, "Invalid serialization version definition!");
+
+static_assert(ESerializationVersion::UPSTREAM_CURRENT < ESerializationVersion::TOROIDAL_MAP);

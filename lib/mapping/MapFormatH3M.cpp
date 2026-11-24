@@ -157,7 +157,7 @@ void CMapLoaderH3M::readHeader()
 		if(features.levelHOTA5)
 		{
 			int32_t townTypesCount = reader->readUInt32();
-			int8_t allowedDifficultiesMask = reader->readInt8Checked(0, 31);
+			int8_t allowedDifficultiesMask = reader->readInt8Checked(1, 31);
 
 			// wrong assumption and this is not related to factions?
 			// assert(features.factionsCount == townTypesCount);
@@ -165,16 +165,14 @@ void CMapLoaderH3M::readHeader()
 			if (features.factionsCount != townTypesCount)
 				logGlobal->warn("Map '%s': Expected %d factions, but %d found!", mapName, features.factionsCount, townTypesCount);
 
-			if (allowedDifficultiesMask != 0 && allowedDifficultiesMask != 31) //TODO: recheck if 0 is possible
-				logGlobal->warn("Map '%s': List of allowed difficulties (%d) is not implemented!", mapName, static_cast<int>(allowedDifficultiesMask));
+			mapHeader->allowedDifficulties = MapDifficultySet(allowedDifficultiesMask);
 		}
 
 		if(features.levelHOTA7)
 		{
 			bool canHireDefeatedHeroes = reader->readBool();
-
-			if (!canHireDefeatedHeroes)
-				logGlobal->warn("Map '%s': Option to block hiring of defeated heroes is not implemented!", mapName);
+			if(map)
+				map->overrideGameSetting(EGameSettings::HEROES_HIRE_DEFEATED, JsonNode(canHireDefeatedHeroes));
 		}
 
 		if(features.levelHOTA8)
@@ -252,9 +250,7 @@ void CMapLoaderH3M::readPlayerInfo()
 
 		playerInfo.isFactionRandom = reader->readBool();
 
-		if (allowedFactions.empty())
-			logGlobal->warn("Map '%s': Player %d has no allowed factions to play! Ignoring.", mapName, i);
-		else if (allowedFactions.size() * 2 >= features.factionsCount)
+		if (allowedFactions.size() * 2 >= features.factionsCount)
 		{
 			// Map that allows most factions is assumed to ban the rest, so factions unknown to its format,
 			// such as ones from mods or from newer HotA versions, remain available
@@ -263,7 +259,12 @@ void CMapLoaderH3M::readPlayerInfo()
 					playerInfo.allowedFactions.erase(faction);
 		}
 		else
-			playerInfo.allowedFactions = allowedFactions;
+		{
+			if (playerInfo.canAnyonePlay() && allowedFactions.empty())
+				logGlobal->warn("Map '%s': Player %d has no allowed factions to play! Ignoring.", mapName, i);
+			else
+				playerInfo.allowedFactions = allowedFactions;
+		}
 
 		playerInfo.hasMainTown = reader->readBool();
 		if(playerInfo.hasMainTown)
@@ -292,7 +293,7 @@ void CMapLoaderH3M::readPlayerInfo()
 
 		if(features.levelAB)
 		{
-            reader->skipUnused(1); //Number of hero placeholders on map - unused
+			reader->skipUnused(1); //Number of hero placeholders on map - unused
 			size_t heroCount = reader->readUInt32();
 			for(size_t pp = 0; pp < heroCount; ++pp)
 			{
@@ -890,8 +891,8 @@ void CMapLoaderH3M::readPredefinedHeroes()
 	{
 		if(static_cast<size_t>(heroID) >= LIBRARY->heroh->size())
 			throw std::runtime_error("Map '" + mapName + "': predefined hero " + std::to_string(heroID) + " is not available; required content may be missing");
-		auto handler = LIBRARY->objtypeh->getHandlerFor(Obj::HERO, HeroTypeID(heroID).toHeroType()->getHeroClass()->getIndex());
-		auto object = handler->create(map->cb, handler->getTemplates().front());
+		auto & handler = LIBRARY->objtypeh->getHandlerFor(Obj::HERO, HeroTypeID(heroID).toHeroType()->getHeroClass()->getIndex());
+		auto object = handler.create(map->cb, handler.getTemplates().front());
 		auto hero = std::dynamic_pointer_cast<CGHeroInstance>(object);
 		hero->subID = heroID;
 		return hero;
@@ -1507,10 +1508,9 @@ std::shared_ptr<CGObjectInstance> CMapLoaderH3M::readResource(const int3 & mapPo
 
 	if (objectTemplate->id != Obj::RANDOM_RESOURCE)
 	{
-		const auto & baseHandler = LIBRARY->objtypeh->getHandlerFor(objectTemplate->id, objectTemplate->subid);
-		const auto & ourHandler = std::dynamic_pointer_cast<ResourceInstanceConstructor>(baseHandler);
+		const auto & ourHandler = dynamic_cast<const ResourceInstanceConstructor &>(LIBRARY->objtypeh->getHandlerFor(objectTemplate->id, objectTemplate->subid));
 
-		object->amount *= ourHandler->getAmountMultiplier();
+		object->amount *= ourHandler.getAmountMultiplier();
 	}
 
 	reader->skipZero(4);
@@ -1684,7 +1684,7 @@ std::shared_ptr<CGObjectInstance> CMapLoaderH3M::readHotaBattleLocation(const in
 std::shared_ptr<CGObjectInstance> CMapLoaderH3M::readGeneric(const int3 & mapPosition, std::shared_ptr<const ObjectTemplate> objectTemplate)
 {
 	if(LIBRARY->objtypeh->knownSubObjects(objectTemplate->id).count(objectTemplate->subid))
-		return LIBRARY->objtypeh->getHandlerFor(objectTemplate->id, objectTemplate->subid)->create(map->cb, objectTemplate);
+		return LIBRARY->objtypeh->getHandlerFor(objectTemplate->id, objectTemplate->subid).create(map->cb, objectTemplate);
 
 	logGlobal->warn("Map '%s': Unrecognized object %d:%d ('%s') at %s found!", mapName, objectTemplate->id.toEnum(), objectTemplate->subid, objectTemplate->animationFile.getOriginalName(), mapPosition.toString());
 	return std::make_shared<CGObjectInstance>(map->cb);
@@ -2275,7 +2275,7 @@ void CMapLoaderH3M::adjustOutdatedGarrisonTemplate(CGObjectInstance & object)
 	if(!object.appearance->isVisitable())
 		return;
 
-	for(const auto & configTemplate : LIBRARY->objtypeh->getHandlerFor(object.ID, object.subID)->getTemplates())
+	for(const auto & configTemplate : LIBRARY->objtypeh->getHandlerFor(object.ID, object.subID).getTemplates())
 	{
 		if(configTemplate->animationFile != object.appearance->animationFile || !configTemplate->isVisitable())
 			continue;

@@ -30,6 +30,8 @@
 #include "../../mapObjects/Quest.h"
 #include "../../mapObjects/MiscObjects.h"
 #include "../../CCreatureHandler.h"
+#include "../../entities/faction/CFaction.h"
+#include "../../entities/faction/CTown.h"
 #include "../../mapping/CMap.h"
 #include "../../mapping/CMapEditManager.h"
 #include "../../spells/CSpellHandler.h"
@@ -122,10 +124,10 @@ void TreasurePlacer::addCommonObjects()
 			continue;
 		for(auto secondaryID : LIBRARY->objtypeh->knownSubObjects(primaryID))
 		{
-			auto handler = LIBRARY->objtypeh->getHandlerFor(primaryID, secondaryID);
-			if(!handler->isStaticObject() && handler->getRMGInfo().value)
+			auto & handler = LIBRARY->objtypeh->getHandlerFor(primaryID, secondaryID);
+			if(!handler.isStaticObject() && handler.getRMGInfo().value)
 			{
-				auto rmgInfo = handler->getRMGInfo();
+				auto rmgInfo = handler.getRMGInfo();
 				if (rmgInfo.mapLimit || rmgInfo.value > zone.getMaxTreasureValue())
 				{
 					//Skip objects with per-map limit here
@@ -149,7 +151,7 @@ void TreasurePlacer::setBasicProperties(ObjectInfo & oi, CompoundMapObjectID obj
 {
 	oi.generateObject = [this, objid]() -> std::shared_ptr<CGObjectInstance>
 	{
-		auto obj = LIBRARY->objtypeh->getHandlerFor(objid)->create(map.mapInstance->cb, nullptr);
+		auto obj = LIBRARY->objtypeh->getHandlerFor(objid).create(map.mapInstance->cb, nullptr);
 		// adjust ownership for ownable objects (such as dwellings)
 		if (obj->asOwnable() && obj->tempOwner == PlayerColor::UNFLAGGABLE)
 			obj->setOwner(PlayerColor::NEUTRAL);		
@@ -161,7 +163,7 @@ void TreasurePlacer::setBasicProperties(ObjectInfo & oi, CompoundMapObjectID obj
 void TreasurePlacer::addPrisons()
 {
 	//Generate Prison on water only if it has a template
-	auto prisonTemplates = LIBRARY->objtypeh->getHandlerFor(Obj::PRISON, 0)->getTemplates(zone.getTerrainType());
+	auto prisonTemplates = LIBRARY->objtypeh->getHandlerFor(Obj::PRISON, 0).getTemplates(zone.getTerrainType());
 	if (!prisonTemplates.empty())
 	{
 		PrisonHeroPlacer * prisonHeroPlacer = nullptr;
@@ -192,8 +194,8 @@ void TreasurePlacer::addPrisons()
 			oi.generateObject = [i, this, prisonHeroPlacer]() -> std::shared_ptr<CGObjectInstance>
 			{
 				HeroTypeID hid = prisonHeroPlacer->drawRandomHero();
-				auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::PRISON, 0);
-				auto obj = std::dynamic_pointer_cast<CGHeroInstance>(factory->create(map.mapInstance->cb, nullptr));
+				auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::PRISON, 0);
+				auto obj = std::dynamic_pointer_cast<CGHeroInstance>(factory.create(map.mapInstance->cb, nullptr));
 
 				obj->setHeroType(hid); //will be initialized later
 				obj->exp = generator.getConfig().prisonExperience[i];
@@ -226,6 +228,14 @@ void TreasurePlacer::addDwellings()
 	if(zone.getType() == ETemplateZoneType::WATER)
 		return;
 
+	// randomDwellingLvl common objects replace native dwellings of the same level
+	std::set<const CCreature *> replacedCreatures;
+	for(const auto & object : zone.getConfiguredObjects())
+	{
+		if(object.primaryID == Obj::RANDOM_DWELLING_LVL)
+			replacedCreatures.insert(getRandomDwellingCreature(zone.getTownType(), object.secondaryID));
+	}
+
 	//dwellings
 	auto dwellingTypes = {Obj::CREATURE_GENERATOR1, Obj::CREATURE_GENERATOR4};
 	
@@ -243,21 +253,19 @@ void TreasurePlacer::addDwellings()
 		
 		for(auto secondaryID : subObjects)
 		{
-			const auto * dwellingHandler = dynamic_cast<const DwellingInstanceConstructor *>(LIBRARY->objtypeh->getHandlerFor(dwellingType, secondaryID).get());
+			const auto * dwellingHandler = dynamic_cast<const DwellingInstanceConstructor *>(&LIBRARY->objtypeh->getHandlerFor(dwellingType, secondaryID));
 			auto creatures = dwellingHandler->getProducedCreatures();
 			if(creatures.empty())
 				continue;
 
 			const auto * cre = creatures.front();
-			if(cre->getFactionID() == zone.getTownType())
+			if(cre->getFactionID() == zone.getTownType() && !replacedCreatures.count(cre))
 			{
-				float nativeZonesCount = static_cast<float>(map.getZoneCount(cre->getFactionID()));
-				// value increases, if there are more native zones for the faction
-				float valueModifier = 1 + (nativeZonesCount / map.getTotalZoneCount()) + (nativeZonesCount / 2);
+				float valueModifier = getNativeDwellingValueModifier(map, cre->getFactionID());
 				ObjectInfo oi(dwellingType, secondaryID);
 				setBasicProperties(oi, CompoundMapObjectID(dwellingType, secondaryID));
 
-				auto rmgInfo = LIBRARY->objtypeh->getHandlerFor(dwellingType, secondaryID)->getRMGInfo();
+				auto rmgInfo = LIBRARY->objtypeh->getHandlerFor(dwellingType, secondaryID).getRMGInfo();
 				// rmg info set for dwelling
 				if(rmgInfo.value)
 				{
@@ -271,14 +279,24 @@ void TreasurePlacer::addDwellings()
 				}
 				else
 				{
-					oi.value = static_cast<ui32>(cre->getAIValue() * cre->getGrowth() * valueModifier);
-					oi.probability = 40;
+					oi.value = getNativeDwellingValue(map, cre);
+					oi.probability = ObjectConfig::NATIVE_DWELLING_RARITY;
 				}
 				if(!oi.templates.empty())
 					addObjectToRandomPool(oi);
 			}
 		}
 	}
+}
+
+void TreasurePlacer::setRandomDwellingValue(ObjectInfo & oi) const
+{
+	// The dwelling becomes one of the zone's faction when placed (see ObjectManager::placeObject).
+	// Without a value from the template, value it the same way as native dwellings in addDwellings()
+	if(oi.primaryID != Obj::RANDOM_DWELLING_LVL || oi.value != 0)
+		return;
+
+	oi.value = getRandomDwellingValue(map, zone.getTownType(), oi.secondaryID); // objectLvl1 has index 0
 }
 
 void TreasurePlacer::addScrolls()
@@ -292,8 +310,8 @@ void TreasurePlacer::addScrolls()
 	{
 		oi.generateObject = [i, this]() -> std::shared_ptr<CGObjectInstance>
 		{
-			auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::SPELL_SCROLL, 0);
-			auto obj = std::dynamic_pointer_cast<CGArtifact>(factory->create(map.mapInstance->cb, nullptr));
+			auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::SPELL_SCROLL, 0);
+			auto obj = std::dynamic_pointer_cast<CGArtifact>(factory.create(map.mapInstance->cb, nullptr));
 			std::vector<SpellID> out;
 			
 			for(auto spellID : LIBRARY->spellh->getDefaultAllowed())
@@ -332,8 +350,8 @@ void TreasurePlacer::addPandoraBoxesWithGold()
 	{
 		oi.generateObject = [this, i]() -> std::shared_ptr<CGObjectInstance>
 		{
-			auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
-			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory->create(map.mapInstance->cb, nullptr));
+			auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
+			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory.create(map.mapInstance->cb, nullptr));
 			
 			Rewardable::VisitInfo reward;
 			reward.reward.resources[EGameResID::GOLD] = i * 5000;
@@ -357,8 +375,8 @@ void TreasurePlacer::addPandoraBoxesWithExperience()
 	{
 		oi.generateObject = [this, i]() -> std::shared_ptr<CGObjectInstance>
 		{
-			auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
-			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory->create(map.mapInstance->cb, nullptr));
+			auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
+			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory.create(map.mapInstance->cb, nullptr));
 			
 			Rewardable::VisitInfo reward;
 			reward.reward.heroExperience = i * 5000;
@@ -387,8 +405,8 @@ void TreasurePlacer::addPandoraBoxesWithCreatures()
 		
 		oi.generateObject = [this, creature, creaturesAmount]() -> std::shared_ptr<CGObjectInstance>
 		{
-			auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
-			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory->create(map.mapInstance->cb, nullptr));
+			auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
+			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory.create(map.mapInstance->cb, nullptr));
 			
 			Rewardable::VisitInfo reward;
 			reward.reward.creatures.emplace_back(creature, creaturesAmount);
@@ -413,8 +431,8 @@ void TreasurePlacer::addPandoraBoxesWithSpells()
 	{
 		oi.generateObject = [i, this]() -> std::shared_ptr<CGObjectInstance>
 		{
-			auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
-			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory->create(map.mapInstance->cb, nullptr));
+			auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
+			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory.create(map.mapInstance->cb, nullptr));
 
 			std::vector <const CSpell *> spells;
 			for(auto spellID : LIBRARY->spellh->getDefaultAllowed())
@@ -446,8 +464,8 @@ void TreasurePlacer::addPandoraBoxesWithSpells()
 	{
 		oi.generateObject = [i, this]() -> std::shared_ptr<CGObjectInstance>
 		{
-			auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
-			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory->create(map.mapInstance->cb, nullptr));
+			auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
+			auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory.create(map.mapInstance->cb, nullptr));
 
 			std::vector <const CSpell *> spells;
 			for(auto spellID : LIBRARY->spellh->getDefaultAllowed())
@@ -478,8 +496,8 @@ void TreasurePlacer::addPandoraBoxesWithSpells()
 	
 	oi.generateObject = [this]() -> std::shared_ptr<CGObjectInstance>
 	{
-		auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
-		auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory->create(map.mapInstance->cb, nullptr));
+		auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::PANDORAS_BOX, 0);
+		auto obj = std::dynamic_pointer_cast<CGPandoraBox>(factory.create(map.mapInstance->cb, nullptr));
 
 		std::vector <const CSpell *> spells;
 		for(auto spellID : LIBRARY->spellh->getDefaultAllowed())
@@ -573,8 +591,8 @@ void TreasurePlacer::addSeerHuts()
 
 			oi.generateObject = [cb=map.mapInstance->cb, creature, creaturesAmount, randomAppearance, setRandomArtifact, rewardValue]() -> std::shared_ptr<CGObjectInstance>
 			{
-				auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::SEER_HUT, randomAppearance);
-				auto obj = std::dynamic_pointer_cast<SeerHut>(factory->create(cb, nullptr));
+				auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::SEER_HUT, randomAppearance);
+				auto obj = std::dynamic_pointer_cast<SeerHut>(factory.create(cb, nullptr));
 				
 				Rewardable::VisitInfo reward;
 				reward.reward.creatures.emplace_back(creature->getId(), creaturesAmount);
@@ -608,8 +626,8 @@ void TreasurePlacer::addSeerHuts()
 			
 			oi.generateObject = [i, randomAppearance, this, setRandomArtifact, rewardValue]() -> std::shared_ptr<CGObjectInstance>
 			{
-				auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::SEER_HUT, randomAppearance);
-				auto obj = std::dynamic_pointer_cast<SeerHut>(factory->create(map.mapInstance->cb, nullptr));
+				auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::SEER_HUT, randomAppearance);
+				auto obj = std::dynamic_pointer_cast<SeerHut>(factory.create(map.mapInstance->cb, nullptr));
 				
 				Rewardable::VisitInfo reward;
 				reward.reward.heroExperience = generator.getConfig().questRewardValues[i];
@@ -626,8 +644,8 @@ void TreasurePlacer::addSeerHuts()
 			
 			oi.generateObject = [i, randomAppearance, this, setRandomArtifact, rewardValue]() -> std::shared_ptr<CGObjectInstance>
 			{
-				auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::SEER_HUT, randomAppearance);
-				auto obj = std::dynamic_pointer_cast<SeerHut>(factory->create(map.mapInstance->cb, nullptr));
+				auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::SEER_HUT, randomAppearance);
+				auto obj = std::dynamic_pointer_cast<SeerHut>(factory.create(map.mapInstance->cb, nullptr));
 				
 				Rewardable::VisitInfo reward;
 				reward.reward.resources[EGameResID::GOLD] = generator.getConfig().questRewardValues[i];
@@ -723,12 +741,7 @@ std::vector<ObjectInfo*> TreasurePlacer::prepareTreasurePile(const CTreasureInfo
 		if(!oi) //fail
 			break;
 		
-		bool visitableFromTop = true;
-		for(auto & t : oi->templates)
-			if(!t->isVisitableFromTop())
-				visitableFromTop = false;
-		
-		if(visitableFromTop)
+		if(isVisitableFromTop(oi->templates))
 		{
 			objectInfos.push_back(oi);
 		}
@@ -789,7 +802,7 @@ rmg::Object TreasurePlacer::constructTreasurePile(const std::vector<ObjectInfo*>
 			continue;
 		}
 		
-		auto templates = object->getObjectHandler()->getMostSpecificTemplates(zone.getTerrainType());
+		auto templates = object->getObjectHandler().getMostSpecificTemplates(zone.getTerrainType());
 
 		if (templates.empty())
 		{
@@ -864,7 +877,7 @@ rmg::Object TreasurePlacer::constructTreasurePile(const std::vector<ObjectInfo*>
 			auto instanceAccessibleArea = instance.getAccessibleArea();
 			if(instance.getBlockedArea().getTilesVector().size() == 1)
 			{
-				if(instance.object().appearance->isVisitableFromTop() && !instance.object().isBlockedVisitable())
+				if(instance.object().isVisitableFromTop() && !instance.object().isBlockedVisitable())
 					instanceAccessibleArea.add(instance.getVisitablePosition());
 			}
 			
@@ -882,6 +895,11 @@ rmg::Object TreasurePlacer::constructTreasurePile(const std::vector<ObjectInfo*>
 	return rmgObject;
 }
 
+bool TreasurePlacer::isVisitableFromTop(const std::vector<std::shared_ptr<const ObjectTemplate>> & templates)
+{
+	return std::ranges::all_of(templates, [](const auto & t){ return LIBRARY->objtypeh->getHandlerFor(t->id, t->subid).isVisitableFromTop(); });
+}
+
 ObjectInfo * TreasurePlacer::getRandomObject(ui32 desiredValue, ui32 currentValue, bool allowLargeObjects)
 {
 	std::vector<std::pair<ui32, ObjectInfo*>> thresholds; //handle complex object via pointer
@@ -896,12 +914,7 @@ ObjectInfo * TreasurePlacer::getRandomObject(ui32 desiredValue, ui32 currentValu
 		if(oi.value > maxVal)
 			break; //this assumes values are sorted in ascending order
 		
-		bool visitableFromTop = true;
-		for(auto & t : oi.templates)
-			if(!t->isVisitableFromTop())
-				visitableFromTop = false;
-		
-		if(!visitableFromTop && !allowLargeObjects)
+		if(!isVisitableFromTop(oi.templates) && !allowLargeObjects)
 			continue;
 		
 		if(oi.value >= minValue && oi.maxPerZone > 0)
@@ -1036,19 +1049,26 @@ void TreasurePlacer::createTreasures(ObjectManager& manager)
 			{
 				Zone::Lock lock(zone.areaMutex); //We are going to subtract this area
 
-				auto searchArea = zone.areaPossible().get();
-				searchArea.erase_if([this, &minDistance](const int3& tile) -> bool
+				// Guarded piles, and piles that cannot be removed, are not placed on roads
+				const bool avoidRoads = guarded || !rmgObject.getRemovableArea().contains(rmgObject.getArea());
+				const auto & searchArea = zone.areaPossible().get(); // live area, under our lock
+				auto searchFilter = [this, &minDistance, &roads, avoidRoads](const int3 & tile) -> bool
 				{
-					auto ti = map.getTileInfo(tile);
-					return (ti.getNearestObjectDistance() < minDistance);
-				});
+					if (map.getNearestObjectDistance(tile) < minDistance)
+						return false;
+					return !(avoidRoads && roads.contains(tile));
+				};
 
 				if (guarded)
 				{
-					searchArea.subtract(roads);
-
-					path = manager.placeAndConnectObject(searchArea, rmgObject, [this, &rmgObject, &minDistance, &manager, blockingGuardMaxValue, &roads, &nextToRoad](const int3& tile)
+					path = manager.placeAndConnectObject(searchArea, searchFilter, rmgObject, [this, &rmgObject, &minDistance, &manager, blockingGuardMaxValue, &roads, &nextToRoad](const int3& tile)
 						{
+							// Guard cannot be adjacent to road, but blocked side of an object could be
+							if (rmgObject.getValue() > blockingGuardMaxValue && nextToRoad.contains(rmgObject.getGuardPos()))
+							{
+								return -1.f;
+							}
+
 							float bestDistance = 10e9;
 							for (const auto& t : rmgObject.getArea().getTilesVector())
 							{
@@ -1059,34 +1079,28 @@ void TreasurePlacer::createTreasures(ObjectManager& manager)
 									vstd::amin(bestDistance, distance);
 							}
 
-							// Guard cannot be adjacent to road, but blocked side of an object could be
-							if (rmgObject.getValue() > blockingGuardMaxValue && nextToRoad.contains(rmgObject.getGuardPos()))
-							{
-								return -1.f;
-							}
-
+							// Tiles the guard will block must not be free paths, roads or object entrances
 							const auto & guardedArea = rmgObject.instances().back()->getAccessibleArea();
-							const auto areaToBlock = rmgObject.getAccessibleArea(true) - guardedArea;
-
-							if (zone.freePaths()->overlap(areaToBlock) || roads.overlap(areaToBlock) || manager.getVisitableArea().overlap(areaToBlock))
-								return -1.f;
+							const auto & visitableArea = manager.getVisitableArea();
+							const auto freePaths = zone.freePaths();
+							for (const auto & t : rmgObject.getAccessibleArea(true).getTilesVector())
+							{
+								if (guardedArea.contains(t))
+									continue;
+								if (roads.contains(t) || visitableArea.contains(t) || freePaths->contains(t))
+									return -1.f;
+							}
 
 							// Add huge penalty for objects hiding roads
 							if (rmgObject.getBorderAbove().overlap(roads))
 								bestDistance /= 10.0f;
 
 							return bestDistance;
-						}, guarded, false, ObjectManager::OptimizeType::BOTH);
+						}, guarded, false, ObjectManager::OptimizeType::BOTH, minDistance);
 				}
 				else
 				{
-					// Do not place non-removable objects on roads
-					if (!rmgObject.getRemovableArea().contains(rmgObject.getArea()))
-					{
-						searchArea.subtract(roads);
-					}
-
-					path = manager.placeAndConnectObject(searchArea, rmgObject, minDistance, guarded, false, ObjectManager::OptimizeType::DISTANCE);
+					path = manager.placeAndConnectObject(searchArea, searchFilter, rmgObject, minDistance, guarded, false, ObjectManager::OptimizeType::DISTANCE, minDistance);
 				}
 			}
 
@@ -1204,6 +1218,7 @@ void TreasurePlacer::ObjectPool::patchWithZoneConfig(const Zone & zone, Treasure
 	for (auto & object : configuredObjects)
 	{
 		tp->setBasicProperties(object, object.getCompoundID());
+		tp->setRandomDwellingValue(object);
 		addObject(object);
 		logGlobal->debug("Added custom object of type %d.%d", object.primaryID, object.secondaryID);
 	}
@@ -1246,13 +1261,8 @@ ObjectConfig::EObjectCategory TreasurePlacer::ObjectPool::getObjectCategory(Comp
 
 	if (name == "configurable")
 	{
-		auto handler = LIBRARY->objtypeh->getHandlerFor(id.primaryID, id.secondaryID);
-		if (!handler)
-		{
-			return ObjectConfig::EObjectCategory::NONE;
-		}
-
-		auto info = handler->getObjectInfo();
+		auto & handler = LIBRARY->objtypeh->getHandlerFor(id.primaryID, id.secondaryID);
+		auto info = handler.getObjectInfo();
 
 		if (info->hasGuards())
 		{

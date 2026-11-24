@@ -12,6 +12,7 @@
 #include "GameStatePackVisitor.h"
 
 #include "CGameState.h"
+#include "HighScore.h"
 #include "TavernHeroesPool.h"
 
 #include "../CPlayerState.h"
@@ -274,6 +275,10 @@ void GameStatePackVisitor::visitFoWChange(FoWChange & pack)
 
 void GameStatePackVisitor::visitSetAvailableHero(SetAvailableHero & pack)
 {
+	bool returnsToPool = pack.roleID == TavernSlotRole::RETREATED || pack.roleID == TavernSlotRole::SURRENDERED;
+	if (returnsToPool && !gs.heroesPool->isHeroInPool(pack.hid))
+		gs.heroesPool->addHeroToPool(pack.hid);
+
 	gs.heroesPool->setHeroForPlayer(pack.player, pack.slotID, pack.hid, pack.army, pack.roleID, pack.replenishPoints);
 }
 
@@ -399,7 +404,7 @@ void GameStatePackVisitor::visitPlayerEndsGame(PlayerEndsGame & pack)
 					crossoverHeroes.push_back(hero);
 
 			auto * campaign = gs.getStartInfo()->campState.get();
-			HeroTypeID enemyHeroType = campaign->scenario(*campaign->currentScenario()).enemyHeroCarriedOver;
+			HeroTypeID enemyHeroType = campaign->getCampaign().scenario(*campaign->currentScenario()).enemyHeroCarriedOver;
 			if (enemyHeroType.hasValue())
 			{
 				// a defeated hero is in the hero pool, stripped of artifacts unless he retreated or surrendered
@@ -410,6 +415,7 @@ void GameStatePackVisitor::visitPlayerEndsGame(PlayerEndsGame & pack)
 					crossoverHeroes.push_back(enemyHero);
 			}
 
+			campaign->highscoreParameters.push_back(HighScore::prepareHighScores(&gs, pack.player, true));
 			campaign->savePersistentVariables(gs.getMap());
 			campaign->setCurrentMapAsConquered(crossoverHeroes);
 		}
@@ -528,8 +534,9 @@ void GameStatePackVisitor::visitRemoveObject(RemoveObject & pack)
 		if(boatFootprint)
 			gs.getMap().calculateGuardingGreaturePositions(boatFootprint->first - boatFootprint->second, boatFootprint->first);
 
-		//return hero to the pool, so he may reappear in tavern
-		gs.heroesPool->addHeroToPool(beatenHero->getHeroTypeID());
+		// retreated or surrendered heroes are added back by SetAvailableHero that follows
+		if (gs.getSettings().getBoolean(EGameSettings::HEROES_HIRE_DEFEATED))
+			gs.heroesPool->addHeroToPool(beatenHero->getHeroTypeID());
 		gs.getMap().addToHeroPool(std::dynamic_pointer_cast<CGHeroInstance>(beatenObject));
 		return;
 	}

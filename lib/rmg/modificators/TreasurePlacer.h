@@ -32,6 +32,8 @@ public:
 	void createTreasures(ObjectManager & manager);
 	void addObjectToRandomPool(const ObjectInfo& oi);
 	void setBasicProperties(ObjectInfo & oi, CompoundMapObjectID objid) const;
+	/// Values a random dwelling of a given level like a native dwelling of the zone's faction, unless the template set a value
+	void setRandomDwellingValue(ObjectInfo & oi) const;
 
 	// TODO: Can be defaulted to addAllPossibleObjects, but then each object will need to be configured
 	void addCommonObjects();
@@ -57,6 +59,8 @@ protected:
 	bool isGuardNeededForTreasure(int value);
 	
 	ObjectInfo * getRandomObject(ui32 desiredValue, ui32 currentValue, bool allowLargeObjects);
+	/// templates may belong to another object type than their ObjectInfo, e.g. seer huts with random appearance
+	static bool isVisitableFromTop(const std::vector<std::shared_ptr<const ObjectTemplate>> & templates);
 	std::vector<ObjectInfo*> prepareTreasurePile(const CTreasureInfo & treasureInfo);
 	rmg::Object constructTreasurePile(const std::vector<ObjectInfo*> & treasureInfos, bool densePlacement = false);
 

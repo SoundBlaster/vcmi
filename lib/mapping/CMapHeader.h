@@ -245,6 +245,8 @@ public:
 	MetaString name;
 	MetaString description;
 	EMapDifficulty difficulty;
+	/// difficulties that player may choose to play this map on
+	MapDifficultySet allowedDifficulties;
 	MetaString author;
 	MetaString authorContact;
 	MetaString mapVersion;
@@ -318,6 +320,8 @@ public:
 		}
 
 		h & difficulty;
+		if (h.version >= Handler::Version::MAP_ALLOWED_DIFFICULTIES)
+			h & allowedDifficulties;
 
 		h & levelLimit;
 		h & areAnyPlayers;

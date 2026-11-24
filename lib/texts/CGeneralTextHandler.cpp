@@ -74,6 +74,8 @@ void CGeneralTextHandler::detectInstallParameters()
 	std::array<double, 16> footprint{};
 	std::array<double, knownFootprints.size()> deviations{};
 
+	static_assert(std::size(knownFootprints) == std::size(knownLanguages));
+
 	auto data = resource->readAll();
 
 	// compute how often each character occurs in input file

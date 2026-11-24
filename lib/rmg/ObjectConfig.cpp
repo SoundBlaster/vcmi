@@ -138,8 +138,8 @@ void ObjectConfig::serializeJson(JsonSerializeFormat & handler, const CObjectCla
 				{
 					if(secondaryID != -1)
 					{
-						auto objectHandler = objects.getHandlerFor(MapObjectID(primaryID), MapObjectSubID(secondaryID));
-						const std::string subtypeKey = objectHandler->getSubTypeName();
+						auto & objectHandler = objects.getHandlerFor(MapObjectID(primaryID), MapObjectSubID(secondaryID));
+						const std::string subtypeKey = objectHandler.getSubTypeName();
 						bool banned = true;
 						objStruct->serializeBool(subtypeKey, banned);
 					}
@@ -193,8 +193,8 @@ void ObjectConfig::serializeJson(JsonSerializeFormat & handler, const CObjectCla
 			std::string objectType = objects.getJsonKey(object.primaryID);
 			objectStruct->serializeString("type", objectType);
 			
-			auto handler = objects.getHandlerFor(MapObjectID(object.primaryID), MapObjectSubID(object.secondaryID));
-			std::string subtypeName = handler->getSubTypeName();
+			auto & handler = objects.getHandlerFor(MapObjectID(object.primaryID), MapObjectSubID(object.secondaryID));
+			std::string subtypeName = handler.getSubTypeName();
 			objectStruct->serializeString("subtype", subtypeName);
 			
 			// Serialize RMG properties
@@ -229,25 +229,34 @@ void ObjectConfig::serializeJson(JsonSerializeFormat & handler, const CObjectCla
 			if (object.maxPerZone == 0)
 				object.maxPerZone = std::numeric_limits<int>::max();
 
-			resolver.requestIdentifierIfFound("object", objectConfig["type"], [this, object, objectConfig, &resolver, &objects](int primaryID)
+			const bool hasRarity = !rmg["rarity"].isNull();
+			auto addObject = [this, hasRarity, &objects](ObjectInfo objectWithID)
+			{
+				// random dwellings replace native ones, so by default they are as common
+				if (!hasRarity && objectWithID.primaryID == Obj::RANDOM_DWELLING_LVL)
+					objectWithID.probability = NATIVE_DWELLING_RARITY;
+				addCustomObject(objectWithID, objects);
+			};
+
+			resolver.requestIdentifierIfFound("object", objectConfig["type"], [addObject, object, objectConfig, &resolver, &objects](int primaryID)
 			{
 				if (objectConfig["subtype"].isNull())
 				{
 					auto objectWithID = object;
 					objectWithID.primaryID = primaryID;
 					objectWithID.secondaryID = 0;
-					addCustomObject(objectWithID, objects);
+					addObject(objectWithID);
 				}
 				else
 				{
 					const std::string jsonKey = objects.getJsonKey(primaryID);
 
-					resolver.requestIdentifierIfFound(jsonKey, objectConfig["subtype"], [this, primaryID, object, &objects](int secondaryID)
+					resolver.requestIdentifierIfFound(jsonKey, objectConfig["subtype"], [addObject, primaryID, object](int secondaryID)
 					{
 						auto objectWithID = object;
 						objectWithID.primaryID = primaryID;
 						objectWithID.secondaryID = secondaryID;
-						addCustomObject(objectWithID, objects);
+						addObject(objectWithID);
 					});
 				}
 			});
@@ -264,8 +273,8 @@ void ObjectConfig::serializeJson(JsonSerializeFormat & handler, const CObjectCla
 			{
 				std::string jsonKey = objects.getJsonKey(objId.primaryID);
 				auto entryStruct = requiredObjectsStruct->enterStruct(jsonKey);
-				auto objHandler = objects.getHandlerFor(objId);
-				std::string jsonSubKey = objHandler->getJsonKey();
+				auto & objHandler = objects.getHandlerFor(objId);
+				std::string jsonSubKey = objHandler.getJsonKey();
 				auto subEntryStruct = requiredObjectsStruct->enterStruct(jsonSubKey);
 
 				ui16 countVal = info.first;
