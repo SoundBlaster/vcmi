@@ -1425,9 +1425,17 @@ void GameStatePackVisitor::visitSetObjectProperty(SetObjectProperty & pack)
 		obj->setProperty(pack.what, pack.identifier);
 		obj->attachToBonusSystem(gs);
 	}
-	else //not an armed instance
+	else
 	{
+		const auto oldType = obj->ID;
 		obj->setProperty(pack.what, pack.identifier);
+		if(obj->ID != oldType)
+		{
+			// Approach rules can change with the type even when the footprint stays put.
+			const auto anchor = obj->anchorPos();
+			const int3 dimensions(obj->getWidth(), obj->getHeight(), 1);
+			gs.getMap().calculateGuardingGreaturePositions(anchor - dimensions - int3(1, 1, 0), anchor + int3(1, 1, 0));
+		}
 	}
 }
 
