@@ -1,9 +1,8 @@
 # Upstream integration: investigation and execution plan
 
-Status: **planning only**. No merge, conflict resolution, implementation,
-build or integration test is authorized by this plan. Execution starts only
-on the user's next instruction. A checked planning item below records an
-observation, not a passed test of the eventual integrated build.
+Status: **execution started on user instruction**. A checked planning item below
+records an observation, not a passed test of the eventual integrated build.
+See the [initial compatibility inventory](evidence/upstream-compatibility-inventory-2026-11-24.md).
 
 ## Snapshot and scope
 
