@@ -76,18 +76,18 @@ public:
 
 	std::shared_ptr<CGObjectInstance> create(MapObjectID id, MapObjectSubID subID, const int3 & near, const std::string & preferred = {})
 	{
-		const auto handler = LIBRARY->objtypeh->getHandlerFor(id, subID);
+		const auto & handler = LIBRARY->objtypeh->getHandlerFor(id, subID);
 		const auto terrain = map.getTile(*wrap(near)).getTerrainID();
-		auto templates = handler->getTemplates(terrain);
+		auto templates = handler.getTemplates(terrain);
 		if(templates.empty())
-			templates = handler->getTemplates();
+			templates = handler.getTemplates();
 		if(templates.empty())
 			throw std::runtime_error("No templates for object " + std::to_string(id.getNum()) + ":" + std::to_string(subID.getNum()));
 		std::shared_ptr<const ObjectTemplate> chosen = templates.front();
 		for(const auto & tmpl : templates)
 			if(tmpl->stringID == preferred)
 				chosen = tmpl;
-		return handler->create(map.cb, chosen);
+		return handler.create(map.cb, chosen);
 	}
 
 	bool fits(const CGObjectInstance & object, const int3 & anchor, bool water, bool avoidObstacles) const

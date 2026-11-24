@@ -382,8 +382,8 @@ TEST(RandomTemplateProbe, GenerateTemplate)
 			const CreatureID creature(0);
 			const int value = creature.toEntity(LIBRARY)->getAIValue();
 			ASSERT_GT(value, 0);
-			auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::MONSTER, creature);
-			auto guard = std::dynamic_pointer_cast<CGCreature>(factory->create(map->cb, nullptr));
+			auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::MONSTER, creature);
+			auto guard = std::dynamic_pointer_cast<CGCreature>(factory.create(map->cb, nullptr));
 			ASSERT_NE(guard, nullptr);
 			guard->initialCharacter = CGCreature::Character::HOSTILE;
 			guard->neverFlees = true;
@@ -3975,13 +3975,13 @@ TEST(MapFormat, ToroidalBoatDemonstrationFixtureRoundTrips)
 	editor->drawTerrain(ETerrainId::WATER, 0, &random);
 
 	const int3 boatPosition(35, 0, 0);
-	auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::BOAT, BoatId::CASTLE);
-	const auto templates = factory->getTemplates(ETerrainId::WATER);
+	auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::BOAT, BoatId::CASTLE);
+	const auto templates = factory.getTemplates(ETerrainId::WATER);
 	ASSERT_FALSE(templates.empty());
-	auto boat = factory->create(&callback, templates.front());
+	auto boat = factory.create(&callback, templates.front());
 	GameRandomizer objectRandomizer(callback);
 	objectRandomizer.setSeed(12345);
-	factory->configureObject(boat.get(), objectRandomizer);
+	factory.configureObject(boat.get(), objectRandomizer);
 	boat->setAnchorPos(boatPosition + boat->getVisitableOffset());
 	map->generateUniqueInstanceName(boat.get());
 	map->addNewObject(boat);
@@ -4056,13 +4056,13 @@ TEST(MapFormat, ToroidalOpenWaterCornerFixtureRoundTrips)
 	editor->drawTerrain(ETerrainId::WATER, 0, &random);
 
 	const int3 boatPosition(31, 30, 0);
-	auto factory = LIBRARY->objtypeh->getHandlerFor(Obj::BOAT, BoatId::CASTLE);
-	const auto templates = factory->getTemplates(ETerrainId::WATER);
+	auto & factory = LIBRARY->objtypeh->getHandlerFor(Obj::BOAT, BoatId::CASTLE);
+	const auto templates = factory.getTemplates(ETerrainId::WATER);
 	ASSERT_FALSE(templates.empty());
-	auto boat = factory->create(&callback, templates.front());
+	auto boat = factory.create(&callback, templates.front());
 	GameRandomizer objectRandomizer(callback);
 	objectRandomizer.setSeed(12345);
-	factory->configureObject(boat.get(), objectRandomizer);
+	factory.configureObject(boat.get(), objectRandomizer);
 	boat->setAnchorPos(boatPosition + boat->getVisitableOffset());
 	map->generateUniqueInstanceName(boat.get());
 	map->addNewObject(boat);
