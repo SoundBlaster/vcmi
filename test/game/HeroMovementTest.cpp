@@ -9328,18 +9328,18 @@ TEST_F(HeroMovementTest, TownAppearanceUsesWrappedAnchorTerrain)
 	ASSERT_NE(town, nullptr);
 	GameRandomizer randomizer(*gameState());
 	const auto originalAnchor = town->anchorPos();
-	ASSERT_NO_THROW(town->getObjectHandler()->configureObject(town, randomizer));
+	ASSERT_NO_THROW(town->getObjectHandler().configureObject(town, randomizer));
 	const auto originalAppearance = town->appearance;
 	map()->setToroidalAndRebuild(true);
 	for(const auto & offset : {int3(map()->width, 0, 0), int3(0, -map()->height, 0),
 		int3(map()->width, -map()->height, 0), int3(-2 * map()->width, 2 * map()->height, 0)})
 	{
 		map()->moveObject(town->id, originalAnchor + offset);
-		ASSERT_NO_THROW(town->getObjectHandler()->configureObject(town, randomizer)) << offset.toString();
+		ASSERT_NO_THROW(town->getObjectHandler().configureObject(town, randomizer)) << offset.toString();
 		EXPECT_EQ(town->appearance, originalAppearance);
 	}
 	map()->setToroidalAndRebuild(false);
-	EXPECT_ANY_THROW(town->getObjectHandler()->configureObject(town, randomizer));
+	EXPECT_ANY_THROW(town->getObjectHandler().configureObject(town, randomizer));
 }
 
 TEST_F(HeroMovementTest, EditorMoveTracksOnlyStillSelectedMainTown)

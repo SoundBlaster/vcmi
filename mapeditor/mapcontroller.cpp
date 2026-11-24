@@ -526,7 +526,7 @@ namespace
 {
 bool isObstacle(const CGObjectInstance & object)
 {
-	return !object.isVisitable() && object.getObjectHandler()->isStaticObject();
+	return !object.isVisitable() && object.getObjectHandler().isStaticObject();
 }
 
 QRgb toRgb(const ColorRGBA & color)

@@ -3309,7 +3309,7 @@ TEST(MapFormat, InitializesExternalToroidalMapAndChecksPortalPairs)
 		std::map<std::string, size_t> terrainScopes;
 		for(const auto & object : map.objects)
 			if(object)
-				++objectScopes[object->getObjectHandler()->getModScope()];
+				++objectScopes[object->getObjectHandler().getModScope()];
 		for(int z = 0; z < state->getMapSize().z; ++z)
 			for(int x = 0; x < map.width; ++x)
 				for(int y = 0; y < map.height; ++y)
