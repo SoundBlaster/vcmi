@@ -1,5 +1,13 @@
 # Toroidal map: remaining work
 
+## Upstream synchronization
+
+- [ ] Follow the [upstream integration plan](upstream-integration-plan-2026-11-24.md)
+  on the separate integration branch after explicit execution instruction.
+  The plan inventories conflicts, compatibility decisions, affected SpecPM
+  obligations and verification. No code merge or conflict resolution has been
+  performed on the planning revision.
+
 This is the execution checklist for the experimental toroidal map goal, as
 agreed on 2026-11-15. The [implementation matrix](implementation-matrix.md)
 tracks requirement coverage, verification and acceptance separately; update
