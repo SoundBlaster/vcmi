@@ -2595,7 +2595,7 @@ TEST_F(GrailTopologyTest, WrappedHoleIsNotAnEligibleGrailLocation)
 	const auto bytes = gameState()->saveToMemory();
 	auto restored = std::make_shared<CGameState>();
 	restored->preInit(LIBRARY);
-	restored->loadFromMemory(bytes);
+	restored->loadFromMemory(bytes, nullptr);
 	EXPECT_TRUE(restored->getMap().isHoleAt(int3(35, 10, 0)));
 	EXPECT_FALSE(restored->getMap().isHoleAt(int3(35, 10, 1)));
 }
@@ -3142,7 +3142,7 @@ TEST_F(HeroMovementTest, CornerMovementRevealsOnlyTheMovingTeamAndLevel)
 	{
 		auto replica = std::make_shared<CGameState>();
 		replica->preInit(LIBRARY);
-		replica->loadFromMemory(snapshot);
+		replica->loadFromMemory(snapshot, nullptr);
 		replicas.push_back(std::move(replica));
 	}
 	class Capture final : public INetworkConnection
@@ -3375,7 +3375,7 @@ TEST_F(HeroMovementTest, TcpPeersReceiveAuthoritativeCornerMovement)
 	{
 		peer->state = std::make_shared<CGameState>();
 		peer->state->preInit(LIBRARY);
-		peer->state->loadFromMemory(snapshot);
+		peer->state->loadFromMemory(snapshot, nullptr);
 		peer->codec->setCallback(*peer->state);
 	}
 	server.setState(EServerState::GAMEPLAY);
@@ -4126,7 +4126,7 @@ TEST_P(MovedGuardCacheTest, MovingMonsterRefreshesOldAndNewNeighborhoods)
 	{
 		auto replica = std::make_shared<CGameState>();
 		replica->preInit(LIBRARY);
-		replica->loadFromMemory(snapshot);
+		replica->loadFromMemory(snapshot, nullptr);
 		replicas.push_back(std::move(replica));
 	}
 	class Capture final : public INetworkConnection
@@ -4261,7 +4261,7 @@ TEST_F(HeroMovementTest, MovingBlockingObjectUpdatesAdjacentGuardCache)
 	auto appearance = std::make_shared<ObjectTemplate>();
 	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
 	appearance->readJson(definition, resolver, false);
-	ASSERT_FALSE(appearance->visitableFromOffset(int3(0, -1), 0)).value();
+	ASSERT_FALSE(appearance->visitableFromOffset(int3(0, -1, 0)).value());
 	map()->hideObject(object);
 	object->appearance = appearance;
 	map()->showObject(object);
@@ -4365,7 +4365,7 @@ TEST_F(HeroMovementTest, grailCanBeDugAfterCrossingToroidalCorner)
 	const auto snapshot = gameState()->saveToMemory();
 	auto restored = std::make_shared<CGameState>();
 	restored->preInit(LIBRARY);
-	restored->loadFromMemory(snapshot);
+	restored->loadFromMemory(snapshot, nullptr);
 	ASSERT_TRUE(restored->getMap().toroidal);
 	EXPECT_TRUE(restored->getMap().isHoleAt(destination));
 	const auto * restoredHero = restored->getHero(hero->id);
@@ -5361,8 +5361,8 @@ TEST_P(ToroidalDirectionalEntranceTest, SelectiveApproachMatchesPathfinderAndSer
 		map()->showObject(resource);
 	};
 	const auto forbidden = makeAppearance(dx, dy);
-	ASSERT_TRUE(forbidden->visitableFromOffset(int3(dx, dy), 0)).value();
-	ASSERT_FALSE(forbidden->visitableFromOffset(int3(-dx, -dy), 0)).value();
+	ASSERT_TRUE(forbidden->visitableFromOffset(int3(dx, dy, 0)).value());
+	ASSERT_FALSE(forbidden->visitableFromOffset(int3(-dx, -dy, 0)).value());
 	setAppearance(forbidden);
 	const auto resourceID = resource->id;
 	const auto gold = gameState()->players.at(player).resources[GameResID::GOLD];
@@ -5382,8 +5382,8 @@ TEST_P(ToroidalDirectionalEntranceTest, SelectiveApproachMatchesPathfinderAndSer
 	ASSERT_NE(map()->getObject(resourceID), nullptr);
 
 	const auto allowed = makeAppearance(-dx, -dy);
-	ASSERT_TRUE(allowed->visitableFromOffset(int3(-dx, -dy), 0)).value();
-	ASSERT_FALSE(allowed->visitableFromOffset(int3(dx, dy), 0)).value();
+	ASSERT_TRUE(allowed->visitableFromOffset(int3(-dx, -dy, 0)).value());
+	ASSERT_FALSE(allowed->visitableFromOffset(int3(dx, dy, 0)).value());
 	setAppearance(allowed);
 	CPathsInfo paths(gameState()->getMapSize(), hero);
 	auto config = std::make_shared<SingleHeroPathfinderConfig>(paths, *gameState(), hero);
@@ -5616,8 +5616,8 @@ TEST_F(HeroMovementTest, ObjectEntranceDirectionIsRespectedAcrossToroidalSeams)
 	auto appearance = std::make_shared<ObjectTemplate>();
 	InstantIdentifierResolver resolver(*LIBRARY->identifiers());
 	appearance->readJson(definition, resolver, false);
-	ASSERT_FALSE(appearance->visitableFromOffset(int3(0, -1), 0)).value();
-	ASSERT_TRUE(appearance->visitableFromOffset(int3(-1, 0), 0)).value();
+	ASSERT_FALSE(appearance->visitableFromOffset(int3(0, -1, 0)).value());
+	ASSERT_TRUE(appearance->visitableFromOffset(int3(-1, 0, 0)).value());
 	map()->hideObject(resource);
 	resource->appearance = appearance;
 	map()->showObject(resource);
@@ -8706,7 +8706,7 @@ TEST_P(PrisonerGuardRefreshTest, ReleasingPrisonerRefreshesGuard)
 	{
 		auto replica = std::make_shared<CGameState>();
 		replica->preInit(LIBRARY);
-		replica->loadFromMemory(snapshot);
+		replica->loadFromMemory(snapshot, nullptr);
 		replicas.push_back(std::move(replica));
 	}
 	class Capture final : public INetworkConnection
@@ -9291,7 +9291,7 @@ TEST_F(HeroMovementTest, ServerDiskReloadPreservesBothTeamsFogAfterCornerCrossin
 	{
 		auto replica = std::make_shared<CGameState>();
 		replica->preInit(LIBRARY);
-		replica->loadFromMemory(loadedSnapshot);
+		replica->loadFromMemory(loadedSnapshot, nullptr);
 		ASSERT_EQ(fogSnapshot(*replica, red), redFog);
 		ASSERT_EQ(fogSnapshot(*replica, blue), blueFog);
 		server.replicas.push_back(std::move(replica));
@@ -9493,7 +9493,7 @@ TEST_F(HeroMovementTest, EditorMovePreservesObjectTargetedObjectives)
 	const auto snapshot = gameState()->saveToMemory();
 	auto restored = std::make_shared<CGameState>();
 	restored->preInit(LIBRARY);
-	restored->loadFromMemory(snapshot);
+	restored->loadFromMemory(snapshot, nullptr);
 	restored->getMap().checkForObjectives();
 	std::vector<EventCondition> resolved;
 	restored->getMap().triggeredEvents[0].trigger.morph([&](const EventCondition & condition) -> EventExpression::Variant
