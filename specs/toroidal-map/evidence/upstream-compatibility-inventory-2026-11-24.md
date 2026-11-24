@@ -18,3 +18,25 @@ must carry enough format identity to choose the correct layout, or fail closed.
 This observation does not prove which migration design is feasible. Existing
 tests (`SaveFileTest`, `GameConnectionTopologyTest`) are candidates for the
 compatibility matrix; none were run for an integrated build in this step.
+
+## Thresholds that need separate format identity
+
+Source inspection found version-gated fields in `CMapHeader` (topology),
+`CMap` (unindexed objects), `CGameHandler` (movement source and transient
+return), `CGHeroInstance` and `PacksForClient` (replicated movement layer).
+The same numeric comparisons cannot simultaneously mean the old fork's
+940–946 sequence and upstream's independently allocated 940–943 sequence.
+Framing and teleport resolution additionally gate network behavior rather than
+save layout. A correct implementation must distinguish provenance/layout when
+evaluating these conditions, not just remap the header integer globally.
+
+`versionForState` also uses the toroidal-tagged save layout for a bounded map
+with unindexed shown objects. Compatibility fixtures must include that case;
+the tag alone does not establish that the map itself is toroidal.
+
+For lobby negotiation, the current implementation caps untagged peers at the
+old pre-toroid version, and rejects untagged server greetings at or above the
+fork's topology threshold. After integrating upstream's newer lobby minimum,
+this policy needs explicit re-evaluation: an apparently valid numeric greeting
+can describe a different layout. No old/new mixed-session behavior has yet
+been tested in an integrated build.
