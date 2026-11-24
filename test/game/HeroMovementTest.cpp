@@ -4217,6 +4217,8 @@ TEST_P(MovedGuardCacheTest, HeroMovementRefreshesGuardCacheForDirectionalAppeara
 	map()->calculateGuardingGreaturePositions();
 	ASSERT_EQ(gameState()->guardingCreaturePosition(target), guard);
 
+	// Bounded maps follow the object type; only the torus applies the explicit mask.
+	const auto guardWithHero = toroidal ? int3(-1, -1, -1) : guard;
 	TryMoveHero movement;
 	movement.id = hero->id;
 	movement.start = hero->anchorPos();
@@ -4225,8 +4227,8 @@ TEST_P(MovedGuardCacheTest, HeroMovementRefreshesGuardCacheForDirectionalAppeara
 	movement.movePoints = hero->movementPointsRemaining();
 	gameState()->apply(movement);
 	ASSERT_EQ(hero->visitablePos(), target);
-	EXPECT_EQ(map()->guardingCreaturePosition(target), int3(-1, -1, -1));
-	EXPECT_EQ(gameState()->guardingCreaturePosition(target), int3(-1, -1, -1));
+	EXPECT_EQ(map()->guardingCreaturePosition(target), guardWithHero);
+	EXPECT_EQ(gameState()->guardingCreaturePosition(target), guardWithHero);
 
 	movement.start = hero->anchorPos();
 	movement.end = hero->convertFromVisitablePos(origin);
@@ -4238,7 +4240,7 @@ TEST_P(MovedGuardCacheTest, HeroMovementRefreshesGuardCacheForDirectionalAppeara
 	movement.start = hero->anchorPos();
 	movement.end = hero->convertFromVisitablePos(target);
 	gameState()->apply(movement);
-	ASSERT_EQ(gameState()->guardingCreaturePosition(target), int3(-1, -1, -1));
+	ASSERT_EQ(gameState()->guardingCreaturePosition(target), guardWithHero);
 	RemoveObject removal(hero->id, player);
 	gameState()->apply(removal);
 	EXPECT_EQ(map()->guardingCreaturePosition(target), guard);
@@ -8674,7 +8676,8 @@ TEST_P(PrisonerGuardRefreshTest, ReleasingPrisonerRefreshesGuard)
 {
 	const PlayerColor player(0);
 	const bool toroidal = GetParam();
-	const int3 prisonPos(toroidal ? 0 : 10, 5, 0), guardPos(toroidal ? 35 : 9, 5, 0);
+	const int3 prisonPos(toroidal ? 0 : 10, 5, 0);
+	const int3 guardPos = toroidal ? int3(35, 5, 0) : prisonPos + int3(0, -1, 0);
 	TinyH3M::TinyH3MBuilder builder(EMapFormat::SOD);
 	builder.size(36, false).playerActive(player).hero(prisonPos + int3(1, 0, 0), HeroTypeID(0), player)
 		.monster(guardPos, CreatureID(27), 1);
