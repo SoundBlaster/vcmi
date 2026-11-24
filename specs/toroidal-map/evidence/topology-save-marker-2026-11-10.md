@@ -38,3 +38,10 @@ check because the test preset and saved game differ; direct decoding does not
 prove that the normal loader accepts the saved mod set or that play can resume.
 Set `VCMI_TOROID_PROTOTYPE_SAVE` to the path of an appropriate old save to
 repeat this optional test; it is skipped when no path is supplied.
+
+**Upstream integration update.** The historical test above describes the
+earlier branch. The integrated branch uses the same environment variable in
+`ToroidalDemoVmapTest.RejectsExternalUntaggedPrototypeInLobby`. It verifies
+that the recorded prototype is rejected by the lobby header reader after
+upstream assigned a different meaning to ordinal 940. See the
+[integration plan](../upstream-integration-plan-2026-11-24.md).

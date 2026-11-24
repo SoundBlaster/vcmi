@@ -178,6 +178,40 @@ investigation; keep proposals and confirmed behavior distinct.
   to reflect only results obtained. Push the integration branch to the user's
   fork and report outstanding risk before any release or branch promotion.
 
+## Local verification on macOS arm64
+
+- The client, server, editor and test executable built on TB5 with SDL3. The
+  linker emitted warnings about duplicate libraries and missing Conan search
+  paths. It produced the requested binaries.
+- The complete `vcmitest` run at `ba6e7897d` passed 2,150 tests, with 18
+  skipped and 3 disabled. Local TCP and internal connection checks passed.
+  The standalone topology and camera suite passed 36 tests, and the SDL
+  wrapped rendering suite passed 5 tests.
+- The editor's headless command generated a bounded 36 × 36 map on one level
+  using `vcmi:4SM0g` and seed 192. Its log override wrote to the isolated
+  profile. Interactive editor gestures and minimap appearance remain open.
+- A native client started `Toroid Visual Seams`, received the first turn,
+  and produced an autosave tagged `0x54522717`. A second client process
+  loaded a copy using its local server in headless mode. These client runs
+  preceded the separate guard cache fix.
+- The original bounded autosave loaded through the normal server check with
+  its corresponding mod profile. The hero could move and spend movement
+  points. The known untagged prototype autosave was rejected at the lobby
+  header check. Both source files retained their recorded SHA-256 hashes.
+  The native client and local server also rejected a copy of a tagged
+  autosave from the old beta with layout `944`.
+- Fix `ba6e7897d` refreshes the guard cache after an object type changes.
+  The prisoner changes type in a second packet after the previous refresh,
+  so the upstream type rule could leave a stale value on the server and on
+  both replicated clients. The bounded regression places the guard north
+  of the prison. Its toroidal counterpart keeps the west seam crossing.
+
+Reports and fixtures are under the integration worktree's build directory on
+TB5. These checks cover native startup, automated gameplay and local network
+paths. Visual scroll continuity, remote multiplayer, Windows and the
+external release pipeline remain open.
+
+
 ## Execution dependencies
 
 `INT-01 → INT-02 → INT-03 → INT-04/05/06 → INT-07 → INT-08`. The order keeps
