@@ -15,13 +15,25 @@ discriminator, not authentication, an upstream reservation, or a promise of
 future interoperability. Unknown tagged versions must fail closed on full
 load while preserving the existing metadata-only behavior for newer saves.
 
-For newly saved bounded games, write the previous upstream serialization
-version and use that version for both binary chunks, so the extra topology
-field is absent. Reading previously written branch saves remains supported;
-an untagged save with the experimental ordinal is inherently ambiguous and
-cannot be guaranteed safe against a future collision. No existing save is
-rewritten or deleted. Before upstream release, this mechanism and the VMAP
-major-version allocation require coordination with maintainers.
+The upstream integration writes bounded saves at upstream layout `943`.
+Saves requiring fork state use tagged layout `10007`, which includes explicit
+object-template approach directions. A bounded map with unindexed shown
+objects also needs the tagged layout to preserve those objects.
+
+The integration retires tagged beta layouts `940–946`. Full loading rejects
+those markers and untagged numbers above the supported upstream layout.
+Metadata-only access still supports newer layouts, subject to the version
+marker and chunk checks. Ordinary upstream saves keep their original
+ordinals. Tagged toroidal VMAPs have their own version and are unaffected by
+the savegame renumbering.
+
+Untagged prototype saves can collide with upstream numbers. The known
+prototype uses `940`, which upstream uses for allowed map difficulties. The
+version reader assigns that number the upstream meaning. The existing lobby
+loader requires the map-header and scenario-options chunk to decode fully
+before offering the save for play. This does not establish a discriminator
+for arbitrary untagged files. Preserve the original files and use the
+matching older build if access is needed.
 
 The verification and its limits are recorded in
 [save marker evidence](evidence/topology-save-marker-2026-11-10.md). These

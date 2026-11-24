@@ -80,6 +80,28 @@ silently reinterpret ambiguous data, rewrite saves, or claim migration is
 possible until demonstrated. If preserving a released format cannot be done
 safely, present the concrete trade-off to the user before making that choice.
 
+## Resolution in the integration branch
+
+Merge `3523590d6` combines feature-side checkpoint `21f7a4f9c` with original
+VCMI `43012e717`. The released feature branch keeps its original history.
+
+| Area | What caused the conflict | Resolution |
+| --- | --- | --- |
+| Save and network versions | Upstream used sequential ordinals for HotA difficulty, campaign lobby, campaign data, and object templates while the fork used the same sequence for topology. | Keep upstream ordinals and allocate fork layouts at `10000–10007`. Accept the supported upstream range for bounded lobby sessions and reject the retired tagged beta range. |
+| Object approaches | Upstream commit `08ec247fc` moved north-entry policy to object types. The fork used an explicit set of eight directions and wrapped offsets. | Ordinary maps use the upstream type rule. Toroidal maps determine approach with wrapped offsets and honor explicit template masks where present. The tagged binary layout preserves those masks. |
+| Minimap and settings | Upstream commit `55a9a86b6` added town icons and replaced the hero-only preference. | Use the upstream icon preference and wrap both icon types on toroidal maps. A profile containing only the older preference receives the upstream default for the new preference. |
+| Editor | Upstream commits `8ec43e06a` and `f97513242` extracted startup for headless generation. | Keep shared startup and move the fork's log override into it. Retain the editor's toroidal map code. |
+| Other changes | Upstream duplicated bonus alias and language fixes, changed the H3M type-handler API, and edited nearby lines in translations, timer and test registration. | Keep common upstream fixes, retain the H3M bounds check, and reconcile the fork-specific tests and strings. |
+
+Future integrations can update one `UPSTREAM_CURRENT` alias when upstream
+adds a layout, leaving the fork ordinals fixed. Each sync still needs to
+verify the two layouts because a numbered format is also a field-order
+contract. Keep topology calculation in existing geometry helpers and pass
+wrapped offsets into gameplay rules. Check paired bounded and toroidal
+fixtures after changes at those boundaries. Port shared fixes by adopting
+upstream's implementation when the behavior and regression checks agree.
+
+
 ## SpecPM and documentation impact
 
 The current package (`specpm.yaml`, `toroidal-map.spec.yaml`) validates at the
@@ -119,7 +141,7 @@ investigation; keep proposals and confirmed behavior distinct.
   actual artifacts when available; do not fabricate evidence or overwrite them.
   Write the proposed mapping or safe rejection policy in the relevant design
   and SpecPM documents before changing serialization code.
-- [ ] **INT-03 — Merge in isolation.** Merge the selected upstream commit into
+- [x] **INT-03 — Merge in isolation.** Merge the selected upstream commit into
   the integration branch without rewriting either history. Resolve files by
   semantic groups with focused commits where Git permits; a merge conflict
   resolution is not complete until the merge commit is created. Record the

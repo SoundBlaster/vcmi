@@ -88,7 +88,7 @@ constraints:
     statement: A supported save and reload preserves the topology and authoritative state; all participants in a supported multiplayer session agree on topology and the resulting movement and visibility. Unsupported versions or peers must not silently interpret a toroidal game as a bounded map.
   - id: network_layout_validation
     level: MUST
-    statement: After negotiating the framed toroidal wire protocol, each packet must identify the negotiated layout and a missing or different layout identifier must be rejected before payload deserialization. Legacy greetings and bounded sessions using the old protocol remain readable.
+    statement: After negotiating the framed toroidal wire protocol, each packet must identify the negotiated layout and a missing or different layout identifier must be rejected before payload deserialization. Greetings and bounded sessions using a supported upstream lobby protocol remain readable.
   - id: bounded_compatibility
     level: MUST
     statement: Existing maps and saves without a toroidal topology declaration retain their existing bounded behavior. The new topology is opt-in and does not silently change existing maps.

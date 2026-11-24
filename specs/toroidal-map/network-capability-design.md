@@ -1,48 +1,28 @@
 # Experimental lobby capability design
 
-Status: implemented experimentally in the local branch; not an upstream
-protocol allocation. Real mixed-version multiplayer remains unverified.
+Status: experimental in the fork. See the
+[upstream integration plan](upstream-integration-plan-2026-11-24.md) for the
+current verification scope.
 
-The existing lobby greeting contains one numeric serialization version. Its
-ordinal cannot establish that another build implements toroidal maps: an
-unrelated future build can reuse the same ordinal. Before allowing a
-toroidal session, the server needs an explicit capability indication from
-every connected client. The client also needs to reject an ambiguous greeting
-from an unmarked server at or beyond this branch's toroidal version.
+The lobby greeting carries a serialization version. The fork marks the high
+16 bits with `0x5452` and uses the low 16 bits for the layout number. The marker
+identifies the fork's protocol family. It does not authenticate a peer.
 
-The proposed compatibility envelope uses the high 16 bits of the existing
-greeting version as the experimental tag `0x5452`, and the low 16 bits as
-the ordinary serialization version. The tag itself changes no packet fields. A separate negotiated version now
-enables per-packet framing; file save versions remain independent.
-The tag is a branch-local protocol marker, not a security credential or an
-upstream-reserved namespace. The approach assumes ordinary upstream version
-ordinals remain below 65,536 and requires upstream coordination before
-release.
+The integrated server accepts upstream greetings at versions `942–943` for
+bounded play. A fork client accepts an upstream acknowledgement in the same
+range. An upstream server that responds with the lower of its own version
+and the offered version can acknowledge the tagged fork greeting using its
+ordinary version. An untagged greeting above `943` has an unknown layout and
+is rejected. Tagged beta greetings from the old range `940–946` are
+rejected in both directions. The fork's integrated layouts start at `10000`
+and its current greeting offers `10007`.
 
-For a tagged greeting, the local server negotiates the ordinary version and
-echoes the tag only if that version supports toroidal maps. For an untagged
-greeting, it caps negotiation at the last version before the toroidal header
-and records no toroidal capability. The toroidal start guard requires both
-the tag and the necessary ordinary version. Bounded sessions continue to use
-the negotiated legacy layout. A local client accepts an untagged server below
-the toroidal version, but disconnects from an untagged server at or beyond
-that version because its layout is ambiguous. The current client also rejects
-an older tagged experimental server whose version predates framed packets, even for a bounded session: the greeting does not identify the map.
-The current server may negotiate such a client into a bounded lobby, but its
-toroidal start guard requires the framed-packet version from every peer.
-A previous upstream server's
-existing `min(clientVersion, serverVersion)` greeting negotiation responds to
-the tagged value with its own untagged, lower ordinary version.
-
-This is not authentication: a modified peer can claim the tag without
-implementing the behavior. The separate [save marker](save-format-design.md)
-protects newly written branch saves but leaves untagged prototype saves
-ambiguous. New toroidal VMAPs now carry a separate branch-local major-version
-marker; earlier version-4 prototypes remain ambiguous and neither marker is
-an upstream allocation. This does not prove interoperability with arbitrary
-future forks. Packet-level tests,
-server preparation tests and real multi-peer sessions are separate evidence
-requirements.
+The server requires a negotiated layout with framing from every connected
+peer before starting a toroidal game. A current fork client also requires
+framing when accepting a tagged server greeting, even if the server will
+choose a bounded map. A matched connection continues to use its negotiated
+layout throughout the game. See [save format](save-format-design.md) for
+the separate policy for saved games.
 
 ## Earlier wire-layout gap
 
@@ -89,8 +69,8 @@ Clients that have already completed the handshake continue using their own
 negotiated framing while observing a later peer's acknowledgement. Servers
 must reject toroidal game start if any connected peer lacks the framed version;
 the current client rejects older tagged servers that could start an unframed
-toroidal game. An untagged older peer may still use a bounded session with the
-prior unframed version.
+toroidal game. A supported untagged upstream peer may still use a bounded session with its
+unframed version.
 
 Verification must cover a two-peer TCP lobby, messages before and after the
 acknowledgement, mixed and malformed headers in both directions, matching
